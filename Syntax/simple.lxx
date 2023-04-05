@@ -1,0 +1,57 @@
+%option noyywrap
+
+%{
+#include <iostream>
+#include <memory>
+#include <string>
+
+extern "C" int yylex();
+extern "C" int yyerror(const char* s);
+
+struct Node {
+    std::string value;
+    std::unique_ptr<Node> left, right;
+};
+
+void parse(Node &node);
+%}
+
+DIGIT     [0-9]
+OPERATOR  [\+\-\*]
+
+%%
+
+{DIGIT}+  { std::cout << "integer: " << yytext << std::endl; }
+{OPERATOR} { std::cout << "operator: " << yytext << std::endl; }
+[ \t]     ; // skip whitespace
+.         { std::cerr << "unexpected character: " << yytext << std::endl; }
+\n        { std::cout << "Enter a new expression: "; yylex(); }
+
+%%
+
+void parse(Node &node) {
+    std::string token;
+    std::cin >> token;
+
+    if (std::isdigit(token[0])) {
+        node.value = token;
+        return;
+    }
+
+    node.value = token;
+    node.left = std::make_unique<Node>();
+    parse(*node.left);
+    node.right = std::make_unique<Node>();
+    parse(*node.right);
+}
+
+int main() {
+    std::cout << "Enter an expression: ";
+    yylex();
+    return 0;
+}
+
+int yyerror(const char* s) {
+    std::cerr << "error: " << s << std::endl;
+    return 0;
+}

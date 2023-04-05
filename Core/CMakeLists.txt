@@ -1,0 +1,29 @@
+set(CMAKE_CXX_STANDARD 17)
+
+add_executable(muesli
+	atom.cpp
+	dfloat.cpp
+	environment.cpp
+	integer.cpp
+	main.cpp
+	muesli.cpp
+	nil.cpp
+	pair.cpp
+	primitive.cpp
+	string.cpp
+	symbol.cpp
+	token.cpp
+	atom.hpp
+	cell.hpp
+	dfloat.hpp
+	environment.hpp
+	integer.hpp
+	muesli.hpp
+	muexcept.hpp
+	nil.hpp
+	pair.hpp
+	primitive.hpp
+	string.hpp
+	symbol.hpp
+	token.hpp
+)
