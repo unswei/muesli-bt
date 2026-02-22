@@ -38,6 +38,9 @@ Inside the REPL:
 
 `bt.tick` returns a Lisp symbol: `success`, `failure`, or `running`.
 
+(DSL:  domain-specific language)
+
+
 ## Architecture Sketch
 
 ```text
@@ -47,7 +50,7 @@ Inside the REPL:
                     |
                     v
 +----------------------------------+
-| BT DSL (domain-specific language) compiler (`bt.compile`)   |
+| BT DSL compiler (`bt.compile`)   |
 | BT runtime + instance state      |
 | blackboard + trace + profiling   |
 +-------------------+--------------+
