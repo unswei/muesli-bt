@@ -1,10 +1,13 @@
 #include <cmath>
+#include <chrono>
 #include <functional>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
+#include "bt/runtime_host.hpp"
 #include "muslisp/env.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/eval.hpp"
@@ -28,6 +31,12 @@ void check_close(double actual, double expected, double epsilon, const std::stri
 
 muslisp::value eval_text(const std::string& source, muslisp::env_ptr env) {
     return muslisp::eval_source(source, env);
+}
+
+void reset_bt_runtime_host() {
+    bt::runtime_host& host = bt::default_runtime_host();
+    host.clear_all();
+    bt::install_demo_callbacks(host);
 }
 
 void test_reader_basics() {
@@ -235,15 +244,150 @@ void test_gc_and_stats_builtins() {
     check(is_nil(gc_stats_result), "gc-stats should return nil");
 }
 
-void test_phase2_bt_stubs() {
+void test_gc_during_argument_evaluation() {
     using namespace muslisp;
 
     env_ptr env = create_global_env();
+
+    // Calling gc-stats while evaluating later arguments must not invalidate earlier values.
+    value out = eval_text("(begin (define x (list 1 2 3)) (list x (gc-stats) x))", env);
+    const auto items = vector_from_list(out);
+    check(items.size() == 3, "list size mismatch");
+    check(print_value(items[0]) == "(1 2 3)", "first retained value mismatch");
+    check(is_nil(items[1]), "gc-stats return value mismatch");
+    check(print_value(items[2]) == "(1 2 3)", "second retained value mismatch");
+}
+
+void test_bt_compile_checks() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
     try {
         (void)eval_text("(bt.compile '(seq))", env);
-        throw std::runtime_error("expected bt.compile to fail in phase 2");
+        throw std::runtime_error("expected bt.compile arity check failure");
     } catch (const lisp_error&) {
     }
+
+    try {
+        (void)eval_text("(bt.compile '(unknown foo))", env);
+        throw std::runtime_error("expected bt.compile unknown-form failure");
+    } catch (const lisp_error&) {
+    }
+}
+
+void test_bt_seq_and_running_semantics() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text("(define tree (bt.compile '(seq (cond always-true) (act running-then-success))))", env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+
+    value first = eval_text("(bt.tick inst)", env);
+    check(is_symbol(first) && symbol_name(first) == "running", "first tick should be running");
+
+    value second = eval_text("(bt.tick inst)", env);
+    check(is_symbol(second) && symbol_name(second) == "success", "second tick should be success");
+}
+
+void test_bt_decorator_semantics() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text("(define rtree (bt.compile '(repeat 3 (act always-success))))", env);
+    (void)eval_text("(define rinst (bt.new-instance rtree))", env);
+    check(symbol_name(eval_text("(bt.tick rinst)", env)) == "running", "repeat tick1 should be running");
+    check(symbol_name(eval_text("(bt.tick rinst)", env)) == "running", "repeat tick2 should be running");
+    check(symbol_name(eval_text("(bt.tick rinst)", env)) == "success", "repeat tick3 should be success");
+
+    (void)eval_text("(define retry-tree (bt.compile '(retry 2 (act always-fail))))", env);
+    (void)eval_text("(define retry-inst (bt.new-instance retry-tree))", env);
+    check(symbol_name(eval_text("(bt.tick retry-inst)", env)) == "running", "retry tick1 should be running");
+    check(symbol_name(eval_text("(bt.tick retry-inst)", env)) == "running", "retry tick2 should be running");
+    check(symbol_name(eval_text("(bt.tick retry-inst)", env)) == "failure", "retry tick3 should be failure");
+}
+
+void test_bt_blackboard_trace_and_stats_builtins() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text("(define tree (bt.compile '(seq (act bb-put-int foo 42) (cond bb-has foo))))", env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "success", "bb tree should tick to success");
+
+    value bb_dump = eval_text("(bt.blackboard.dump inst)", env);
+    check(is_string(bb_dump), "bt.blackboard.dump should return string");
+    check(string_value(bb_dump).find("foo=42") != std::string::npos, "blackboard dump missing foo=42");
+
+    value trace_dump = eval_text("(bt.trace.snapshot inst)", env);
+    check(is_string(trace_dump), "bt.trace.snapshot should return string");
+    check(string_value(trace_dump).find("bb_write") != std::string::npos, "trace should include bb_write");
+
+    value stats_dump = eval_text("(bt.stats inst)", env);
+    check(is_string(stats_dump), "bt.stats should return string");
+    check(string_value(stats_dump).find("tick_count=1") != std::string::npos, "stats should include tick_count=1");
+
+    (void)eval_text("(bt.set-tick-budget-ms inst 1)", env);
+    (void)eval_text("(bt.set-trace-enabled inst #t)", env);
+    (void)eval_text("(bt.clear-trace inst)", env);
+    (void)eval_text("(bt.set-read-trace-enabled inst #t)", env);
+    (void)eval_text("(bt.tick inst)", env);
+    trace_dump = eval_text("(bt.trace.snapshot inst)", env);
+    check(string_value(trace_dump).find("bb_read") != std::string::npos, "trace should include bb_read");
+    (void)eval_text("(bt.clear-logs)", env);
+}
+
+void test_bt_scheduler_backed_action() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text("(define tree (bt.compile '(act async-sleep-ms 10)))", env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+
+    value st = eval_text("(bt.tick inst)", env);
+    check(is_symbol(st) && symbol_name(st) == "running", "first async tick should be running");
+
+    bool done = false;
+    for (int i = 0; i < 40; ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+        st = eval_text("(bt.tick inst)", env);
+        if (is_symbol(st) && symbol_name(st) == "success") {
+            done = true;
+            break;
+        }
+    }
+    check(done, "async action should eventually succeed");
+
+    value trace_dump = eval_text("(bt.trace.snapshot inst)", env);
+    check(is_string(trace_dump), "bt.trace.snapshot should return string");
+    check(string_value(trace_dump).find("scheduler_submit") != std::string::npos,
+          "trace should include scheduler_submit");
+    check(string_value(trace_dump).find("scheduler_finish") != std::string::npos,
+          "trace should include scheduler_finish");
+
+    value sched_stats = eval_text("(bt.scheduler.stats)", env);
+    check(is_string(sched_stats), "bt.scheduler.stats should return string");
+    check(string_value(sched_stats).find("submitted=") != std::string::npos, "scheduler stats missing submitted");
+}
+
+void test_bt_tick_with_blackboard_input() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text("(define tree (bt.compile '(cond bb-has foo)))", env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "failure", "bb key should not exist before input");
+    check(symbol_name(eval_text("(bt.tick inst '((foo 1)))", env)) == "success", "tick input should seed blackboard");
 }
 
 }  // namespace
@@ -258,7 +402,13 @@ int main() {
         {"closures and function define sugar", test_closures_and_function_define_sugar},
         {"list and predicate builtins", test_list_and_predicate_builtins},
         {"gc and stats builtins", test_gc_and_stats_builtins},
-        {"phase2 bt stubs", test_phase2_bt_stubs},
+        {"gc during argument evaluation", test_gc_during_argument_evaluation},
+        {"bt compile checks", test_bt_compile_checks},
+        {"bt seq/running semantics", test_bt_seq_and_running_semantics},
+        {"bt decorator semantics", test_bt_decorator_semantics},
+        {"bt blackboard/trace/stats builtins", test_bt_blackboard_trace_and_stats_builtins},
+        {"bt scheduler-backed action", test_bt_scheduler_backed_action},
+        {"bt tick with blackboard input", test_bt_tick_with_blackboard_input},
     };
 
     std::size_t passed = 0;

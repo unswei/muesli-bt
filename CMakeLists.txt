@@ -7,6 +7,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(muslisp_core
+    src/bt/blackboard.cpp
+    src/bt/compiler.cpp
+    src/bt/instance.cpp
+    src/bt/logging.cpp
+    src/bt/profile.cpp
+    src/bt/registry.cpp
+    src/bt/runtime.cpp
+    src/bt/runtime_host.cpp
+    src/bt/scheduler.cpp
+    src/bt/status.cpp
+    src/bt/trace.cpp
     src/builtins.cpp
     src/env.cpp
     src/eval.cpp

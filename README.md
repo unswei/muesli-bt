@@ -1,22 +1,18 @@
-# muslisp-bt (Phase 2)
+# muslisp-bt
 
-A tiny Lisp core in modern C++20 for the `muslisp-bt` project.
+A compact Lisp runtime with built-in Behaviour Tree (BT) compile/tick support, written in modern C++20.
 
-This repository currently implements **Phase 1 + Phase 2** from the design doc:
+This repository currently covers:
 
-- values + printer
-- reader/parser
-- lexical environment
-- evaluator special forms
-- minimal built-ins
-- REPL + script mode
-- simple non-moving mark/sweep GC
-- heap/gc stats built-ins
-- mixed int/float numeric model
+- Phase 1: Lisp core
+- Phase 2: non-moving mark/sweep GC
+- Phase 3: BT compiler + runtime core nodes
+- Phase 4: decorators + per-node instance memory + reset
+- Phase 5: inspectability (blackboard metadata, trace, logs, stats)
 
-## What Works Right Now
+## What Works
 
-### Runtime values
+### Lisp core
 
 Implemented value types:
 
@@ -24,36 +20,25 @@ Implemented value types:
 - `boolean`
 - `integer` (`std::int64_t`)
 - `float` (`double`)
-- `symbol` (interned)
+- `symbol`
 - `string`
 - `cons`
 - `primitive_fn`
 - `closure`
-- `bt_def` (placeholder handle)
-- `bt_instance` (placeholder handle)
+- `bt_def`
+- `bt_instance`
 
-### Reader/parser
+Reader/parser supports:
 
-Supported syntax:
-
-- integers (`123`, `-42`)
-- float literals (`3.14`, `1e-3`, `2.`)
+- integers and float literals (`123`, `-42`, `3.14`, `1e-3`, `2.`)
 - symbols
-- booleans: `#t`, `#f`
-- lists: `( ... )`
-- quote sugar: `'x` -> `(quote x)`
-- strings with escapes (`\n`, `\t`, `\r`, `\"`, `\\`)
-- comments: `; ...` to end of line
+- booleans (`#t`, `#f`)
+- lists
+- quote sugar (`'x`)
+- strings with escapes
+- line comments (`; ...`)
 
-Not supported in v1/v2 core:
-
-- rationals (`3/7`)
-- complex numbers
-- numeric prefixes/suffixes
-
-### Evaluator
-
-Implemented special forms:
+Evaluator supports:
 
 - `quote`
 - `if`
@@ -61,130 +46,161 @@ Implemented special forms:
 - `lambda`
 - `begin`
 
-Implemented function application for:
+Closures use lexical scope with environment chaining.
 
-- primitive functions
-- closures with lexical scoping
+### Numeric model (int + float)
 
-`define` supports both forms:
-
-- `(define name expr)`
-- `(define (fn arg1 arg2) body...)`
-
-### Numeric behavior (int + float)
-
-Implemented promotion rules:
-
-- `int op int -> int` (except `/`, see below)
-- `int op float -> float`
-- `float op int -> float`
-- `float op float -> float`
-
-Division policy:
-
+- `+`, `-`, `*`, `/`, `=`, `<`, `>`, `<=`, `>=`
+- mixed int/float promotion
 - `/` always returns float
-- examples:
-  - `(/ 6 3) -> 2.0`
-  - `(/ 5 2) -> 2.5`
-  - `(/ 4) -> 0.25`
+- checked integer overflow for int arithmetic
+- predicates: `number?`, `int?`, `integer?`, `float?`, `zero?`
+- float printing includes readable forms like `2.0`, `3.14`, `inf`, `-inf`, `nan`
 
-Arithmetic behavior:
+### Memory management
 
-- `(+ ) -> 0`
-- `(* ) -> 1`
-- `(+ x) -> x`
-- `(* x) -> x`
-- `(- x) -> unary negation`
-- `(/ x) -> reciprocal (float)`
+- non-moving stop-the-world mark/sweep GC
+- GC-managed Lisp objects and environments
+- root registration for global env + scoped temporaries during eval
+- threshold-based collection trigger
 
-Comparisons:
-
-- `=`, `<`, `>`, `<=`, `>=`
-- mixed int/float comparisons supported
-- return Lisp booleans (`#t` / `#f`)
-
-Numeric predicates:
-
-- `number?`
-- `int?`
-- `integer?`
-- `float?`
-- `zero?`
-
-Integer overflow policy:
-
-- int arithmetic uses checked `int64_t` operations
-- overflow raises runtime error
-
-Float behavior:
-
-- IEEE-style `nan`, `inf`, `-inf` are allowed
-- printer renders them as `nan`, `inf`, `-inf`
-
-### GC (Phase 2)
-
-Implemented GC model:
-
-- non-moving mark/sweep
-- all Lisp values allocated through GC
-- environment objects are GC-managed
-- root support via global env roots and scoped temporary roots
-- threshold-based collection scheduling (`next_gc_threshold`)
-
-### Heap / GC stats built-ins
-
-Implemented built-ins:
+GC/heap built-ins:
 
 - `(heap-stats)`
-- `(gc-stats)`
+- `(gc-stats)` (forces a collection before printing)
 
 Both print:
 
-- `total allocated objects`
-- `live objects after last GC`
-- `bytes allocated`
-- `next GC threshold`
+- total allocated objects
+- live objects after last GC
+- bytes allocated
+- next GC threshold
 
-Behavior:
+### BT DSL compiler
 
-- `heap-stats` prints current snapshot
-- `gc-stats` runs a collection, then prints snapshot
+`(bt.compile '<dsl-form>)` compiles quoted BT DSL into an internal node graph.
 
-Note: `bytes allocated` is tracked at GC-node object granularity (not deep container heap usage).
+Supported DSL forms:
 
-### Other built-ins
+- composites: `(seq child...)`, `(sel child...)`
+- decorators: `(invert child)`, `(repeat n child)`, `(retry n child)`
+- leaves: `(cond name arg...)`, `(act name arg...)`
+- utility nodes: `(succeed)`, `(fail)`, `(running)`
 
-List/predicate built-ins:
+Compiler validation includes:
 
-- `cons`, `car`, `cdr`, `null?`, `eq?`, `list`
+- known form checks
+- arity checks
+- non-empty child checks for `seq`/`sel`
+- integer validation for decorator counts
+- leaf name must be symbol/string
+- leaf args limited to literal/symbol forms
 
-Utility built-ins:
+### BT runtime semantics
 
-- `print`
+- statuses: `success`, `failure`, `running`
+- memoryless `seq` and `sel` traversal
+- decorator semantics for `invert`, `repeat`, `retry`
+- per-node runtime memory (`node_memory`)
+- instance-level blackboard storage with metadata
+- `(bt.reset inst)` clears per-node memory and blackboard
 
-`bt.*` built-ins are present as **phase-2 stubs** and currently raise runtime errors:
+### Blackboard, tracing, logging, profiling, scheduler
+
+Blackboard:
+
+- typed variant values (`nil`, bool, int64, double, string)
+- metadata on writes:
+  - `last_write_tick`
+  - `last_write_ts`
+  - `last_writer_node_id`
+  - `last_writer_name`
+
+Trace:
+
+- in-memory ring buffer
+- events include:
+  - `tick_begin`, `tick_end`
+  - `node_enter`, `node_exit`
+  - `bb_write`
+  - optional `bb_read` (via `(bt.set-read-trace-enabled inst #t)`)
+  - `scheduler_submit`, `scheduler_start`, `scheduler_finish`, `scheduler_cancel`
+  - `warning`, `error`
+
+Logging:
+
+- in-memory ring log sink
+- per-record level/category/tick/node/message fields
+
+Profiling:
+
+- per-tree tick stats
+- per-node duration and return counters
+- scheduler queue/run timing stats
+- tick budget warnings via `(bt.set-tick-budget-ms inst ms)`
+
+Scheduler:
+
+- fixed-size thread pool scheduler
+- async job submit/poll/result/cancel API
+- built-in demo async action (`async-sleep-ms`)
+
+### Lisp-facing BT built-ins
+
+Core:
 
 - `bt.compile`
 - `bt.new-instance`
 - `bt.tick`
 - `bt.reset`
+- `bt.status->symbol`
 
-### REPL
+Companion-style introspection/config:
 
-- interactive prompt
-- multiline expression support (continues until parse is complete)
-- `:q`, `:quit`, `:exit` to leave
-- optional script mode by passing a file path
+- `bt.stats`
+- `bt.trace.dump`
+- `bt.trace.snapshot`
+- `bt.blackboard.dump`
+- `bt.logs.dump`
+- `bt.logs.snapshot`
+- `bt.scheduler.stats`
+- `bt.set-tick-budget-ms`
+- `bt.set-trace-enabled`
+- `bt.set-read-trace-enabled`
+- `bt.clear-trace`
+- `bt.clear-logs`
 
-## Build and Test (Linux/macOS)
+`bt.tick` supports:
 
-### Requirements
+- `(bt.tick inst)`
+- `(bt.tick inst '((key value) ...))` to seed/update blackboard entries before the tick
+
+### Demo host callbacks installed by default
+
+Conditions:
+
+- `always-true`
+- `always-false`
+- `bb-has`
+
+Actions:
+
+- `always-success`
+- `always-fail`
+- `running-then-success`
+- `bb-put-int`
+- `bb-put-float`
+- `async-sleep-ms`
+
+## Build and Test (macOS/Linux)
+
+Requirements:
 
 - C++20 compiler (`clang++` or `g++`)
 - CMake 3.20+
 - Ninja (recommended)
 
-### With presets
+With presets:
 
 ```bash
 cmake --preset dev
@@ -192,7 +208,7 @@ cmake --build --preset dev -j
 ctest --preset dev
 ```
 
-### Without presets
+Without presets:
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
@@ -200,43 +216,45 @@ cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
 
-## Run
-
-### REPL
+Run REPL:
 
 ```bash
 ./build/dev/muslisp
 ```
 
-### Script mode
+Run script:
 
 ```bash
 ./build/dev/muslisp path/to/script.lisp
 ```
 
-## Verified Status
+## Verification Status
 
-Automated tests currently cover:
+Current automated tests cover:
 
-- reader basics (including float literals)
-- env shadowing
-- special forms + arithmetic semantics
-- mixed numeric comparisons and predicates
-- float `nan`/`inf` behavior and printing
-- integer overflow checks
-- lexical closures
-- list/predicate built-ins
-- GC stress allocations and stats built-ins
-- phase-2 BT stub behavior
+- reader/parser
+- evaluator and lexical closures
+- int/float arithmetic semantics and predicates
+- integer overflow handling
+- GC behavior and GC stats built-ins
+- GC safety during argument evaluation with in-eval collection
+- BT compiler checks
+- BT runtime status propagation and decorators
+- blackboard writes/reads and trace events
+- scheduler-backed async action behavior
+- BT introspection/config built-ins
+- `bt.tick` blackboard input path
 
-Validated on:
+Validated in this environment with:
 
 - AppleClang 17 (macOS)
 - GNU g++-15 (Homebrew toolchain on macOS)
 
+Code is written to be portable across Linux/macOS (standard library threads/chrono/containers, no platform-specific APIs).
+
 ## Not Implemented Yet
 
-- BT compiler/runtime semantics (phase 3+)
-- decorators and BT instance memory (phase 4)
-- tracing/inspectability features (phase 5)
-- robotics host integration (phase 6)
+- timeout decorator (`timeout`) from companion extension ideas
+- external logging/metrics adapters (for example `spdlog`, Prometheus, OpenTelemetry)
+- macro-based BT authoring sugar (`(bt ...)`)
+- advanced halting contracts for long-running leaves beyond reset/cancel patterns

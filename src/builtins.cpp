@@ -1,11 +1,16 @@
 #include "muslisp/builtins.hpp"
 
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <iostream>
 #include <limits>
 #include <utility>
 
+#include "bt/blackboard.hpp"
+#include "bt/compiler.hpp"
+#include "bt/runtime_host.hpp"
+#include "bt/status.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
@@ -382,20 +387,245 @@ value builtin_print(const std::vector<value>& args) {
     return make_nil();
 }
 
-value builtin_bt_compile(const std::vector<value>&) {
-    throw lisp_error("bt.compile is not available in phase 2");
+std::int64_t require_bt_def_handle(value v, const std::string& where) {
+    if (!is_bt_def(v)) {
+        throw lisp_error(where + ": expected bt_def");
+    }
+    return bt_handle(v);
 }
 
-value builtin_bt_new_instance(const std::vector<value>&) {
-    throw lisp_error("bt.new-instance is not available in phase 2");
+std::int64_t require_bt_instance_handle(value v, const std::string& where) {
+    if (!is_bt_instance(v)) {
+        throw lisp_error(where + ": expected bt_instance");
+    }
+    return bt_handle(v);
 }
 
-value builtin_bt_tick(const std::vector<value>&) {
-    throw lisp_error("bt.tick is not available in phase 2");
+std::string require_bb_key(value v, const std::string& where) {
+    if (is_symbol(v)) {
+        return symbol_name(v);
+    }
+    if (is_string(v)) {
+        return string_value(v);
+    }
+    throw lisp_error(where + ": expected key as symbol or string");
 }
 
-value builtin_bt_reset(const std::vector<value>&) {
-    throw lisp_error("bt.reset is not available in phase 2");
+bt::bb_value to_bb_value(value v, const std::string& where) {
+    if (is_nil(v)) {
+        return bt::bb_value{};
+    }
+    if (is_boolean(v)) {
+        return bt::bb_value{boolean_value(v)};
+    }
+    if (is_integer(v)) {
+        return bt::bb_value{integer_value(v)};
+    }
+    if (is_float(v)) {
+        return bt::bb_value{float_value(v)};
+    }
+    if (is_symbol(v)) {
+        return bt::bb_value{symbol_name(v)};
+    }
+    if (is_string(v)) {
+        return bt::bb_value{string_value(v)};
+    }
+    throw lisp_error(where + ": unsupported blackboard value type");
+}
+
+void apply_tick_blackboard_inputs(bt::instance& inst, value entries) {
+    constexpr const char* kWhere = "bt.tick";
+
+    if (!is_proper_list(entries)) {
+        throw lisp_error(std::string(kWhere) + ": expected list of key/value pairs");
+    }
+
+    for (value item : vector_from_list(entries)) {
+        if (!is_proper_list(item)) {
+            throw lisp_error(std::string(kWhere) + ": each entry must be a 2-item list");
+        }
+
+        const std::vector<value> pair = vector_from_list(item);
+        if (pair.size() != 2) {
+            throw lisp_error(std::string(kWhere) + ": each entry must contain exactly key and value");
+        }
+
+        inst.bb.put(require_bb_key(pair[0], kWhere),
+                    to_bb_value(pair[1], kWhere),
+                    inst.tick_index + 1,
+                    std::chrono::steady_clock::now(),
+                    0,
+                    "bt.tick");
+    }
+}
+
+value status_to_symbol(bt::status st) {
+    return make_symbol(bt::status_name(st));
+}
+
+value builtin_bt_compile(const std::vector<value>& args) {
+    require_arity("bt.compile", args, 1);
+    try {
+        bt::definition def = bt::compile_definition(args[0]);
+        const std::int64_t handle = bt::default_runtime_host().store_definition(std::move(def));
+        return make_bt_def(handle);
+    } catch (const bt::bt_compile_error& e) {
+        throw lisp_error(std::string("bt.compile: ") + e.what());
+    }
+}
+
+value builtin_bt_new_instance(const std::vector<value>& args) {
+    require_arity("bt.new-instance", args, 1);
+    const std::int64_t def_handle = require_bt_def_handle(args[0], "bt.new-instance");
+    try {
+        const std::int64_t inst_handle = bt::default_runtime_host().create_instance(def_handle);
+        return make_bt_instance(inst_handle);
+    } catch (const std::exception& e) {
+        throw lisp_error(std::string("bt.new-instance: ") + e.what());
+    }
+}
+
+value builtin_bt_tick(const std::vector<value>& args) {
+    if (args.size() != 1 && args.size() != 2) {
+        throw lisp_error("bt.tick: expected 1 or 2 arguments");
+    }
+    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.tick");
+    try {
+        bt::runtime_host& host = bt::default_runtime_host();
+        if (args.size() == 2) {
+            bt::instance* inst = host.find_instance(inst_handle);
+            if (!inst) {
+                throw lisp_error("bt.tick: unknown instance");
+            }
+            apply_tick_blackboard_inputs(*inst, args[1]);
+        }
+        const bt::status st = host.tick_instance(inst_handle);
+        return status_to_symbol(st);
+    } catch (const std::exception& e) {
+        throw lisp_error(std::string("bt.tick: ") + e.what());
+    }
+}
+
+value builtin_bt_reset(const std::vector<value>& args) {
+    require_arity("bt.reset", args, 1);
+    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.reset");
+    try {
+        bt::default_runtime_host().reset_instance(inst_handle);
+        return make_nil();
+    } catch (const std::exception& e) {
+        throw lisp_error(std::string("bt.reset: ") + e.what());
+    }
+}
+
+value builtin_bt_status_to_symbol(const std::vector<value>& args) {
+    require_arity("bt.status->symbol", args, 1);
+    if (!is_symbol(args[0])) {
+        throw lisp_error("bt.status->symbol: expected symbol");
+    }
+    const std::string name = symbol_name(args[0]);
+    if (name != "success" && name != "failure" && name != "running") {
+        throw lisp_error("bt.status->symbol: expected success/failure/running");
+    }
+    return args[0];
+}
+
+value builtin_bt_stats(const std::vector<value>& args) {
+    require_arity("bt.stats", args, 1);
+    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.stats");
+    return make_string(bt::default_runtime_host().dump_instance_stats(inst_handle));
+}
+
+value builtin_bt_trace_dump(const std::vector<value>& args) {
+    require_arity("bt.trace.dump", args, 1);
+    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.trace.dump");
+    return make_string(bt::default_runtime_host().dump_instance_trace(inst_handle));
+}
+
+value builtin_bt_trace_snapshot(const std::vector<value>& args) {
+    require_arity("bt.trace.snapshot", args, 1);
+    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.trace.snapshot");
+    return make_string(bt::default_runtime_host().dump_instance_trace(inst_handle));
+}
+
+value builtin_bt_blackboard_dump(const std::vector<value>& args) {
+    require_arity("bt.blackboard.dump", args, 1);
+    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.blackboard.dump");
+    return make_string(bt::default_runtime_host().dump_instance_blackboard(inst_handle));
+}
+
+value builtin_bt_logs_dump(const std::vector<value>& args) {
+    require_arity("bt.logs.dump", args, 0);
+    return make_string(bt::default_runtime_host().dump_logs());
+}
+
+value builtin_bt_logs_snapshot(const std::vector<value>& args) {
+    require_arity("bt.logs.snapshot", args, 0);
+    return make_string(bt::default_runtime_host().dump_logs());
+}
+
+value builtin_bt_scheduler_stats(const std::vector<value>& args) {
+    require_arity("bt.scheduler.stats", args, 0);
+    return make_string(bt::default_runtime_host().dump_scheduler_stats());
+}
+
+value builtin_bt_set_tick_budget_ms(const std::vector<value>& args) {
+    require_arity("bt.set-tick-budget-ms", args, 2);
+    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.set-tick-budget-ms");
+    if (!is_integer(args[1])) {
+        throw lisp_error("bt.set-tick-budget-ms: expected integer milliseconds");
+    }
+
+    bt::instance* inst = bt::default_runtime_host().find_instance(inst_handle);
+    if (!inst) {
+        throw lisp_error("bt.set-tick-budget-ms: unknown instance");
+    }
+    bt::set_tick_budget_ms(*inst, integer_value(args[1]));
+    return make_nil();
+}
+
+value builtin_bt_set_trace_enabled(const std::vector<value>& args) {
+    require_arity("bt.set-trace-enabled", args, 2);
+    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.set-trace-enabled");
+    if (!is_boolean(args[1])) {
+        throw lisp_error("bt.set-trace-enabled: expected boolean");
+    }
+    bt::instance* inst = bt::default_runtime_host().find_instance(inst_handle);
+    if (!inst) {
+        throw lisp_error("bt.set-trace-enabled: unknown instance");
+    }
+    inst->trace_enabled = boolean_value(args[1]);
+    return make_nil();
+}
+
+value builtin_bt_set_read_trace_enabled(const std::vector<value>& args) {
+    require_arity("bt.set-read-trace-enabled", args, 2);
+    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.set-read-trace-enabled");
+    if (!is_boolean(args[1])) {
+        throw lisp_error("bt.set-read-trace-enabled: expected boolean");
+    }
+    bt::instance* inst = bt::default_runtime_host().find_instance(inst_handle);
+    if (!inst) {
+        throw lisp_error("bt.set-read-trace-enabled: unknown instance");
+    }
+    inst->read_trace_enabled = boolean_value(args[1]);
+    return make_nil();
+}
+
+value builtin_bt_clear_trace(const std::vector<value>& args) {
+    require_arity("bt.clear-trace", args, 1);
+    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.clear-trace");
+    bt::instance* inst = bt::default_runtime_host().find_instance(inst_handle);
+    if (!inst) {
+        throw lisp_error("bt.clear-trace: unknown instance");
+    }
+    inst->trace.clear();
+    return make_nil();
+}
+
+value builtin_bt_clear_logs(const std::vector<value>& args) {
+    require_arity("bt.clear-logs", args, 0);
+    bt::default_runtime_host().clear_logs();
+    return make_nil();
 }
 
 }  // namespace
@@ -441,6 +671,21 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "bt.new-instance", builtin_bt_new_instance);
     bind_primitive(global_env, "bt.tick", builtin_bt_tick);
     bind_primitive(global_env, "bt.reset", builtin_bt_reset);
+    bind_primitive(global_env, "bt.status->symbol", builtin_bt_status_to_symbol);
+
+    bind_primitive(global_env, "bt.stats", builtin_bt_stats);
+    bind_primitive(global_env, "bt.trace.dump", builtin_bt_trace_dump);
+    bind_primitive(global_env, "bt.trace.snapshot", builtin_bt_trace_snapshot);
+    bind_primitive(global_env, "bt.blackboard.dump", builtin_bt_blackboard_dump);
+    bind_primitive(global_env, "bt.logs.dump", builtin_bt_logs_dump);
+    bind_primitive(global_env, "bt.logs.snapshot", builtin_bt_logs_snapshot);
+    bind_primitive(global_env, "bt.scheduler.stats", builtin_bt_scheduler_stats);
+
+    bind_primitive(global_env, "bt.set-tick-budget-ms", builtin_bt_set_tick_budget_ms);
+    bind_primitive(global_env, "bt.set-trace-enabled", builtin_bt_set_trace_enabled);
+    bind_primitive(global_env, "bt.set-read-trace-enabled", builtin_bt_set_read_trace_enabled);
+    bind_primitive(global_env, "bt.clear-trace", builtin_bt_clear_trace);
+    bind_primitive(global_env, "bt.clear-logs", builtin_bt_clear_logs);
 }
 
 }  // namespace muslisp

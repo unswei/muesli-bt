@@ -2,6 +2,7 @@
 
 #include <utility>
 
+#include "bt/runtime_host.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/reader.hpp"
@@ -145,8 +146,16 @@ value eval_if(const std::vector<value>& args, env_ptr scope) {
 }
 
 value eval_list_form(value expr, env_ptr scope) {
-    const value head = car(expr);
-    const std::vector<value> raw_args = vector_from_list(cdr(expr));
+    gc_root_scope roots(default_gc());
+    roots.add(&expr);
+
+    value head = car(expr);
+    roots.add(&head);
+
+    std::vector<value> raw_args = vector_from_list(cdr(expr));
+    for (value& arg : raw_args) {
+        roots.add(&arg);
+    }
 
     if (is_symbol_named(head, "quote")) {
         expect_exact("quote", raw_args, 1);
@@ -170,10 +179,12 @@ value eval_list_form(value expr, env_ptr scope) {
     }
 
     value fn = eval(head, scope);
+    roots.add(&fn);
     std::vector<value> evaluated_args;
     evaluated_args.reserve(raw_args.size());
     for (value raw_arg : raw_args) {
         evaluated_args.push_back(eval(raw_arg, scope));
+        roots.add(&evaluated_args.back());
     }
     return apply_callable(fn, evaluated_args);
 }
@@ -181,6 +192,9 @@ value eval_list_form(value expr, env_ptr scope) {
 }  // namespace
 
 value eval(value expr, env_ptr scope) {
+    gc_root_scope roots(default_gc());
+    roots.add(&expr);
+
     if (!expr) {
         throw lisp_error("eval: null expression");
     }
@@ -238,6 +252,7 @@ value eval_source(std::string_view source, env_ptr scope) {
 env_ptr create_global_env() {
     env_ptr global = make_env();
     install_core_builtins(global);
+    bt::install_demo_callbacks(bt::default_runtime_host());
     default_gc().register_root_env(global);
     return global;
 }
