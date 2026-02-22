@@ -274,6 +274,18 @@ void test_bt_compile_checks() {
         throw std::runtime_error("expected bt.compile unknown-form failure");
     } catch (const lisp_error&) {
     }
+
+    try {
+        (void)eval_text("(bt.compile '(invert (succeed) (fail)))", env);
+        throw std::runtime_error("expected bt.compile invert arity failure");
+    } catch (const lisp_error&) {
+    }
+
+    try {
+        (void)eval_text("(bt.compile '(repeat -1 (succeed)))", env);
+        throw std::runtime_error("expected bt.compile negative repeat count failure");
+    } catch (const lisp_error&) {
+    }
 }
 
 void test_bt_seq_and_running_semantics() {
@@ -298,6 +310,15 @@ void test_bt_decorator_semantics() {
     reset_bt_runtime_host();
     env_ptr env = create_global_env();
 
+    (void)eval_text("(define invert-tree (bt.compile '(invert (cond always-false))))", env);
+    (void)eval_text("(define invert-inst (bt.new-instance invert-tree))", env);
+    check(symbol_name(eval_text("(bt.tick invert-inst)", env)) == "success", "invert should flip failure to success");
+
+    (void)eval_text("(define invert-running-tree (bt.compile '(invert (running))))", env);
+    (void)eval_text("(define invert-running-inst (bt.new-instance invert-running-tree))", env);
+    check(symbol_name(eval_text("(bt.tick invert-running-inst)", env)) == "running",
+          "invert should leave running unchanged");
+
     (void)eval_text("(define rtree (bt.compile '(repeat 3 (act always-success))))", env);
     (void)eval_text("(define rinst (bt.new-instance rtree))", env);
     check(symbol_name(eval_text("(bt.tick rinst)", env)) == "running", "repeat tick1 should be running");
@@ -309,6 +330,27 @@ void test_bt_decorator_semantics() {
     check(symbol_name(eval_text("(bt.tick retry-inst)", env)) == "running", "retry tick1 should be running");
     check(symbol_name(eval_text("(bt.tick retry-inst)", env)) == "running", "retry tick2 should be running");
     check(symbol_name(eval_text("(bt.tick retry-inst)", env)) == "failure", "retry tick3 should be failure");
+}
+
+void test_bt_reset_clears_phase4_state() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text("(define rtree (bt.compile '(repeat 2 (act always-success))))", env);
+    (void)eval_text("(define rinst (bt.new-instance rtree))", env);
+    check(symbol_name(eval_text("(bt.tick rinst)", env)) == "running", "repeat pre-reset tick should be running");
+    check(is_nil(eval_text("(bt.reset rinst)", env)), "bt.reset should return nil");
+    check(symbol_name(eval_text("(bt.tick rinst)", env)) == "running", "repeat should restart after reset");
+    check(symbol_name(eval_text("(bt.tick rinst)", env)) == "success", "repeat should complete after restart");
+
+    (void)eval_text("(define btree (bt.compile '(cond bb-has foo)))", env);
+    (void)eval_text("(define binst (bt.new-instance btree))", env);
+    check(symbol_name(eval_text("(bt.tick binst '((foo 1)))", env)) == "success",
+          "tick input should make bb-has succeed");
+    (void)eval_text("(bt.reset binst)", env);
+    check(symbol_name(eval_text("(bt.tick binst)", env)) == "failure", "reset should clear blackboard entries");
 }
 
 void test_bt_blackboard_trace_and_stats_builtins() {
@@ -406,6 +448,7 @@ int main() {
         {"bt compile checks", test_bt_compile_checks},
         {"bt seq/running semantics", test_bt_seq_and_running_semantics},
         {"bt decorator semantics", test_bt_decorator_semantics},
+        {"bt reset clears phase4 state", test_bt_reset_clears_phase4_state},
         {"bt blackboard/trace/stats builtins", test_bt_blackboard_trace_and_stats_builtins},
         {"bt scheduler-backed action", test_bt_scheduler_backed_action},
         {"bt tick with blackboard input", test_bt_tick_with_blackboard_input},
