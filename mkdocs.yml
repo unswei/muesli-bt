@@ -1,0 +1,55 @@
+site_name: muesli-bt
+site_description: Tiny Lisp + behaviour tree runtime in modern C++
+repo_name: muesli-bt
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.details
+
+nav:
+  - Project Overview: index.md
+  - Getting Started: getting-started.md
+  - Lisp Basics: lisp-basics.md
+  - Language:
+      - Syntax: language/syntax.md
+      - Semantics: language/semantics.md
+      - Built-ins: language/builtins.md
+  - Behaviour Trees:
+      - Intro: bt/intro.md
+      - Syntax: bt/syntax.md
+      - Semantics: bt/semantics.md
+      - Blackboard: bt/blackboard.md
+      - Scheduler: bt/scheduler.md
+      - Robot Integration: bt/robot-integration.md
+  - Observability:
+      - Logging: observability/logging.md
+      - Tracing: observability/tracing.md
+      - Profiling: observability/profiling.md
+  - Internals:
+      - Architecture: internals/architecture.md
+      - GC: internals/gc.md
+      - Code Map: internals/code-map.md
+      - Extending: internals/extending.md
+  - Examples:
+      - Lisp Basics: examples/lisp-basics.md
+      - Hello BT: examples/hello-bt.md
+      - Recovery BT: examples/recovery-bt.md
+      - C++ Nodes: examples/cpp-nodes.md
+  - Testing: testing.md
+  - Limitations and Roadmap: limitations-roadmap.md
