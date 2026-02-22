@@ -1,7 +1,4 @@
-muslisp-bt.md
-muesli-bt.md
-bt-companion.md
-documentation-brief.md
+.instructions/
 
 # cmake out-of-source builds
 /build/

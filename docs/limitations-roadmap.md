@@ -20,7 +20,7 @@
 
 Implemented now:
 
-- phases 1-6 from `muesli-bt.md`
+- phases 1-6 documented in this MkDocs set and the repository `README.md`
 - typed host services (`clock_interface`, `robot_interface`)
 - sample robotics wrappers (`battery-ok`, `target-visible`, `approach-target`, `grasp`, `search-target`)
 

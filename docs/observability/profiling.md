@@ -1,34 +1,80 @@
 # Profiling And Performance
 
-v1 profiling is intentionally lightweight but useful.
+This page documents current profiling surfaces in v1.
 
-## What To Measure First
+## Current Implementation State
 
-- per-tick duration
-- per-node durations
-- counts of `running`/`success`/`failure` returns
-- scheduler queue and run timings
-- GC pressure indicators
+Implemented now:
 
-## Runtime Profiling Surfaces
+- per-tree tick duration and overrun counters
+- per-node duration and return-status counters
+- scheduler throughput/timing counters
+- configurable tick budget warnings
+- GC/heap counters for allocation pressure context
 
-## BT stats
+Not implemented yet:
+
+- no built-in percentile/histogram reporting
+- no time-series export pipeline
+- no per-instance scheduler partitioning in the default host
+
+## Commands Available Now
+
+| Command | Purpose | Return |
+| --- | --- | --- |
+| `(bt.stats inst)` | Tree + node runtime stats | string |
+| `(bt.scheduler.stats)` | Scheduler counters/timings | string |
+| `(bt.set-tick-budget-ms inst ms)` | Set tick overrun budget | `nil` |
+| `(heap-stats)` | Heap counters snapshot | `nil` (prints) |
+| `(gc-stats)` | Force GC then print counters | `nil` (prints) |
+
+## `bt.stats` Output (What It Contains)
+
+`bt.stats` includes at least:
+
+- `tick_count`
+- `tick_overrun_count`
+- `tick_last_ns`
+- `tick_max_ns`
+- `tick_total_ns`
+
+It also includes one line per touched node with:
+
+- node id and node name
+- `success`/`failure`/`running` return counts
+- `last_ns`
+- `max_ns`
+
+## `bt.scheduler.stats` Output (What It Contains)
+
+Current scheduler dump fields:
+
+- `submitted`
+- `started`
+- `completed`
+- `failed`
+- `cancelled`
+- `queue_delay_last_ns`
+- `run_time_last_ns`
+
+These are useful for a quick sanity check of async throughput and recent latency.
+
+## Tick Budget Warnings
+
+Set a tick budget:
 
 ```lisp
-(bt.stats inst)
+(bt.set-tick-budget-ms inst 20)
 ```
 
-Includes tick counters and node-level timing summaries.
+If a tick exceeds budget:
 
-## Scheduler stats
+- profile overrun counters increment
+- warning trace/log records are emitted
 
-```lisp
-(bt.scheduler.stats)
-```
+## GC/Heap Context For Performance
 
-Includes submitted/started/completed/failed/cancelled plus timing fields.
-
-## GC/Heap stats
+Use heap/GC counters to distinguish BT logic overhead from memory pressure.
 
 ```lisp
 (heap-stats)
@@ -42,27 +88,15 @@ Printed counters include:
 - bytes allocated
 - next GC threshold
 
-## Budget Warnings
+## Practical Profiling Workflow
 
-Set warning budget:
-
-```lisp
-(bt.set-tick-budget-ms inst 20)
-```
-
-If tick duration exceeds budget, runtime emits warning trace/log and increments overrun counters.
-
-## Tracing Overhead Guidance
-
-Tracing is valuable but not free.
-
-Suggested workflow:
-
-1. profile with trace mostly off
-2. enable tracing when investigating a specific issue
-3. disable `bb_read` trace once diagnosis is complete
+1. run with a realistic tick cadence
+2. capture `bt.stats` and `bt.scheduler.stats`
+3. if latency spikes appear, inspect trace/log around same tick window
+4. confirm GC pressure with `heap-stats` / `gc-stats`
+5. repeat in Release build for throughput numbers
 
 ## Debug vs Release
 
-- Debug builds are preferred for semantics and instrumentation validation.
-- Release builds are preferred for realistic throughput measurements.
+- Debug builds are preferred for semantic validation and instrumentation checks.
+- Release builds are preferred for representative performance measurements.

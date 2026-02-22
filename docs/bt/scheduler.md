@@ -1,61 +1,101 @@
 # Scheduler And Execution Model
 
-This page explains ticking and async execution assumptions.
+This page documents exactly what scheduler/tick behaviour is implemented in v1, and what is still intentionally missing.
 
-## Who Calls `bt.tick`
+## Current Implementation State
 
-`bt.tick` is called by host code:
+Implemented now:
 
-- REPL/manual tests
-- script loops
-- application supervision loops
-- robot control/supervisory threads
+- Host-driven ticking via `bt.tick`.
+- A real background scheduler (`thread_pool_scheduler`) with worker threads.
+- Scheduler job lifecycle tracking (`queued`, `running`, `done`, `failed`, `cancelled`).
+- Scheduler profiling counters surfaced via `bt.scheduler.stats`.
+- A concrete scheduler-backed action example: `async-sleep-ms`.
 
-The runtime defines per-tick semantics. The host controls frequency.
+Not implemented yet:
 
-## Tick Frequency Guidance
+- no direct Lisp API to submit/cancel arbitrary scheduler jobs
+- no explicit BT `halt` contract in v1
+- no scheduler timeout enforcement in the default thread pool
 
-Choose a fixed cadence that matches your application budget.
+## Who Owns Tick Cadence
 
-Typical approach:
+`bt.tick` is called by host code (REPL loop, script loop, application supervisor, robot control loop). The runtime defines per-tick semantics, but the host owns timing and cadence.
 
-- run BT tick at steady rate
-- keep leaf poll work cheap
-- move heavy work off tick thread when possible
+## Lisp-Facing Scheduler Surfaces
 
-## Synchronous vs Asynchronous Leaves
+### Commands Available Now
 
-- synchronous leaves: quick checks/writes, return immediately
-- asynchronous pattern: submit work, return `running`, poll later
+| Surface | Purpose | Notes |
+| --- | --- | --- |
+| `(bt.scheduler.stats)` | View scheduler counters/timings | Global scheduler stats from the runtime host |
+| `(act async-sleep-ms <ms>)` | Demo async action pattern | Returns `running` until job completes |
+| `(bt.tick inst)` | Advance async leaves | Polling/reconciliation happens on tick |
+| `(bt.trace.snapshot inst)` | See scheduler events | Includes submit/start/finish/cancel events |
 
-The project includes `async-sleep-ms` as a scheduler-backed action example.
+### Scheduler-Related Trace Directives
 
-## Time Handling
+When tracing is enabled, scheduler activity appears as:
 
-Tick context includes:
+- `scheduler_submit`
+- `scheduler_start`
+- `scheduler_finish`
+- `scheduler_cancel`
 
-- `tick_index`
-- `now`
+These are useful for confirming async progression across ticks.
 
-`services` can carry a typed `clock_interface`, so host code can provide custom timing sources.
+## C++ Scheduler API (Host/Leaf Side)
 
-## Reset Behaviour
+The scheduler interface exposes:
 
-`bt.reset` clears node memory and blackboard.
+- `submit(job_request)`
+- `get_info(job_id)`
+- `try_get_result(job_id, out)`
+- `cancel(job_id)`
+- `stats_snapshot()`
 
-Any action that persists progress in node memory should tolerate reset cleanly.
+Typical leaf pattern:
 
-## Cancellation / Halt
+1. submit work once and store `job_id` in node memory
+2. return `running`
+3. poll `get_info` on later ticks
+4. read result with `try_get_result` when `done`
+5. return `success`/`failure`
 
-Explicit `halt` semantics are not implemented in v1.
+## Threading Model (Current Boundary)
 
-Current policy:
+Current runtime model is mixed and explicit:
 
-- reset and status transitions drive interruption indirectly
-- scheduler cancel is best-effort where used
+- Lisp evaluation and BT ticking are expected on an owning host thread.
+- Scheduler jobs run on background worker threads.
+- BT instance state (`node_memory`, blackboard, trace, per-node stats) is mutated on the tick path.
+- Worker jobs should not mutate BT instance state directly.
+- Async outcomes should be merged from the tick path on later ticks.
 
-## Blocking Caveat
+There is no v1 guarantee for concurrent `bt.tick` on the same instance. Treat instance ticking as single-owner.
 
-Avoid blocking operations inside `act` callbacks on the tick thread.
+## `async-sleep-ms` Lifecycle (Reference Example)
 
-If blocking is unavoidable, isolate it behind scheduler/external async APIs and return `running` while pending.
+`async-sleep-ms` demonstrates the expected async contract:
+
+1. first tick submits scheduler job and returns `running`
+2. follow-up ticks observe queued/running status and keep returning `running`
+3. completion tick consumes job result and returns `success`
+4. failures/cancellations return `failure`
+
+This is an action-level pattern, not a separate BT scheduler node type.
+
+## Reset, Cancellation, And Halt
+
+`bt.reset` clears per-node memory and blackboard, so in-flight async leaf progress tracked in node memory is discarded.
+
+Cancellation in v1 is best-effort where used by actions/scheduler.
+
+Explicit `halt` semantics are intentionally deferred to v2.
+
+## Practical Guidance
+
+- Keep tick-thread leaf work short.
+- Offload blocking I/O or long computation to scheduler jobs.
+- Reconcile async results in deterministic tick logic.
+- Use trace plus scheduler stats together when diagnosing latency.
