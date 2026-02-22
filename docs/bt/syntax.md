@@ -1,6 +1,6 @@
-# Behaviour Tree DSL Syntax
+# Behaviour Tree Syntax
 
-In v1, BTs are authored as quoted Lisp data and compiled with `bt.compile`.
+In v1, BTs are authored in the BT DSL (domain-specific language) as quoted Lisp data and compiled with `bt.compile`.
 
 ```lisp
 (bt.compile '(seq (cond battery-ok) (act approach-target)))

@@ -15,7 +15,7 @@
 
 What this shows:
 
-- quoted BT DSL
+- quoted BT DSL (domain-specific language)
 - compile + instance creation
 - `running` transition to `success`
 - trace inspection after ticks

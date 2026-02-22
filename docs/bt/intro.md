@@ -26,4 +26,4 @@ Each tick evaluates from the root and returns one status:
 - decorators: transform child outcomes (`invert`, `repeat`, `retry`)
 - leaves: host callbacks (`cond`, `act`)
 
-This prepares you for the project DSL in [BT Syntax](syntax.md).
+This prepares you for the project BT DSL (domain-specific language) in [BT Syntax](syntax.md).

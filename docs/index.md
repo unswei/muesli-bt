@@ -52,7 +52,7 @@ Planned later (v2+):
                 v
 +-------------------------------+
 | BT Layer                      |
-| - bt.compile (DSL -> nodes)   |
+| - bt.compile (BT DSL (domain-specific language) -> nodes)   |
 | - tick runtime                |
 | - instance memory             |
 | - blackboard                  |

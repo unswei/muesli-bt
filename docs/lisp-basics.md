@@ -39,7 +39,7 @@ Quote prevents evaluation and keeps a form as data:
 '(seq (cond target-visible) (act grasp))
 ```
 
-This matters for BTs: in v1, BT DSL forms are usually passed as quoted Lisp data to `bt.compile`.
+This matters for BTs: in v1, BT DSL (domain-specific language) forms are usually passed as quoted Lisp data to `bt.compile`.
 
 ```lisp
 (bt.compile '(seq (cond battery-ok) (act approach-target)))

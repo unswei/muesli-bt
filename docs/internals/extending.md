@@ -12,7 +12,7 @@ Checklist:
 4. add tests for happy path and error cases
 5. document in `docs/language/builtins.md`
 
-## Add A New BT DSL Node/Decorator
+## Add A New BT DSL (domain-specific language) Node/Decorator
 
 Checklist:
 

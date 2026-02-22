@@ -13,7 +13,7 @@
 
 ## BT runtime
 
-- DSL compiler
+- BT DSL (domain-specific language) compiler
 - compiled node graph
 - tick semantics
 - instance memory

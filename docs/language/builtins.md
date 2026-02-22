@@ -129,7 +129,7 @@ Common errors:
 
 ### `bt.compile`
 
-- purpose: compile quoted BT DSL
+- purpose: compile quoted BT DSL (domain-specific language)
 - signature: `(bt.compile '<bt-form>)`
 - returns: `bt_def`
 

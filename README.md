@@ -47,7 +47,7 @@ Inside the REPL:
                     |
                     v
 +----------------------------------+
-| BT DSL compiler (`bt.compile`)   |
+| BT DSL (domain-specific language) compiler (`bt.compile`)   |
 | BT runtime + instance state      |
 | blackboard + trace + profiling   |
 +-------------------+--------------+
@@ -61,7 +61,7 @@ Inside the REPL:
 
 ## Intended Usage Model
 
-- BTs are authored as quoted Lisp DSL forms and compiled with `bt.compile`.
+- BTs are authored as quoted BT DSL forms and compiled with `bt.compile`.
 - A host supervision loop owns tick cadence and calls `bt.tick`.
 - Conditions/actions are implemented in C++ and registered in the runtime host.
 - Blackboard keys carry task/runtime state and are inspected via dump/trace surfaces.
