@@ -66,4 +66,21 @@ std::string bb_value_repr(const bb_value& value) {
         value);
 }
 
+const char* bb_value_type_name(const bb_value& value) noexcept {
+    switch (value.index()) {
+        case 0:
+            return "nil";
+        case 1:
+            return "bool";
+        case 2:
+            return "int64";
+        case 3:
+            return "float64";
+        case 4:
+            return "string";
+        default:
+            return "unknown";
+    }
+}
+
 }  // namespace bt

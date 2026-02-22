@@ -9,6 +9,7 @@ This repository currently covers:
 - Phase 3: BT compiler + runtime core nodes
 - Phase 4: decorators + per-node instance memory + reset
 - Phase 5: inspectability (blackboard metadata, trace, logs, stats)
+- Phase 6: robotics-oriented host integration (typed services + sample wrappers)
 
 ## What Works
 
@@ -47,6 +48,14 @@ Evaluator supports:
 - `begin`
 
 Closures use lexical scope with environment chaining.
+
+Error hierarchy includes:
+
+- `parse_error`
+- `eval_error`
+- `type_error`
+- `name_error`
+- `lisp_error` base
 
 ### Numeric model (int + float)
 
@@ -115,6 +124,7 @@ Blackboard:
   - `last_write_ts`
   - `last_writer_node_id`
   - `last_writer_name`
+- `bt.blackboard.dump` includes value + type + write metadata (`tick`, `ts_ns`, writer fields)
 
 Trace:
 
@@ -126,11 +136,13 @@ Trace:
   - optional `bb_read` (via `(bt.set-read-trace-enabled inst #t)`)
   - `scheduler_submit`, `scheduler_start`, `scheduler_finish`, `scheduler_cancel`
   - `warning`, `error`
+- `bt.trace.dump` / `bt.trace.snapshot` include event timestamps (`ts_ns`) and durations (`duration_ns`) when applicable
 
 Logging:
 
 - in-memory ring log sink
 - per-record level/category/tick/node/message fields
+- `bt.logs.dump` / `bt.logs.snapshot` (and aliases `bt.log.dump` / `bt.log.snapshot`)
 
 Profiling:
 
@@ -163,6 +175,8 @@ Companion-style introspection/config:
 - `bt.blackboard.dump`
 - `bt.logs.dump`
 - `bt.logs.snapshot`
+- `bt.log.dump`
+- `bt.log.snapshot`
 - `bt.scheduler.stats`
 - `bt.set-tick-budget-ms`
 - `bt.set-trace-enabled`
@@ -182,6 +196,8 @@ Conditions:
 - `always-true`
 - `always-false`
 - `bb-has`
+- `battery-ok` (robot wrapper)
+- `target-visible` (robot wrapper)
 
 Actions:
 
@@ -191,6 +207,20 @@ Actions:
 - `bb-put-int`
 - `bb-put-float`
 - `async-sleep-ms`
+- `approach-target` (robot wrapper)
+- `grasp` (robot wrapper)
+- `search-target` (robot wrapper)
+
+### Typed host services (Phase 6)
+
+`bt::services` is typed and no longer uses a generic `void*` user payload. It now carries typed integration points:
+
+- `scheduler*`
+- observability handles (`trace_buffer*`, `log_sink*`)
+- `clock_interface*`
+- `robot_interface*`
+
+`runtime_host` provides a default clock and default demo robot service, and allows swapping a custom robot implementation via `set_robot_interface(...)`.
 
 ## Build and Test (macOS/Linux)
 
@@ -240,6 +270,8 @@ Current automated tests cover:
 - GC safety during argument evaluation with in-eval collection
 - BT compiler checks
 - BT runtime status propagation and decorators
+- phase-6 sample wrappers (`battery-ok`, `target-visible`, `approach-target`, `grasp`, `search-target`)
+- typed custom robot interface injection
 - blackboard writes/reads and trace events
 - scheduler-backed async action behavior
 - BT introspection/config built-ins
@@ -257,4 +289,4 @@ Code is written to be portable across Linux/macOS (standard library threads/chro
 - timeout decorator (`timeout`) from companion extension ideas
 - external logging/metrics adapters (for example `spdlog`, Prometheus, OpenTelemetry)
 - macro-based BT authoring sugar (`(bt ...)`)
-- advanced halting contracts for long-running leaves beyond reset/cancel patterns
+- advanced halting contracts for long-running leaves beyond reset/cancel patterns (`halt` is intentionally v2)

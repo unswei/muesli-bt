@@ -5,9 +5,13 @@
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
+#include "bt/instance.hpp"
+#include "bt/logging.hpp"
 #include "bt/runtime_host.hpp"
+#include "bt/trace.hpp"
 #include "muslisp/env.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/eval.hpp"
@@ -16,6 +20,13 @@
 #include "muslisp/reader.hpp"
 
 namespace {
+
+template <typename T>
+concept has_user_member = requires(T t) {
+    t.user;
+};
+
+static_assert(!has_user_member<bt::services>, "bt::services should be typed and must not expose void* user");
 
 void check(bool condition, const std::string& message) {
     if (!condition) {
@@ -91,6 +102,24 @@ void test_environment_shadowing() {
     check(integer_value(lookup(global, "x")) == 1, "global lookup failed");
     check(integer_value(lookup(child, "x")) == 3, "shadowed lookup failed");
     check(integer_value(lookup(child, "y")) == 2, "child lookup failed");
+}
+
+void test_error_hierarchy_basics() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+
+    try {
+        (void)eval_text("missing-symbol", env);
+        throw std::runtime_error("expected name_error for unbound symbol");
+    } catch (const name_error&) {
+    }
+
+    try {
+        (void)eval_text("(1 2)", env);
+        throw std::runtime_error("expected type_error for non-function call");
+    } catch (const type_error&) {
+    }
 }
 
 void test_eval_special_forms_and_arithmetic() {
@@ -366,10 +395,19 @@ void test_bt_blackboard_trace_and_stats_builtins() {
     value bb_dump = eval_text("(bt.blackboard.dump inst)", env);
     check(is_string(bb_dump), "bt.blackboard.dump should return string");
     check(string_value(bb_dump).find("foo=42") != std::string::npos, "blackboard dump missing foo=42");
+    check(string_value(bb_dump).find("type=int64") != std::string::npos, "blackboard dump missing type metadata");
+    check(string_value(bb_dump).find("ts_ns=") != std::string::npos, "blackboard dump missing timestamp metadata");
+    check(string_value(bb_dump).find("writer_name=bb-put-int") != std::string::npos,
+          "blackboard dump missing writer metadata");
 
     value trace_dump = eval_text("(bt.trace.snapshot inst)", env);
     check(is_string(trace_dump), "bt.trace.snapshot should return string");
+    check(string_value(trace_dump).find("kind=tick_begin") != std::string::npos, "trace should include tick_begin");
+    check(string_value(trace_dump).find("kind=node_enter") != std::string::npos, "trace should include node_enter");
+    check(string_value(trace_dump).find("kind=node_exit") != std::string::npos, "trace should include node_exit");
     check(string_value(trace_dump).find("bb_write") != std::string::npos, "trace should include bb_write");
+    check(string_value(trace_dump).find("duration_ns=") != std::string::npos, "trace should include duration metadata");
+    check(string_value(trace_dump).find("ts_ns=") != std::string::npos, "trace should include timestamp metadata");
 
     value stats_dump = eval_text("(bt.stats inst)", env);
     check(is_string(stats_dump), "bt.stats should return string");
@@ -383,6 +421,11 @@ void test_bt_blackboard_trace_and_stats_builtins() {
     trace_dump = eval_text("(bt.trace.snapshot inst)", env);
     check(string_value(trace_dump).find("bb_read") != std::string::npos, "trace should include bb_read");
     (void)eval_text("(bt.clear-logs)", env);
+
+    value log_dump_alias = eval_text("(bt.log.dump)", env);
+    check(is_string(log_dump_alias), "bt.log.dump alias should return string");
+    value log_snapshot_alias = eval_text("(bt.log.snapshot)", env);
+    check(is_string(log_snapshot_alias), "bt.log.snapshot alias should return string");
 }
 
 void test_bt_scheduler_backed_action() {
@@ -432,12 +475,148 @@ void test_bt_tick_with_blackboard_input() {
     check(symbol_name(eval_text("(bt.tick inst '((foo 1)))", env)) == "success", "tick input should seed blackboard");
 }
 
+void test_phase5_ring_buffer_bounds() {
+    bt::trace_buffer trace(3);
+
+    bt::trace_event a{};
+    a.kind = bt::trace_event_kind::tick_begin;
+    trace.push(a);
+    bt::trace_event b{};
+    b.kind = bt::trace_event_kind::node_enter;
+    trace.push(b);
+    bt::trace_event c{};
+    c.kind = bt::trace_event_kind::node_exit;
+    trace.push(c);
+    bt::trace_event d{};
+    d.kind = bt::trace_event_kind::tick_end;
+    trace.push(d);
+
+    const auto trace_events = trace.snapshot();
+    check(trace_events.size() == 3, "trace ring should cap at configured capacity");
+    check(trace_events.front().sequence == 2, "trace ring should evict oldest event first");
+    check(trace_events.back().sequence == 4, "trace ring should keep newest event");
+
+    bt::memory_log_sink logs(2);
+    bt::log_record r1{};
+    r1.message = "one";
+    logs.write(r1);
+    bt::log_record r2{};
+    r2.message = "two";
+    logs.write(r2);
+    bt::log_record r3{};
+    r3.message = "three";
+    logs.write(r3);
+
+    const auto log_records = logs.snapshot();
+    check(log_records.size() == 2, "log ring should cap at configured capacity");
+    check(log_records.front().sequence == 2, "log ring should evict oldest record first");
+    check(log_records.back().sequence == 3, "log ring should keep newest record");
+}
+
+void test_phase6_sample_wrappers_tree() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text(
+        "(define tree "
+        "  (bt.compile "
+        "    '(sel "
+        "       (seq "
+        "         (cond battery-ok) "
+        "         (cond target-visible) "
+        "         (act approach-target) "
+        "         (act grasp)) "
+        "       (act search-target))))",
+        env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "success",
+          "tick1 should use search-target fallback and succeed");
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "running",
+          "tick2 should run approach-target once target is visible");
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "success",
+          "tick3 should complete approach-target and grasp");
+}
+
+class test_robot_service final : public bt::robot_interface {
+public:
+    bool battery_ok(bt::tick_context&) override {
+        ++battery_checks;
+        return true;
+    }
+
+    bool target_visible(bt::tick_context&) override {
+        ++visibility_checks;
+        return visible;
+    }
+
+    bt::status approach_target(bt::tick_context&, bt::node_memory&) override {
+        ++approach_calls;
+        return bt::status::success;
+    }
+
+    bt::status grasp(bt::tick_context&, bt::node_memory&) override {
+        ++grasp_calls;
+        return bt::status::success;
+    }
+
+    bt::status search_target(bt::tick_context&, bt::node_memory&) override {
+        ++search_calls;
+        visible = true;
+        return bt::status::success;
+    }
+
+    bool visible = false;
+    int battery_checks = 0;
+    int visibility_checks = 0;
+    int approach_calls = 0;
+    int grasp_calls = 0;
+    int search_calls = 0;
+};
+
+void test_phase6_custom_robot_interface() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    bt::runtime_host& host = bt::default_runtime_host();
+    test_robot_service robot;
+    host.set_robot_interface(&robot);
+
+    env_ptr env = create_global_env();
+    (void)eval_text(
+        "(define tree "
+        "  (bt.compile "
+        "    '(sel "
+        "       (seq "
+        "         (cond battery-ok) "
+        "         (cond target-visible) "
+        "         (act approach-target) "
+        "         (act grasp)) "
+        "       (act search-target))))",
+        env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "success", "custom robot tick1 should search and succeed");
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "success", "custom robot tick2 should approach/grasp and succeed");
+
+    check(robot.search_calls == 1, "custom robot search-target should be called once");
+    check(robot.approach_calls == 1, "custom robot approach-target should be called once");
+    check(robot.grasp_calls == 1, "custom robot grasp should be called once");
+    check(robot.battery_checks >= 2, "custom robot battery-ok should be checked each tick");
+    check(robot.visibility_checks >= 2, "custom robot target-visible should be checked each tick");
+
+    host.set_robot_interface(nullptr);
+}
+
 }  // namespace
 
 int main() {
     const std::vector<std::pair<std::string, std::function<void()>>> tests = {
         {"reader basics", test_reader_basics},
         {"environment shadowing", test_environment_shadowing},
+        {"error hierarchy basics", test_error_hierarchy_basics},
         {"eval special forms and arithmetic", test_eval_special_forms_and_arithmetic},
         {"numeric rules, predicates, and printing", test_numeric_rules_predicates_and_printing},
         {"integer overflow checks", test_integer_overflow_checks},
@@ -452,6 +631,9 @@ int main() {
         {"bt blackboard/trace/stats builtins", test_bt_blackboard_trace_and_stats_builtins},
         {"bt scheduler-backed action", test_bt_scheduler_backed_action},
         {"bt tick with blackboard input", test_bt_tick_with_blackboard_input},
+        {"phase5 ring buffer bounds", test_phase5_ring_buffer_bounds},
+        {"phase6 sample wrappers tree", test_phase6_sample_wrappers_tree},
+        {"phase6 custom robot interface", test_phase6_custom_robot_interface},
     };
 
     std::size_t passed = 0;

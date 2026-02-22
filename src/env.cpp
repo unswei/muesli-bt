@@ -35,7 +35,7 @@ value lookup(env_ptr scope, const std::string& name) {
             return it->second;
         }
     }
-    throw lisp_error("unbound symbol: " + name);
+    throw name_error("unbound symbol: " + name);
 }
 
 }  // namespace muslisp

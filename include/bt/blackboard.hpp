@@ -44,5 +44,6 @@ private:
 };
 
 std::string bb_value_repr(const bb_value& value);
+const char* bb_value_type_name(const bb_value& value) noexcept;
 
 }  // namespace bt

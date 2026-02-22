@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -9,6 +10,11 @@
 #include "bt/status.hpp"
 
 namespace bt {
+
+class bt_runtime_error : public std::runtime_error {
+public:
+    explicit bt_runtime_error(const std::string& message) : std::runtime_error(message) {}
+};
 
 struct tick_context {
     instance& inst;

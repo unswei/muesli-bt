@@ -21,4 +21,19 @@ private:
     bool incomplete_;
 };
 
+class eval_error : public lisp_error {
+public:
+    explicit eval_error(const std::string& message) : lisp_error(message) {}
+};
+
+class type_error : public eval_error {
+public:
+    explicit type_error(const std::string& message) : eval_error(message) {}
+};
+
+class name_error : public eval_error {
+public:
+    explicit name_error(const std::string& message) : eval_error(message) {}
+};
+
 }  // namespace muslisp

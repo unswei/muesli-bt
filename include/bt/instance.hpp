@@ -11,9 +11,12 @@
 #include "bt/logging.hpp"
 #include "bt/profile.hpp"
 #include "bt/scheduler.hpp"
+#include "bt/status.hpp"
 #include "bt/trace.hpp"
 
 namespace bt {
+
+struct tick_context;
 
 struct node_memory {
     std::int64_t i0 = 0;
@@ -27,10 +30,29 @@ struct observability {
     log_sink* logger = nullptr;
 };
 
+class clock_interface {
+public:
+    virtual ~clock_interface() = default;
+    virtual std::chrono::steady_clock::time_point now() const = 0;
+};
+
+class robot_interface {
+public:
+    virtual ~robot_interface() = default;
+
+    virtual bool battery_ok(tick_context& ctx) = 0;
+    virtual bool target_visible(tick_context& ctx) = 0;
+
+    virtual status approach_target(tick_context& ctx, node_memory& mem) = 0;
+    virtual status grasp(tick_context& ctx, node_memory& mem) = 0;
+    virtual status search_target(tick_context& ctx, node_memory& mem) = 0;
+};
+
 struct services {
     scheduler* sched = nullptr;
     observability obs{};
-    void* user = nullptr;
+    clock_interface* clock = nullptr;
+    robot_interface* robot = nullptr;
 };
 
 struct instance {

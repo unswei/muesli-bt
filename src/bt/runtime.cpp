@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <sstream>
-#include <stdexcept>
 #include <vector>
 
 #include "bt/blackboard.hpp"
@@ -17,6 +16,17 @@ trace_event make_trace_event(trace_event_kind kind) {
     trace_event ev{};
     ev.kind = kind;
     return ev;
+}
+
+std::int64_t ns_since_epoch(std::chrono::steady_clock::time_point tp) {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count();
+}
+
+std::chrono::steady_clock::time_point tick_now(tick_context& ctx) {
+    if (ctx.svc.clock) {
+        return ctx.svc.clock->now();
+    }
+    return std::chrono::steady_clock::now();
 }
 
 trace_buffer* resolve_trace_buffer(tick_context& ctx) {
@@ -37,7 +47,7 @@ void emit_trace(tick_context& ctx, trace_event ev) {
     }
 
     ev.tick_index = ctx.tick_index;
-    ev.ts = ctx.now;
+    ev.ts = tick_now(ctx);
     buffer->push(std::move(ev));
 }
 
@@ -46,7 +56,7 @@ void emit_log(tick_context& ctx, log_level level, std::string category, std::str
         return;
     }
     log_record rec;
-    rec.ts = ctx.now;
+    rec.ts = tick_now(ctx);
     rec.level = level;
     rec.tick_index = ctx.tick_index;
     rec.node = ctx.current_node;
@@ -72,7 +82,7 @@ node_memory& node_memory_for(instance& inst, node_id id) {
 
 const node& get_node(const definition& def, node_id id) {
     if (id >= def.nodes.size()) {
-        throw std::runtime_error("BT runtime: invalid node id");
+        throw bt_runtime_error("BT runtime: invalid node id");
     }
     return def.nodes[id];
 }
@@ -102,7 +112,7 @@ public:
     void set_status(status st) { status_ = st; }
 
     ~tick_scope() {
-        const auto end = std::chrono::steady_clock::now();
+        const auto end = tick_now(ctx_);
         const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - started_at_);
 
         ctx_.inst.tree_stats.tick_duration.observe(elapsed, ctx_.inst.tree_stats.configured_tick_budget);
@@ -134,7 +144,7 @@ private:
 class node_scope {
 public:
     node_scope(tick_context& ctx, const node& n)
-        : ctx_(ctx), node_(n), prev_node_(ctx.current_node), started_at_(std::chrono::steady_clock::now()) {
+        : ctx_(ctx), node_(n), prev_node_(ctx.current_node), started_at_(tick_now(ctx_)) {
         ctx_.current_node = node_.id;
         trace_event ev = make_trace_event(trace_event_kind::node_enter);
         ev.node = node_.id;
@@ -144,7 +154,7 @@ public:
     void set_status(status st) { status_ = st; }
 
     ~node_scope() {
-        const auto end = std::chrono::steady_clock::now();
+        const auto end = tick_now(ctx_);
         const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - started_at_);
 
         node_profile_stats& stats = node_stats_for(ctx_.inst, node_);
@@ -342,7 +352,8 @@ status tick_node(node_id id, tick_context& ctx) {
 }  // namespace
 
 void tick_context::bb_put(std::string key, bb_value value, std::string writer_name) {
-    inst.bb.put(key, value, tick_index, now, current_node, std::move(writer_name));
+    const auto ts = tick_now(*this);
+    inst.bb.put(key, value, tick_index, ts, current_node, std::move(writer_name));
 
     trace_event ev = make_trace_event(trace_event_kind::bb_write);
     ev.node = current_node;
@@ -381,22 +392,23 @@ void tick_context::scheduler_event(trace_event_kind kind, job_id job, job_status
 
 status tick(instance& inst, registry& reg, services& svc) {
     if (!inst.def) {
-        throw std::runtime_error("BT tick: instance has no definition");
+        throw bt_runtime_error("BT tick: instance has no definition");
     }
 
     ++inst.tick_index;
+    const auto tick_start = svc.clock ? svc.clock->now() : std::chrono::steady_clock::now();
     tick_context ctx{.inst = inst,
                      .reg = reg,
                      .svc = svc,
                      .tick_index = inst.tick_index,
-                     .now = std::chrono::steady_clock::now(),
+                     .now = tick_start,
                      .current_node = inst.def->root};
 
     trace_event ev = make_trace_event(trace_event_kind::tick_begin);
     ev.node = inst.def->root;
     emit_trace(ctx, std::move(ev));
 
-    tick_scope scope(ctx, ctx.now);
+    tick_scope scope(ctx, tick_start);
     const status result = tick_node(inst.def->root, ctx);
     scope.set_status(result);
     return result;
@@ -442,7 +454,13 @@ std::string dump_trace(const instance& inst) {
     std::ostringstream out;
     for (const trace_event& ev : inst.trace.snapshot()) {
         out << ev.sequence << " kind=" << trace_event_kind_name(ev.kind) << " tick=" << ev.tick_index
-            << " node=" << ev.node << " status=" << status_name(ev.node_status);
+            << " node=" << ev.node << " ts_ns=" << ns_since_epoch(ev.ts);
+        if (ev.kind == trace_event_kind::node_exit || ev.kind == trace_event_kind::tick_end) {
+            out << " status=" << status_name(ev.node_status);
+        }
+        if (ev.duration.count() > 0) {
+            out << " duration_ns=" << ev.duration.count();
+        }
         if (ev.job != 0 || ev.job_st != job_status::unknown) {
             out << " job=" << ev.job << " job_status=" << job_status_name(ev.job_st);
         }
@@ -465,7 +483,8 @@ std::string dump_blackboard(const instance& inst) {
 
     const auto entries = inst.bb.snapshot();
     for (const auto& [key, entry] : entries) {
-        out << key << "=" << bb_value_repr(entry.value) << " tick=" << entry.last_write_tick
+        out << key << "=" << bb_value_repr(entry.value) << " type=" << bb_value_type_name(entry.value)
+            << " tick=" << entry.last_write_tick << " ts_ns=" << ns_since_epoch(entry.last_write_ts)
             << " writer_node=" << entry.last_writer_node_id;
         if (!entry.last_writer_name.empty()) {
             out << " writer_name=" << entry.last_writer_name;

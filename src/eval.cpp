@@ -84,7 +84,7 @@ value apply_callable(value fn_value, const std::vector<value>& args) {
         return eval_sequence(closure_body(fn_value), call_scope);
     }
 
-    throw lisp_error("attempt to call non-function value");
+    throw type_error("attempt to call non-function value");
 }
 
 value eval_define(const std::vector<value>& args, env_ptr scope) {
@@ -121,7 +121,7 @@ value eval_define(const std::vector<value>& args, env_ptr scope) {
         return fn;
     }
 
-    throw lisp_error("define: first argument must be symbol or function signature");
+    throw type_error("define: first argument must be symbol or function signature");
 }
 
 value eval_lambda(const std::vector<value>& args, env_ptr scope) {
@@ -196,10 +196,10 @@ value eval(value expr, env_ptr scope) {
     roots.add(&expr);
 
     if (!expr) {
-        throw lisp_error("eval: null expression");
+        throw eval_error("eval: null expression");
     }
     if (!scope) {
-        throw lisp_error("eval: null environment");
+        throw eval_error("eval: null environment");
     }
 
     switch (type_of(expr)) {
@@ -219,7 +219,7 @@ value eval(value expr, env_ptr scope) {
             return eval_list_form(expr, scope);
     }
 
-    throw lisp_error("eval: unknown value type");
+    throw eval_error("eval: unknown value type");
 }
 
 value eval_sequence(const std::vector<value>& exprs, env_ptr scope) {

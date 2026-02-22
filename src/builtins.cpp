@@ -679,6 +679,8 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "bt.blackboard.dump", builtin_bt_blackboard_dump);
     bind_primitive(global_env, "bt.logs.dump", builtin_bt_logs_dump);
     bind_primitive(global_env, "bt.logs.snapshot", builtin_bt_logs_snapshot);
+    bind_primitive(global_env, "bt.log.dump", builtin_bt_logs_dump);
+    bind_primitive(global_env, "bt.log.snapshot", builtin_bt_logs_snapshot);
     bind_primitive(global_env, "bt.scheduler.stats", builtin_bt_scheduler_stats);
 
     bind_primitive(global_env, "bt.set-tick-budget-ms", builtin_bt_set_tick_budget_ms);

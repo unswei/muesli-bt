@@ -34,6 +34,14 @@ public:
     memory_log_sink& logs() noexcept;
     const memory_log_sink& logs() const noexcept;
 
+    void set_clock_interface(clock_interface* clock) noexcept;
+    clock_interface* clock_interface_ptr() noexcept;
+    const clock_interface* clock_interface_ptr() const noexcept;
+
+    void set_robot_interface(robot_interface* robot) noexcept;
+    robot_interface* robot_interface_ptr() noexcept;
+    const robot_interface* robot_interface_ptr() const noexcept;
+
     void clear_logs();
     void clear_all();
 
@@ -53,6 +61,11 @@ private:
     registry registry_;
     thread_pool_scheduler scheduler_;
     memory_log_sink logs_;
+
+    std::unique_ptr<clock_interface> owned_clock_;
+    std::unique_ptr<robot_interface> owned_robot_;
+    clock_interface* clock_ = nullptr;
+    robot_interface* robot_ = nullptr;
 };
 
 runtime_host& default_runtime_host();
