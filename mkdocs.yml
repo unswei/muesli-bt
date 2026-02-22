@@ -1,6 +1,8 @@
 site_name: muesli-bt
 site_description: Tiny Lisp + behaviour tree runtime in modern C++
 repo_name: muesli-bt
+repo_url: https://github.com/unswei/muesli-bt
+site_url: https://unswei.github.io/muesli-bt/
 
 theme:
   name: material

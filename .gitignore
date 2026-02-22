@@ -6,6 +6,7 @@
 /cmake-build-*/
 /out/
 /dist/
+/site/
 
 # cmake / toolchain artefacts (if they ever appear in-source)
 CMakeCache.txt
@@ -24,6 +25,9 @@ compile_commands.json
 *.dylib
 *.dll
 *.exe
+
+# python
+.venv
 
 # logs and misc
 *.log
