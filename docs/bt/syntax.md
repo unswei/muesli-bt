@@ -1,16 +1,28 @@
 # Behaviour Tree Syntax
 
-In v1, BTs are authored in the BT DSL (domain-specific language) as quoted Lisp data and compiled with `bt.compile`.
+BTs are authored in the BT DSL and compiled into `bt_def` values.
+
+Preferred authoring forms:
+
+```lisp
+(bt (seq (cond battery-ok) (act approach-target)))
+```
+
+```lisp
+(defbt patrol
+  (sel
+    (seq
+      (cond target-visible)
+      (act approach-target)
+      (act grasp))
+    (act search-target)))
+```
+
+`bt.compile` remains the low-level primitive:
 
 ```lisp
 (bt.compile '(seq (cond battery-ok) (act approach-target)))
 ```
-
-## Why Quoting Is Required
-
-Without quoting, Lisp would try to evaluate forms as normal function calls.
-
-BT forms are data consumed by the BT compiler, so quoting is required in v1.
 
 ## Syntax Summary
 
@@ -36,7 +48,7 @@ BT forms are data consumed by the BT compiler, so quoting is required in v1.
 (cond name arg...)
 ```
 
-`name` must be a symbol or string that matches a registered condition callback.
+`name` must match a registered condition callback.
 
 ### `act`
 
@@ -44,7 +56,7 @@ BT forms are data consumed by the BT compiler, so quoting is required in v1.
 (act name arg...)
 ```
 
-`name` must be a symbol or string that matches a registered action callback.
+`name` must match a registered action callback.
 
 ## Decorators
 
@@ -78,31 +90,24 @@ BT forms are data consumed by the BT compiler, so quoting is required in v1.
 (running)
 ```
 
-## Complete Example
+## BT Save/Load APIs
 
-```lisp
-(define tree
-  (bt.compile
-    '(sel
-       (seq
-         (cond target-visible)
-         (act approach-target)
-         (act grasp))
-       (act search-target))))
-```
+### Portable DSL path (recommended)
 
-## Fallback/Recovery Example
+- `(bt.to-dsl bt-def)` -> canonical DSL form (data, not string)
+- `(bt.save-dsl bt-def "tree.lisp")`
+- `(bt.load-dsl "tree.lisp")`
 
-```lisp
-(define recover-tree
-  (bt.compile
-    '(sel
-       (seq
-         (cond battery-ok)
-         (cond target-visible)
-         (act approach-target)
-         (act grasp))
-       (act search-target))))
-```
+### Compiled binary path (fast load)
 
-The second branch acts as fallback behaviour if the primary branch cannot proceed.
+- `(bt.save bt-def "tree.mbt")`
+- `(bt.load "tree.mbt")`
+
+Binary format notes:
+
+- magic header: `MBT1`
+- explicit format version
+- little-endian marker
+- unsupported/unknown versions are rejected
+
+Use DSL save/load when long-term portability is the priority.

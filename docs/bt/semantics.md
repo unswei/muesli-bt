@@ -28,7 +28,7 @@ Instance state includes:
 - trace buffer
 - profiling counters
 
-This split allows one definition to be shared across many instances.
+One definition can be shared across many instances.
 
 ## Composite Semantics
 
@@ -64,14 +64,6 @@ Memoryless means it starts from child 0 on each tick.
 - `failure -> success`
 - `running -> running`
 
-Quick table:
-
-| Child status | `invert` result |
-| --- | --- |
-| `success` | `failure` |
-| `failure` | `success` |
-| `running` | `running` |
-
 ## `repeat n`
 
 Uses per-node counter memory.
@@ -84,7 +76,7 @@ Uses per-node counter memory.
   - if counter reaches `n`, returns `success`
   - otherwise returns `running`
 
-Note: `n == 0` returns `success` immediately.
+`n == 0` returns `success` immediately.
 
 ## `retry n`
 
@@ -113,7 +105,7 @@ Uses per-node retry counter.
 
 ## Error And Missing Callback Semantics
 
-If condition/action callback is missing, runtime:
+If a condition/action callback is missing, runtime:
 
 - emits trace/log error
 - returns `failure`
@@ -133,9 +125,16 @@ If callback throws, runtime:
 
 It does not implicitly clear trace/log buffers.
 
+## Authoring And Persistence Notes
+
+- `(bt ...)` and `(defbt ...)` compile DSL at evaluation time.
+- `bt.compile` is equivalent low-level compilation over quoted DSL data.
+- `bt.to-dsl` returns canonical DSL data for a compiled definition.
+- `bt.save-dsl` / `bt.load-dsl` are the recommended portable persistence path.
+- `bt.save` / `bt.load` provide versioned compiled serialisation (`MBT1`).
+
 ## Common Gotchas
 
-- BT forms must be quoted data in v1.
 - `seq` and `sel` are memoryless in v1.
-- `running` is not a thread; it is a status that indicates unfinished work.
+- `running` is a status, not a thread.
 - long-running leaves should avoid blocking the tick thread.

@@ -7,7 +7,7 @@ This page gets a new developer from clone to runnable REPL, tests, and docs.
 - C++20 compiler (`clang++` or `g++`)
 - CMake 3.20+
 - Ninja
-- Python 3 (for MkDocs docs build)
+- Python 3 (for MkDocs build)
 
 ## Build And Test
 
@@ -35,11 +35,30 @@ ctest --test-dir build --output-on-failure
 
 Exit with `:q`, `:quit`, or `:exit`.
 
-## Run A Script
+Quick BT authoring example:
+
+```lisp
+(defbt patrol
+  (sel
+    (seq
+      (cond target-visible)
+      (act approach-target)
+      (act grasp))
+    (act search-target)))
+
+(define inst (bt.new-instance patrol))
+(bt.tick inst)
+(bt.tick inst)
+```
+
+## Run Scripts
 
 ```bash
 ./build/dev/muslisp examples/repl_scripts/lisp-basics.lisp
+./build/dev/muslisp examples/bt/hello_bt.lisp
 ```
+
+`(load "path/to/file.lisp")` is also available inside the REPL for runtime loading.
 
 ## Run Tests Directly
 
@@ -47,7 +66,7 @@ Exit with `:q`, `:quit`, or `:exit`.
 ./build/dev/muslisp_tests
 ```
 
-## Documentation Build
+## Build Documentation
 
 Install docs dependencies:
 

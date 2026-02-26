@@ -1,4 +1,5 @@
 .instructions/
+images/
 
 # cmake out-of-source builds
 /build/

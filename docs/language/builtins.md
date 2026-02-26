@@ -1,165 +1,114 @@
 # Built-ins Reference
 
-This is the project built-in surface, grouped by purpose.
+This is the current built-in surface, grouped by purpose.
 
 ## Core List And Predicate Built-ins
 
-### `cons`
-
-- purpose: construct a pair/list cell
-- signature: `(cons a d)`
-- returns: cons cell
-- example:
-
-```lisp
-(cons 1 (list 2 3)) ; (1 2 3)
-```
-
-- common errors: arity mismatch
-
-### `car`
-
-- purpose: first element of cons
-- signature: `(car pair)`
-- returns: first value
-- common errors: non-cons input
-
-### `cdr`
-
-- purpose: rest of cons
-- signature: `(cdr pair)`
-- returns: tail value
-- common errors: non-cons input
-
-### `list`
-
-- purpose: build proper list from arguments
-- signature: `(list a b c ...)`
-- returns: proper list
-
-### `null?`
-
-- purpose: nil predicate
-- signature: `(null? x)`
-- returns: `#t` if `x` is `nil`, else `#f`
-
-### `eq?`
-
-- purpose: equality check for core value semantics
-- signature: `(eq? a b)`
-- returns: boolean
+- `cons`, `car`, `cdr`, `list`
+- `null?`, `eq?`
 
 ## Arithmetic And Comparisons
 
-### Arithmetic
+- arithmetic: `+`, `-`, `*`, `/`
+- comparisons: `=`, `<`, `>`, `<=`, `>=`
+- predicates: `number?`, `int?`, `integer?`, `float?`, `zero?`
 
-- `+`, `-`, `*`, `/`
-
-Examples:
-
-```lisp
-(+ 1 2 3)   ; 6
-(- 10 3 2)  ; 5
-(* 2 3 4)   ; 24
-(/ 5 2)     ; 2.5
-```
-
-### Comparisons
-
-- `=`, `<`, `>`, `<=`, `>=`
-
-Examples:
-
-```lisp
-(= 3 3.0)   ; #t
-(< 3 3.5)   ; #t
-(>= 4 4.0)  ; #t
-```
-
-Common errors:
-
-- non-numeric arguments
-- arity below minimum for comparisons
-
-## Numeric Predicates
-
-### `number?`
-
-- signature: `(number? x)`
-- returns: true for int/float
-
-### `int?` and `integer?`
-
-- signature: `(int? x)` or `(integer? x)`
-- returns: true for int only
-
-### `float?`
-
-- signature: `(float? x)`
-- returns: true for float only
-
-### `zero?`
-
-- signature: `(zero? x)`
-- returns: true if numeric zero
-
-## Printing And Heap Helpers
+## Printing, Serialisation, And Files
 
 ### `print`
 
 - signature: `(print a b c ...)`
-- returns: `nil`
-- side effect: writes printed values to stdout
+- purpose: human-facing output
+- return: `nil`
 
-### `heap-stats`
+### `write`
 
-- signature: `(heap-stats)`
-- returns: `nil`
-- side effect: prints current heap counters
+- signature: `(write x)`
+- purpose: readable output suitable for parse-back
+- return: `x`
 
-### `gc-stats`
+### `write-to-string`
 
-- signature: `(gc-stats)`
-- returns: `nil`
-- side effect: triggers GC, then prints counters
+- signature: `(write-to-string x)`
+- purpose: readable string representation
+- return: string
+
+### `save`
+
+- signature: `(save "path" x)`
+- purpose: save readable value to file for `load` consumption
+- return: `#t` on success
+
+### `load` (special form)
+
+- signature: `(load "path")`
+- purpose: parse and evaluate file forms sequentially
+- return: final evaluated form (or `nil` for empty files)
+
+### Heap Introspection
+
+- `(heap-stats)`
+- `(gc-stats)`
 
 ## BT Built-ins
 
-## Core
+## Authoring/Compilation
+
+- `bt.compile`
+- `bt` (special form)
+- `defbt` (special form)
 
 ### `bt.compile`
 
-- purpose: compile quoted BT DSL (domain-specific language)
 - signature: `(bt.compile '<bt-form>)`
-- returns: `bt_def`
+- return: `bt_def`
 
-### `bt.new-instance`
+### `bt` (special form)
 
-- purpose: create mutable runtime instance from definition
-- signature: `(bt.new-instance bt-def)`
-- returns: `bt_instance`
+- signature: `(bt <bt-form>)`
+- return: `bt_def`
+- note: compiles one raw DSL form at evaluation time
 
-### `bt.tick`
+### `defbt` (special form)
 
-- purpose: tick one instance once
+- signature: `(defbt name <bt-form>)`
+- return: compiled `bt_def` bound to `name`
+
+## Instances And Ticking
+
+- `bt.new-instance`
+- `bt.tick`
+- `bt.reset`
+- `bt.status->symbol`
+
+## BT Persistence
+
+- `bt.to-dsl`
+- `bt.save-dsl`
+- `bt.load-dsl`
+- `bt.save`
+- `bt.load`
+
+### `bt.to-dsl`
+
+- signature: `(bt.to-dsl bt-def)`
+- return: canonical BT DSL form (data)
+
+### `bt.save-dsl` / `bt.load-dsl`
+
 - signatures:
-  - `(bt.tick bt-inst)`
-  - `(bt.tick bt-inst '((key value) ...))`
-- returns: symbol `success` / `failure` / `running`
+  - `(bt.save-dsl bt-def "tree.lisp")`
+  - `(bt.load-dsl "tree.lisp")`
+- purpose: portable DSL persistence
 
-### `bt.reset`
+### `bt.save` / `bt.load`
 
-- purpose: clear per-node memory and blackboard for instance
-- signature: `(bt.reset bt-inst)`
-- returns: `nil`
+- signatures:
+  - `(bt.save bt-def "tree.mbt")`
+  - `(bt.load "tree.mbt")`
+- purpose: versioned compiled serialisation (`MBT1`)
 
-### `bt.status->symbol`
-
-- purpose: validate a status symbol
-- signature: `(bt.status->symbol 'success)`
-- returns: same symbol
-
-## Inspectability and Config
+## BT Observability And Config
 
 - `bt.stats`
 - `bt.trace.dump`
@@ -176,20 +125,10 @@ Common errors:
 - `bt.clear-trace`
 - `bt.clear-logs`
 
-Example:
-
-```lisp
-(bt.set-trace-enabled inst #t)
-(bt.tick inst)
-(bt.trace.snapshot inst)
-```
-
-## Arity And Type Error Pattern
+## Error Message Pattern
 
 Built-ins report explicit messages such as:
 
 - `name: expected N arguments, got M`
 - `name: expected number`
 - `name: expected bt_instance`
-
-These are designed to be readable in REPL and test output.

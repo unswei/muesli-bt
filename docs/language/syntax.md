@@ -1,6 +1,6 @@
 # Language Syntax
 
-This page documents the concrete syntax accepted by the v1 reader.
+This page documents the concrete syntax accepted by the current reader.
 
 ## Literals
 
@@ -74,7 +74,7 @@ A semicolon starts a line comment:
 (+ 1 2) ; this is ignored
 ```
 
-## Quote Syntax
+## Quote And Quasiquote Syntax
 
 Quote sugar expands to `(quote ...)`:
 
@@ -83,13 +83,28 @@ Quote sugar expands to `(quote ...)`:
 '(1 2 3)
 ```
 
-Equivalent explicit form:
+Backquote expands to `(quasiquote ...)`:
+
+```lisp
+`x
+`(a ,x ,@xs)
+```
+
+Unquote forms:
+
+```lisp
+,x
+,@xs
+```
+
+Equivalent explicit forms:
 
 ```lisp
 (quote x)
+(quasiquote (a (unquote x) (unquote-splicing xs)))
 ```
 
-## Deliberate Omissions In v1
+## Deliberate Omissions
 
 - no rationals (`3/7`)
 - no complex numbers

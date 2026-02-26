@@ -36,6 +36,16 @@ When adding code that allocates Lisp values:
 - preserve evaluation order correctness around GC calls
 - add regression tests if GC can run mid-operation
 
+## Read/Write Round-Trip Constraints
+
+`write` and `write-to-string` are used for read-back-safe serialisation.
+
+Practical implications for contributors:
+
+- readable output must stay parseable by the reader
+- non-readable runtime objects (`primitive_fn`, `closure`, `bt_def`, `bt_instance`) must not be silently serialised
+- when evaluating file forms repeatedly (`load`), temporary values must be rooted across allocations
+
 ## User-Visible GC Stats
 
 Built-ins:

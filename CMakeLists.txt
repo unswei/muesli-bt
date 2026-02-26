@@ -16,6 +16,7 @@ add_library(muesli_bt_core
     src/bt/runtime.cpp
     src/bt/runtime_host.cpp
     src/bt/scheduler.cpp
+    src/bt/serialisation.cpp
     src/bt/status.cpp
     src/bt/trace.cpp
     src/builtins.cpp

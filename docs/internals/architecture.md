@@ -36,8 +36,8 @@ Preferred direction:
 
 ## Data Flow
 
-1. user writes quoted BT DSL in Lisp
-2. `bt.compile` creates immutable definition
+1. user writes BT DSL in Lisp (`bt`/`defbt` or quoted form with `bt.compile`)
+2. `bt`/`defbt` (or `bt.compile`) create immutable definition
 3. `bt.new-instance` creates mutable instance
 4. host ticks instance repeatedly
 5. leaves call host callbacks and blackboard

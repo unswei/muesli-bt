@@ -1,5 +1,6 @@
 #include "muslisp/reader.hpp"
 
+#include <cstddef>
 #include <charconv>
 #include <cctype>
 #include <cerrno>
@@ -28,6 +29,25 @@ public:
     }
 
 private:
+    [[nodiscard]] parse_error parse_error_at(const std::string& message, bool incomplete, std::size_t position) const {
+        std::size_t line = 1;
+        std::size_t column = 1;
+        const std::size_t end = position < source_.size() ? position : source_.size();
+        for (std::size_t i = 0; i < end; ++i) {
+            if (source_[i] == '\n') {
+                ++line;
+                column = 1;
+                continue;
+            }
+            ++column;
+        }
+        return parse_error("line " + std::to_string(line) + ", column " + std::to_string(column) + ": " + message, incomplete);
+    }
+
+    [[nodiscard]] parse_error parse_error_here(const std::string& message, bool incomplete) const {
+        return parse_error_at(message, incomplete, pos_);
+    }
+
     [[nodiscard]] bool eof() const {
         return pos_ >= source_.size();
     }
@@ -60,7 +80,7 @@ private:
     [[nodiscard]] value read_expr() {
         skip_ws_and_comments();
         if (eof()) {
-            throw parse_error("unexpected end of input", true);
+            throw parse_error_here("unexpected end of input", true);
         }
 
         const char c = get();
@@ -68,11 +88,27 @@ private:
             return read_list();
         }
         if (c == ')') {
-            throw parse_error("unexpected ')'", false);
+            throw parse_error_here("unexpected ')'", false);
         }
         if (c == '\'') {
             value quoted = read_expr();
             return list_from_vector({make_symbol("quote"), quoted});
+        }
+        if (c == '`') {
+            value qq = read_expr();
+            return list_from_vector({make_symbol("quasiquote"), qq});
+        }
+        if (c == ',') {
+            if (eof()) {
+                throw parse_error_here("unexpected end of input after ','", true);
+            }
+            if (peek() == '@') {
+                ++pos_;
+                value splice = read_expr();
+                return list_from_vector({make_symbol("unquote-splicing"), splice});
+            }
+            value unquoted = read_expr();
+            return list_from_vector({make_symbol("unquote"), unquoted});
         }
         if (c == '"') {
             return read_string();
@@ -85,7 +121,7 @@ private:
         while (true) {
             skip_ws_and_comments();
             if (eof()) {
-                throw parse_error("unterminated list", true);
+                throw parse_error_here("unterminated list", true);
             }
             if (peek() == ')') {
                 ++pos_;
@@ -99,7 +135,7 @@ private:
         std::string out;
         while (true) {
             if (eof()) {
-                throw parse_error("unterminated string", true);
+                throw parse_error_here("unterminated string", true);
             }
 
             const char c = get();
@@ -108,7 +144,7 @@ private:
             }
             if (c == '\\') {
                 if (eof()) {
-                    throw parse_error("unterminated string escape", true);
+                    throw parse_error_here("unterminated string escape", true);
                 }
                 const char escaped = get();
                 switch (escaped) {
@@ -128,7 +164,7 @@ private:
                         out.push_back('\\');
                         break;
                     default:
-                        throw parse_error("unknown string escape", false);
+                        throw parse_error_here("unknown string escape", false);
                 }
                 continue;
             }
@@ -193,10 +229,10 @@ private:
 value read_one(std::string_view source) {
     auto exprs = read_all(source);
     if (exprs.empty()) {
-        throw parse_error("expected one expression, got none", false);
+        throw parse_error("line 1, column 1: expected one expression, got none", false);
     }
     if (exprs.size() != 1) {
-        throw parse_error("expected one expression, got multiple", false);
+        throw parse_error("line 1, column 1: expected one expression, got multiple", false);
     }
     return exprs.front();
 }

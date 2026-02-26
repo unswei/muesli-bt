@@ -1,6 +1,8 @@
 #include <cmath>
 #include <chrono>
+#include <filesystem>
 #include <functional>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -50,6 +52,52 @@ void reset_bt_runtime_host() {
     bt::install_demo_callbacks(host);
 }
 
+std::filesystem::path temp_file_path(const std::string& stem, const std::string& extension = ".lisp") {
+    const auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+    return std::filesystem::temp_directory_path() / ("muesli_bt_" + stem + "_" + std::to_string(now) + extension);
+}
+
+void write_text_file(const std::filesystem::path& path, const std::string& content) {
+    std::ofstream out(path);
+    if (!out) {
+        throw std::runtime_error("failed to open file for test write: " + path.string());
+    }
+    out << content;
+    if (!out) {
+        throw std::runtime_error("failed while writing test file: " + path.string());
+    }
+}
+
+std::string lisp_string_literal(const std::string& text) {
+    std::string escaped;
+    escaped.reserve(text.size() + 2);
+    escaped.push_back('"');
+    for (char c : text) {
+        switch (c) {
+            case '\\':
+                escaped += "\\\\";
+                break;
+            case '"':
+                escaped += "\\\"";
+                break;
+            case '\n':
+                escaped += "\\n";
+                break;
+            case '\t':
+                escaped += "\\t";
+                break;
+            case '\r':
+                escaped += "\\r";
+                break;
+            default:
+                escaped.push_back(c);
+                break;
+        }
+    }
+    escaped.push_back('"');
+    return escaped;
+}
+
 void test_reader_basics() {
     using namespace muslisp;
 
@@ -71,6 +119,9 @@ void test_reader_basics() {
 
     const auto quoted = read_one("'x");
     check(print_value(quoted) == "(quote x)", "quote sugar parse failed");
+    check(print_value(read_one("`x")) == "(quasiquote x)", "quasiquote sugar parse failed");
+    check(print_value(read_one(",x")) == "(unquote x)", "unquote sugar parse failed");
+    check(print_value(read_one(",@xs")) == "(unquote-splicing xs)", "unquote-splicing sugar parse failed");
 
     const auto list_expr = read_one("(1 2 3)");
     check(print_value(list_expr) == "(1 2 3)", "list parse failed");
@@ -224,6 +275,258 @@ void test_closures_and_function_define_sugar() {
 
     const auto sugar = eval_text("(begin (define (inc x) (+ x 1)) (inc 41))", env);
     check(integer_value(sugar) == 42, "define function sugar failed");
+}
+
+void test_quasiquote_semantics_and_errors() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+
+    value qq = eval_text("(write-to-string `(a ,(+ 1 2) ,@(list 4 5)))", env);
+    check(is_string(qq), "quasiquote expansion should return string via write-to-string");
+    check(string_value(qq) == "(a 3 4 5)", "quasiquote unquote/splicing expansion mismatch");
+
+    value nested = eval_text("(write-to-string `(outer `(inner ,(+ 1 2))))", env);
+    check(is_string(nested), "nested quasiquote should return string via write-to-string");
+    check(string_value(nested) == "(outer (quasiquote (inner (unquote (+ 1 2)))))",
+          "nested quasiquote depth semantics mismatch");
+
+    try {
+        (void)eval_text("(unquote x)", env);
+        throw std::runtime_error("expected unquote misuse failure");
+    } catch (const lisp_error&) {
+    }
+
+    try {
+        (void)eval_text("(quasiquote (unquote-splicing (list 1 2)))", env);
+        throw std::runtime_error("expected unquote-splicing list-context failure");
+    } catch (const lisp_error&) {
+    }
+
+    try {
+        (void)eval_text("(quasiquote (a (unquote-splicing 1)))", env);
+        throw std::runtime_error("expected unquote-splicing non-list failure");
+    } catch (const lisp_error&) {
+    }
+}
+
+void test_let_and_cond_forms() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+
+    value let_sum = eval_text("(let ((x 1) (y 2)) (+ x y))", env);
+    check(is_integer(let_sum) && integer_value(let_sum) == 3, "let binding sum failed");
+
+    value let_shadow = eval_text("(begin (define x 9) (let ((x 1)) x) x)", env);
+    check(is_integer(let_shadow) && integer_value(let_shadow) == 9, "let shadowing should not leak");
+
+    value let_init_scope = eval_text("(begin (define x 10) (let ((x 1) (y x)) y))", env);
+    check(is_integer(let_init_scope) && integer_value(let_init_scope) == 10,
+          "let initialisers should evaluate in parent scope");
+
+    value cond_else = eval_text("(cond ((< 1 0) 'neg) (else 'pos))", env);
+    check(is_symbol(cond_else) && symbol_name(cond_else) == "pos", "cond else clause failed");
+
+    value cond_nil = eval_text("(cond ((< 1 0) 'neg))", env);
+    check(is_nil(cond_nil), "cond without matching clause should return nil");
+
+    value cond_multi = eval_text("(cond ((= 1 1) (define z 41) (+ z 1)) (else 0))", env);
+    check(is_integer(cond_multi) && integer_value(cond_multi) == 42, "cond multi-expression clause failed");
+
+    try {
+        (void)eval_text("(cond (else 1) (#t 2))", env);
+        throw std::runtime_error("expected cond else-last validation failure");
+    } catch (const lisp_error&) {
+    }
+}
+
+void test_bt_authoring_sugar() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    value compiled_bt = eval_text("(bt (seq (cond always-true) (act running-then-success)))", env);
+    check(is_bt_def(compiled_bt), "bt form should produce bt_def");
+
+    value defined_bt = eval_text("(defbt patrol (seq (cond always-true) (act running-then-success)))", env);
+    check(is_bt_def(defined_bt), "defbt should bind bt_def");
+
+    (void)eval_text("(define tree-old (bt.compile '(seq (cond always-true) (act running-then-success))))", env);
+    (void)eval_text("(define tree-new (bt (seq (cond always-true) (act running-then-success))))", env);
+    (void)eval_text("(define inst-old (bt.new-instance tree-old))", env);
+    (void)eval_text("(define inst-new (bt.new-instance tree-new))", env);
+
+    value old_tick1 = eval_text("(bt.tick inst-old)", env);
+    value new_tick1 = eval_text("(bt.tick inst-new)", env);
+    check(is_symbol(old_tick1) && is_symbol(new_tick1), "bt tick results should be symbols");
+    check(symbol_name(old_tick1) == symbol_name(new_tick1), "bt and bt.compile should tick identically (tick1)");
+
+    value old_tick2 = eval_text("(bt.tick inst-old)", env);
+    value new_tick2 = eval_text("(bt.tick inst-new)", env);
+    check(symbol_name(old_tick2) == symbol_name(new_tick2), "bt and bt.compile should tick identically (tick2)");
+
+    try {
+        (void)eval_text("(bt)", env);
+        throw std::runtime_error("expected bt arity failure");
+    } catch (const lisp_error&) {
+    }
+
+    try {
+        (void)eval_text("(defbt 42 (succeed))", env);
+        throw std::runtime_error("expected defbt name validation failure");
+    } catch (const lisp_error&) {
+    }
+}
+
+void test_load_write_save_and_roundtrip() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    const value original = eval_text("'(1 \"line\\nnext\" #t 2.5 nil foo)", env);
+    const value serialised = eval_text("(write-to-string '(1 \"line\\nnext\" #t 2.5 nil foo))", env);
+    check(is_string(serialised), "write-to-string should return string");
+    const value reparsed = read_one(string_value(serialised));
+    check(print_value(reparsed) == print_value(original), "write-to-string should round-trip through reader");
+
+    const auto save_path = temp_file_path("save_value");
+    const std::string save_path_lisp = lisp_string_literal(save_path.string());
+    value save_ok = eval_text("(save " + save_path_lisp + " '(alpha 1 \"two\"))", env);
+    check(is_boolean(save_ok) && boolean_value(save_ok), "save should return #t");
+
+    value loaded_value = eval_text("(load " + save_path_lisp + ")", env);
+    check(print_value(loaded_value) == "(alpha 1 \"two\")", "load should evaluate saved readable value");
+
+    const auto script_path = temp_file_path("load_script");
+    write_text_file(
+        script_path,
+        "(define loaded-x 41)\n"
+        "(define (loaded-inc x) (+ x 1))\n"
+        "(defbt loaded-tree (seq (cond always-true) (act running-then-success)))\n"
+        "(define loaded-inst (bt.new-instance loaded-tree))\n"
+        "(bt.tick loaded-inst)\n");
+
+    const std::string script_path_lisp = lisp_string_literal(script_path.string());
+    value load_result = eval_text("(load " + script_path_lisp + ")", env);
+    check(is_symbol(load_result) && symbol_name(load_result) == "running", "load should return last form value");
+    check(integer_value(eval_text("loaded-x", env)) == 41, "load should define globals from file");
+    check(integer_value(eval_text("(loaded-inc 1)", env)) == 2, "load should define functions from file");
+    check(symbol_name(eval_text("(bt.tick loaded-inst)", env)) == "success",
+          "loaded BT instance should continue ticking");
+
+    const auto missing_path = temp_file_path("missing_script");
+    const std::string missing_path_lisp = lisp_string_literal(missing_path.string());
+    try {
+        (void)eval_text("(load " + missing_path_lisp + ")", env);
+        throw std::runtime_error("expected load missing-file failure");
+    } catch (const lisp_error&) {
+    }
+}
+
+void test_bt_dsl_save_load_roundtrip() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text("(define tree (bt (seq (act bb-put-int foo 42) (cond bb-has foo))))", env);
+
+    value dsl = eval_text("(bt.to-dsl tree)", env);
+    check(print_value(dsl) == "(seq (act bb-put-int foo 42) (cond bb-has foo))",
+          "bt.to-dsl should return canonical DSL");
+
+    (void)eval_text("(define tree2 (bt.compile (bt.to-dsl tree)))", env);
+    (void)eval_text("(define inst1 (bt.new-instance tree))", env);
+    (void)eval_text("(define inst2 (bt.new-instance tree2))", env);
+    check(symbol_name(eval_text("(bt.tick inst1)", env)) == "success", "source tree tick should succeed");
+    check(symbol_name(eval_text("(bt.tick inst2)", env)) == "success", "to-dsl recompiled tree tick should succeed");
+
+    const auto dsl_path = temp_file_path("tree_dsl");
+    const std::string dsl_path_lisp = lisp_string_literal(dsl_path.string());
+    value save_ok = eval_text("(bt.save-dsl tree " + dsl_path_lisp + ")", env);
+    check(is_boolean(save_ok) && boolean_value(save_ok), "bt.save-dsl should return #t");
+
+    (void)eval_text("(define tree3 (bt.load-dsl " + dsl_path_lisp + "))", env);
+    (void)eval_text("(define inst3 (bt.new-instance tree3))", env);
+    check(symbol_name(eval_text("(bt.tick inst3)", env)) == "success", "bt.load-dsl tree tick should succeed");
+}
+
+void test_bt_binary_save_load_roundtrip_and_validation() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text("(define tree (bt (act always-success nil #t 7 3.5 \"txt\" sym)))", env);
+
+    const auto bin_path = temp_file_path("tree_binary", ".mbt");
+    const std::string bin_path_lisp = lisp_string_literal(bin_path.string());
+    value save_ok = eval_text("(bt.save tree " + bin_path_lisp + ")", env);
+    check(is_boolean(save_ok) && boolean_value(save_ok), "bt.save should return #t");
+
+    (void)eval_text("(define tree2 (bt.load " + bin_path_lisp + "))", env);
+    (void)eval_text("(define inst1 (bt.new-instance tree))", env);
+    (void)eval_text("(define inst2 (bt.new-instance tree2))", env);
+    check(symbol_name(eval_text("(bt.tick inst1)", env)) == "success", "original binary source tree tick should succeed");
+    check(symbol_name(eval_text("(bt.tick inst2)", env)) == "success", "bt.load binary tree tick should succeed");
+
+    const auto bad_header_path = temp_file_path("bad_header", ".mbt");
+    write_text_file(bad_header_path, "NOT_A_VALID_MBT");
+    try {
+        (void)eval_text("(bt.load " + lisp_string_literal(bad_header_path.string()) + ")", env);
+        throw std::runtime_error("expected bt.load invalid-header failure");
+    } catch (const lisp_error&) {
+    }
+
+    const auto unsupported_arg_path = temp_file_path("unsupported_arg", ".mbt");
+    {
+        std::ofstream out(unsupported_arg_path, std::ios::binary);
+        check(static_cast<bool>(out), "failed to open unsupported_arg test file");
+
+        auto write_u8 = [&](std::uint8_t v) { out.put(static_cast<char>(v)); };
+        auto write_u32 = [&](std::uint32_t v) {
+            write_u8(static_cast<std::uint8_t>(v & 0xFFu));
+            write_u8(static_cast<std::uint8_t>((v >> 8u) & 0xFFu));
+            write_u8(static_cast<std::uint8_t>((v >> 16u) & 0xFFu));
+            write_u8(static_cast<std::uint8_t>((v >> 24u) & 0xFFu));
+        };
+        auto write_u64 = [&](std::uint64_t v) {
+            for (int i = 0; i < 8; ++i) {
+                write_u8(static_cast<std::uint8_t>((v >> (8 * i)) & 0xFFu));
+            }
+        };
+        auto write_str = [&](const std::string& s) {
+            write_u32(static_cast<std::uint32_t>(s.size()));
+            out.write(s.data(), static_cast<std::streamsize>(s.size()));
+        };
+
+        out.write("MBT1", 4);
+        write_u32(1);         // version
+        write_u8(1);          // little-endian marker
+        write_u8(0);
+        write_u8(0);
+        write_u8(0);
+        write_u32(1);         // node count
+        write_u32(0);         // root
+        write_u8(6);          // act
+        write_u8(0);
+        write_u8(0);
+        write_u8(0);
+        write_u64(0);         // int_param
+        write_u32(0);         // children
+        write_str("always-success");
+        write_u32(1);         // arg count
+        write_u8(99);         // unsupported arg kind
+    }
+
+    try {
+        (void)eval_text("(bt.load " + lisp_string_literal(unsupported_arg_path.string()) + ")", env);
+        throw std::runtime_error("expected bt.load unsupported-arg failure");
+    } catch (const lisp_error&) {
+    }
 }
 
 void test_list_and_predicate_builtins() {
@@ -621,6 +924,12 @@ int main() {
         {"numeric rules, predicates, and printing", test_numeric_rules_predicates_and_printing},
         {"integer overflow checks", test_integer_overflow_checks},
         {"closures and function define sugar", test_closures_and_function_define_sugar},
+        {"quasiquote semantics and errors", test_quasiquote_semantics_and_errors},
+        {"let and cond forms", test_let_and_cond_forms},
+        {"bt authoring sugar", test_bt_authoring_sugar},
+        {"load/write/save and roundtrip", test_load_write_save_and_roundtrip},
+        {"bt dsl save/load roundtrip", test_bt_dsl_save_load_roundtrip},
+        {"bt binary save/load roundtrip and validation", test_bt_binary_save_load_roundtrip_and_validation},
         {"list and predicate builtins", test_list_and_predicate_builtins},
         {"gc and stats builtins", test_gc_and_stats_builtins},
         {"gc during argument evaluation", test_gc_during_argument_evaluation},

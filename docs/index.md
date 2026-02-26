@@ -4,7 +4,7 @@ muesli-bt is a tiny Lisp runtime with built-in behaviour tree (BT) support, impl
 
 The project exists to provide:
 
-- clear BT authoring in Lisp data
+- clear BT authoring in Lisp
 - explicit, testable BT semantics (`success`, `failure`, `running`)
 - practical host-side C++ integration for robotics work
 
@@ -36,7 +36,6 @@ Implemented in v1 (phases 1-6):
 Planned later (v2+):
 
 - explicit `halt` contracts for leaves
-- macro conveniences such as `(bt ...)`
 - memoryful sequence/selector variants
 
 ## Architecture Sketch
@@ -52,7 +51,7 @@ Planned later (v2+):
                 v
 +-------------------------------+
 | BT Layer                      |
-| - bt.compile (BT DSL (domain-specific language) -> nodes)   |
+| - bt/defbt/bt.compile (BT DSL -> nodes)   |
 | - tick runtime                |
 | - instance memory             |
 | - blackboard                  |
@@ -71,14 +70,13 @@ Planned later (v2+):
 ## First BT Example
 
 ```lisp
-(define tree
-  (bt.compile
-    '(sel
-       (seq
-         (cond target-visible)
-         (act approach-target)
-         (act grasp))
-       (act search-target))))
+(defbt tree
+  (sel
+    (seq
+      (cond target-visible)
+      (act approach-target)
+      (act grasp))
+    (act search-target)))
 
 (define inst (bt.new-instance tree))
 (bt.tick inst)

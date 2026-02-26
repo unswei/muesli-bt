@@ -19,14 +19,13 @@ cmake --build --preset dev -j
 Inside the REPL:
 
 ```lisp
-(define t
-  (bt.compile
-    '(sel
-       (seq
-         (cond target-visible)
-         (act approach-target)
-         (act grasp))
-       (act search-target))))
+(defbt t
+  (sel
+    (seq
+      (cond target-visible)
+      (act approach-target)
+      (act grasp))
+    (act search-target)))
 
 (define inst (bt.new-instance t))
 (bt.tick inst)
@@ -50,7 +49,7 @@ Inside the REPL:
                     |
                     v
 +----------------------------------+
-| BT DSL compiler (`bt.compile`)   |
+| BT DSL compiler (`bt`, `defbt`, `bt.compile`)   |
 | BT runtime + instance state      |
 | blackboard + trace + profiling   |
 +-------------------+--------------+
@@ -64,7 +63,7 @@ Inside the REPL:
 
 ## Intended Usage Model
 
-- BTs are authored as quoted BT DSL forms and compiled with `bt.compile`.
+- BTs are authored with `bt`/`defbt` (or `bt.compile` for low-level use).
 - A host supervision loop owns tick cadence and calls `bt.tick`.
 - Conditions/actions are implemented in C++ and registered in the runtime host.
 - Blackboard keys carry task/runtime state and are inspected via dump/trace surfaces.
@@ -73,7 +72,7 @@ Inside the REPL:
 ## Design Choices (v1)
 
 - Non-moving mark/sweep GC keeps C++ interop simple and pointer-stable.
-- BTs compile from quoted Lisp data in v1; macro sugar is intentionally deferred.
+- BTs compile from Lisp DSL forms at evaluation time.
 - `seq`/`sel` are memoryless in v1 to keep semantics explicit and testable.
 - Explicit leaf `halt` contracts are deferred to v2 in favour of a smaller initial runtime.
 
@@ -113,6 +112,7 @@ Reader/parser supports:
 - booleans (`#t`, `#f`)
 - lists
 - quote sugar (`'x`)
+- quasiquote sugar (`` `x ``, `,x`, `,@xs`)
 - strings with escapes
 - line comments (`; ...`)
 
@@ -123,6 +123,12 @@ Evaluator supports:
 - `define`
 - `lambda`
 - `begin`
+- `let`
+- `cond`
+- `quasiquote`
+- `bt`
+- `defbt`
+- `load`
 
 Numeric model:
 
@@ -138,10 +144,12 @@ GC:
 - GC-managed Lisp objects and environments
 - threshold-based collection trigger
 - built-ins: `(heap-stats)`, `(gc-stats)`
+- readable serialisation helpers: `write`, `write-to-string`, `save`
 
 BT compile/runtime:
 
-- `(bt.compile '<dsl-form>)` for BT DSL compilation
+- `(bt <dsl-form>)` and `(defbt name <dsl-form>)`
+- `(bt.compile '<dsl-form>)` (low-level primitive)
 - composites: `seq`, `sel`
 - decorators: `invert`, `repeat`, `retry`
 - leaves: `cond`, `act`
@@ -150,6 +158,9 @@ BT compile/runtime:
 - memoryless `seq`/`sel` traversal
 - per-node runtime memory (`node_memory`)
 - `(bt.reset inst)` clears per-node memory and blackboard
+- persistence:
+  - DSL: `bt.to-dsl`, `bt.save-dsl`, `bt.load-dsl`
+  - compiled: `bt.save`, `bt.load` (`MBT1` versioned format)
 
 Typed host services (Phase 6):
 
@@ -201,6 +212,8 @@ Scheduler:
 
 Core:
 
+- `bt`
+- `defbt`
 - `bt.compile`
 - `bt.new-instance`
 - `bt.tick`
@@ -223,6 +236,11 @@ Inspectability/config:
 - `bt.set-read-trace-enabled`
 - `bt.clear-trace`
 - `bt.clear-logs`
+- `bt.to-dsl`
+- `bt.save-dsl`
+- `bt.load-dsl`
+- `bt.save`
+- `bt.load`
 
 `bt.tick` supports:
 
@@ -319,7 +337,6 @@ Code is written to be portable across Linux/macOS (standard library threads/chro
 
 - timeout decorator (`timeout`) from companion extension ideas
 - external logging/metrics adapters (for example `spdlog`, Prometheus, OpenTelemetry)
-- macro-based BT authoring sugar (`(bt ...)`)
 - advanced halting contracts for long-running leaves beyond reset/cancel patterns
 - memoryful composite variants (`mem-seq`, `mem-sel`)
 

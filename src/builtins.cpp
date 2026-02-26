@@ -3,17 +3,21 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <limits>
+#include <sstream>
 #include <utility>
 
 #include "bt/blackboard.hpp"
 #include "bt/compiler.hpp"
 #include "bt/runtime_host.hpp"
+#include "bt/serialisation.hpp"
 #include "bt/status.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
+#include "muslisp/reader.hpp"
 
 namespace muslisp {
 namespace {
@@ -28,6 +32,34 @@ void require_min_arity(const std::string& name, const std::vector<value>& args, 
     if (args.size() < min_expected) {
         throw lisp_error(name + ": expected at least " + std::to_string(min_expected) + " arguments, got " +
                          std::to_string(args.size()));
+    }
+}
+
+std::string require_path_arg(value v, const std::string& where) {
+    if (!is_string(v)) {
+        throw lisp_error(where + ": expected file path string");
+    }
+    return string_value(v);
+}
+
+std::string read_text_file(const std::string& path, const std::string& where) {
+    std::ifstream in(path);
+    if (!in) {
+        throw lisp_error(where + ": failed to open file: " + path);
+    }
+    std::ostringstream ss;
+    ss << in.rdbuf();
+    return ss.str();
+}
+
+void write_text_file(const std::string& path, const std::string& text, const std::string& where) {
+    std::ofstream out(path);
+    if (!out) {
+        throw lisp_error(where + ": failed to open file for write: " + path);
+    }
+    out << text;
+    if (!out) {
+        throw lisp_error(where + ": failed while writing file: " + path);
     }
 }
 
@@ -387,6 +419,28 @@ value builtin_print(const std::vector<value>& args) {
     return make_nil();
 }
 
+value builtin_write(const std::vector<value>& args) {
+    require_arity("write", args, 1);
+    std::cout << write_value(args[0]) << std::endl;
+    return args[0];
+}
+
+value builtin_write_to_string(const std::vector<value>& args) {
+    require_arity("write-to-string", args, 1);
+    return make_string(write_value(args[0]));
+}
+
+value builtin_save(const std::vector<value>& args) {
+    require_arity("save", args, 2);
+    const std::string path = require_path_arg(args[0], "save");
+    std::string text = write_value(args[1]);
+    if (!is_nil(args[1]) && !is_boolean(args[1]) && !is_integer(args[1]) && !is_float(args[1]) && !is_string(args[1])) {
+        text = "(quote " + text + ")";
+    }
+    write_text_file(path, text, "save");
+    return make_boolean(true);
+}
+
 std::int64_t require_bt_def_handle(value v, const std::string& where) {
     if (!is_bt_def(v)) {
         throw lisp_error(where + ": expected bt_def");
@@ -463,6 +517,105 @@ value status_to_symbol(bt::status st) {
     return make_symbol(bt::status_name(st));
 }
 
+value bt_arg_to_lisp_value(const bt::arg_value& arg) {
+    switch (arg.kind) {
+        case bt::arg_kind::nil:
+            return make_nil();
+        case bt::arg_kind::boolean:
+            return make_boolean(arg.bool_v);
+        case bt::arg_kind::integer:
+            return make_integer(arg.int_v);
+        case bt::arg_kind::floating:
+            return make_float(arg.float_v);
+        case bt::arg_kind::symbol:
+            return make_symbol(arg.text);
+        case bt::arg_kind::string:
+            return make_string(arg.text);
+    }
+    throw lisp_error("bt.to-dsl: unsupported arg kind");
+}
+
+value bt_node_to_dsl(const bt::definition& def, bt::node_id id) {
+    if (id >= def.nodes.size()) {
+        throw lisp_error("bt.to-dsl: invalid node id");
+    }
+    const bt::node& n = def.nodes[id];
+
+    std::vector<value> form;
+    switch (n.kind) {
+        case bt::node_kind::seq:
+            form.push_back(make_symbol("seq"));
+            for (bt::node_id child : n.children) {
+                form.push_back(bt_node_to_dsl(def, child));
+            }
+            break;
+        case bt::node_kind::sel:
+            form.push_back(make_symbol("sel"));
+            for (bt::node_id child : n.children) {
+                form.push_back(bt_node_to_dsl(def, child));
+            }
+            break;
+        case bt::node_kind::invert:
+            form.push_back(make_symbol("invert"));
+            if (n.children.size() != 1) {
+                throw lisp_error("bt.to-dsl: invert node requires one child");
+            }
+            form.push_back(bt_node_to_dsl(def, n.children[0]));
+            break;
+        case bt::node_kind::repeat:
+            form.push_back(make_symbol("repeat"));
+            form.push_back(make_integer(n.int_param));
+            if (n.children.size() != 1) {
+                throw lisp_error("bt.to-dsl: repeat node requires one child");
+            }
+            form.push_back(bt_node_to_dsl(def, n.children[0]));
+            break;
+        case bt::node_kind::retry:
+            form.push_back(make_symbol("retry"));
+            form.push_back(make_integer(n.int_param));
+            if (n.children.size() != 1) {
+                throw lisp_error("bt.to-dsl: retry node requires one child");
+            }
+            form.push_back(bt_node_to_dsl(def, n.children[0]));
+            break;
+        case bt::node_kind::cond:
+            form.push_back(make_symbol("cond"));
+            form.push_back(make_symbol(n.leaf_name));
+            for (const bt::arg_value& arg : n.args) {
+                form.push_back(bt_arg_to_lisp_value(arg));
+            }
+            break;
+        case bt::node_kind::act:
+            form.push_back(make_symbol("act"));
+            form.push_back(make_symbol(n.leaf_name));
+            for (const bt::arg_value& arg : n.args) {
+                form.push_back(bt_arg_to_lisp_value(arg));
+            }
+            break;
+        case bt::node_kind::succeed:
+            form.push_back(make_symbol("succeed"));
+            break;
+        case bt::node_kind::fail:
+            form.push_back(make_symbol("fail"));
+            break;
+        case bt::node_kind::running:
+            form.push_back(make_symbol("running"));
+            break;
+    }
+
+    return list_from_vector(form);
+}
+
+value bt_definition_to_dsl(const bt::definition& def) {
+    if (def.nodes.empty()) {
+        throw lisp_error("bt.to-dsl: definition has no nodes");
+    }
+    if (def.root >= def.nodes.size()) {
+        throw lisp_error("bt.to-dsl: root node out of range");
+    }
+    return bt_node_to_dsl(def, def.root);
+}
+
 value builtin_bt_compile(const std::vector<value>& args) {
     require_arity("bt.compile", args, 1);
     try {
@@ -471,6 +624,75 @@ value builtin_bt_compile(const std::vector<value>& args) {
         return make_bt_def(handle);
     } catch (const bt::bt_compile_error& e) {
         throw lisp_error(std::string("bt.compile: ") + e.what());
+    }
+}
+
+value builtin_bt_to_dsl(const std::vector<value>& args) {
+    require_arity("bt.to-dsl", args, 1);
+    const std::int64_t def_handle = require_bt_def_handle(args[0], "bt.to-dsl");
+    const bt::definition* def = bt::default_runtime_host().find_definition(def_handle);
+    if (!def) {
+        throw lisp_error("bt.to-dsl: unknown definition");
+    }
+    return bt_definition_to_dsl(*def);
+}
+
+value builtin_bt_save_dsl(const std::vector<value>& args) {
+    require_arity("bt.save-dsl", args, 2);
+    const std::int64_t def_handle = require_bt_def_handle(args[0], "bt.save-dsl");
+    const std::string path = require_path_arg(args[1], "bt.save-dsl");
+    const bt::definition* def = bt::default_runtime_host().find_definition(def_handle);
+    if (!def) {
+        throw lisp_error("bt.save-dsl: unknown definition");
+    }
+    const value dsl = bt_definition_to_dsl(*def);
+    write_text_file(path, write_value(dsl), "bt.save-dsl");
+    return make_boolean(true);
+}
+
+value builtin_bt_load_dsl(const std::vector<value>& args) {
+    require_arity("bt.load-dsl", args, 1);
+    const std::string path = require_path_arg(args[0], "bt.load-dsl");
+    try {
+        const std::string source = read_text_file(path, "bt.load-dsl");
+        value form = read_one(source);
+        bt::definition def = bt::compile_definition(form);
+        const std::int64_t handle = bt::default_runtime_host().store_definition(std::move(def));
+        return make_bt_def(handle);
+    } catch (const parse_error& e) {
+        throw lisp_error("bt.load-dsl: " + path + ": " + std::string(e.what()));
+    } catch (const bt::bt_compile_error& e) {
+        throw lisp_error("bt.load-dsl: " + path + ": " + std::string(e.what()));
+    } catch (const std::exception& e) {
+        throw lisp_error("bt.load-dsl: " + path + ": " + std::string(e.what()));
+    }
+}
+
+value builtin_bt_save_binary(const std::vector<value>& args) {
+    require_arity("bt.save", args, 2);
+    const std::int64_t def_handle = require_bt_def_handle(args[0], "bt.save");
+    const std::string path = require_path_arg(args[1], "bt.save");
+    const bt::definition* def = bt::default_runtime_host().find_definition(def_handle);
+    if (!def) {
+        throw lisp_error("bt.save: unknown definition");
+    }
+    try {
+        bt::save_definition_binary(*def, path);
+    } catch (const std::exception& e) {
+        throw lisp_error(std::string("bt.save: ") + e.what());
+    }
+    return make_boolean(true);
+}
+
+value builtin_bt_load_binary(const std::vector<value>& args) {
+    require_arity("bt.load", args, 1);
+    const std::string path = require_path_arg(args[0], "bt.load");
+    try {
+        bt::definition def = bt::load_definition_binary(path);
+        const std::int64_t handle = bt::default_runtime_host().store_definition(std::move(def));
+        return make_bt_def(handle);
+    } catch (const std::exception& e) {
+        throw lisp_error(std::string("bt.load: ") + e.what());
     }
 }
 
@@ -666,8 +888,16 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "gc-stats", builtin_gc_stats);
 
     bind_primitive(global_env, "print", builtin_print);
+    bind_primitive(global_env, "write", builtin_write);
+    bind_primitive(global_env, "write-to-string", builtin_write_to_string);
+    bind_primitive(global_env, "save", builtin_save);
 
     bind_primitive(global_env, "bt.compile", builtin_bt_compile);
+    bind_primitive(global_env, "bt.to-dsl", builtin_bt_to_dsl);
+    bind_primitive(global_env, "bt.save-dsl", builtin_bt_save_dsl);
+    bind_primitive(global_env, "bt.load-dsl", builtin_bt_load_dsl);
+    bind_primitive(global_env, "bt.save", builtin_bt_save_binary);
+    bind_primitive(global_env, "bt.load", builtin_bt_load_binary);
     bind_primitive(global_env, "bt.new-instance", builtin_bt_new_instance);
     bind_primitive(global_env, "bt.tick", builtin_bt_tick);
     bind_primitive(global_env, "bt.reset", builtin_bt_reset);

@@ -7,5 +7,6 @@
 namespace muslisp {
 
 std::string print_value(value v);
+std::string write_value(value v);
 
 }  // namespace muslisp

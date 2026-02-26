@@ -14,14 +14,6 @@ Lisp code is written as lists:
 
 The first item is the operator, followed by arguments.
 
-## Prefix Notation
-
-```lisp
-(+ 2 3)   ; 5
-(* 4 5)   ; 20
-(> 7 2)   ; #t
-```
-
 ## Core Atoms
 
 - symbols: `foo`, `target-visible`
@@ -29,29 +21,80 @@ The first item is the operator, followed by arguments.
 - floats: `3.14`, `1e-3`, `2.`
 - booleans: `#t`, `#f`
 - nil: `nil`
+- strings: `"hello"`
 
-## Quoting: Data vs Evaluation
+## Quote And Quasiquote
 
-Quote prevents evaluation and keeps a form as data:
+Quote keeps code as data:
 
 ```lisp
 '(1 2 3)
 '(seq (cond target-visible) (act grasp))
 ```
 
-This matters for BTs: in v1, BT DSL (domain-specific language) forms are usually passed as quoted Lisp data to `bt.compile`.
+Quasiquote is template-friendly:
 
 ```lisp
-(bt.compile '(seq (cond battery-ok) (act approach-target)))
+`(seq (cond ,name) ,@children)
 ```
 
-## Tiny End-To-End Example
+- `,x` unquotes inside a quasiquote
+- `,@xs` unquote-splices a list inside list context
+
+## Practical Convenience Forms
+
+`let` introduces lexical bindings:
 
 ```lisp
-(begin
-  (define x 5)
-  (define y 7)
+(let ((x 1) (y 2))
   (+ x y))
 ```
+
+`cond` handles branch chains:
+
+```lisp
+(cond
+  ((< x 0) 'neg)
+  ((= x 0) 'zero)
+  (else 'pos))
+```
+
+## BT Authoring In Lisp
+
+Use `bt` and `defbt` for human-authored trees:
+
+```lisp
+(defbt patrol
+  (sel
+    (seq
+      (cond target-visible)
+      (act approach-target)
+      (act grasp))
+    (act search-target)))
+```
+
+`bt.compile` still exists as the low-level primitive.
+
+## `print` vs `write`
+
+- `print` is for human output.
+- `write` and `write-to-string` are for readable data output.
+
+Example:
+
+```lisp
+(define payload '(foo "bar" 3))
+(write payload)
+(define s (write-to-string payload))
+```
+
+## Loading And Saving
+
+```lisp
+(save "state.lisp" '(x 1 y 2))
+(load "state.lisp")
+```
+
+`load` reads and evaluates forms from file in order and returns the last value.
 
 Next: [Language Syntax](language/syntax.md) and [Language Semantics](language/semantics.md).

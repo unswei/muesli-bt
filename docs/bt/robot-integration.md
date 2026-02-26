@@ -73,3 +73,19 @@ reg.register_action("set-goal", [](bt::tick_context& ctx, bt::node_id, bt::node_
 BT layer decides *what should happen next*.
 
 Host robotics code decides *how the robot actually executes it* (controllers, planners, ROS2 actions, drivers, etc.).
+
+## Shipping Trees With `load`
+
+For deployment scripts, keep BT and glue code in Lisp source files and load them at runtime:
+
+```lisp
+(load "robot_trees/patrol.lisp")
+(define inst (bt.new-instance patrol-tree))
+(bt.tick inst)
+```
+
+Recommended pattern:
+
+- define trees with `defbt`
+- keep callback names stable with host registry names
+- use `bt.save-dsl` for portable artefacts when you need to export/import trees

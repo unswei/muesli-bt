@@ -27,3 +27,8 @@ Each tick evaluates from the root and returns one status:
 - leaves: host callbacks (`cond`, `act`)
 
 This prepares you for the project BT DSL (domain-specific language) in [BT Syntax](syntax.md).
+
+Authoring helpers are available:
+
+- `(bt ...)` compiles one DSL form
+- `(defbt name ...)` defines a compiled tree
