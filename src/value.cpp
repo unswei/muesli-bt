@@ -1,6 +1,7 @@
 #include "muslisp/value.hpp"
 
 #include <cmath>
+#include <cstdint>
 #include <mutex>
 #include <unordered_map>
 #include <utility>
@@ -43,6 +44,45 @@ double number_to_double(value v) {
 
 }  // namespace
 
+bool map_key::operator==(const map_key& other) const noexcept {
+    if (type != other.type) {
+        return false;
+    }
+
+    switch (type) {
+        case map_key_type::symbol:
+        case map_key_type::string:
+            return text_data == other.text_data;
+        case map_key_type::integer:
+            return integer_data == other.integer_data;
+        case map_key_type::floating:
+            return float_data == other.float_data;
+    }
+    return false;
+}
+
+std::size_t map_key_hash::operator()(const map_key& key) const noexcept {
+    auto combine = [](std::size_t lhs, std::size_t rhs) {
+        constexpr std::size_t mix = 0x9e3779b97f4a7c15ull;
+        return lhs ^ (rhs + mix + (lhs << 6u) + (lhs >> 2u));
+    };
+
+    std::size_t seed = std::hash<int>{}(static_cast<int>(key.type));
+    switch (key.type) {
+        case map_key_type::symbol:
+        case map_key_type::string:
+            seed = combine(seed, std::hash<std::string>{}(key.text_data));
+            break;
+        case map_key_type::integer:
+            seed = combine(seed, std::hash<std::int64_t>{}(key.integer_data));
+            break;
+        case map_key_type::floating:
+            seed = combine(seed, std::hash<double>{}(key.float_data));
+            break;
+    }
+    return seed;
+}
+
 object::object(value_type value_type_tag) : type(value_type_tag) {}
 
 void object::gc_mark_children(gc& heap) {
@@ -56,6 +96,16 @@ void object::gc_mark_children(gc& heap) {
                 heap.mark_value(expr);
             }
             heap.mark_env(closure_env_data);
+            break;
+        case value_type::vec:
+            for (value elem : vec_data) {
+                heap.mark_value(elem);
+            }
+            break;
+        case value_type::map:
+            for (const auto& [_, mapped] : map_data) {
+                heap.mark_value(mapped);
+            }
             break;
         default:
             break;
@@ -159,6 +209,25 @@ value make_closure(const std::vector<std::string>& params, const std::vector<val
     return out;
 }
 
+value make_vec(std::size_t capacity) {
+    auto out = make_object(value_type::vec);
+    out->vec_data.reserve(capacity);
+    return out;
+}
+
+value make_map() {
+    return make_object(value_type::map);
+}
+
+value make_rng(std::uint64_t seed) {
+    auto out = make_object(value_type::rng);
+    out->rng_data = std::make_shared<rng_state>();
+    out->rng_data->state = seed;
+    out->rng_data->has_spare_normal = false;
+    out->rng_data->spare_normal = 0.0;
+    return out;
+}
+
 value make_bt_def(std::int64_t handle) {
     auto out = make_object(value_type::bt_def);
     out->bt_handle_data = handle;
@@ -198,6 +267,12 @@ std::string_view type_name(value_type t) {
             return "primitive_fn";
         case value_type::closure:
             return "closure";
+        case value_type::vec:
+            return "vec";
+        case value_type::map:
+            return "map";
+        case value_type::rng:
+            return "rng";
         case value_type::bt_def:
             return "bt_def";
         case value_type::bt_instance:
@@ -244,6 +319,18 @@ bool is_primitive(value v) {
 
 bool is_closure(value v) {
     return v && v->type == value_type::closure;
+}
+
+bool is_vec(value v) {
+    return v && v->type == value_type::vec;
+}
+
+bool is_map(value v) {
+    return v && v->type == value_type::map;
+}
+
+bool is_rng(value v) {
+    return v && v->type == value_type::rng;
 }
 
 bool is_bt_def(value v) {

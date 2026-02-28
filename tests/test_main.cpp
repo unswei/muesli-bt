@@ -1,5 +1,6 @@
 #include <cmath>
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <fstream>
@@ -590,6 +591,310 @@ void test_gc_during_argument_evaluation() {
     check(print_value(items[2]) == "(1 2 3)", "second retained value mismatch");
 }
 
+void test_math_time_and_domain_errors() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+
+    value sqrt_value = eval_text("(sqrt 4)", env);
+    check(is_float(sqrt_value), "sqrt should return float");
+    check_close(float_value(sqrt_value), 2.0, 1e-12, "sqrt(4) mismatch");
+
+    value log_value = eval_text("(log 1)", env);
+    check(is_float(log_value), "log should return float");
+    check_close(float_value(log_value), 0.0, 1e-12, "log(1) mismatch");
+
+    value exp_value = eval_text("(exp 0)", env);
+    check(is_float(exp_value), "exp should return float");
+    check_close(float_value(exp_value), 1.0, 1e-12, "exp(0) mismatch");
+
+    value abs_i = eval_text("(abs -7)", env);
+    check(is_integer(abs_i) && integer_value(abs_i) == 7, "abs over integer mismatch");
+    value abs_f = eval_text("(abs -2.5)", env);
+    check(is_float(abs_f), "abs over float should return float");
+    check_close(float_value(abs_f), 2.5, 1e-12, "abs over float mismatch");
+
+    value clamp_i = eval_text("(clamp 9 0 5)", env);
+    check(is_integer(clamp_i) && integer_value(clamp_i) == 5, "clamp int mismatch");
+    value clamp_f = eval_text("(clamp 0.2 0.3 0.9)", env);
+    check(is_float(clamp_f), "clamp float should return float");
+    check_close(float_value(clamp_f), 0.3, 1e-12, "clamp float mismatch");
+
+    value t1 = eval_text("(time.now-ms)", env);
+    std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    value t2 = eval_text("(time.now-ms)", env);
+    check(is_integer(t1) && is_integer(t2), "time.now-ms should return integer");
+    check(integer_value(t2) >= integer_value(t1), "time.now-ms should be monotonic");
+
+    try {
+        (void)eval_text("(sqrt -1)", env);
+        throw std::runtime_error("expected sqrt domain error");
+    } catch (const lisp_error&) {
+    }
+    try {
+        (void)eval_text("(log 0)", env);
+        throw std::runtime_error("expected log domain error");
+    } catch (const lisp_error&) {
+    }
+}
+
+void test_rng_determinism_and_ranges() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+    value seq = eval_text(
+        "(begin "
+        "  (define r (rng.make 42)) "
+        "  (list "
+        "    (rng.int r 1000) "
+        "    (rng.int r 1000) "
+        "    (rng.int r 1000) "
+        "    (rng.int r 1000) "
+        "    (rng.int r 1000) "
+        "    (rng.int r 1000) "
+        "    (rng.int r 1000) "
+        "    (rng.int r 1000)))",
+        env);
+    const std::vector<value> items = vector_from_list(seq);
+    const std::vector<std::int64_t> expected = {413, 291, 858, 764, 250, 62, 925, 908};
+    check(items.size() == expected.size(), "rng.int deterministic sequence size mismatch");
+    for (std::size_t i = 0; i < expected.size(); ++i) {
+        check(is_integer(items[i]), "rng.int should return integer");
+        check(integer_value(items[i]) == expected[i], "rng.int deterministic sequence mismatch");
+    }
+
+    value uniform_ok = eval_text(
+        "(begin "
+        "  (define r (rng.make 7)) "
+        "  (define (check i) "
+        "    (if (= i 0) #t "
+        "      (let ((x (rng.uniform r -1.25 3.5))) "
+        "        (if (>= x -1.25) (if (<= x 3.5) (check (- i 1)) #f) #f)))) "
+        "  (check 200))",
+        env);
+    check(is_boolean(uniform_ok) && boolean_value(uniform_ok), "rng.uniform range check failed");
+
+    value int_ok = eval_text(
+        "(begin "
+        "  (define r (rng.make 9)) "
+        "  (define (check i) "
+        "    (if (= i 0) #t "
+        "      (let ((x (rng.int r 17))) "
+        "        (if (>= x 0) (if (< x 17) (check (- i 1)) #f) #f)))) "
+        "  (check 200))",
+        env);
+    check(is_boolean(int_ok) && boolean_value(int_ok), "rng.int range check failed");
+
+    value normal_repeat = eval_text(
+        "(begin "
+        "  (define r1 (rng.make 123)) "
+        "  (define r2 (rng.make 123)) "
+        "  (define a1 (rng.normal r1 0.0 1.0)) "
+        "  (define a2 (rng.normal r1 0.0 1.0)) "
+        "  (define b1 (rng.normal r2 0.0 1.0)) "
+        "  (define b2 (rng.normal r2 0.0 1.0)) "
+        "  (if (= a1 b1) (= a2 b2) #f))",
+        env);
+    check(is_boolean(normal_repeat) && boolean_value(normal_repeat), "rng.normal should be deterministic for fixed seed");
+
+    try {
+        (void)eval_text("(begin (define r (rng.make 1)) (rng.int r 0))", env);
+        throw std::runtime_error("expected rng.int n>0 validation error");
+    } catch (const lisp_error&) {
+    }
+    try {
+        (void)eval_text("(begin (define r (rng.make 1)) (rng.normal r 0.0 -1.0))", env);
+        throw std::runtime_error("expected rng.normal sigma>=0 validation error");
+    } catch (const lisp_error&) {
+    }
+}
+
+void test_vec_gc_growth_and_fuzz() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+    (void)eval_text("(define v (vec.make 1))", env);
+
+    for (int i = 0; i < 256; ++i) {
+        (void)eval_text("(vec.push! v (list 'item " + std::to_string(i) + "))", env);
+        if ((i % 23) == 0) {
+            default_gc().collect();
+        }
+    }
+    default_gc().collect();
+
+    value len = eval_text("(vec.len v)", env);
+    check(is_integer(len) && integer_value(len) == 256, "vec.len mismatch after growth");
+    for (int i = 0; i < 256; ++i) {
+        value got = eval_text("(vec.get v " + std::to_string(i) + ")", env);
+        check(print_value(got) == "(item " + std::to_string(i) + ")", "vec retained value mismatch after GC");
+    }
+
+    (void)eval_text("(vec.set! v 7 (list 'replaced 7))", env);
+    default_gc().collect();
+    check(print_value(eval_text("(vec.get v 7)", env)) == "(replaced 7)", "vec.set! overwrite mismatch");
+
+    std::vector<std::int64_t> model;
+    std::uint64_t state = 0x123456789abcdef0ull;
+    auto next = [&]() {
+        state = state * 6364136223846793005ull + 1442695040888963407ull;
+        return state;
+    };
+    (void)eval_text("(define vf (vec.make 2))", env);
+    for (int step = 0; step < 400; ++step) {
+        const std::uint64_t r = next();
+        if (model.empty() || (r % 3u == 0u)) {
+            const std::int64_t value_i = static_cast<std::int64_t>((next() % 4000u)) - 2000;
+            (void)eval_text("(vec.push! vf " + std::to_string(value_i) + ")", env);
+            model.push_back(value_i);
+        } else if (r % 3u == 1u) {
+            const std::size_t idx = static_cast<std::size_t>(next() % model.size());
+            const std::int64_t value_i = static_cast<std::int64_t>((next() % 4000u)) - 2000;
+            (void)eval_text("(vec.set! vf " + std::to_string(idx) + " " + std::to_string(value_i) + ")", env);
+            model[idx] = value_i;
+        } else {
+            const std::size_t idx = static_cast<std::size_t>(next() % model.size());
+            value got = eval_text("(vec.get vf " + std::to_string(idx) + ")", env);
+            check(is_integer(got), "vec.get in fuzz should return integer");
+            check(integer_value(got) == model[idx], "vec fuzz model mismatch");
+        }
+
+        if ((step % 37) == 0) {
+            default_gc().collect();
+        }
+    }
+    check(integer_value(eval_text("(vec.len vf)", env)) == static_cast<std::int64_t>(model.size()), "vec fuzz len mismatch");
+    for (std::size_t i = 0; i < model.size(); ++i) {
+        value got = eval_text("(vec.get vf " + std::to_string(i) + ")", env);
+        check(integer_value(got) == model[i], "vec fuzz final state mismatch");
+    }
+}
+
+void test_map_gc_rehash_and_ops() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+    (void)eval_text("(define m (map.make))", env);
+
+    for (int i = 0; i < 400; ++i) {
+        const std::string key = "\"k" + std::to_string(i) + "\"";
+        (void)eval_text("(map.set! m " + key + " (list 'v " + std::to_string(i) + "))", env);
+        if ((i % 41) == 0) {
+            default_gc().collect();
+        }
+    }
+    default_gc().collect();
+
+    for (int i = 0; i < 400; ++i) {
+        const std::string key = "\"k" + std::to_string(i) + "\"";
+        value got = eval_text("(map.get m " + key + " nil)", env);
+        check(print_value(got) == "(v " + std::to_string(i) + ")", "map retrieval mismatch after GC/rehash");
+    }
+
+    (void)eval_text("(map.set! m \"k12\" (list 'new 12))", env);
+    check(print_value(eval_text("(map.get m \"k12\" nil)", env)) == "(new 12)", "map overwrite mismatch");
+    check(boolean_value(eval_text("(map.has? m \"k12\")", env)), "map.has? should be true");
+    check(boolean_value(eval_text("(map.del! m \"k12\")", env)), "map.del! should return true on existing key");
+    check(!boolean_value(eval_text("(map.has? m \"k12\")", env)), "map.has? should be false after delete");
+    check(boolean_value(eval_text("(null? (map.get m \"k12\" nil))", env)), "map.get should return default for missing key");
+
+    value keys = eval_text("(map.keys m)", env);
+    check(is_proper_list(keys), "map.keys should return a proper list");
+    check(integer_value(eval_text("(vec.len (vec.make 0))", env)) == 0, "sanity check for vec.make default path");
+
+    try {
+        (void)eval_text("(map.set! m '(bad key) 1)", env);
+        throw std::runtime_error("expected map key type validation error");
+    } catch (const lisp_error&) {
+    }
+}
+
+void test_continuous_mcts_smoke_deterministic() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+    const std::string program =
+        "(begin "
+        "  (define goal 1.0) "
+        "  (define (step x a) "
+        "    (let ((a2 (clamp a -1.0 1.0))) "
+        "      (let ((x2 (+ x (* 0.25 a2)))) "
+        "        (- 0.0 (abs (- goal x2)))))) "
+        "  (define (pw-allow? n-visits n-children k alpha) "
+        "    (< n-children (* k (exp (* alpha (log (if (< n-visits 1) 1 n-visits))))))) "
+        "  (define (ucb q n parent-n c) "
+        "    (if (= n 0) 1.0e30 (+ q (* c (sqrt (/ (log (if (< parent-n 1) 1 parent-n)) n)))))) "
+        "  (define (child.new a) "
+        "    (let ((m (map.make))) "
+        "      (begin (map.set! m 'a a) (map.set! m 'n 0) (map.set! m 'w 0.0) m))) "
+        "  (define (child.q ch) "
+        "    (let ((n (map.get ch 'n 0)) (w (map.get ch 'w 0.0))) "
+        "      (if (= n 0) 0.0 (/ w n)))) "
+        "  (define (node.new) "
+        "    (let ((m (map.make))) "
+        "      (begin (map.set! m 'n 0) (map.set! m 'w 0.0) (map.set! m 'children (vec.make 4)) m))) "
+        "  (define (select-child children i nch parent-n c best best-score) "
+        "    (if (>= i nch) "
+        "        best "
+        "        (let ((ch (vec.get children i))) "
+        "          (let ((score (ucb (child.q ch) (map.get ch 'n 0) parent-n c))) "
+        "            (if (> score best-score) "
+        "                (select-child children (+ i 1) nch parent-n c ch score) "
+        "                (select-child children (+ i 1) nch parent-n c best best-score)))))) "
+        "  (define (simulate root x rng c k alpha) "
+        "    (let ((n (map.get root 'n 0)) (children (map.get root 'children nil))) "
+        "      (let ((nch (vec.len children))) "
+        "        (if (pw-allow? n nch k alpha) "
+        "            (let ((a (rng.uniform rng -1.0 1.0))) "
+        "              (let ((ch (child.new a)) (v (step x a))) "
+        "                (begin "
+        "                  (vec.push! children ch) "
+        "                  (map.set! ch 'n (+ (map.get ch 'n 0) 1)) "
+        "                  (map.set! ch 'w (+ (map.get ch 'w 0.0) v)) "
+        "                  (map.set! root 'n (+ n 1)) "
+        "                  (map.set! root 'w (+ (map.get root 'w 0.0) v)) "
+        "                  v))) "
+        "            (let ((ch (select-child children 0 nch n c nil -1.0e30))) "
+        "              (let ((v (step x (map.get ch 'a 0.0)))) "
+        "                (begin "
+        "                  (map.set! ch 'n (+ (map.get ch 'n 0) 1)) "
+        "                  (map.set! ch 'w (+ (map.get ch 'w 0.0) v)) "
+        "                  (map.set! root 'n (+ n 1)) "
+        "                  (map.set! root 'w (+ (map.get root 'w 0.0) v)) "
+        "                  v))))))) "
+        "  (define (search-loop root x rng i iters c k alpha) "
+        "    (if (>= i iters) "
+        "        root "
+        "        (begin "
+        "          (simulate root x rng c k alpha) "
+        "          (search-loop root x rng (+ i 1) iters c k alpha)))) "
+        "  (define (best-child children i nch best best-n) "
+        "    (if (>= i nch) "
+        "        best "
+        "        (let ((ch (vec.get children i)) (cn (map.get (vec.get children i) 'n 0))) "
+        "          (if (> cn best-n) "
+        "              (best-child children (+ i 1) nch ch cn) "
+        "              (best-child children (+ i 1) nch best best-n))))) "
+        "  (define (mcts.search x0 seed iters) "
+        "    (let ((rng (rng.make seed)) (root (node.new)) (c 1.2) (k 2.0) (alpha 0.5)) "
+        "      (begin "
+        "        (search-loop root x0 rng 0 iters c k alpha) "
+        "        (let ((children (map.get root 'children nil))) "
+        "          (let ((best (best-child children 0 (vec.len children) nil -1))) "
+        "            (map.get best 'a 0.0)))))) "
+        "  (let ((a1 (mcts.search 0.0 42 350)) (a2 (mcts.search 0.0 42 350))) "
+        "    (list a1 a2)))";
+
+    value out = eval_text(program, env);
+    const std::vector<value> pair = vector_from_list(out);
+    check(pair.size() == 2, "mcts smoke output shape mismatch");
+    check(is_float(pair[0]) && is_float(pair[1]), "mcts smoke should return float actions");
+    const double a1 = float_value(pair[0]);
+    const double a2 = float_value(pair[1]);
+    check(a1 > 0.0, "mcts smoke action should move toward positive goal");
+    check_close(a1, a2, 1e-12, "mcts smoke should be deterministic for fixed seed");
+}
+
 void test_bt_compile_checks() {
     using namespace muslisp;
 
@@ -933,6 +1238,11 @@ int main() {
         {"list and predicate builtins", test_list_and_predicate_builtins},
         {"gc and stats builtins", test_gc_and_stats_builtins},
         {"gc during argument evaluation", test_gc_during_argument_evaluation},
+        {"math/time builtins and domain errors", test_math_time_and_domain_errors},
+        {"rng determinism and ranges", test_rng_determinism_and_ranges},
+        {"vec gc/growth/fuzz", test_vec_gc_growth_and_fuzz},
+        {"map gc/rehash/ops", test_map_gc_rehash_and_ops},
+        {"continuous mcts smoke deterministic", test_continuous_mcts_smoke_deterministic},
         {"bt compile checks", test_bt_compile_checks},
         {"bt seq/running semantics", test_bt_seq_and_running_semantics},
         {"bt decorator semantics", test_bt_decorator_semantics},

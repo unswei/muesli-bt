@@ -125,6 +125,21 @@ std::string print_impl(value v, bool readable) {
                 throw lisp_error(write_error_message(value_type::closure));
             }
             return "<closure>";
+        case value_type::vec:
+            if (readable) {
+                throw lisp_error(write_error_message(value_type::vec));
+            }
+            return "<vec:" + std::to_string(v->vec_data.size()) + ">";
+        case value_type::map:
+            if (readable) {
+                throw lisp_error(write_error_message(value_type::map));
+            }
+            return "<map:" + std::to_string(v->map_data.size()) + ">";
+        case value_type::rng:
+            if (readable) {
+                throw lisp_error(write_error_message(value_type::rng));
+            }
+            return "<rng>";
         case value_type::bt_def:
             if (readable) {
                 throw lisp_error(write_error_message(value_type::bt_def));

@@ -1,5 +1,6 @@
 #include "muslisp/builtins.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -33,6 +34,112 @@ void require_min_arity(const std::string& name, const std::vector<value>& args, 
         throw lisp_error(name + ": expected at least " + std::to_string(min_expected) + " arguments, got " +
                          std::to_string(args.size()));
     }
+}
+
+std::int64_t require_int_arg(value v, const std::string& where) {
+    if (!is_integer(v)) {
+        throw lisp_error(where + ": expected integer");
+    }
+    return integer_value(v);
+}
+
+value require_vec_arg(value v, const std::string& where) {
+    if (!is_vec(v)) {
+        throw lisp_error(where + ": expected vec");
+    }
+    return v;
+}
+
+value require_map_arg(value v, const std::string& where) {
+    if (!is_map(v)) {
+        throw lisp_error(where + ": expected map");
+    }
+    return v;
+}
+
+value require_rng_arg(value v, const std::string& where) {
+    if (!is_rng(v) || !v->rng_data) {
+        throw lisp_error(where + ": expected rng");
+    }
+    return v;
+}
+
+std::int64_t to_int64_size(std::size_t size, const std::string& where) {
+    if (size > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max())) {
+        throw lisp_error(where + ": size exceeds int64 range");
+    }
+    return static_cast<std::int64_t>(size);
+}
+
+std::size_t require_non_negative_index(value v, std::size_t upper_bound, const std::string& where) {
+    if (!is_integer(v)) {
+        throw lisp_error(where + ": expected integer index");
+    }
+
+    const std::int64_t index = integer_value(v);
+    if (index < 0 || static_cast<std::size_t>(index) >= upper_bound) {
+        throw lisp_error(where + ": index out of range");
+    }
+    return static_cast<std::size_t>(index);
+}
+
+std::size_t require_non_negative_capacity(value v, const std::string& where) {
+    if (!is_integer(v)) {
+        throw lisp_error(where + ": expected integer capacity");
+    }
+
+    const std::int64_t raw = integer_value(v);
+    if (raw < 0) {
+        throw lisp_error(where + ": expected non-negative capacity");
+    }
+    return static_cast<std::size_t>(raw);
+}
+
+map_key map_key_from_value(value key, const std::string& where) {
+    if (is_symbol(key)) {
+        map_key out;
+        out.type = map_key_type::symbol;
+        out.text_data = symbol_name(key);
+        return out;
+    }
+    if (is_string(key)) {
+        map_key out;
+        out.type = map_key_type::string;
+        out.text_data = string_value(key);
+        return out;
+    }
+    if (is_integer(key)) {
+        map_key out;
+        out.type = map_key_type::integer;
+        out.integer_data = integer_value(key);
+        return out;
+    }
+    if (is_float(key)) {
+        const double numeric = float_value(key);
+        if (std::isnan(numeric)) {
+            throw lisp_error(where + ": float keys must not be NaN");
+        }
+        map_key out;
+        out.type = map_key_type::floating;
+        out.float_data = (numeric == 0.0) ? 0.0 : numeric;
+        return out;
+    }
+
+    throw lisp_error(where + ": expected key as symbol, string, integer, or float");
+}
+
+value map_key_to_value(const map_key& key) {
+    switch (key.type) {
+        case map_key_type::symbol:
+            return make_symbol(key.text_data);
+        case map_key_type::string:
+            return make_string(key.text_data);
+        case map_key_type::integer:
+            return make_integer(key.integer_data);
+        case map_key_type::floating:
+            return make_float(key.float_data);
+    }
+    throw lisp_error("map.keys: invalid key type");
 }
 
 std::string require_path_arg(value v, const std::string& where) {
@@ -90,6 +197,21 @@ bool contains_float(const std::vector<value>& args) {
         }
     }
     return false;
+}
+
+std::uint64_t splitmix64_next(std::uint64_t& state) {
+    state += 0x9e3779b97f4a7c15ull;
+    std::uint64_t z = state;
+    z = (z ^ (z >> 30u)) * 0xbf58476d1ce4e5b9ull;
+    z = (z ^ (z >> 27u)) * 0x94d049bb133111ebull;
+    return z ^ (z >> 31u);
+}
+
+double rng_next_unit(value rng_obj) {
+    // Use top 53 random bits for deterministic [0,1) doubles.
+    constexpr double kScale = 1.0 / 9007199254740992.0;
+    const std::uint64_t bits = splitmix64_next(rng_obj->rng_data->state);
+    return static_cast<double>(bits >> 11u) * kScale;
 }
 
 bool checked_add(std::int64_t lhs, std::int64_t rhs, std::int64_t& out) {
@@ -386,6 +508,263 @@ value builtin_zero_pred(const std::vector<value>& args) {
         return make_boolean(float_value(args[0]) == 0.0);
     }
     return make_boolean(false);
+}
+
+value builtin_sqrt(const std::vector<value>& args) {
+    require_arity("sqrt", args, 1);
+    const double x = number_as_double(as_numeric(args[0], "sqrt"));
+    if (x < 0.0) {
+        throw lisp_error("sqrt: expected x >= 0");
+    }
+    return make_float(std::sqrt(x));
+}
+
+value builtin_log(const std::vector<value>& args) {
+    require_arity("log", args, 1);
+    const double x = number_as_double(as_numeric(args[0], "log"));
+    if (x <= 0.0) {
+        throw lisp_error("log: expected x > 0");
+    }
+    return make_float(std::log(x));
+}
+
+value builtin_exp(const std::vector<value>& args) {
+    require_arity("exp", args, 1);
+    return make_float(std::exp(number_as_double(as_numeric(args[0], "exp"))));
+}
+
+value builtin_abs(const std::vector<value>& args) {
+    require_arity("abs", args, 1);
+    if (is_integer(args[0])) {
+        const std::int64_t x = integer_value(args[0]);
+        if (x == std::numeric_limits<std::int64_t>::min()) {
+            throw lisp_error("abs: integer overflow");
+        }
+        return make_integer(x < 0 ? -x : x);
+    }
+    if (is_float(args[0])) {
+        return make_float(std::fabs(float_value(args[0])));
+    }
+    throw lisp_error("abs: expected number");
+}
+
+value builtin_clamp(const std::vector<value>& args) {
+    require_arity("clamp", args, 3);
+    const numeric x = as_numeric(args[0], "clamp");
+    const numeric lo = as_numeric(args[1], "clamp");
+    const numeric hi = as_numeric(args[2], "clamp");
+
+    if (x.is_int && lo.is_int && hi.is_int) {
+        if (lo.int_value > hi.int_value) {
+            throw lisp_error("clamp: expected lo <= hi");
+        }
+        const std::int64_t out = std::clamp(x.int_value, lo.int_value, hi.int_value);
+        return make_integer(out);
+    }
+
+    const double xd = number_as_double(x);
+    const double lod = number_as_double(lo);
+    const double hid = number_as_double(hi);
+    if (lod > hid) {
+        throw lisp_error("clamp: expected lo <= hi");
+    }
+    return make_float(std::clamp(xd, lod, hid));
+}
+
+value builtin_time_now_ms(const std::vector<value>& args) {
+    require_arity("time.now-ms", args, 0);
+    const auto now = std::chrono::steady_clock::now().time_since_epoch();
+    const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    return make_integer(ms);
+}
+
+value builtin_rng_make(const std::vector<value>& args) {
+    require_arity("rng.make", args, 1);
+    const std::int64_t seed = require_int_arg(args[0], "rng.make");
+    return make_rng(static_cast<std::uint64_t>(seed));
+}
+
+value builtin_rng_uniform(const std::vector<value>& args) {
+    require_arity("rng.uniform", args, 3);
+    value rng_obj = require_rng_arg(args[0], "rng.uniform");
+    const double lo = number_as_double(as_numeric(args[1], "rng.uniform"));
+    const double hi = number_as_double(as_numeric(args[2], "rng.uniform"));
+    if (lo > hi) {
+        throw lisp_error("rng.uniform: expected lo <= hi");
+    }
+    if (lo == hi) {
+        return make_float(lo);
+    }
+
+    const double u = rng_next_unit(rng_obj);
+    return make_float(lo + (hi - lo) * u);
+}
+
+value builtin_rng_int(const std::vector<value>& args) {
+    require_arity("rng.int", args, 2);
+    value rng_obj = require_rng_arg(args[0], "rng.int");
+    const std::int64_t n = require_int_arg(args[1], "rng.int");
+    if (n <= 0) {
+        throw lisp_error("rng.int: expected n > 0");
+    }
+
+    const std::uint64_t bound = static_cast<std::uint64_t>(n);
+    const std::uint64_t threshold = static_cast<std::uint64_t>(-bound) % bound;
+    while (true) {
+        const std::uint64_t r = splitmix64_next(rng_obj->rng_data->state);
+        if (r >= threshold) {
+            return make_integer(static_cast<std::int64_t>(r % bound));
+        }
+    }
+}
+
+value builtin_rng_normal(const std::vector<value>& args) {
+    require_arity("rng.normal", args, 3);
+    value rng_obj = require_rng_arg(args[0], "rng.normal");
+    const double mu = number_as_double(as_numeric(args[1], "rng.normal"));
+    const double sigma = number_as_double(as_numeric(args[2], "rng.normal"));
+    if (sigma < 0.0) {
+        throw lisp_error("rng.normal: expected sigma >= 0");
+    }
+    if (sigma == 0.0) {
+        return make_float(mu);
+    }
+
+    if (rng_obj->rng_data->has_spare_normal) {
+        rng_obj->rng_data->has_spare_normal = false;
+        return make_float(mu + sigma * rng_obj->rng_data->spare_normal);
+    }
+
+    constexpr double kTwoPi = 6.28318530717958647692;
+    double u1 = rng_next_unit(rng_obj);
+    if (u1 <= 0.0) {
+        u1 = std::numeric_limits<double>::min();
+    }
+    const double u2 = rng_next_unit(rng_obj);
+
+    const double r = std::sqrt(-2.0 * std::log(u1));
+    const double theta = kTwoPi * u2;
+    const double z0 = r * std::cos(theta);
+    const double z1 = r * std::sin(theta);
+    rng_obj->rng_data->spare_normal = z1;
+    rng_obj->rng_data->has_spare_normal = true;
+    return make_float(mu + sigma * z0);
+}
+
+value builtin_vec_make(const std::vector<value>& args) {
+    if (args.size() > 1) {
+        throw lisp_error("vec.make: expected 0 or 1 arguments");
+    }
+    std::size_t capacity = 4;
+    if (args.size() == 1) {
+        capacity = require_non_negative_capacity(args[0], "vec.make");
+    }
+    return make_vec(capacity);
+}
+
+value builtin_vec_len(const std::vector<value>& args) {
+    require_arity("vec.len", args, 1);
+    value vec_obj = require_vec_arg(args[0], "vec.len");
+    return make_integer(to_int64_size(vec_obj->vec_data.size(), "vec.len"));
+}
+
+value builtin_vec_get(const std::vector<value>& args) {
+    require_arity("vec.get", args, 2);
+    value vec_obj = require_vec_arg(args[0], "vec.get");
+    const std::size_t index = require_non_negative_index(args[1], vec_obj->vec_data.size(), "vec.get");
+    return vec_obj->vec_data[index];
+}
+
+value builtin_vec_set(const std::vector<value>& args) {
+    require_arity("vec.set!", args, 3);
+    value vec_obj = require_vec_arg(args[0], "vec.set!");
+    const std::size_t index = require_non_negative_index(args[1], vec_obj->vec_data.size(), "vec.set!");
+    vec_obj->vec_data[index] = args[2];
+    return args[2];
+}
+
+value builtin_vec_push(const std::vector<value>& args) {
+    require_arity("vec.push!", args, 2);
+    value vec_obj = require_vec_arg(args[0], "vec.push!");
+    vec_obj->vec_data.push_back(args[1]);
+    return make_integer(to_int64_size(vec_obj->vec_data.size() - 1, "vec.push!"));
+}
+
+value builtin_vec_pop(const std::vector<value>& args) {
+    require_arity("vec.pop!", args, 1);
+    value vec_obj = require_vec_arg(args[0], "vec.pop!");
+    if (vec_obj->vec_data.empty()) {
+        throw lisp_error("vec.pop!: vector is empty");
+    }
+    value out = vec_obj->vec_data.back();
+    vec_obj->vec_data.pop_back();
+    return out;
+}
+
+value builtin_vec_clear(const std::vector<value>& args) {
+    require_arity("vec.clear!", args, 1);
+    value vec_obj = require_vec_arg(args[0], "vec.clear!");
+    vec_obj->vec_data.clear();
+    return make_nil();
+}
+
+value builtin_vec_reserve(const std::vector<value>& args) {
+    require_arity("vec.reserve!", args, 2);
+    value vec_obj = require_vec_arg(args[0], "vec.reserve!");
+    const std::size_t capacity = require_non_negative_capacity(args[1], "vec.reserve!");
+    vec_obj->vec_data.reserve(capacity);
+    return make_nil();
+}
+
+value builtin_map_make(const std::vector<value>& args) {
+    require_arity("map.make", args, 0);
+    return make_map();
+}
+
+value builtin_map_get(const std::vector<value>& args) {
+    require_arity("map.get", args, 3);
+    value map_obj = require_map_arg(args[0], "map.get");
+    const map_key key = map_key_from_value(args[1], "map.get");
+    const auto it = map_obj->map_data.find(key);
+    if (it == map_obj->map_data.end()) {
+        return args[2];
+    }
+    return it->second;
+}
+
+value builtin_map_has(const std::vector<value>& args) {
+    require_arity("map.has?", args, 2);
+    value map_obj = require_map_arg(args[0], "map.has?");
+    const map_key key = map_key_from_value(args[1], "map.has?");
+    return make_boolean(map_obj->map_data.find(key) != map_obj->map_data.end());
+}
+
+value builtin_map_set(const std::vector<value>& args) {
+    require_arity("map.set!", args, 3);
+    value map_obj = require_map_arg(args[0], "map.set!");
+    const map_key key = map_key_from_value(args[1], "map.set!");
+    map_obj->map_data[key] = args[2];
+    return args[2];
+}
+
+value builtin_map_del(const std::vector<value>& args) {
+    require_arity("map.del!", args, 2);
+    value map_obj = require_map_arg(args[0], "map.del!");
+    const map_key key = map_key_from_value(args[1], "map.del!");
+    return make_boolean(map_obj->map_data.erase(key) > 0);
+}
+
+value builtin_map_keys(const std::vector<value>& args) {
+    require_arity("map.keys", args, 1);
+    value map_obj = require_map_arg(args[0], "map.keys");
+    std::vector<value> keys;
+    keys.reserve(map_obj->map_data.size());
+    gc_root_scope roots(default_gc());
+    for (const auto& [key, _] : map_obj->map_data) {
+        keys.push_back(map_key_to_value(key));
+        roots.add(&keys.back());
+    }
+    return list_from_vector(keys);
 }
 
 void print_gc_snapshot(const gc_stats_snapshot& snapshot) {
@@ -877,12 +1256,39 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, ">", builtin_greater);
     bind_primitive(global_env, "<=", builtin_less_equal);
     bind_primitive(global_env, ">=", builtin_greater_equal);
+    bind_primitive(global_env, "sqrt", builtin_sqrt);
+    bind_primitive(global_env, "log", builtin_log);
+    bind_primitive(global_env, "exp", builtin_exp);
+    bind_primitive(global_env, "abs", builtin_abs);
+    bind_primitive(global_env, "clamp", builtin_clamp);
 
     bind_primitive(global_env, "number?", builtin_number_pred);
     bind_primitive(global_env, "int?", builtin_integer_pred);
     bind_primitive(global_env, "integer?", builtin_integer_pred);
     bind_primitive(global_env, "float?", builtin_float_pred);
     bind_primitive(global_env, "zero?", builtin_zero_pred);
+    bind_primitive(global_env, "time.now-ms", builtin_time_now_ms);
+
+    bind_primitive(global_env, "rng.make", builtin_rng_make);
+    bind_primitive(global_env, "rng.uniform", builtin_rng_uniform);
+    bind_primitive(global_env, "rng.normal", builtin_rng_normal);
+    bind_primitive(global_env, "rng.int", builtin_rng_int);
+
+    bind_primitive(global_env, "vec.make", builtin_vec_make);
+    bind_primitive(global_env, "vec.len", builtin_vec_len);
+    bind_primitive(global_env, "vec.get", builtin_vec_get);
+    bind_primitive(global_env, "vec.set!", builtin_vec_set);
+    bind_primitive(global_env, "vec.push!", builtin_vec_push);
+    bind_primitive(global_env, "vec.pop!", builtin_vec_pop);
+    bind_primitive(global_env, "vec.clear!", builtin_vec_clear);
+    bind_primitive(global_env, "vec.reserve!", builtin_vec_reserve);
+
+    bind_primitive(global_env, "map.make", builtin_map_make);
+    bind_primitive(global_env, "map.get", builtin_map_get);
+    bind_primitive(global_env, "map.has?", builtin_map_has);
+    bind_primitive(global_env, "map.set!", builtin_map_set);
+    bind_primitive(global_env, "map.del!", builtin_map_del);
+    bind_primitive(global_env, "map.keys", builtin_map_keys);
 
     bind_primitive(global_env, "heap-stats", builtin_heap_stats);
     bind_primitive(global_env, "gc-stats", builtin_gc_stats);

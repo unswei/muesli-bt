@@ -1,19 +1,87 @@
 # Built-ins Reference
 
-This is the current built-in surface, grouped by purpose.
+This page lists the current built-in surface in muesli-bt v1.1.
 
-## Core List And Predicate Built-ins
+## Core list and predicates
 
 - `cons`, `car`, `cdr`, `list`
 - `null?`, `eq?`
 
-## Arithmetic And Comparisons
+## Arithmetic and comparisons
 
 - arithmetic: `+`, `-`, `*`, `/`
 - comparisons: `=`, `<`, `>`, `<=`, `>=`
 - predicates: `number?`, `int?`, `integer?`, `float?`, `zero?`
 
-## Printing, Serialisation, And Files
+### Maths helpers
+
+- `(sqrt x) -> float`
+- `(log x) -> float`
+- `(exp x) -> float`
+- `(abs x) -> int|float`
+- `(clamp x lo hi) -> int|float`
+
+Errors:
+
+- `sqrt`: `x` must be `>= 0`
+- `log`: `x` must be `> 0`
+- `abs`: integer overflow on `-9223372036854775808`
+- `clamp`: `lo` must be `<= hi`
+
+## Time
+
+- `(time.now-ms) -> int`
+
+Returns monotonic milliseconds from `steady_clock` (not wall clock time).
+
+## RNG built-ins
+
+- `(rng.make seed-int) -> rng`
+- `(rng.uniform rng lo hi) -> float`
+- `(rng.normal rng mu sigma) -> float`
+- `(rng.int rng n) -> int` in `[0, n-1]`
+
+Validation:
+
+- `rng.uniform`: `lo <= hi`
+- `rng.normal`: `sigma >= 0`
+- `rng.int`: `n > 0`
+
+Implementation note: RNG uses a deterministic SplitMix64-based stream.
+
+## Mutable vector built-ins
+
+- `(vec.make [capacity]) -> vec` (default capacity is `4`)
+- `(vec.len v) -> int`
+- `(vec.get v i) -> any`
+- `(vec.set! v i x) -> x`
+- `(vec.push! v x) -> int` (returns new index)
+- `(vec.pop! v) -> any`
+- `(vec.clear! v) -> nil`
+- `(vec.reserve! v cap) -> nil`
+
+Validation:
+
+- indices must satisfy `0 <= i < (vec.len v)`
+- capacities must be non-negative integers
+- `vec.pop!` on empty vector raises an error
+
+## Mutable map built-ins
+
+- `(map.make) -> map`
+- `(map.get m k default) -> any`
+- `(map.has? m k) -> bool`
+- `(map.set! m k v) -> v`
+- `(map.del! m k) -> bool`
+- `(map.keys m) -> list`
+
+Key policy in v1.1:
+
+- allowed key types: symbol, string, integer, float
+- float keys must not be `NaN`
+- keys are type-sensitive (`1` and `1.0` are different keys)
+
+## Printing, serialisation, and files
 
 ### `print`
 
@@ -45,43 +113,27 @@ This is the current built-in surface, grouped by purpose.
 - purpose: parse and evaluate file forms sequentially
 - return: final evaluated form (or `nil` for empty files)
 
-### Heap Introspection
+### Heap introspection
 
 - `(heap-stats)`
 - `(gc-stats)`
 
-## BT Built-ins
+## BT built-ins
 
-## Authoring/Compilation
+### Authoring/compilation
 
 - `bt.compile`
 - `bt` (special form)
 - `defbt` (special form)
 
-### `bt.compile`
-
-- signature: `(bt.compile '<bt-form>)`
-- return: `bt_def`
-
-### `bt` (special form)
-
-- signature: `(bt <bt-form>)`
-- return: `bt_def`
-- note: compiles one raw DSL form at evaluation time
-
-### `defbt` (special form)
-
-- signature: `(defbt name <bt-form>)`
-- return: compiled `bt_def` bound to `name`
-
-## Instances And Ticking
+### Instances and ticking
 
 - `bt.new-instance`
 - `bt.tick`
 - `bt.reset`
 - `bt.status->symbol`
 
-## BT Persistence
+### Persistence
 
 - `bt.to-dsl`
 - `bt.save-dsl`
@@ -89,26 +141,7 @@ This is the current built-in surface, grouped by purpose.
 - `bt.save`
 - `bt.load`
 
-### `bt.to-dsl`
-
-- signature: `(bt.to-dsl bt-def)`
-- return: canonical BT DSL form (data)
-
-### `bt.save-dsl` / `bt.load-dsl`
-
-- signatures:
-  - `(bt.save-dsl bt-def "tree.lisp")`
-  - `(bt.load-dsl "tree.lisp")`
-- purpose: portable DSL persistence
-
-### `bt.save` / `bt.load`
-
-- signatures:
-  - `(bt.save bt-def "tree.mbt")`
-  - `(bt.load "tree.mbt")`
-- purpose: versioned compiled serialisation (`MBT1`)
-
-## BT Observability And Config
+### Observability/config
 
 - `bt.stats`
 - `bt.trace.dump`
@@ -125,10 +158,12 @@ This is the current built-in surface, grouped by purpose.
 - `bt.clear-trace`
 - `bt.clear-logs`
 
-## Error Message Pattern
+## Error message pattern
 
-Built-ins report explicit messages such as:
+Built-ins use explicit messages, for example:
 
 - `name: expected N arguments, got M`
 - `name: expected number`
-- `name: expected bt_instance`
+- `name: expected vec`
+- `name: expected map`
+- `name: expected rng`

@@ -504,6 +504,9 @@ value eval(value expr, env_ptr scope) {
         case value_type::string:
         case value_type::primitive_fn:
         case value_type::closure:
+        case value_type::vec:
+        case value_type::map:
+        case value_type::rng:
         case value_type::bt_def:
         case value_type::bt_instance:
             return expr;

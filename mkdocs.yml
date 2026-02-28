@@ -52,6 +52,7 @@ nav:
       - Lisp Basics: examples/lisp-basics.md
       - Hello BT: examples/hello-bt.md
       - Recovery BT: examples/recovery-bt.md
+      - Continuous MCTS v1.1: examples/continuous-mcts.md
       - C++ Nodes: examples/cpp-nodes.md
   - Testing: testing.md
   - Limitations and Roadmap: limitations-roadmap.md

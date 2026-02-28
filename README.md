@@ -102,6 +102,9 @@ Implemented value types:
 - `cons`
 - `primitive_fn`
 - `closure`
+- `vec`
+- `map`
+- `rng`
 - `bt_def`
 - `bt_instance`
 
@@ -133,6 +136,7 @@ Evaluator supports:
 Numeric model:
 
 - `+`, `-`, `*`, `/`, `=`, `<`, `>`, `<=`, `>=`
+- `sqrt`, `log`, `exp`, `abs`, `clamp`
 - mixed int/float promotion
 - `/` always returns float
 - checked integer overflow for int arithmetic
@@ -142,9 +146,12 @@ GC:
 
 - non-moving stop-the-world mark/sweep collector
 - GC-managed Lisp objects and environments
+- GC-scanned mutable containers (`vec`, `map`)
 - threshold-based collection trigger
 - built-ins: `(heap-stats)`, `(gc-stats)`
 - readable serialisation helpers: `write`, `write-to-string`, `save`
+- deterministic RNG: `rng.make`, `rng.uniform`, `rng.normal`, `rng.int`
+- monotonic clock: `time.now-ms`
 
 BT compile/runtime:
 
