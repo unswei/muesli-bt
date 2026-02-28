@@ -38,6 +38,11 @@ jobs:
       - name: Build docs
         run: .venv-py311/bin/python -m mkdocs build --strict
 
+      - name: Verify llms artifacts
+        run: |
+          test -f site/llms.txt
+          test -f site/llms-full.txt
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 

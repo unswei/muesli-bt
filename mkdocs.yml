@@ -13,6 +13,17 @@ theme:
 
 plugins:
   - search
+  - llmstxt:
+      full_output: llms-full.txt
+      sections:
+        muesli-bt:
+          - index.md: project overview
+          - getting-started.md: quickstart and setup
+          - bt/*.md: behaviour tree semantics and usage
+          - language/**/*.md: language syntax and reference
+          - internals/*.md: implementer notes
+          - observability/*.md: tracing, logging, profiling
+          - examples/*.md: runnable patterns
 
 markdown_extensions:
   - admonition
