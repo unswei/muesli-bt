@@ -1976,6 +1976,112 @@ void test_racecar_planner_model_and_sim_get_state_builtin() {
     bt::clear_racecar_demo_state();
 }
 
+void test_env_core_interface_unattached() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    value info = eval_text("(env.info)", env);
+    check(is_map(info), "env.info should return map");
+    check(is_string(eval_text("(map.get (env.info) 'api_version \"\")", env)), "env.info api_version must be string");
+    check(string_value(eval_text("(map.get (env.info) 'api_version \"\")", env)) == "env.api.v1",
+          "env.info api_version mismatch");
+    check(!boolean_value(eval_text("(map.get (env.info) 'attached #t)", env)), "env.info should report unattached");
+    check(is_nil(eval_text("(map.get (env.info) 'backend ':none)", env)), "env.info backend should be nil when unattached");
+    check(!boolean_value(eval_text("(map.get (sim.info) 'attached #t)", env)), "sim.info alias should forward to env.info");
+
+    try {
+        (void)eval_text("(env.observe)", env);
+        throw std::runtime_error("expected env.observe to fail when unattached");
+    } catch (const lisp_error& e) {
+        check(std::string(e.what()) == "env backend not attached", "env.observe unattached error mismatch");
+    }
+}
+
+void test_env_generic_pybullet_backend_contract() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    bt::runtime_host& host = bt::default_runtime_host();
+    bt::install_racecar_demo_callbacks(host);
+    env_ptr env = create_env_with_pybullet_extension();
+
+    auto adapter = std::make_shared<mock_racecar_adapter>();
+    bt::set_racecar_sim_adapter(adapter);
+
+    (void)eval_text("(env.attach \"pybullet\")", env);
+    check(boolean_value(eval_text("(map.get (env.info) 'attached #f)", env)), "env.info should report attached after attach");
+    check(string_value(eval_text("(map.get (env.info) 'backend \"\")", env)) == "pybullet", "env.info backend mismatch");
+    check(boolean_value(eval_text("(map.get (map.get (env.info) 'supports (map.make)) 'reset #f)", env)),
+          "env.info supports.reset should be true for pybullet backend");
+
+    (void)eval_text(
+        "(begin "
+        "  (define cfg (map.make)) "
+        "  (map.set! cfg 'tick_hz 1000) "
+        "  (map.set! cfg 'steps_per_tick 2) "
+        "  (map.set! cfg 'realtime #f) "
+        "  (env.configure cfg))",
+        env);
+    (void)eval_text("(define obs0 (env.reset 7))", env);
+    value obs0 = eval_text("obs0", env);
+    check(is_map(obs0), "env.reset should return observation map");
+    check(string_value(eval_text("(map.get obs0 'obs_schema \"\")", env)) == "racecar.obs.v1", "env.reset obs_schema mismatch");
+    check(is_integer(eval_text("(map.get obs0 't_ms -1)", env)), "env.reset observation should include t_ms");
+    check(integer_value(eval_text("(map.get obs0 'episode -1)", env)) == 1, "env.reset should set episode to 1");
+    check(integer_value(eval_text("(map.get obs0 'step -1)", env)) == 0, "env.reset should set step to 0");
+
+    (void)eval_text(
+        "(begin "
+        "  (define a (map.make)) "
+        "  (map.set! a 'action_schema \"racecar.action.v1\") "
+        "  (map.set! a 'u (list 0.2 0.3)) "
+        "  (env.act a))",
+        env);
+    check(adapter->apply_calls == 1, "env.act should call adapter once");
+
+    value step_ok = eval_text("(env.step)", env);
+    check(is_boolean(step_ok) && boolean_value(step_ok), "env.step should return true");
+    check(adapter->step_calls == 1, "env.step should call adapter step");
+    check(!adapter->step_args.empty() && adapter->step_args.back() == 2, "env.step should use configured steps_per_tick");
+
+    (void)eval_text("(define obs1 (env.observe))", env);
+    value obs1 = eval_text("obs1", env);
+    check(is_map(obs1), "env.observe should return map");
+    check(integer_value(eval_text("(map.get obs1 'step -1)", env)) == 1, "env.observe should expose incremented step");
+
+    (void)eval_text(
+        "(define on-tick "
+        "  (lambda (obs) "
+        "    (begin "
+        "      (define a (map.make)) "
+        "      (map.set! a 'action_schema \"racecar.action.v1\") "
+        "      (map.set! a 'u (list 0.0 0.1)) "
+        "      a)))",
+        env);
+    (void)eval_text(
+        "(define loop-result "
+        "  (env.run-loop "
+        "    (begin "
+        "      (define cfg (map.make)) "
+        "      (define safe (map.make)) "
+        "      (map.set! safe 'action_schema \"racecar.action.v1\") "
+        "      (map.set! safe 'u (list 0.0 0.0)) "
+        "      (map.set! cfg 'tick_hz 1000) "
+        "      (map.set! cfg 'max_ticks 3) "
+        "      (map.set! cfg 'safe_action safe) "
+        "      cfg) "
+        "    on-tick))",
+        env);
+    check(symbol_name(eval_text("(map.get loop-result 'status ':none)", env)) == ":stopped",
+          "env.run-loop should stop on max ticks");
+    check(integer_value(eval_text("(map.get loop-result 'ticks -1)", env)) == 3, "env.run-loop ticks mismatch");
+    check(integer_value(eval_text("(map.get loop-result 'episodes -1)", env)) == 1, "env.run-loop episodes mismatch");
+
+    bt::clear_racecar_demo_state();
+}
+
 void test_pybullet_extension_symbols_absent_in_core_env() {
     using namespace muslisp;
 
@@ -2037,6 +2143,8 @@ int main() {
         {"bt blackboard/trace/stats builtins", test_bt_blackboard_trace_and_stats_builtins},
         {"bt scheduler-backed action", test_bt_scheduler_backed_action},
         {"bt tick with blackboard input", test_bt_tick_with_blackboard_input},
+        {"env core interface unattached", test_env_core_interface_unattached},
+        {"env generic pybullet backend contract", test_env_generic_pybullet_backend_contract},
         {"pybullet symbols absent in core env", test_pybullet_extension_symbols_absent_in_core_env},
         {"pybullet symbols present with hook", test_pybullet_extension_symbols_present_with_hook},
         {"racecar run-loop contract", test_racecar_loop_contract},

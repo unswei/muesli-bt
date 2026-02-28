@@ -25,6 +25,8 @@ add_library(muesli_bt_core
     src/bt/vla.cpp
     src/builtins.cpp
     src/env.cpp
+    src/env_api.cpp
+    src/env_builtins.cpp
     src/eval.cpp
     src/extensions.cpp
     src/gc.cpp

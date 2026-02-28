@@ -7,6 +7,8 @@
 
 #include "bt/compiler.hpp"
 #include "bt/runtime_host.hpp"
+#include "muslisp/env_api.hpp"
+#include "muslisp/env_builtins.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/reader.hpp"
@@ -530,6 +532,10 @@ value eval_sequence(const std::vector<value>& exprs, env_ptr scope) {
     return last;
 }
 
+value invoke_callable(value fn_value, const std::vector<value>& args) {
+    return apply_callable(fn_value, args);
+}
+
 value eval_source(std::string_view source, env_ptr scope) {
     std::vector<value> exprs = read_all(source);
 
@@ -550,6 +556,8 @@ value eval_source(std::string_view source, env_ptr scope) {
 }
 
 env_ptr create_global_env(const runtime_config& config) {
+    env_api_reset();
+    reset_env_capability_runtime_state();
     env_ptr global = make_env();
     install_core_builtins(global);
     if (config.extension_register_hook) {

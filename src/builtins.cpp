@@ -22,6 +22,7 @@
 #include "bt/status.hpp"
 #include "bt/vla.hpp"
 #include "muslisp/error.hpp"
+#include "muslisp/env_builtins.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
 #include "muslisp/reader.hpp"
@@ -2692,6 +2693,7 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "planner.set-log-enabled", builtin_planner_set_log_enabled);
     bind_primitive(global_env, "planner.set-base-seed", builtin_planner_set_base_seed);
     bind_primitive(global_env, "planner.get-base-seed", builtin_planner_get_base_seed);
+    install_env_capability_builtins(global_env);
 
     bind_primitive(global_env, "vec.make", builtin_vec_make);
     bind_primitive(global_env, "vec.len", builtin_vec_len);
