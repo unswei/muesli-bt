@@ -28,9 +28,14 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
 
+      - name: Install Python build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
       - name: Validate unified Python environment
         run: |
-          ./scripts/setup-python-env.sh .venv-py311
+          bash ./scripts/setup-python-env.sh .venv-py311
           .venv-py311/bin/python -c "import pybullet, mkdocs; print('python env ok')"
 
   build-and-test:

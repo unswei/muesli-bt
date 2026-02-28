@@ -33,7 +33,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Setup unified Python environment
-        run: ./scripts/setup-python-env.sh .venv-py311
+        run: bash ./scripts/setup-python-env.sh .venv-py311
 
       - name: Build docs
         run: .venv-py311/bin/python -m mkdocs build --strict
