@@ -63,10 +63,11 @@ PYTHONPATH=build/dev/python \
 ```
 
 Controls: arrows or `WASD`/`IJKL`. If keyboard focus is flaky, use the on-screen steering/throttle sliders.
-If you want more/less speed, tune `--max-speed` (default is `60.0`).
+Manual mode defaults to a 4x actuator boost (`--manual-action-scale 4.0`) and 4x real-time pacing.
+If you want more/less speed, tune `--manual-action-scale` and/or `--max-speed`.
 Keyboard backend can be forced with `--keyboard-backend pynput` (or `pybullet`).
 On macOS GUI runs, `pynput` is disabled due a PyBullet SIGTRAP interaction; use `pybullet` backend + sliders.
-Manual mode runs at 4x real-time by default (`--manual-realtime-speed 4.0`).
+Camera follow is enabled by default in GUI (`--no-follow-camera` to disable).
 
 ### Step 2: Basic BT-style constant drive
 
@@ -88,6 +89,8 @@ PYTHONPATH=build/dev/python \
 PYTHONPATH=build/dev/python \
   .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 20
 ```
+
+BT modes keep default pacing (`--bt-sim-speed 1.0`). Increase this value to make BT simulation advance faster per tick.
 
 Budget sweep example:
 
@@ -145,7 +148,8 @@ If Graphviz is unavailable, the script still generates a `.dot` file.
 
 ## Files
 
-- `run_demo.py`: demo entrypoint and controller/planner loop
+- `run_demo.py`: demo entrypoint, PyBullet sim adapter, manual controls
+- `native/`: demo-native C++/pybind pieces (`sim.run-loop`, racecar model, Python bridge module)
 - `bt/racecar_bt.mueslisp`: canonical BT DSL for diagram export
 - `scripts/plot_logs.py`: log-to-plot utility
 - `scripts/render_bt_dot.py`: DOT/SVG export helper

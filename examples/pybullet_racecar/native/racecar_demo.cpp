@@ -1,4 +1,4 @@
-#include "bt/racecar_demo.hpp"
+#include "racecar_demo.hpp"
 
 #include <algorithm>
 #include <array>
@@ -10,6 +10,7 @@
 #include <thread>
 #include <utility>
 
+#include "bt/planner.hpp"
 #include "bt/status.hpp"
 #include "muslisp/value.hpp"
 
@@ -177,6 +178,117 @@ extracted_action extract_action(const bb_entry* entry) {
     out.used_fallback = false;
     return out;
 }
+
+class racecar_kinematic_model final : public planner_model {
+public:
+    planner_step_result step(const planner_vector& state, const planner_vector& action, planner_rng&) const override {
+        if (state.size() < 6) {
+            throw std::runtime_error("racecar-kinematic-v1.step: expected state [x y yaw speed gx gy ...]");
+        }
+        if (action.size() < 2) {
+            throw std::runtime_error("racecar-kinematic-v1.step: expected action [steering throttle]");
+        }
+
+        const double x = state[0];
+        const double y = state[1];
+        const double yaw = state[2];
+        const double speed = state[3];
+        const double gx = state[4];
+        const double gy = state[5];
+
+        const double steering = clamp_double(action[0], -1.0, 1.0);
+        const double throttle = clamp_double(action[1], 0.0, 1.0);
+
+        constexpr double kDt = 0.10;
+        constexpr double kMaxSpeed = 8.0;
+        constexpr double kWheelBase = 0.35;
+        constexpr double kMaxSteerRad = 0.55;
+
+        const double accel = (4.0 * throttle) - (1.25 * speed);
+        const double speed2 = clamp_double(speed + accel * kDt, 0.0, kMaxSpeed);
+        const double yaw_rate = (std::fabs(kWheelBase) > 1.0e-6)
+                                    ? ((speed2 / kWheelBase) * std::tan(steering * kMaxSteerRad))
+                                    : 0.0;
+        const double yaw2 = wrap_angle(yaw + yaw_rate * kDt);
+        const double x2 = x + speed2 * std::cos(yaw2) * kDt;
+        const double y2 = y + speed2 * std::sin(yaw2) * kDt;
+
+        const double dx_before = gx - x;
+        const double dy_before = gy - y;
+        const double dx_after = gx - x2;
+        const double dy_after = gy - y2;
+        const double dist_before = std::hypot(dx_before, dy_before);
+        const double dist_after = std::hypot(dx_after, dy_after);
+        const double progress_reward = dist_before - dist_after;
+        const double control_penalty = 0.02 * ((steering * steering) + (throttle * throttle));
+
+        double min_ray = 3.0;
+        if (state.size() > 6) {
+            min_ray = *std::min_element(state.begin() + 6, state.end());
+        }
+        const bool hard_collision = min_ray < 0.25;
+        const bool imminent_collision = min_ray < 0.90;
+        const double collision_penalty = hard_collision ? 2.5 : (imminent_collision ? 0.4 : 0.0);
+        const double goal_bonus = (dist_after < 0.60) ? 1.5 : 0.0;
+
+        planner_step_result out;
+        out.reward = progress_reward - control_penalty - collision_penalty + goal_bonus;
+        out.done = hard_collision || (dist_after < 0.60);
+        out.next_state.reserve(state.size());
+        out.next_state.push_back(x2);
+        out.next_state.push_back(y2);
+        out.next_state.push_back(yaw2);
+        out.next_state.push_back(speed2);
+        out.next_state.push_back(gx);
+        out.next_state.push_back(gy);
+
+        if (state.size() > 6) {
+            const double ray_decay = std::max(0.0, speed2) * kDt;
+            for (std::size_t i = 6; i < state.size(); ++i) {
+                out.next_state.push_back(clamp_double(state[i] - ray_decay, 0.0, 10.0));
+            }
+        }
+        return out;
+    }
+
+    planner_vector sample_action(const planner_vector&, planner_rng& rng) const override {
+        return {rng.uniform(-1.0, 1.0), rng.uniform(0.0, 1.0)};
+    }
+
+    planner_vector rollout_action(const planner_vector& state, planner_rng& rng) const override {
+        if (state.size() < 6) {
+            return {0.0, 0.0};
+        }
+        const double x = state[0];
+        const double y = state[1];
+        const double yaw = state[2];
+        const double gx = state[4];
+        const double gy = state[5];
+        const double heading = std::atan2(gy - y, gx - x);
+        const double heading_err = wrap_angle(heading - yaw);
+        const double steering = clamp_double(1.4 * heading_err + rng.normal(0.0, 0.12), -1.0, 1.0);
+        const double throttle = clamp_double(0.55 + rng.normal(0.0, 0.20), 0.0, 1.0);
+        return {steering, throttle};
+    }
+
+    planner_vector clamp_action(const planner_vector& action) const override {
+        const double steering = action.empty() ? 0.0 : action[0];
+        const double throttle = action.size() > 1 ? action[1] : 0.0;
+        return {clamp_double(steering, -1.0, 1.0), clamp_double(throttle, 0.0, 1.0)};
+    }
+
+    planner_vector zero_action() const override {
+        return {0.0, 0.0};
+    }
+
+    bool validate_state(const planner_vector& state) const override {
+        return state.size() >= 6;
+    }
+
+    std::size_t action_dims() const override {
+        return 2;
+    }
+};
 
 void write_state_to_blackboard(instance& inst,
                                const racecar_state& state,
@@ -470,6 +582,7 @@ racecar_loop_result run_racecar_loop(runtime_host& host, std::int64_t instance_h
 }
 
 void install_racecar_demo_callbacks(runtime_host& host) {
+    host.planner_ref().register_model("racecar-kinematic-v1", std::make_shared<racecar_kinematic_model>());
     registry& reg = host.callbacks();
 
     reg.register_condition("collision-imminent", [](tick_context& ctx, std::span<const muslisp::value> args) {

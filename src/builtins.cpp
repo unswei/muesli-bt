@@ -17,7 +17,7 @@
 #include "bt/blackboard.hpp"
 #include "bt/compiler.hpp"
 #include "bt/planner.hpp"
-#include "bt/racecar_demo.hpp"
+#include "racecar_demo.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/serialisation.hpp"
 #include "bt/status.hpp"

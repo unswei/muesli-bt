@@ -13,7 +13,7 @@
 
 #include "bt/instance.hpp"
 #include "bt/logging.hpp"
-#include "bt/racecar_demo.hpp"
+#include "racecar_demo.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/trace.hpp"
 #include "muslisp/env.hpp"

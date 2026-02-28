@@ -15,7 +15,7 @@ add_library(muesli_bt_core
     src/bt/logging.cpp
     src/bt/planner.cpp
     src/bt/profile.cpp
-    src/bt/racecar_demo.cpp
+    examples/pybullet_racecar/native/racecar_demo.cpp
     src/bt/registry.cpp
     src/bt/runtime.cpp
     src/bt/runtime_host.cpp
@@ -36,6 +36,7 @@ add_library(muesli_bt_core
 target_include_directories(muesli_bt_core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/pybullet_racecar/native
 )
 
 target_compile_features(muesli_bt_core PUBLIC cxx_std_20)
@@ -68,7 +69,7 @@ if(MUESLI_BT_BUILD_PYTHON_BRIDGE)
         endif()
     endif()
 
-    pybind11_add_module(muesli_bt_bridge src/python/bridge_module.cpp)
+    pybind11_add_module(muesli_bt_bridge examples/pybullet_racecar/native/bridge_module.cpp)
     target_link_libraries(muesli_bt_bridge PRIVATE muesli_bt_core)
     target_include_directories(muesli_bt_bridge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
     set_target_properties(muesli_bt_bridge PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/python")

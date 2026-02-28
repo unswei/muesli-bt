@@ -10,7 +10,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "bt/racecar_demo.hpp"
+#include "racecar_demo.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/status.hpp"
 #include "muslisp/builtins.hpp"
