@@ -413,20 +413,50 @@ value build_tick_record(std::int64_t tick_index,
                         value obs,
                         value action,
                         value on_tick_result,
+                        std::optional<std::string> schema_version,
+                        double tick_budget_ms,
+                        double tick_time_ms,
                         bool used_fallback,
                         bool overrun,
                         const std::string& error_reason) {
     value record = make_map();
+    value budget = make_map();
     gc_root_scope roots(default_gc());
     roots.add(&record);
+    roots.add(&budget);
     roots.add(&obs);
     roots.add(&action);
     roots.add(&on_tick_result);
 
     map_set_symbol(record, "tick", make_integer(tick_index));
+    if (const auto t_ms = map_lookup_option(obs, "t_ms")) {
+        if (is_integer(*t_ms)) {
+            map_set_symbol(record, "t_ms", *t_ms);
+        }
+    }
+    if (schema_version.has_value()) {
+        map_set_symbol(record, "schema_version", make_string(*schema_version));
+    }
     map_set_symbol(record, "obs", obs);
     map_set_symbol(record, "action", action);
     map_set_symbol(record, "on_tick", on_tick_result);
+    map_set_symbol(budget, "tick_budget_ms", make_float(tick_budget_ms));
+    map_set_symbol(budget, "tick_time_ms", make_float(tick_time_ms));
+    map_set_symbol(record, "budget", budget);
+
+    if (is_map(on_tick_result)) {
+        if (const auto bt_map = map_lookup_option(on_tick_result, "bt")) {
+            if (is_map(*bt_map)) {
+                map_set_symbol(record, "bt", *bt_map);
+            }
+        }
+        if (const auto planner_map = map_lookup_option(on_tick_result, "planner")) {
+            if (is_map(*planner_map)) {
+                map_set_symbol(record, "planner", *planner_map);
+            }
+        }
+    }
+
     map_set_symbol(record, "used_fallback", make_boolean(used_fallback));
     map_set_symbol(record, "overrun", make_boolean(overrun));
     if (!error_reason.empty()) {
@@ -742,6 +772,14 @@ value builtin_env_run_loop(const std::vector<value>& args) {
         realtime = require_bool(*realtime_opt, "env.run-loop :realtime");
     }
 
+    std::optional<std::string> schema_version{};
+    if (const auto schema_opt = map_lookup_option(config, "schema_version")) {
+        if (!is_string(*schema_opt)) {
+            throw lisp_error("env.run-loop :schema_version: expected string");
+        }
+        schema_version = string_value(*schema_opt);
+    }
+
     if (const auto steps = map_lookup_option(config, "steps_per_tick")) {
         const std::int64_t parsed = require_int(*steps, "env.run-loop :steps_per_tick");
         if (parsed <= 0) {
@@ -805,6 +843,8 @@ value builtin_env_run_loop(const std::vector<value>& args) {
     for (std::int64_t k = 0; k < max_ticks; ++k) {
         bool used_fallback = false;
         bool overrun = false;
+        std::optional<std::string> tick_schema = schema_version;
+        const auto tick_started = std::chrono::steady_clock::now();
 
         try {
             obs = backend->observe();
@@ -812,6 +852,14 @@ value builtin_env_run_loop(const std::vector<value>& args) {
             final_obs = obs;
 
             on_tick_result = invoke_callable_unary(on_tick_fn, obs, "env.run-loop on_tick");
+            if (is_map(on_tick_result)) {
+                if (const auto on_tick_schema = map_lookup_option(on_tick_result, "schema_version")) {
+                    if (!is_string(*on_tick_schema)) {
+                        throw lisp_error("env.run-loop on_tick: schema_version must be string");
+                    }
+                    tick_schema = string_value(*on_tick_schema);
+                }
+            }
 
             const auto action_candidate = extract_action_from_on_tick(on_tick_result);
 
@@ -842,8 +890,13 @@ value builtin_env_run_loop(const std::vector<value>& args) {
             backend->act(chosen_action);
             const bool can_continue = perform_step_and_pacing(*backend, tick_hz, realtime);
             ++ticks;
+            const auto tick_finished = std::chrono::steady_clock::now();
+            const double tick_time_ms =
+                std::chrono::duration<double, std::milli>(tick_finished - tick_started).count();
+            const double tick_budget_ms = 1000.0 / static_cast<double>(tick_hz);
 
-            tick_record = build_tick_record(ticks, obs, chosen_action, on_tick_result, used_fallback, overrun, {});
+            tick_record = build_tick_record(
+                ticks, obs, chosen_action, on_tick_result, tick_schema, tick_budget_ms, tick_time_ms, used_fallback, overrun, {});
             emit_record(observer_fn, has_observer, log_path, tick_record);
 
             if (!can_continue) {
@@ -887,7 +940,12 @@ value builtin_env_run_loop(const std::vector<value>& args) {
             }
 
             ++ticks;
-            tick_record = build_tick_record(ticks, final_obs, safety_action, on_tick_result, true, overrun, error_reason);
+            const auto tick_finished = std::chrono::steady_clock::now();
+            const double tick_time_ms =
+                std::chrono::duration<double, std::milli>(tick_finished - tick_started).count();
+            const double tick_budget_ms = 1000.0 / static_cast<double>(tick_hz);
+            tick_record = build_tick_record(
+                ticks, final_obs, safety_action, on_tick_result, tick_schema, tick_budget_ms, tick_time_ms, true, overrun, error_reason);
             emit_record(observer_fn, has_observer, log_path, tick_record);
             return make_result(":error", error_reason);
         }

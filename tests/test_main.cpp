@@ -1589,6 +1589,27 @@ void test_bt_blackboard_trace_and_stats_builtins() {
     check(is_string(log_snapshot_alias), "bt.log.snapshot alias should return string");
 }
 
+void test_bt_blackboard_get_builtin() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text("(define tree (bt.compile '(seq (act bb-put-int foo 42) (succeed))))", env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "success", "bb tree should tick to success");
+
+    value foo_value = eval_text("(bt.blackboard.get inst 'foo -1)", env);
+    check(is_integer(foo_value) && integer_value(foo_value) == 42, "bt.blackboard.get should read integer entry");
+
+    value missing_default = eval_text("(bt.blackboard.get inst 'missing 77)", env);
+    check(is_integer(missing_default) && integer_value(missing_default) == 77,
+          "bt.blackboard.get should return caller default for missing key");
+
+    value missing_nil = eval_text("(bt.blackboard.get inst 'missing)", env);
+    check(is_nil(missing_nil), "bt.blackboard.get without default should return nil");
+}
+
 void test_bt_scheduler_backed_action() {
     using namespace muslisp;
 
@@ -2082,6 +2103,86 @@ void test_env_generic_pybullet_backend_contract() {
     bt::clear_racecar_demo_state();
 }
 
+void test_env_run_loop_log_record_shape() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    bt::runtime_host& host = bt::default_runtime_host();
+    bt::install_racecar_demo_callbacks(host);
+    env_ptr env = create_env_with_pybullet_extension();
+
+    auto adapter = std::make_shared<mock_racecar_adapter>();
+    bt::set_racecar_sim_adapter(adapter);
+
+    (void)eval_text("(env.attach \"pybullet\")", env);
+
+    const std::filesystem::path log_path = temp_file_path("env_runloop_record", ".jsonl");
+    const std::string log_lisp = lisp_string_literal(log_path.string());
+
+    (void)eval_text(
+        "(define on-tick-log-shape "
+        "  (lambda (obs) "
+        "    (begin "
+        "      (define a (map.make)) "
+        "      (map.set! a 'action_schema \"racecar.action.v1\") "
+        "      (map.set! a 'u (list 0.0 0.1)) "
+        "      (define btm (map.make)) "
+        "      (map.set! btm 'active_path (list \"root\" \"node\")) "
+        "      (define pm (map.make)) "
+        "      (map.set! pm 'used #t) "
+        "      (map.set! pm 'confidence 0.5) "
+        "      (define out (map.make)) "
+        "      (map.set! out 'schema_version \"epuck_demo.v1\") "
+        "      (map.set! out 'action a) "
+        "      (map.set! out 'bt btm) "
+        "      (map.set! out 'planner pm) "
+        "      out)))",
+        env);
+
+    const std::string run_expr =
+        "(define run-result-log-shape "
+        "  (env.run-loop "
+        "    (begin "
+        "      (define cfg (map.make)) "
+        "      (define safe (map.make)) "
+        "      (map.set! safe 'action_schema \"racecar.action.v1\") "
+        "      (map.set! safe 'u (list 0.0 0.0)) "
+        "      (map.set! cfg 'tick_hz 1000) "
+        "      (map.set! cfg 'max_ticks 1) "
+        "      (map.set! cfg 'realtime #f) "
+        "      (map.set! cfg 'safe_action safe) "
+        "      (map.set! cfg 'schema_version \"epuck_demo.v1\") "
+        "      (map.set! cfg 'log_path " +
+        log_lisp +
+        ") "
+        "      cfg) "
+        "    on-tick-log-shape))";
+    (void)eval_text(run_expr, env);
+    value run_result = eval_text("run-result-log-shape", env);
+
+    check(is_map(run_result), "env.run-loop result should be map");
+    check(symbol_name(eval_text("(map.get run-result-log-shape 'status ':none)", env)) == ":stopped",
+          "env.run-loop should stop on max_ticks=1");
+
+    std::ifstream in(log_path);
+    check(in.good(), "expected env.run-loop log file to exist");
+    std::string line;
+    std::getline(in, line);
+    check(!line.empty(), "expected at least one env.run-loop log record");
+    check(line.find("\"schema_version\":\"epuck_demo.v1\"") != std::string::npos, "log record missing schema_version");
+    check(line.find("\"t_ms\":") != std::string::npos, "log record missing t_ms");
+    check(line.find("\"budget\":") != std::string::npos, "log record missing budget block");
+    check(line.find("\"tick_budget_ms\"") != std::string::npos, "log record missing tick_budget_ms");
+    check(line.find("\"tick_time_ms\"") != std::string::npos, "log record missing tick_time_ms");
+    check(line.find("\"bt\":") != std::string::npos, "log record missing bt map");
+    check(line.find("\"planner\":") != std::string::npos, "log record missing planner map");
+
+    std::error_code ec;
+    std::filesystem::remove(log_path, ec);
+
+    bt::clear_racecar_demo_state();
+}
+
 void test_pybullet_extension_symbols_absent_in_core_env() {
     using namespace muslisp;
 
@@ -2141,10 +2242,12 @@ int main() {
         {"bt decorator semantics", test_bt_decorator_semantics},
         {"bt reset clears phase4 state", test_bt_reset_clears_phase4_state},
         {"bt blackboard/trace/stats builtins", test_bt_blackboard_trace_and_stats_builtins},
+        {"bt blackboard.get builtin", test_bt_blackboard_get_builtin},
         {"bt scheduler-backed action", test_bt_scheduler_backed_action},
         {"bt tick with blackboard input", test_bt_tick_with_blackboard_input},
         {"env core interface unattached", test_env_core_interface_unattached},
         {"env generic pybullet backend contract", test_env_generic_pybullet_backend_contract},
+        {"env run-loop log record shape", test_env_run_loop_log_record_shape},
         {"pybullet symbols absent in core env", test_pybullet_extension_symbols_absent_in_core_env},
         {"pybullet symbols present with hook", test_pybullet_extension_symbols_present_with_hook},
         {"racecar run-loop contract", test_racecar_loop_contract},

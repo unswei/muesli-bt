@@ -43,3 +43,21 @@ compile_commands.json
 # pybullet racecar demo outputs
 examples/pybullet_racecar/logs/
 examples/pybullet_racecar/out/
+examples/webots_epuck_obstacle/logs/*
+!examples/webots_epuck_obstacle/logs/.gitkeep
+examples/webots_epuck_obstacle/out/*
+!examples/webots_epuck_obstacle/out/.gitkeep
+examples/webots_epuck_line/logs/*
+!examples/webots_epuck_line/logs/.gitkeep
+examples/webots_epuck_line/out/*
+!examples/webots_epuck_line/out/.gitkeep
+examples/webots_epuck_obstacle/controllers/muesli_epuck/muesli_epuck
+examples/webots_epuck_obstacle/controllers/muesli_epuck/build/
+examples/webots_epuck_line/controllers/muesli_epuck/muesli_epuck
+examples/webots_epuck_line/controllers/muesli_epuck/build/
+
+# generic example run artefacts
+examples/**/logs/*
+!examples/**/logs/.gitkeep
+examples/**/out/*
+!examples/**/out/.gitkeep

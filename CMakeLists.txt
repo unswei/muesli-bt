@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(MUESLI_BT_BUILD_PYTHON_BRIDGE "Build the Python bridge module (muesli_bt_bridge)" OFF)
+option(MUESLI_BT_BUILD_WEBOTS_EXAMPLES "Build the Webots e-puck example controllers" OFF)
 
 add_library(muesli_bt_core
     src/bt/blackboard.cpp
@@ -64,6 +65,57 @@ target_compile_features(muesli_bt_ext_pybullet_racecar PUBLIC cxx_std_20)
 
 add_executable(muslisp src/main.cpp)
 target_link_libraries(muslisp PRIVATE muesli_bt_core)
+
+if(MUESLI_BT_BUILD_WEBOTS_EXAMPLES)
+    find_path(WEBOTS_CPP_INCLUDE_DIR webots/Robot.hpp
+        HINTS ENV WEBOTS_HOME "${WEBOTS_HOME}"
+        PATH_SUFFIXES include/controller/cpp Contents/include/controller/cpp)
+    find_library(WEBOTS_CONTROLLER_LIBRARY Controller
+        HINTS ENV WEBOTS_HOME "${WEBOTS_HOME}"
+        PATH_SUFFIXES lib/controller Contents/lib/controller)
+    find_library(WEBOTS_CPP_CONTROLLER_LIBRARY CppController
+        HINTS ENV WEBOTS_HOME "${WEBOTS_HOME}"
+        PATH_SUFFIXES lib/controller Contents/lib/controller)
+
+    if(NOT WEBOTS_CPP_INCLUDE_DIR OR NOT WEBOTS_CONTROLLER_LIBRARY OR NOT WEBOTS_CPP_CONTROLLER_LIBRARY)
+        message(FATAL_ERROR
+            "MUESLI_BT_BUILD_WEBOTS_EXAMPLES=ON requires Webots controller headers and library. "
+            "Set WEBOTS_HOME to your Webots installation path."
+        )
+    endif()
+
+    function(add_webots_epuck_controller target_name source_path output_dir)
+        add_executable(${target_name} ${source_path})
+        target_link_libraries(${target_name}
+            PRIVATE
+                muesli_bt_core
+                ${WEBOTS_CPP_CONTROLLER_LIBRARY}
+                ${WEBOTS_CONTROLLER_LIBRARY}
+        )
+        target_include_directories(${target_name}
+            PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/include
+                ${WEBOTS_CPP_INCLUDE_DIR}
+        )
+        target_compile_features(${target_name} PRIVATE cxx_std_20)
+        set_target_properties(${target_name}
+            PROPERTIES
+                OUTPUT_NAME muesli_epuck
+                RUNTIME_OUTPUT_DIRECTORY ${output_dir}
+        )
+    endfunction()
+
+    add_webots_epuck_controller(
+        muesli_webots_epuck_obstacle
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/webots_epuck_obstacle/controllers/muesli_epuck/muesli_epuck.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/webots_epuck_obstacle/controllers/muesli_epuck
+    )
+    add_webots_epuck_controller(
+        muesli_webots_epuck_line
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/webots_epuck_line/controllers/muesli_epuck/muesli_epuck.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/webots_epuck_line/controllers/muesli_epuck
+    )
+endif()
 
 if(MUESLI_BT_BUILD_PYTHON_BRIDGE)
     if(NOT Python3_EXECUTABLE)

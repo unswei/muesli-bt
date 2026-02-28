@@ -1,0 +1,97 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "webots://projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "webots://projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "webots://projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "webots://projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "webots://projects/robots/gctronic/e-puck/protos/E-puckGroundSensors.proto"
+
+WorldInfo {
+  title "Muesli-BT e-puck obstacle arena"
+}
+Viewpoint {
+  orientation 0.36 0.63 -0.69 0.95
+  position -0.88 0.66 0.94
+  follow "epuck"
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  rotation 0 0 1 -1.5708
+  floorSize 0.9 0.9
+  floorTileSize 0.9 0.9
+  wallHeight 0.06
+  floorAppearance PBRAppearance {
+    baseColorMap ImageTexture {
+      url [
+        "textures/floor.png"
+      ]
+    }
+    roughness 0.3
+    metalness 0
+  }
+}
+DEF BOX_A Solid {
+  translation 0.19 -0.08 0.025
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0.1 0.3
+        roughness 0.5
+        metalness 0
+      }
+      geometry DEF BOX_A_GEOM Box {
+        size 0.06 0.06 0.05
+      }
+    }
+  ]
+  name "box_a"
+  boundingObject USE BOX_A_GEOM
+}
+DEF BOX_B Solid {
+  translation 0.04 0.08 0.025
+  rotation 0 0 1 2.7
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 1 0.55 0.95
+        roughness 0.5
+        metalness 0
+      }
+      geometry DEF BOX_B_GEOM Box {
+        size 0.09 0.08 0.05
+      }
+    }
+  ]
+  name "box_b"
+  boundingObject USE BOX_B_GEOM
+}
+DEF BOX_C Solid {
+  translation -0.16 -0.2 0.025
+  rotation 0 0 1 1.2
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.6 0.6 0.6
+        roughness 0.5
+        metalness 0
+      }
+      geometry DEF BOX_C_GEOM Box {
+        size 0.06 0.2 0.05
+      }
+    }
+  ]
+  name "box_c"
+  boundingObject USE BOX_C_GEOM
+}
+DEF epuck E-puck {
+  translation -0.23 0.0 0
+  rotation 0 0 1 1.45
+  controller "muesli_epuck"
+  groundSensorsSlot [
+    E-puckGroundSensors {
+    }
+  ]
+}

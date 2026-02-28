@@ -956,6 +956,8 @@ std::string require_bb_key(value v, const std::string& where) {
     throw lisp_error(where + ": expected key as symbol or string");
 }
 
+value numeric_vector_to_lisp_list(const std::vector<double>& values);
+
 bt::bb_value to_bb_value(value v, const std::string& where) {
     if (is_nil(v)) {
         return bt::bb_value{};
@@ -997,6 +999,31 @@ bt::bb_value to_bb_value(value v, const std::string& where) {
         return bt::bb_value{std::move(out)};
     }
     throw lisp_error(where + ": unsupported blackboard value type");
+}
+
+value bb_value_to_lisp_value(const bt::bb_value& v) {
+    if (const auto* b = std::get_if<bool>(&v)) {
+        return make_boolean(*b);
+    }
+    if (const auto* i = std::get_if<std::int64_t>(&v)) {
+        return make_integer(*i);
+    }
+    if (const auto* f = std::get_if<double>(&v)) {
+        return make_float(*f);
+    }
+    if (const auto* s = std::get_if<std::string>(&v)) {
+        return make_string(*s);
+    }
+    if (const auto* vec = std::get_if<std::vector<double>>(&v)) {
+        return numeric_vector_to_lisp_list(*vec);
+    }
+    if (const auto* image = std::get_if<bt::image_handle_ref>(&v)) {
+        return make_image_handle(image->id);
+    }
+    if (const auto* blob = std::get_if<bt::blob_handle_ref>(&v)) {
+        return make_blob_handle(blob->id);
+    }
+    return make_nil();
 }
 
 void apply_tick_blackboard_inputs(bt::instance& inst, value entries) {
@@ -2091,6 +2118,25 @@ value builtin_bt_blackboard_dump(const std::vector<value>& args) {
     return make_string(bt::default_runtime_host().dump_instance_blackboard(inst_handle));
 }
 
+value builtin_bt_blackboard_get(const std::vector<value>& args) {
+    if (args.size() != 2 && args.size() != 3) {
+        throw lisp_error("bt.blackboard.get: expected 2 or 3 arguments");
+    }
+    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.blackboard.get");
+    const std::string key = require_bb_key(args[1], "bt.blackboard.get");
+
+    const bt::instance* inst = bt::default_runtime_host().find_instance(inst_handle);
+    if (!inst) {
+        throw lisp_error("bt.blackboard.get: unknown instance");
+    }
+
+    const bt::bb_entry* entry = inst->bb.get(key);
+    if (!entry) {
+        return args.size() == 3 ? args[2] : make_nil();
+    }
+    return bb_value_to_lisp_value(entry->value);
+}
+
 value builtin_bt_logs_dump(const std::vector<value>& args) {
     require_arity("bt.logs.dump", args, 0);
     return make_string(bt::default_runtime_host().dump_logs());
@@ -2742,6 +2788,7 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "bt.trace.dump", builtin_bt_trace_dump);
     bind_primitive(global_env, "bt.trace.snapshot", builtin_bt_trace_snapshot);
     bind_primitive(global_env, "bt.blackboard.dump", builtin_bt_blackboard_dump);
+    bind_primitive(global_env, "bt.blackboard.get", builtin_bt_blackboard_get);
     bind_primitive(global_env, "bt.logs.dump", builtin_bt_logs_dump);
     bind_primitive(global_env, "bt.logs.snapshot", builtin_bt_logs_snapshot);
     bind_primitive(global_env, "bt.log.dump", builtin_bt_logs_dump);
