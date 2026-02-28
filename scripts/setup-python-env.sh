@@ -16,8 +16,11 @@ uv venv --python "${PYTHON_VERSION}" "${VENV_DIR}"
 echo "Installing docs/tooling requirements (excluding pybullet)"
 REQ_NO_PYBULLET="$(mktemp)"
 trap 'rm -f "${REQ_NO_PYBULLET}"' EXIT
-grep -vE '^[[:space:]]*pybullet([[:space:]]|$)' "${ROOT_DIR}/docs/requirements.txt" > "${REQ_NO_PYBULLET}"
+grep -viE '^[[:space:]]*pybullet([<>=!~].*)?([[:space:]]*;.*)?$' "${ROOT_DIR}/docs/requirements.txt" > "${REQ_NO_PYBULLET}"
 uv pip install --python "${VENV_DIR}/bin/python" -r "${REQ_NO_PYBULLET}"
+
+echo "Installing numpy (required by pybullet at import time)"
+uv pip install --python "${VENV_DIR}/bin/python" "numpy>=1.26"
 
 echo "Installing pybullet"
 if [[ "$(uname -s)" == "Darwin" ]]; then
