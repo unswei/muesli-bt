@@ -9,7 +9,8 @@ This demo uses the canonical `env.*` interface with:
 ## Folder layout
 
 - `worlds/epuck_line_follow.wbt`: line-follow world.
-- `controllers/muesli_epuck/muesli_epuck.cpp`: thin Webots controller + `env` backend adapter.
+- `controllers/muesli_epuck/muesli_epuck.cpp`: tiny wrapper that includes the shared Webots controller implementation.
+- `../webots_epuck_common/muesli_epuck_controller_impl.cpp`: shared controller + `env` backend adapter used by both e-puck demos.
 - `lisp/main.mueslisp`: loop entrypoint, control logic, and planner log shaping.
 - `lisp/bt_line_follow.mueslisp`: BT structure.
 - `logs/`: JSONL output.
