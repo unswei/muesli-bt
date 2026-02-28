@@ -39,6 +39,12 @@ Run bounded-time planner demo:
 ./build/dev/muslisp examples/repl_scripts/planner-bt-1d.lisp
 ```
 
+Run pure Lisp A* grid-search demo:
+
+```bash
+./build/dev/muslisp examples/repl_scripts/a-star-grid.lisp
+```
+
 Run async VLA demo with fallback behavior:
 
 ```bash
@@ -165,6 +171,7 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 ## Documentation Map
 
 - [Getting started](docs/getting-started.md)
+- [Example: A* search](docs/examples/a-star-search.md)
 - [Language manual](docs/language/syntax.md)
 - [Language reference index](docs/language/reference/index.md)
 - [Behaviour trees](docs/bt/intro.md)
@@ -195,6 +202,8 @@ ctest --test-dir build/dev --output-on-failure
 - `src/`, `include/`: runtime, evaluator, BT engine, planner, VLA integration
 - `examples/bt/`: compact BT scripts
 - `examples/repl_scripts/`: end-to-end experiments and demos
+- `examples/pybullet_racecar/`: racecar demo package
+  - `native/`: demo-only C++ + pybind bridge code for `sim.run-loop`
 - `tests/`: unit/integration coverage
 - `docs/`: user and internals documentation
 

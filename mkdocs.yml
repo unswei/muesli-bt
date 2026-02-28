@@ -32,6 +32,7 @@ nav:
       - Examples:
           - Lisp Basics: examples/lisp-basics.md
           - Hello BT: examples/hello-bt.md
+          - A* Search: examples/a-star-search.md
           - Recovery BT: examples/recovery-bt.md
           - Continuous MCTS: examples/continuous-mcts.md
           - Planning BT (1D): examples/planner-bt-1d.md

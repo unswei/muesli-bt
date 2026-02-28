@@ -30,9 +30,16 @@ cmake --build --preset dev -j
   (list 'ok 'ready))
 ```
 
+3. Run a complete algorithm example (A* search).
+
+```bash
+./build/dev/muslisp examples/repl_scripts/a-star-grid.lisp
+```
+
 ## Manual Sections
 
 - [Getting Started](getting-started.md): install/build/run workflow
+- [A* Search Example](examples/a-star-search.md): full muslisp implementation
 - [Language](language/syntax.md): syntax, semantics, and complete reference
 - [Behaviour Trees](bt/intro.md): DSL, runtime model, blackboard, scheduler, bounded-time planning, observability
 - [VLA Integration](bt/vla-integration.md): capability-based async vision-language-action orchestration

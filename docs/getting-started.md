@@ -56,6 +56,7 @@ Quick BT authoring example:
 
 ```bash
 ./build/dev/muslisp examples/repl_scripts/lisp-basics.lisp
+./build/dev/muslisp examples/repl_scripts/a-star-grid.lisp
 ./build/dev/muslisp examples/bt/hello_bt.lisp
 ./build/dev/muslisp examples/repl_scripts/planner-bt-1d.lisp
 ./build/dev/muslisp examples/repl_scripts/planner-bt-ptz.lisp

@@ -26,7 +26,7 @@ Loads and evaluates all forms from a file in current environment.
 ### Realistic
 
 ```lisp
-(begin (load "examples/bt/hello-bt.lisp") nil)
+(begin (load "examples/bt/hello_bt.lisp") nil)
 ```
 
 ## Notes

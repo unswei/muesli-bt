@@ -8,7 +8,7 @@ repository as of February 28, 2026.
 ---------------------
 
   git clone <repo-url>
-  cd muslisp-bt
+  cd muesli-bt
   git checkout <branch-or-tag>
 
 2) Build the C++ project (muslisp runtime)
@@ -78,6 +78,10 @@ Core runtime example:
 
   ./build/dev/muslisp examples/bt/hello_bt.lisp
 
+Pure Lisp algorithm example (A*):
+
+  ./build/dev/muslisp examples/repl_scripts/a-star-grid.lisp
+
 PyBullet racecar demo:
 
   make demo-run MODE=bt_planner
@@ -110,5 +114,5 @@ Make sure ~/.local/bin is on PATH, then run:
   Click inside the GUI window first, or use the on-screen sliders in manual mode.
 
 - Slow manual movement:
-  Increase wheel speed scale, for example:
-    --max-speed 80
+  Increase actuator scale for manual mode, for example:
+    --manual-action-scale 6

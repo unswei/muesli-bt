@@ -6,6 +6,7 @@ Use this page to find where to implement specific changes.
 
 - `include/` public headers
 - `src/` implementation
+- `examples/` runnable Lisp and demo packages
 - `tests/` test binary sources
 - `.github/workflows/` CI jobs
 
@@ -36,6 +37,12 @@ Use this page to find where to implement specific changes.
 
 - `src/main.cpp` (REPL + script mode)
 - `tests/test_main.cpp` (coverage)
+
+### Demo integration (PyBullet racecar)
+
+- `examples/pybullet_racecar/run_demo.py` (demo entrypoint)
+- `examples/pybullet_racecar/native/racecar_demo.cpp` (demo builtins/callbacks/run-loop)
+- `examples/pybullet_racecar/native/bridge_module.cpp` (Python bridge module)
 
 ## Where Do I Change X?
 
