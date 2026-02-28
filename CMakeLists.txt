@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(MUESLI_BT_BUILD_PYTHON_BRIDGE "Build the Python bridge module (muesli_bt_bridge)" OFF)
+
 add_library(muesli_bt_core
     src/bt/blackboard.cpp
     src/bt/compiler.cpp
@@ -13,6 +15,7 @@ add_library(muesli_bt_core
     src/bt/logging.cpp
     src/bt/planner.cpp
     src/bt/profile.cpp
+    src/bt/racecar_demo.cpp
     src/bt/registry.cpp
     src/bt/runtime.cpp
     src/bt/runtime_host.cpp
@@ -45,6 +48,31 @@ endif()
 
 add_executable(muslisp src/main.cpp)
 target_link_libraries(muslisp PRIVATE muesli_bt_core)
+
+if(MUESLI_BT_BUILD_PYTHON_BRIDGE)
+    find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
+    find_package(pybind11 CONFIG QUIET)
+
+    if(NOT pybind11_FOUND)
+        execute_process(
+            COMMAND "${Python3_EXECUTABLE}" -m pybind11 --cmakedir
+            OUTPUT_VARIABLE PYBIND11_CMAKE_DIR
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            RESULT_VARIABLE PYBIND11_DIR_RESULT
+        )
+        if(PYBIND11_DIR_RESULT EQUAL 0 AND EXISTS "${PYBIND11_CMAKE_DIR}")
+            list(APPEND CMAKE_PREFIX_PATH "${PYBIND11_CMAKE_DIR}")
+            find_package(pybind11 CONFIG REQUIRED)
+        else()
+            message(FATAL_ERROR "pybind11 not found. Install pybind11 into the selected Python environment.")
+        endif()
+    endif()
+
+    pybind11_add_module(muesli_bt_bridge src/python/bridge_module.cpp)
+    target_link_libraries(muesli_bt_bridge PRIVATE muesli_bt_core)
+    target_include_directories(muesli_bt_bridge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    set_target_properties(muesli_bt_bridge PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/python")
+endif()
 
 enable_testing()
 

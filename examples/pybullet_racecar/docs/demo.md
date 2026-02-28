@@ -4,6 +4,9 @@
 
 The agent drives a PyBullet racecar from start pose to a goal marker while avoiding static box obstacles.
 
+In BT modes, the control loop is executed by `muesli_bt_bridge` and the C++ builtin `sim.run-loop`
+(observe -> BT tick -> action extract -> actuation -> sim step -> log callback).
+
 State used by control:
 
 - pose: `x`, `y`, `yaw`
@@ -28,14 +31,19 @@ Action:
 ```text
 Selector
   Sequence
+    GoalReachedRacecar?
+    Succeed
+  Sequence
     CollisionImminent?
     AvoidObstacle
+    Running
   Sequence
     PlanActionNode
     ApplyAction
+    Running
 ```
 
-The safety branch always has priority. If no hazard is detected, planning executes.
+The goal branch is terminal. Otherwise the tree keeps returning `running` while driving.
 
 ## Planner Defaults
 
@@ -50,11 +58,11 @@ Transition model is a lightweight kinematic approximation. Real execution still 
 
 ## Logging and Introspection
 
-Each tick emits a JSONL record with:
+Each tick emits a JSONL record with schema `racecar_demo.v1`:
 
 - base run metadata (`run_id`, `mode`, `tick_index`, `sim_time_s`)
 - observed state + chosen action
-- BT path and per-node status (BT modes)
+- BT status (BT modes)
 - planner diagnostics (planner mode): budget, used time, visits, widening, confidence, top-k actions
 
 Every run also writes `run_metadata.json` containing:

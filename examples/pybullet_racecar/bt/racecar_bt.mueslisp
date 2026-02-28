@@ -2,8 +2,24 @@
 ; This tree mirrors the hybrid controller shape used by --mode bt_planner.
 (sel
   (seq
-    (cond collision-imminent)
-    (act avoid-obstacle))
+    (cond goal-reached-racecar)
+    (succeed))
   (seq
-    (act plan-action)
-    (act apply-action)))
+    (cond collision-imminent)
+    (act avoid-obstacle rays action)
+    (running))
+  (seq
+    (plan-action :name "racecar-plan"
+                 :budget_ms 20
+                 :iters_max 1200
+                 :max_depth 18
+                 :gamma 0.96
+                 :pw_k 2.0
+                 :pw_alpha 0.5
+                 :model_service "racecar-kinematic-v1"
+                 :state_key state
+                 :action_key action
+                 :meta_key plan-meta
+                 :top_k 5)
+    (act apply-action action)
+    (running)))

@@ -69,3 +69,4 @@ Required fields:
 
 - Additive changes only within `racecar_demo.v1`.
 - Any field removal/rename/type change requires a new `schema_version`.
+- `run_demo.py` validates top-level fields before writing each record (schema regression guard).

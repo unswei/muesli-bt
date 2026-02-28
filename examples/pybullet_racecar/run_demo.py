@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import importlib
 import json
 import math
 import platform
@@ -12,7 +13,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple
 
 import pybullet as p
 import pybullet_data
@@ -20,6 +21,23 @@ import pybullet_data
 
 SCHEMA_VERSION = "racecar_demo.v1"
 PLANNER_SCHEMA_VERSION = "planner.v1"
+
+REQUIRED_LOG_FIELDS = {
+    "schema_version",
+    "run_id",
+    "tick_index",
+    "sim_time_s",
+    "wall_time_s",
+    "mode",
+    "state",
+    "goal",
+    "distance_to_goal",
+    "collision_imminent",
+    "action",
+    "collisions_total",
+    "goal_reached",
+}
+OPTIONAL_LOG_FIELDS = {"bt", "planner"}
 
 STEERING_JOINTS = (4, 6)
 DRIVE_JOINTS = (2, 3, 5, 7)
@@ -122,6 +140,17 @@ class JsonlSink:
 
     def close(self) -> None:
         self._file.close()
+
+
+def validate_log_record_v1(record: Dict[str, object]) -> None:
+    missing = REQUIRED_LOG_FIELDS.difference(record.keys())
+    if missing:
+        raise ValueError(f"racecar_demo.v1 missing required fields: {sorted(missing)}")
+    extra = set(record.keys()).difference(REQUIRED_LOG_FIELDS.union(OPTIONAL_LOG_FIELDS))
+    if extra:
+        raise ValueError(f"racecar_demo.v1 unexpected top-level fields: {sorted(extra)}")
+    if record.get("schema_version") != SCHEMA_VERSION:
+        raise ValueError(f"racecar_demo.v1 schema_version mismatch: {record.get('schema_version')}")
 
 
 STATUS_SUCCESS = "success"
@@ -797,6 +826,244 @@ def action_from_key_state(key_state: Dict[str, bool]) -> Action:
     return Action(steering=steering, throttle=throttle)
 
 
+def import_bridge_module(repo_root: Path) -> Any:
+    module_name = "muesli_bt_bridge"
+    try:
+        return importlib.import_module(module_name)
+    except Exception:
+        candidate = repo_root / "build" / "dev" / "python"
+        if candidate.exists():
+            sys.path.insert(0, str(candidate))
+            try:
+                return importlib.import_module(module_name)
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Failed to import {module_name} from {candidate}. "
+                    "Run `make demo-setup` first."
+                ) from exc
+        raise RuntimeError(
+            f"Failed to import {module_name}. "
+            "Build/install the bridge first (recommended: `make demo-setup`)."
+        )
+
+
+def build_muesli_bt_dsl(mode: str, args: argparse.Namespace) -> str:
+    if mode == "bt_basic":
+        return "(seq (act constant-drive action 0.0 0.45) (act apply-action action) (running))"
+    if mode == "bt_obstacles":
+        return (
+            "(sel "
+            "  (seq (cond goal-reached-racecar) (succeed)) "
+            "  (sel "
+            "    (seq (cond collision-imminent) (act avoid-obstacle rays action) (running)) "
+            "    (seq (act drive-to-goal goal action) (act apply-action action) (running))))"
+        )
+    if mode == "bt_planner":
+        budget_ms = max(1, int(round(args.budget_ms)))
+        return (
+            "(sel "
+            "  (seq (cond goal-reached-racecar) (succeed)) "
+            "  (sel "
+            "    (seq (cond collision-imminent) (act avoid-obstacle rays action) (running)) "
+            "    (seq "
+            "      (plan-action "
+            "        :name \"racecar-plan\" "
+            f"        :budget_ms {budget_ms} "
+            f"        :iters_max {int(args.iters_max)} "
+            f"        :max_depth {int(args.max_depth)} "
+            f"        :gamma {float(args.gamma)} "
+            f"        :pw_k {float(args.pw_k)} "
+            f"        :pw_alpha {float(args.pw_alpha)} "
+            "        :model_service \"racecar-kinematic-v1\" "
+            "        :state_key state "
+            "        :action_key action "
+            "        :meta_key plan-meta "
+            "        :top_k 5) "
+            "      (act apply-action action) "
+            "      (running))))"
+        )
+    raise ValueError(f"Unsupported BT mode: {mode}")
+
+
+def planner_payload_from_meta(meta_json: str) -> Optional[Dict[str, object]]:
+    try:
+        meta = json.loads(meta_json)
+    except Exception:
+        return None
+    if not isinstance(meta, dict):
+        return None
+
+    action_list = meta.get("action", [0.0, 0.0])
+    if not isinstance(action_list, list):
+        action_list = [0.0, 0.0]
+    steering = float(action_list[0]) if len(action_list) > 0 else 0.0
+    throttle = float(action_list[1]) if len(action_list) > 1 else 0.0
+    return {
+        "schema_version": PLANNER_SCHEMA_VERSION,
+        "budget_ms": float(meta.get("budget_ms", 0.0)),
+        "time_used_ms": float(meta.get("time_used_ms", 0.0)),
+        "iters": int(meta.get("iters", 0)),
+        "root_visits": int(meta.get("root_visits", 0)),
+        "root_children": int(meta.get("root_children", 0)),
+        "widen_added": int(meta.get("widen_added", 0)),
+        "depth_max": int(meta.get("depth_max", 0)),
+        "depth_mean": float(meta.get("depth_mean", 0.0)),
+        "status": str(meta.get("status", "noaction")),
+        "confidence": float(meta.get("confidence", 0.0)),
+        "value_est": float(meta.get("value_est", 0.0)),
+        "action": {"steering": steering, "throttle": throttle},
+        "top_k": [],
+    }
+
+
+class BridgeRacecarSimAdapter:
+    def __init__(
+        self,
+        client_id: int,
+        car_id: int,
+        goal_xy: Tuple[float, float],
+        obstacles: Sequence[Obstacle],
+        sink: JsonlSink,
+        run_id: str,
+        mode: str,
+        max_speed: float,
+        tick_hz: float,
+        draw_debug_enabled: bool,
+    ) -> None:
+        self.client_id = client_id
+        self.car_id = car_id
+        self.goal_xy = goal_xy
+        self.obstacles = list(obstacles)
+        self.obstacle_body_ids = {obs.body_id for obs in obstacles}
+        self.sink = sink
+        self.run_id = run_id
+        self.mode = mode
+        self.max_speed = max_speed
+        self.tick_hz = tick_hz
+        self.draw_debug_enabled = draw_debug_enabled
+
+        self.ray_angles = [-45.0, -25.0, -10.0, 0.0, 10.0, 25.0, 45.0]
+        self.ray_length = 3.0
+        self.collision_count = 0
+        self.wall_start = time.perf_counter()
+        self.debug_items: List[int] = []
+        self._last_state: Optional[CarState] = None
+        self._last_ray_segments: List[Tuple[Tuple[float, float, float], Tuple[float, float, float], float]] = []
+        self._stop_requested = False
+
+    def reset(self) -> None:
+        p.resetBasePositionAndOrientation(self.car_id, [0.0, 0.0, 0.20], [0.0, 0.0, 0.0, 1.0], physicsClientId=self.client_id)
+        p.resetBaseVelocity(self.car_id, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], physicsClientId=self.client_id)
+        self.collision_count = 0
+        self.wall_start = time.perf_counter()
+        self.debug_items = []
+        self._last_state = None
+        self._last_ray_segments = []
+        self._stop_requested = False
+
+    def get_state(self) -> Dict[str, object]:
+        state = car_state(self.client_id, self.car_id)
+        ray_distances, ray_segments = raycast_observation(self.client_id, state, self.ray_angles, self.ray_length)
+        self._last_state = state
+        self._last_ray_segments = ray_segments
+        collision_imminent = min(ray_distances) < 0.9 if ray_distances else False
+        state_vec = [
+            float(state.x),
+            float(state.y),
+            float(state.yaw),
+            float(state.speed),
+            float(self.goal_xy[0]),
+            float(self.goal_xy[1]),
+            *[float(v) for v in ray_distances],
+        ]
+        return {
+            "state_schema": "racecar_state.v1",
+            "state_vec": state_vec,
+            "x": float(state.x),
+            "y": float(state.y),
+            "yaw": float(state.yaw),
+            "speed": float(state.speed),
+            "rays": [float(v) for v in ray_distances],
+            "goal": [float(self.goal_xy[0]), float(self.goal_xy[1])],
+            "collision_imminent": bool(collision_imminent),
+            "collision_count": int(self.collision_count),
+            "t_ms": int((time.perf_counter() - self.wall_start) * 1000.0),
+        }
+
+    def apply_action(self, action: Tuple[float, float]) -> None:
+        steering = float(action[0])
+        throttle = float(action[1])
+        globals()["apply_action"](
+            self.client_id,
+            self.car_id,
+            Action(steering=steering, throttle=throttle),
+            max_speed=self.max_speed,
+        )
+
+    def step(self, steps: int) -> None:
+        step_count = max(1, int(steps))
+        for _ in range(step_count):
+            p.stepSimulation(physicsClientId=self.client_id)
+            contacts = p.getContactPoints(bodyA=self.car_id, physicsClientId=self.client_id)
+            if any(cp[2] in self.obstacle_body_ids for cp in contacts):
+                self.collision_count += 1
+
+    def debug_draw(self) -> None:
+        if not self.draw_debug_enabled:
+            return
+        if self._last_state is None:
+            return
+        self.debug_items = draw_debug(
+            self.client_id,
+            self._last_state,
+            self.goal_xy,
+            self._last_ray_segments,
+            self.debug_items,
+        )
+
+    def stop_requested(self) -> bool:
+        if self._stop_requested:
+            return True
+        events = p.getKeyboardEvents(physicsClientId=self.client_id)
+        esc = events.get(27, 0)
+        q = events.get(ord("q"), 0)
+        q_upper = events.get(ord("Q"), 0)
+        if (esc & p.KEY_WAS_TRIGGERED) or (q & p.KEY_WAS_TRIGGERED) or (q_upper & p.KEY_WAS_TRIGGERED):
+            self._stop_requested = True
+            return True
+        return False
+
+    def on_tick_record(self, payload: Dict[str, object]) -> None:
+        record: Dict[str, object] = {
+            "schema_version": SCHEMA_VERSION,
+            "run_id": self.run_id,
+            "tick_index": int(payload["tick_index"]),
+            "sim_time_s": float(payload["sim_time_s"]),
+            "wall_time_s": float(payload["wall_time_s"]),
+            "mode": self.mode,
+            "state": payload["state"],
+            "goal": payload["goal"],
+            "distance_to_goal": float(payload["distance_to_goal"]),
+            "collision_imminent": bool(payload["collision_imminent"]),
+            "action": payload["action"],
+            "collisions_total": int(payload["collisions_total"]),
+            "goal_reached": bool(payload["goal_reached"]),
+        }
+
+        bt_status = payload.get("bt_status")
+        if isinstance(bt_status, str):
+            record["bt"] = {"status": bt_status, "active_path": [], "node_status": {}}
+
+        planner_meta = payload.get("planner_meta_json")
+        if isinstance(planner_meta, str) and planner_meta:
+            planner = planner_payload_from_meta(planner_meta)
+            if planner is not None:
+                record["planner"] = planner
+
+        validate_log_record_v1(record)
+        self.sink.write(record)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="PyBullet racecar showcase demo for muesli-bt style BT + bounded-time MCTS.")
     parser.add_argument("--mode", choices=("manual", "bt_basic", "bt_obstacles", "bt_planner"), default="manual")
@@ -836,6 +1103,7 @@ def main() -> int:
     random.seed(args.seed)
 
     root_dir = Path(__file__).resolve().parent
+    repo_root = root_dir.parent.parent
     logs_dir = root_dir / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     out_dir = root_dir / "out"
@@ -851,9 +1119,10 @@ def main() -> int:
         raise RuntimeError("Failed to connect to PyBullet.")
 
     sink = JsonlSink(log_path)
-    debug_items: List[int] = []
-
-    repo_root = root_dir.parent.parent
+    config_for_metadata = {
+        key: (str(value) if isinstance(value, Path) else value)
+        for key, value in vars(args).items()
+    }
     metadata = {
         "schema_version": SCHEMA_VERSION,
         "run_id": run_id,
@@ -862,13 +1131,11 @@ def main() -> int:
         "platform": platform.platform(),
         "python_version": sys.version.split()[0],
         "pybullet_api_version": p.getAPIVersion(),
+        "pybullet_version": getattr(p, "__version__", "unknown"),
         "seed": args.seed,
-        "config": vars(args),
+        "config": config_for_metadata,
     }
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-
-    planner: Optional[ContinuousMctsPlanner] = None
-    bt_root: Optional[BtNode] = None
 
     try:
         p.setAdditionalSearchPath(pybullet_data.getDataPath(), physicsClientId=client_id)
@@ -892,22 +1159,61 @@ def main() -> int:
             obstacles = [make_box_obstacle(client_id, center, half) for center, half in obstacle_specs]
         obstacle_body_ids = {obs.body_id for obs in obstacles}
 
-        if args.mode == "bt_basic":
-            bt_root = build_bt_basic(constant_throttle=0.45)
-        elif args.mode == "bt_obstacles":
-            bt_root = build_bt_obstacle_goal()
-        elif args.mode == "bt_planner":
-            planner_cfg = PlannerConfig(
-                budget_ms=args.budget_ms,
-                iters_max=args.iters_max,
-                max_depth=args.max_depth,
-                gamma=args.gamma,
-                pw_k=args.pw_k,
-                pw_alpha=args.pw_alpha,
-                dt=max(1.0 / args.tick_hz, 0.05),
+        if args.mode != "manual":
+            bridge = import_bridge_module(repo_root)
+            runtime = bridge.Runtime()
+            runtime.reset()
+
+            adapter = BridgeRacecarSimAdapter(
+                client_id=client_id,
+                car_id=car_id,
+                goal_xy=goal_xy,
+                obstacles=obstacles,
+                sink=sink,
+                run_id=run_id,
+                mode=args.mode,
+                max_speed=args.max_speed,
+                tick_hz=args.tick_hz,
+                draw_debug_enabled=not args.headless,
             )
-            planner = ContinuousMctsPlanner(config=planner_cfg, rng=random.Random(args.seed))
-            bt_root = build_bt_planner(planner)
+            runtime.install_racecar_demo_extensions(adapter)
+
+            tree_dsl = build_muesli_bt_dsl(args.mode, args)
+            tree_handle = runtime.compile_bt(tree_dsl)
+            instance_handle = runtime.new_instance(tree_handle)
+
+            steps_per_tick = max(1, int(round(args.physics_hz / args.tick_hz)))
+            max_ticks = max(1, int(round(args.duration_sec * args.tick_hz)))
+            loop_result = runtime.run_loop(
+                instance_handle,
+                {
+                    "tick_hz": float(args.tick_hz),
+                    "max_ticks": int(max_ticks),
+                    "state_key": "state",
+                    "action_key": "action",
+                    "steps_per_tick": int(steps_per_tick),
+                    "safe_action": [0.0, 0.0],
+                    "draw_debug": bool(not args.headless),
+                    "mode": args.mode,
+                    "planner_meta_key": "plan-meta",
+                    "run_id": run_id,
+                },
+            )
+
+            summary = {
+                "run_id": run_id,
+                "mode": args.mode,
+                "status": loop_result.get("status", "error"),
+                "reason": loop_result.get("reason", ""),
+                "ticks": int(loop_result.get("ticks", 0)),
+                "collisions_total": int(loop_result.get("collisions_total", 0)),
+                "goal_reached": bool(loop_result.get("goal_reached", False)),
+                "fallback_count": int(loop_result.get("fallback_count", 0)),
+                "log_path": str(log_path),
+                "metadata_path": str(metadata_path),
+            }
+            print(json.dumps(summary, indent=2))
+            return 0
 
         ray_angles = [-45.0, -25.0, -10.0, 0.0, 10.0, 25.0, 45.0]
         ray_length = 3.0
@@ -957,7 +1263,7 @@ def main() -> int:
             )
 
         tick_every_n = max(1, int(round(args.physics_hz / args.tick_hz)))
-        realtime_speed = args.manual_realtime_speed if args.mode == "manual" else 1.0
+        realtime_speed = args.manual_realtime_speed
         realtime_speed = max(1.0, realtime_speed)
         max_steps = int(args.duration_sec * args.physics_hz * realtime_speed)
 
@@ -978,112 +1284,52 @@ def main() -> int:
                 ray_distances, ray_segments = raycast_observation(client_id, state, ray_angles, ray_length)
                 collision_imminent = min(ray_distances) < 0.9
 
-                if args.mode != "manual":
-                    debug_items = draw_debug(client_id, state, goal_xy, ray_segments, debug_items)
-
-                bt_status = None
-                bt_payload = None
-                planner_payload = None
-
-                if args.mode == "manual":
-                    key_events: Dict[int, int] = {}
-                    if manual_keyboard_backend == "pynput" and manual_pynput is not None and manual_pynput.available:
-                        snapshot = manual_pynput.snapshot()
-                        manual_key_state = {
-                            "forward": bool(snapshot.get("forward", False)),
-                            "backward": bool(snapshot.get("backward", False)),
-                            "left": bool(snapshot.get("left", False)),
-                            "right": bool(snapshot.get("right", False)),
-                            "brake": bool(snapshot.get("brake", False)),
-                        }
-                        keyboard_control = action_from_key_state(snapshot)
-                    else:
-                        keyboard_control, manual_key_state, key_events = poll_pybullet_key_state(client_id, manual_key_state)
-
-                    keyboard_active = any(manual_key_state.values())
-                    if keyboard_active:
-                        current_action = keyboard_control
-                        control_source = "keyboard"
-                    elif manual_steering_slider_id is not None and manual_throttle_slider_id is not None:
-                        current_action = Action(
-                            steering=p.readUserDebugParameter(manual_steering_slider_id, physicsClientId=client_id),
-                            throttle=p.readUserDebugParameter(manual_throttle_slider_id, physicsClientId=client_id),
-                        )
-                        control_source = "slider"
-                    else:
-                        current_action = keyboard_control
-                        control_source = "keyboard"
-
-                    if not args.headless:
-                        status_text = (
-                            f"control={control_source} backend={manual_keyboard_backend}  "
-                            f"keys[f={int(manual_key_state['forward'])},b={int(manual_key_state['backward'])},"
-                            f"l={int(manual_key_state['left'])},r={int(manual_key_state['right'])},"
-                            f"br={int(manual_key_state['brake'])}]  "
-                            f"events={len(key_events)}  "
-                            f"throttle={current_action.throttle:+.2f} steer={current_action.steering:+.2f}"
-                        )
-                        manual_input_debug_id = p.addUserDebugText(
-                            status_text,
-                            [state.x - 0.6, state.y + 0.7, 0.75],
-                            textColorRGB=[0.95, 0.95, 0.95],
-                            textSize=1.2,
-                            lifeTime=0.12,
-                            replaceItemUniqueId=manual_input_debug_id,
-                            physicsClientId=client_id,
-                        )
-                elif bt_root is not None:
-                    blackboard: Dict[str, object] = {
-                        "state": state,
-                        "goal_xy": goal_xy,
-                        "ray_distances": ray_distances,
-                        "ray_angles_deg": list(ray_angles),
-                        "collision_imminent": collision_imminent,
-                        "obstacles": obstacles,
-                        "planner_result": None,
+                key_events: Dict[int, int] = {}
+                if manual_keyboard_backend == "pynput" and manual_pynput is not None and manual_pynput.available:
+                    snapshot = manual_pynput.snapshot()
+                    manual_key_state = {
+                        "forward": bool(snapshot.get("forward", False)),
+                        "backward": bool(snapshot.get("backward", False)),
+                        "left": bool(snapshot.get("left", False)),
+                        "right": bool(snapshot.get("right", False)),
+                        "brake": bool(snapshot.get("brake", False)),
                     }
-                    tick_ctx = TickContext(blackboard=blackboard)
-                    bt_status = bt_root.tick(tick_ctx)
-                    action_from_bt = tick_ctx.blackboard.get("action")
-                    if isinstance(action_from_bt, Action):
-                        current_action = action_from_bt
-                    else:
-                        current_action = Action(steering=0.0, throttle=0.0)
+                    keyboard_control = action_from_key_state(snapshot)
+                else:
+                    keyboard_control, manual_key_state, key_events = poll_pybullet_key_state(client_id, manual_key_state)
 
-                    bt_payload = {
-                        "status": bt_status,
-                        "active_path": tick_ctx.visited_nodes,
-                        "node_status": tick_ctx.node_status,
-                    }
+                keyboard_active = any(manual_key_state.values())
+                if keyboard_active:
+                    current_action = keyboard_control
+                    control_source = "keyboard"
+                elif manual_steering_slider_id is not None and manual_throttle_slider_id is not None:
+                    current_action = Action(
+                        steering=p.readUserDebugParameter(manual_steering_slider_id, physicsClientId=client_id),
+                        throttle=p.readUserDebugParameter(manual_throttle_slider_id, physicsClientId=client_id),
+                    )
+                    control_source = "slider"
+                else:
+                    current_action = keyboard_control
+                    control_source = "keyboard"
 
-                    planner_result = tick_ctx.blackboard.get("planner_result")
-                    if isinstance(planner_result, PlannerResult):
-                        planner_payload = {
-                            "schema_version": PLANNER_SCHEMA_VERSION,
-                            "budget_ms": planner.cfg.budget_ms if planner is not None else args.budget_ms,
-                            "time_used_ms": planner_result.stats.time_used_ms,
-                            "iters": planner_result.stats.iters,
-                            "root_visits": planner_result.stats.root_visits,
-                            "root_children": planner_result.stats.root_children,
-                            "widen_added": planner_result.stats.widen_added,
-                            "depth_max": planner_result.stats.depth_max,
-                            "depth_mean": planner_result.stats.depth_mean,
-                            "status": planner_result.status,
-                            "confidence": planner_result.confidence,
-                            "value_est": planner_result.stats.value_est,
-                            "action": {
-                                "steering": planner_result.action.steering,
-                                "throttle": planner_result.action.throttle,
-                            },
-                            "top_k": [
-                                {
-                                    "action": {"steering": top.action.steering, "throttle": top.action.throttle},
-                                    "visits": top.visits,
-                                    "q": top.q,
-                                }
-                                for top in planner_result.stats.top_k
-                            ],
-                        }
+                if not args.headless:
+                    status_text = (
+                        f"control={control_source} backend={manual_keyboard_backend}  "
+                        f"keys[f={int(manual_key_state['forward'])},b={int(manual_key_state['backward'])},"
+                        f"l={int(manual_key_state['left'])},r={int(manual_key_state['right'])},"
+                        f"br={int(manual_key_state['brake'])}]  "
+                        f"events={len(key_events)}  "
+                        f"throttle={current_action.throttle:+.2f} steer={current_action.steering:+.2f}"
+                    )
+                    manual_input_debug_id = p.addUserDebugText(
+                        status_text,
+                        [state.x - 0.6, state.y + 0.7, 0.75],
+                        textColorRGB=[0.95, 0.95, 0.95],
+                        textSize=1.2,
+                        lifeTime=0.12,
+                        replaceItemUniqueId=manual_input_debug_id,
+                        physicsClientId=client_id,
+                    )
 
                 apply_action(client_id, car_id, current_action, max_speed=args.max_speed)
 
@@ -1109,10 +1355,7 @@ def main() -> int:
                     "collisions_total": collision_count,
                     "goal_reached": bool(success_tick is not None),
                 }
-                if bt_payload is not None:
-                    record["bt"] = bt_payload
-                if planner_payload is not None:
-                    record["planner"] = planner_payload
+                validate_log_record_v1(record)
                 sink.write(record)
 
             if not args.no_sleep:

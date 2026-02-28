@@ -3,8 +3,8 @@
 This example provides a cross-platform visual PyBullet demo with:
 
 - manual driving
-- BT-style control loops
-- bounded-time continuous-action MCTS planning
+- muesli-bt executed control loops in BT modes
+- bounded-time continuous-action MCTS planning via `plan-action` node
 - stable JSONL logging + run metadata
 - BT DOT export + Graphviz rendering
 
@@ -12,26 +12,54 @@ This example provides a cross-platform visual PyBullet demo with:
 
 - Linux or macOS
 - Python 3.11+
-- muesli-bt built (`./build/dev/muslisp`) for BT DOT export
+- CMake + Ninja + C++20 toolchain
 - optional Graphviz (`dot`) for SVG/PNG rendering
 
 ## Install
 
+From repo root (recommended):
+
 ```bash
-cd examples/pybullet_racecar
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+make demo-setup
+```
+
+This builds:
+
+- `muslisp` runtime
+- Python bridge module `muesli_bt_bridge`
+- demo Python dependencies (including PyBullet)
+
+Manual equivalent:
+
+```bash
+python3.11 -m venv .venv-py311
+.venv-py311/bin/python -m pip install -r examples/pybullet_racecar/requirements.txt
+cmake --preset dev \
+  -DMUESLI_BT_BUILD_PYTHON_BRIDGE=ON \
+  -DPython3_EXECUTABLE="$(pwd)/.venv-py311/bin/python" \
+  -DPython3_FIND_VIRTUALENV=ONLY \
+  -DPython3_FIND_STRATEGY=LOCATION
+cmake --build --preset dev -j
 ```
 
 ## Run Modes
 
-From repo root:
+From repo root (recommended):
+
+```bash
+make demo-run MODE=manual
+make demo-run MODE=bt_basic
+make demo-run MODE=bt_obstacles
+make demo-run MODE=bt_planner
+```
+
+Or direct command:
 
 ### Step 1: Manual visual bring-up
 
 ```bash
-python examples/pybullet_racecar/run_demo.py --mode manual
+PYTHONPATH=build/dev/python \
+  .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode manual
 ```
 
 Controls: arrows or `WASD`/`IJKL`. If keyboard focus is flaky, use the on-screen steering/throttle sliders.
@@ -43,34 +71,38 @@ Manual mode runs at 4x real-time by default (`--manual-realtime-speed 4.0`).
 ### Step 2: Basic BT-style constant drive
 
 ```bash
-python examples/pybullet_racecar/run_demo.py --mode bt_basic
+PYTHONPATH=build/dev/python \
+  .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_basic
 ```
 
 ### Step 3: Obstacles + goal with heuristic BT switching
 
 ```bash
-python examples/pybullet_racecar/run_demo.py --mode bt_obstacles
+PYTHONPATH=build/dev/python \
+  .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_obstacles
 ```
 
 ### Step 4: Hybrid BT + bounded-time MCTS planning
 
 ```bash
-python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 20
+PYTHONPATH=build/dev/python \
+  .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 20
 ```
 
 Budget sweep example:
 
 ```bash
-python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 5
-python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 10
-python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 20
-python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 50
+PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 5
+PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 10
+PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 20
+PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 50
 ```
 
 Headless (CI/remote):
 
 ```bash
-python examples/pybullet_racecar/run_demo.py --mode bt_planner --headless --no-sleep
+PYTHONPATH=build/dev/python \
+  .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --headless --no-sleep
 ```
 
 ## Logs and Metadata

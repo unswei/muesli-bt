@@ -15,6 +15,7 @@ CMakeFiles/
 cmake_install.cmake
 Makefile
 compile_commands.json
+!/Makefile
 
 # common compiled outputs
 *.o

@@ -13,10 +13,12 @@
 
 #include "bt/instance.hpp"
 #include "bt/logging.hpp"
+#include "bt/racecar_demo.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/trace.hpp"
 #include "muslisp/env.hpp"
 #include "muslisp/error.hpp"
+#include "muslisp/builtins.hpp"
 #include "muslisp/eval.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
@@ -1643,6 +1645,212 @@ void test_phase6_custom_robot_interface() {
     host.set_robot_interface(nullptr);
 }
 
+class mock_racecar_adapter final : public bt::racecar_sim_adapter {
+public:
+    bt::racecar_state get_state() override {
+        ++get_state_calls;
+        if (throw_get_state_at > 0 && get_state_calls == throw_get_state_at) {
+            throw std::runtime_error("forced get_state failure");
+        }
+        bt::racecar_state state;
+        state.state_schema = "racecar_state.v1";
+        state.x = 0.05 * static_cast<double>(get_state_calls);
+        state.y = 0.0;
+        state.yaw = 0.0;
+        state.speed = 0.1;
+        state.goal = {10.0, 0.0};
+        state.rays = {3.0, 3.0, 3.0, 3.0, 3.0};
+        state.state_vec = {state.x, state.y, state.yaw, state.speed, state.goal[0], state.goal[1],
+                           state.rays[0], state.rays[1], state.rays[2], state.rays[3], state.rays[4]};
+        state.collision_imminent = false;
+        state.collision_count = collision_count;
+        state.t_ms = get_state_calls * 50;
+        return state;
+    }
+
+    void apply_action(double steering, double throttle) override {
+        ++apply_calls;
+        actions.emplace_back(steering, throttle);
+        last_action = {steering, throttle};
+    }
+
+    void step(std::int64_t steps) override {
+        ++step_calls;
+        step_args.push_back(steps);
+    }
+
+    void reset() override {}
+
+    void on_tick_record(const bt::racecar_tick_record& record) override {
+        ++tick_record_calls;
+        tick_records.push_back(record);
+    }
+
+    std::int64_t throw_get_state_at = -1;
+    std::int64_t get_state_calls = 0;
+    std::int64_t apply_calls = 0;
+    std::int64_t step_calls = 0;
+    std::int64_t tick_record_calls = 0;
+    std::int64_t collision_count = 0;
+    std::vector<std::int64_t> step_args{};
+    std::vector<std::pair<double, double>> actions{};
+    std::array<double, 2> last_action{0.0, 0.0};
+    std::vector<bt::racecar_tick_record> tick_records{};
+};
+
+void test_racecar_loop_contract() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    bt::runtime_host& host = bt::default_runtime_host();
+    bt::install_racecar_demo_callbacks(host);
+    env_ptr env = create_global_env();
+
+    (void)eval_text(
+        "(define tree "
+        "  (bt.compile '(seq (act constant-drive action 0.1 0.3) (act apply-action action) (running))))",
+        env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+    const std::int64_t inst_handle = bt_handle(eval_text("inst", env));
+
+    auto adapter = std::make_shared<mock_racecar_adapter>();
+    bt::set_racecar_sim_adapter(adapter);
+
+    bt::racecar_loop_options opts;
+    opts.tick_hz = 1000.0;
+    opts.max_ticks = 5;
+    opts.state_key = "state";
+    opts.action_key = "action";
+    opts.steps_per_tick = 3;
+    opts.mode = "bt_basic";
+    opts.run_id = "test-run";
+
+    const bt::racecar_loop_result result = bt::run_racecar_loop(host, inst_handle, opts);
+    check(result.status == bt::racecar_loop_status::stopped, "run-loop should stop on max ticks");
+    check(result.ticks == 5, "run-loop should execute max ticks");
+    check(adapter->get_state_calls == 5, "run-loop should observe exactly once per tick");
+    check(adapter->apply_calls == 5, "run-loop should apply exactly once per tick");
+    check(adapter->step_calls == 5, "run-loop should step exactly once per tick");
+    check(adapter->tick_record_calls == 5, "run-loop should emit exactly one tick record per tick");
+    check(result.fallback_count == 0, "run-loop should not use fallback when action is valid");
+    for (std::int64_t arg : adapter->step_args) {
+        check(arg == 3, "run-loop should preserve configured steps_per_tick");
+    }
+    check(!adapter->tick_records.empty(), "run-loop should collect tick records");
+    check(adapter->tick_records.front().run_id == "test-run", "run-loop record should carry run_id");
+
+    bt::clear_racecar_demo_state();
+}
+
+void test_racecar_loop_error_safe_action() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    bt::runtime_host& host = bt::default_runtime_host();
+    bt::install_racecar_demo_callbacks(host);
+    env_ptr env = create_global_env();
+
+    (void)eval_text(
+        "(define tree "
+        "  (bt.compile '(seq (act constant-drive action 0.2 0.4) (act apply-action action) (running))))",
+        env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+    const std::int64_t inst_handle = bt_handle(eval_text("inst", env));
+
+    auto adapter = std::make_shared<mock_racecar_adapter>();
+    adapter->throw_get_state_at = 2;
+    bt::set_racecar_sim_adapter(adapter);
+
+    bt::racecar_loop_options opts;
+    opts.tick_hz = 1000.0;
+    opts.max_ticks = 10;
+    opts.state_key = "state";
+    opts.action_key = "action";
+    opts.steps_per_tick = 2;
+    opts.safe_action = {0.33, 0.0};
+    opts.mode = "bt_basic";
+    opts.run_id = "error-run";
+
+    const bt::racecar_loop_result result = bt::run_racecar_loop(host, inst_handle, opts);
+    check(result.status == bt::racecar_loop_status::error, "run-loop should return :error when adapter throws");
+    check(result.ticks == 2, "run-loop error path should emit final error tick record");
+    check(adapter->apply_calls == 2, "run-loop error path should apply safe action once");
+    check(adapter->step_calls == 2, "run-loop error path should step once after safe action");
+    check_close(adapter->last_action[0], 0.33, 1e-9, "safe action steering mismatch");
+    check_close(adapter->last_action[1], 0.0, 1e-9, "safe action throttle mismatch");
+    check(adapter->tick_records.size() == 2, "run-loop error path should emit final error record");
+    check(adapter->tick_records.back().is_error_record, "final record should be marked as error");
+    check(result.fallback_count == 0, "error-safe-action should not change fallback_count");
+
+    bt::clear_racecar_demo_state();
+}
+
+void test_racecar_planner_model_and_sim_get_state_builtin() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    bt::runtime_host& host = bt::default_runtime_host();
+    bt::install_racecar_demo_callbacks(host);
+    check(host.planner_ref().has_model("racecar-kinematic-v1"), "planner should register racecar-kinematic-v1 model");
+
+    env_ptr env = create_global_env();
+    install_racecar_demo_builtins(env);
+
+    auto adapter = std::make_shared<mock_racecar_adapter>();
+    bt::set_racecar_sim_adapter(adapter);
+
+    value state_meta = eval_text(
+        "(begin "
+        "  (define s (sim.get-state)) "
+        "  (list (map.get s 'state_schema \"none\") "
+        "        (map.get s 'x -1.0) "
+        "        (map.get s 'collision_count -1)))",
+        env);
+    const auto state_fields = vector_from_list(state_meta);
+    check(state_fields.size() == 3, "sim.get-state metadata shape mismatch");
+    check(is_string(state_fields[0]) && string_value(state_fields[0]) == "racecar_state.v1",
+          "sim.get-state should expose state_schema");
+    check(is_float(state_fields[1]), "sim.get-state should expose x as float");
+    check(is_integer(state_fields[2]) && integer_value(state_fields[2]) == 0,
+          "sim.get-state should expose collision_count as int");
+
+    (void)eval_text(
+        "(define loop-tree "
+        "  (bt.compile '(seq (act constant-drive action 0.0 0.2) (act apply-action action) (running))))",
+        env);
+    (void)eval_text("(define loop-inst (bt.new-instance loop-tree))", env);
+    (void)eval_text(
+        "(define loop-result "
+        "(sim.run-loop loop-inst \"tick_hz\" 1000 \"max_ticks\" 3 \"state_key\" 'state \"action_key\" 'action "
+        "\"steps_per_tick\" 1 \"mode\" \"test\"))",
+        env);
+    check(is_symbol(eval_text("(map.get loop-result 'status ':none)", env)), "sim.run-loop status should be symbol");
+    check(symbol_name(eval_text("(map.get loop-result 'status ':none)", env)) == ":stopped",
+          "sim.run-loop should stop on max ticks");
+    check(integer_value(eval_text("(map.get loop-result 'ticks -1)", env)) == 3, "sim.run-loop tick count mismatch");
+
+    (void)eval_text(
+        "(define tree "
+        "  (bt.compile "
+        "    '(seq "
+        "       (plan-action :name \"race\" :budget_ms 4 :iters_max 120 "
+        "                    :model_service \"racecar-kinematic-v1\" :state_key state :action_key action :meta_key plan-meta) "
+        "       (act apply-action action))))",
+        env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+    value st = eval_text("(bt.tick inst '((state (0.0 0.0 0.0 0.0 7.0 3.0 3.0 3.0 3.0))))", env);
+    check(is_symbol(st) && symbol_name(st) == "success", "plan-action with racecar model should succeed");
+
+    bt::instance* inst = host.find_instance(bt_handle(eval_text("inst", env)));
+    check(inst != nullptr, "racecar plan-action instance should exist");
+    const bt::bb_entry* action_entry = inst->bb.get("action");
+    check(action_entry != nullptr, "racecar plan-action should publish action");
+    const auto* action_vec = std::get_if<std::vector<double>>(&action_entry->value);
+    check(action_vec && action_vec->size() >= 2, "racecar plan-action should output [steering throttle]");
+
+    bt::clear_racecar_demo_state();
+}
+
 }  // namespace
 
 int main() {
@@ -1682,6 +1890,9 @@ int main() {
         {"bt blackboard/trace/stats builtins", test_bt_blackboard_trace_and_stats_builtins},
         {"bt scheduler-backed action", test_bt_scheduler_backed_action},
         {"bt tick with blackboard input", test_bt_tick_with_blackboard_input},
+        {"racecar run-loop contract", test_racecar_loop_contract},
+        {"racecar run-loop error safe-action", test_racecar_loop_error_safe_action},
+        {"racecar planner model + sim.get-state", test_racecar_planner_model_and_sim_get_state_builtin},
         {"phase5 ring buffer bounds", test_phase5_ring_buffer_bounds},
         {"phase6 sample wrappers tree", test_phase6_sample_wrappers_tree},
         {"phase6 custom robot interface", test_phase6_custom_robot_interface},

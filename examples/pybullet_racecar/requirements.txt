@@ -1,3 +1,4 @@
-pybullet>=3.2
-matplotlib>=3.8
-pynput>=1.7
+pybullet==3.2.7
+matplotlib==3.10.8
+pynput==1.8.1
+pybind11==2.13.6

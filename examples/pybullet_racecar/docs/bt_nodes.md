@@ -2,44 +2,42 @@
 
 ## `bt_basic`
 
-- `ApplyConstantDrive` (action)
-  - Writes constant action `{steering=0.0, throttle=0.45}`.
+- `constant-drive` (action callback)
+  - Writes constant action `[0.0, 0.45]` to blackboard key `action`.
+- `apply-action` (action callback)
+  - Validates action shape for host extraction.
 
 ## `bt_obstacles`
 
-- `RootSelector` (selector)
-  - `AvoidBranch` (sequence)
-    - `CollisionImminent?` (condition)
-    - `AvoidObstacle` (action)
-  - `GoalBranch` (sequence)
-    - `DriveToGoal` (action)
+- `goal-reached-racecar` (condition callback)
+- `collision-imminent` (condition callback)
+- `avoid-obstacle` (action callback)
+- `drive-to-goal` (action callback)
+- `apply-action` (action callback)
 
 Behavior:
 
-- When any forward ray falls below threshold, the avoid branch takes control.
-- Otherwise a simple proportional goal tracker drives toward the marker.
+- Goal condition returns success.
+- Otherwise when forward rays are short, avoidance steers to the clearer side.
+- If no hazard is active, proportional goal tracking drives toward the marker.
 
 ## `bt_planner`
 
-- `RootSelector` (selector)
-  - `AvoidBranch` (sequence)
-    - `CollisionImminent?`
-    - `AvoidObstacle`
-  - `PlannerBranch` (sequence)
-    - `PlanActionNode`
-    - `ApplyAction`
+- `goal-reached-racecar` (condition callback)
+- `collision-imminent` (condition callback)
+- `avoid-obstacle` (action callback)
+- `plan-action` (planner node, model `racecar-kinematic-v1`)
+- `apply-action` (action callback)
 
 Behavior:
 
 - Safety branch preempts planning.
 - Planner branch runs bounded-time continuous MCTS and writes best-so-far action.
-- If planner yields no action, branch fails and safe fallback action is applied.
+- If planner does not publish a valid action, host fallback `[0.0, 0.0]` is applied.
 
 ## Introspection
 
-Per tick, logs include:
+Per tick logs keep `racecar_demo.v1` unchanged, with optional:
 
-- active path (`bt.active_path`)
-- per-node statuses (`bt.node_status`)
-
-These are stable fields in `racecar_demo.v1`.
+- `bt.status`
+- `planner` block derived from planner meta when planning executes

@@ -48,7 +48,8 @@ Run async VLA demo with fallback behavior:
 Run the visual PyBullet racecar showcase:
 
 ```bash
-python examples/pybullet_racecar/run_demo.py --mode bt_planner
+make demo-setup
+make demo-run MODE=bt_planner
 ```
 
 Open a REPL:
@@ -80,6 +81,11 @@ Then use that same environment for docs:
 ```bash
 .venv-py311/bin/python -m mkdocs serve
 ```
+
+## Demo Make Targets
+
+- `make demo-setup`: installs pinned demo deps and builds `muesli_bt_bridge`.
+- `make demo-run MODE=bt_planner`: runs the racecar demo through the bridge/runtime path.
 
 ## A Small Hybrid Example
 
