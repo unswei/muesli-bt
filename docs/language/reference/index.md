@@ -161,6 +161,7 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`bt.clear-logs`](builtins/bt/bt-clear-logs.md)
 - [`bt.clear-trace`](builtins/bt/bt-clear-trace.md)
 - [`bt.compile`](builtins/bt/bt-compile.md)
+- [`bt.export-dot`](builtins/bt/bt-export-dot.md)
 - [`bt.load`](builtins/bt/bt-load.md)
 - [`bt.load-dsl`](builtins/bt/bt-load-dsl.md)
 - [`bt.log.dump`](builtins/bt/bt-log-dump.md)

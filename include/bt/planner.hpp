@@ -116,6 +116,7 @@ struct planner_result {
 };
 
 struct planner_record {
+    std::string schema_version = "planner.v1";
     std::int64_t ts_ms = 0;
     std::string run_id;
     std::uint64_t tick_index = 0;

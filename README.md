@@ -45,6 +45,12 @@ Run async VLA demo with fallback behavior:
 ./build/dev/muslisp examples/repl_scripts/vla-stub-bt.lisp
 ```
 
+Run the visual PyBullet racecar showcase:
+
+```bash
+python examples/pybullet_racecar/run_demo.py --mode bt_planner
+```
+
 Open a REPL:
 
 ```bash

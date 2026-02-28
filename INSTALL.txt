@@ -1,0 +1,91 @@
+muesli-bt install and setup notes
+================================
+
+This file describes the current setup flow after clone/checkout, based on the
+repository as of February 28, 2026.
+
+1) Clone and checkout
+---------------------
+
+  git clone <repo-url>
+  cd muslisp-bt
+  git checkout <branch-or-tag>
+
+2) Build the C++ project (muslisp runtime)
+------------------------------------------
+
+Required tools:
+- CMake 3.20+
+- Ninja
+- C++20 compiler (clang++ or g++)
+
+Build:
+
+  cmake --preset dev
+  cmake --build --preset dev -j
+
+This produces:
+- build/dev/muslisp
+- build/dev/muslisp_tests
+
+3) Run tests
+------------
+
+  ctest --preset dev
+
+or:
+
+  ctest --test-dir build/dev --output-on-failure
+
+4) Set up unified Python environment (docs + pybullet demo)
+------------------------------------------------------------
+
+The repo includes a helper script:
+
+  ./scripts/setup-python-env.sh
+
+Default environment path:
+- .venv-py311
+
+Manual equivalent (if you prefer direct commands):
+
+  uv venv --python 3.11 .venv-py311
+  uv pip install --python .venv-py311/bin/python -r docs/requirements.txt
+  uv pip install --python .venv-py311/bin/python pybullet
+
+5) Run examples
+---------------
+
+Core runtime example:
+
+  ./build/dev/muslisp examples/bt/hello_bt.lisp
+
+PyBullet racecar demo:
+
+  .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner
+
+6) "Install" muslisp command locally (optional)
+------------------------------------------------
+
+There is currently no CMake install target in this repository.
+If you want a global-ish command, create a symlink:
+
+  mkdir -p ~/.local/bin
+  ln -sf "$(pwd)/build/dev/muslisp" ~/.local/bin/muslisp
+
+Make sure ~/.local/bin is on PATH, then run:
+
+  muslisp --help
+
+7) Common troubleshooting
+-------------------------
+
+- pybullet import error:
+  Use .venv-py311/bin/python explicitly when running demo scripts.
+
+- Arrow keys not captured in PyBullet GUI:
+  Click inside the GUI window first, or use the on-screen sliders in manual mode.
+
+- Slow manual movement:
+  Increase wheel speed scale, for example:
+    --max-speed 80

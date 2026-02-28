@@ -601,6 +601,7 @@ planner_result planner_service::plan(const planner_request& request) {
     }
 
     planner_record rec;
+    rec.schema_version = "planner.v1";
     rec.ts_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end.time_since_epoch()).count();
     rec.run_id = request.run_id;
     rec.tick_index = request.tick_index;
@@ -713,8 +714,10 @@ void planner_service::append_record(planner_record record) {
 }
 
 std::string planner_service::record_to_json(const planner_record& record) const {
+    const std::string schema = record.schema_version.empty() ? "planner.v1" : record.schema_version;
     std::ostringstream out;
     out << '{'
+        << "\"schema_version\":\"" << json_escape(schema) << "\","
         << "\"ts_ms\":" << record.ts_ms << ','
         << "\"run_id\":\"" << json_escape(record.run_id) << "\","
         << "\"tick_index\":" << record.tick_index << ','

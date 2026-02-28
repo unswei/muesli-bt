@@ -1,0 +1,9 @@
+; Canonical BT DSL used for diagram export in the racecar demo.
+; This tree mirrors the hybrid controller shape used by --mode bt_planner.
+(sel
+  (seq
+    (cond collision-imminent)
+    (act avoid-obstacle))
+  (seq
+    (act plan-action)
+    (act apply-action)))

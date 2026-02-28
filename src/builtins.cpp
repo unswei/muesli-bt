@@ -1843,6 +1843,22 @@ value builtin_bt_save_dsl(const std::vector<value>& args) {
     return make_boolean(true);
 }
 
+value builtin_bt_export_dot(const std::vector<value>& args) {
+    require_arity("bt.export-dot", args, 2);
+    const std::int64_t def_handle = require_bt_def_handle(args[0], "bt.export-dot");
+    const std::string path = require_path_arg(args[1], "bt.export-dot");
+    const bt::definition* def = bt::default_runtime_host().find_definition(def_handle);
+    if (!def) {
+        throw lisp_error("bt.export-dot: unknown definition");
+    }
+    try {
+        bt::export_definition_dot(*def, path);
+    } catch (const std::exception& e) {
+        throw lisp_error(std::string("bt.export-dot: ") + e.what());
+    }
+    return make_boolean(true);
+}
+
 value builtin_bt_load_dsl(const std::vector<value>& args) {
     require_arity("bt.load-dsl", args, 1);
     const std::string path = require_path_arg(args[0], "bt.load-dsl");
@@ -2598,6 +2614,7 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "bt.compile", builtin_bt_compile);
     bind_primitive(global_env, "bt.to-dsl", builtin_bt_to_dsl);
     bind_primitive(global_env, "bt.save-dsl", builtin_bt_save_dsl);
+    bind_primitive(global_env, "bt.export-dot", builtin_bt_export_dot);
     bind_primitive(global_env, "bt.load-dsl", builtin_bt_load_dsl);
     bind_primitive(global_env, "bt.save", builtin_bt_save_binary);
     bind_primitive(global_env, "bt.load", builtin_bt_load_binary);

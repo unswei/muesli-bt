@@ -34,3 +34,7 @@ compile_commands.json
 *.log
 .DS_Store
 *~
+
+# pybullet racecar demo outputs
+examples/pybullet_racecar/logs/
+examples/pybullet_racecar/out/

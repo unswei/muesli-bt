@@ -455,6 +455,37 @@ void test_bt_dsl_save_load_roundtrip() {
     check(symbol_name(eval_text("(bt.tick inst3)", env)) == "success", "bt.load-dsl tree tick should succeed");
 }
 
+void test_bt_export_dot_builtin() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text(
+        "(define tree "
+        "  (bt (seq (cond always-true) (act bb-put-int foo 42) (retry 2 (act always-fail)))))",
+        env);
+
+    const auto dot_path = temp_file_path("tree_graph", ".dot");
+    const std::string dot_path_lisp = lisp_string_literal(dot_path.string());
+    value export_ok = eval_text("(bt.export-dot tree " + dot_path_lisp + ")", env);
+    check(is_boolean(export_ok) && boolean_value(export_ok), "bt.export-dot should return #t");
+
+    std::ifstream in(dot_path);
+    check(static_cast<bool>(in), "bt.export-dot should write the .dot file");
+    std::ostringstream text;
+    text << in.rdbuf();
+    const std::string dot = text.str();
+
+    check(dot.find("digraph bt") != std::string::npos, "dot output should include graph header");
+    check(dot.find("always-true") != std::string::npos, "dot output should include condition leaf label");
+    check(dot.find("bb-put-int") != std::string::npos, "dot output should include action leaf label");
+    check(dot.find("[retry 2]") != std::string::npos, "dot output should include retry node metadata");
+    check(dot.find("->") != std::string::npos, "dot output should include edges");
+
+    std::filesystem::remove(dot_path);
+}
+
 void test_bt_binary_save_load_roundtrip_and_validation() {
     using namespace muslisp;
 
@@ -1047,6 +1078,8 @@ void test_plan_action_node_blackboard_meta_and_logs() {
 
     value planner_logs = eval_text("(planner.logs.dump 10)", env);
     check(is_string(planner_logs), "planner.logs.dump should return string");
+    check(string_value(planner_logs).find("\"schema_version\":\"planner.v1\"") != std::string::npos,
+          "planner logs should include stable schema_version");
     check(string_value(planner_logs).find("\"node_name\":\"toy-plan\"") != std::string::npos,
           "planner logs should include node name");
     check(string_value(planner_logs).find("\"status\"") != std::string::npos,
@@ -1626,6 +1659,7 @@ int main() {
         {"bt authoring sugar", test_bt_authoring_sugar},
         {"load/write/save and roundtrip", test_load_write_save_and_roundtrip},
         {"bt dsl save/load roundtrip", test_bt_dsl_save_load_roundtrip},
+        {"bt export-dot builtin", test_bt_export_dot_builtin},
         {"bt binary save/load roundtrip and validation", test_bt_binary_save_load_roundtrip_and_validation},
         {"list and predicate builtins", test_list_and_predicate_builtins},
         {"gc and stats builtins", test_gc_and_stats_builtins},

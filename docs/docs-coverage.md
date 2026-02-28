@@ -182,6 +182,7 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `bt.clear-logs` -> [page](language/reference/builtins/bt/bt-clear-logs.md)
 - [x] `bt.clear-trace` -> [page](language/reference/builtins/bt/bt-clear-trace.md)
 - [x] `bt.compile` -> [page](language/reference/builtins/bt/bt-compile.md)
+- [x] `bt.export-dot` -> [page](language/reference/builtins/bt/bt-export-dot.md)
 - [x] `bt.load` -> [page](language/reference/builtins/bt/bt-load.md)
 - [x] `bt.load-dsl` -> [page](language/reference/builtins/bt/bt-load-dsl.md)
 - [x] `bt.log.dump` -> [page](language/reference/builtins/bt/bt-log-dump.md)

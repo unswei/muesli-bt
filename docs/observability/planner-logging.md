@@ -15,6 +15,7 @@ Use:
 
 Each record contains:
 
+- `schema_version` (currently `planner.v1`)
 - `ts_ms`
 - `run_id`
 - `tick_index`
@@ -38,7 +39,7 @@ Each record contains:
 ## Example JSON Line
 
 ```json
-{"ts_ms":4955202,"run_id":"inst-1","tick_index":1,"node_name":"toy-plan","budget_ms":5,"time_used_ms":3.258,"iters":200,"root_visits":200,"root_children":29,"widen_added":200,"action":[0.973466],"confidence":0.18,"value_est":-3.2084,"status":"ok","depth_max":25,"depth_mean":18.99,"seed":42,"state_key":"state"}
+{"schema_version":"planner.v1","ts_ms":4955202,"run_id":"inst-1","tick_index":1,"node_name":"toy-plan","budget_ms":5,"time_used_ms":3.258,"iters":200,"root_visits":200,"root_children":29,"widen_added":200,"action":[0.973466],"confidence":0.18,"value_est":-3.2084,"status":"ok","depth_max":25,"depth_mean":18.99,"seed":42,"state_key":"state"}
 ```
 
 ## Quick Plotting Example

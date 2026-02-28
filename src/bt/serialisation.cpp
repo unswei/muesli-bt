@@ -5,8 +5,10 @@
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace bt {
@@ -139,6 +141,82 @@ bool is_valid_node_kind(std::uint8_t raw) {
 
 bool is_valid_arg_kind(std::uint8_t raw) {
     return raw <= static_cast<std::uint8_t>(arg_kind::string);
+}
+
+const char* node_kind_name(node_kind kind) {
+    switch (kind) {
+        case node_kind::seq:
+            return "seq";
+        case node_kind::sel:
+            return "sel";
+        case node_kind::invert:
+            return "invert";
+        case node_kind::repeat:
+            return "repeat";
+        case node_kind::retry:
+            return "retry";
+        case node_kind::cond:
+            return "cond";
+        case node_kind::act:
+            return "act";
+        case node_kind::succeed:
+            return "succeed";
+        case node_kind::fail:
+            return "fail";
+        case node_kind::running:
+            return "running";
+        case node_kind::plan_action:
+            return "plan-action";
+        case node_kind::vla_request:
+            return "vla-request";
+        case node_kind::vla_wait:
+            return "vla-wait";
+        case node_kind::vla_cancel:
+            return "vla-cancel";
+    }
+    return "unknown";
+}
+
+std::string dot_escape(std::string_view text) {
+    std::string out;
+    out.reserve(text.size() + 8);
+    for (const char c : text) {
+        switch (c) {
+            case '\\':
+                out += "\\\\";
+                break;
+            case '"':
+                out += "\\\"";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            case '\r':
+                out += "\\r";
+                break;
+            case '\t':
+                out += "\\t";
+                break;
+            default:
+                out.push_back(c);
+                break;
+        }
+    }
+    return out;
+}
+
+std::string node_label(const node& n) {
+    std::ostringstream label;
+    label << "id=" << n.id << "\n";
+    if (!n.leaf_name.empty()) {
+        label << n.leaf_name << "\n";
+    }
+    label << "[" << node_kind_name(n.kind);
+    if (n.kind == node_kind::repeat || n.kind == node_kind::retry) {
+        label << " " << n.int_param;
+    }
+    label << "]";
+    return label.str();
 }
 
 void validate_definition(const definition& def) {
@@ -365,6 +443,39 @@ definition load_definition_binary(const std::string& path) {
 
     validate_definition(def);
     return def;
+}
+
+void export_definition_dot(const definition& def, const std::string& path) {
+    validate_definition(def);
+
+    std::ofstream out(path);
+    if (!out) {
+        throw std::runtime_error("failed to open file: " + path);
+    }
+
+    out << "digraph bt {\n";
+    out << "  rankdir=TB;\n";
+    out << "  node [shape=box, fontname=\"Helvetica\"];\n";
+    out << "  edge [fontname=\"Helvetica\"];\n";
+
+    for (const node& n : def.nodes) {
+        out << "  n" << n.id << " [label=\"" << dot_escape(node_label(n)) << "\"";
+        if (n.id == def.root) {
+            out << ", style=\"bold\"";
+        }
+        out << "];\n";
+    }
+
+    for (const node& n : def.nodes) {
+        for (const node_id child : n.children) {
+            out << "  n" << n.id << " -> n" << child << ";\n";
+        }
+    }
+
+    out << "}\n";
+    if (!out) {
+        throw std::runtime_error("failed while writing file: " + path);
+    }
 }
 
 }  // namespace bt
