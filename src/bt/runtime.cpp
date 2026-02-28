@@ -1,10 +1,13 @@
 #include "bt/runtime.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <optional>
 #include <sstream>
 #include <vector>
 
 #include "bt/blackboard.hpp"
+#include "bt/planner.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
@@ -105,6 +108,103 @@ muslisp::value materialize_arg(const arg_value& arg) {
     return muslisp::make_nil();
 }
 
+std::string normalize_plan_option(std::string key) {
+    if (!key.empty() && key.front() == ':') {
+        key.erase(key.begin());
+    }
+    for (char& c : key) {
+        if (c == '-') {
+            c = '_';
+        }
+    }
+    return key;
+}
+
+std::string arg_as_text(const muslisp::value& v, const std::string& where) {
+    if (muslisp::is_symbol(v)) {
+        return muslisp::symbol_name(v);
+    }
+    if (muslisp::is_string(v)) {
+        return muslisp::string_value(v);
+    }
+    throw bt_runtime_error(where + ": expected symbol or string");
+}
+
+std::int64_t arg_as_int(const muslisp::value& v, const std::string& where) {
+    if (!muslisp::is_integer(v)) {
+        throw bt_runtime_error(where + ": expected integer value");
+    }
+    return muslisp::integer_value(v);
+}
+
+double arg_as_number(const muslisp::value& v, const std::string& where) {
+    if (muslisp::is_integer(v)) {
+        return static_cast<double>(muslisp::integer_value(v));
+    }
+    if (muslisp::is_float(v)) {
+        return muslisp::float_value(v);
+    }
+    throw bt_runtime_error(where + ": expected numeric value");
+}
+
+planner_vector state_from_blackboard(const bb_value& value, const std::string& where) {
+    if (const std::int64_t* i = std::get_if<std::int64_t>(&value)) {
+        return {static_cast<double>(*i)};
+    }
+    if (const double* f = std::get_if<double>(&value)) {
+        return {*f};
+    }
+    if (const planner_vector* vec = std::get_if<planner_vector>(&value)) {
+        return *vec;
+    }
+    throw bt_runtime_error(where + ": state must be int, float, or float vector");
+}
+
+std::optional<std::uint64_t> seed_from_blackboard(const bb_value& value) {
+    if (const std::int64_t* i = std::get_if<std::int64_t>(&value)) {
+        if (*i < 0) {
+            return std::nullopt;
+        }
+        return static_cast<std::uint64_t>(*i);
+    }
+    if (const double* f = std::get_if<double>(&value)) {
+        if (!std::isfinite(*f) || *f < 0.0) {
+            return std::nullopt;
+        }
+        return static_cast<std::uint64_t>(*f);
+    }
+    if (const std::string* s = std::get_if<std::string>(&value)) {
+        return planner_service::hash64(*s);
+    }
+    return std::nullopt;
+}
+
+bb_value action_to_blackboard(const planner_vector& action) {
+    if (action.size() == 1) {
+        return bb_value{action[0]};
+    }
+    return bb_value{action};
+}
+
+std::string plan_meta_to_json(const planner_result& result, const planner_request& request) {
+    std::ostringstream out;
+    out << '{' << "\"status\":\"" << planner_status_name(result.status) << "\","
+        << "\"tick_index\":" << request.tick_index << ',' << "\"seed\":" << request.seed << ','
+        << "\"budget_ms\":" << request.config.budget_ms << ',' << "\"time_used_ms\":" << result.stats.time_used_ms << ','
+        << "\"iters\":" << result.stats.iters << ',' << "\"root_visits\":" << result.stats.root_visits << ','
+        << "\"root_children\":" << result.stats.root_children << ',' << "\"widen_added\":" << result.stats.widen_added << ','
+        << "\"confidence\":" << result.confidence << ',' << "\"value_est\":" << result.stats.value_est << ','
+        << "\"action\":[";
+    for (std::size_t i = 0; i < result.action.size(); ++i) {
+        if (i != 0) {
+            out << ',';
+        }
+        out << result.action[i];
+    }
+    out << "]}";
+    return out.str();
+}
+
 class tick_scope {
 public:
     tick_scope(tick_context& ctx, std::chrono::steady_clock::time_point started_at) : ctx_(ctx), started_at_(started_at) {}
@@ -187,6 +287,200 @@ private:
     std::chrono::steady_clock::time_point started_at_{};
     status status_ = status::failure;
 };
+
+status execute_plan_action(const node& n, tick_context& ctx, const std::vector<muslisp::value>& args) {
+    if (!ctx.svc.planner) {
+        trace_event ev = make_trace_event(trace_event_kind::error);
+        ev.node = n.id;
+        ev.message = "planner service is not available";
+        emit_trace(ctx, std::move(ev));
+        emit_log(ctx, log_level::error, "planner", "planner service is not available");
+        return status::failure;
+    }
+
+    planner_request request;
+    request.node_name = n.leaf_name.empty() ? ("plan-action-" + std::to_string(n.id)) : n.leaf_name;
+    request.tick_index = ctx.tick_index;
+    request.run_id = "inst-" + std::to_string(ctx.inst.instance_handle);
+
+    std::string state_key = "state";
+    std::string action_key = "action";
+    std::string model_service = "toy-1d";
+    std::string meta_key;
+    std::string seed_key;
+
+    for (std::size_t i = 0; i < args.size(); i += 2) {
+        const std::string raw_key = arg_as_text(args[i], "plan-action");
+        const std::string key = normalize_plan_option(raw_key);
+        const muslisp::value value = args[i + 1];
+
+        if (key == "name") {
+            request.node_name = arg_as_text(value, "plan-action :name");
+            continue;
+        }
+        if (key == "budget_ms") {
+            request.config.budget_ms = arg_as_int(value, "plan-action :budget_ms");
+            continue;
+        }
+        if (key == "iters_max") {
+            request.config.iters_max = arg_as_int(value, "plan-action :iters_max");
+            continue;
+        }
+        if (key == "model_service") {
+            model_service = arg_as_text(value, "plan-action :model_service");
+            continue;
+        }
+        if (key == "state_key") {
+            state_key = arg_as_text(value, "plan-action :state_key");
+            continue;
+        }
+        if (key == "action_key") {
+            action_key = arg_as_text(value, "plan-action :action_key");
+            continue;
+        }
+        if (key == "meta_key") {
+            meta_key = arg_as_text(value, "plan-action :meta_key");
+            continue;
+        }
+        if (key == "seed_key") {
+            seed_key = arg_as_text(value, "plan-action :seed_key");
+            continue;
+        }
+        if (key == "fallback_action") {
+            request.config.fallback_action = {arg_as_number(value, "plan-action :fallback_action")};
+            continue;
+        }
+        if (key == "gamma") {
+            request.config.gamma = arg_as_number(value, "plan-action :gamma");
+            continue;
+        }
+        if (key == "max_depth") {
+            request.config.max_depth = arg_as_int(value, "plan-action :max_depth");
+            continue;
+        }
+        if (key == "c_ucb") {
+            request.config.c_ucb = arg_as_number(value, "plan-action :c_ucb");
+            continue;
+        }
+        if (key == "pw_k") {
+            request.config.pw_k = arg_as_number(value, "plan-action :pw_k");
+            continue;
+        }
+        if (key == "pw_alpha") {
+            request.config.pw_alpha = arg_as_number(value, "plan-action :pw_alpha");
+            continue;
+        }
+        if (key == "rollout_policy") {
+            request.config.rollout_policy = arg_as_text(value, "plan-action :rollout_policy");
+            continue;
+        }
+        if (key == "action_sampler") {
+            request.config.action_sampler = arg_as_text(value, "plan-action :action_sampler");
+            continue;
+        }
+        if (key == "top_k") {
+            request.config.top_k = arg_as_int(value, "plan-action :top_k");
+            continue;
+        }
+
+        throw bt_runtime_error("plan-action: unknown option: " + raw_key);
+    }
+
+    request.model_service = model_service;
+    request.state_key = state_key;
+
+    const bb_entry* state_entry = ctx.bb_get(state_key);
+    if (!state_entry) {
+        trace_event ev = make_trace_event(trace_event_kind::error);
+        ev.node = n.id;
+        ev.message = "plan-action: missing state key: " + state_key;
+        emit_trace(ctx, std::move(ev));
+        emit_log(ctx, log_level::error, "planner", "plan-action: missing state key: " + state_key);
+        return status::failure;
+    }
+
+    try {
+        request.state = state_from_blackboard(state_entry->value, "plan-action");
+    } catch (const std::exception& e) {
+        trace_event ev = make_trace_event(trace_event_kind::error);
+        ev.node = n.id;
+        ev.message = e.what();
+        emit_trace(ctx, std::move(ev));
+        emit_log(ctx, log_level::error, "planner", e.what());
+        return status::failure;
+    }
+
+    bool has_explicit_seed = false;
+    if (!seed_key.empty()) {
+        const bb_entry* seed_entry = ctx.bb_get(seed_key);
+        if (seed_entry) {
+            const std::optional<std::uint64_t> seed = seed_from_blackboard(seed_entry->value);
+            if (seed.has_value()) {
+                request.seed = *seed;
+                has_explicit_seed = true;
+            }
+        }
+    }
+    if (!has_explicit_seed) {
+        request.seed = ctx.svc.planner->derive_seed(request.node_name, ctx.tick_index);
+    }
+
+    planner_result result;
+    try {
+        result = ctx.svc.planner->plan(request);
+    } catch (const std::exception& e) {
+        trace_event ev = make_trace_event(trace_event_kind::error);
+        ev.node = n.id;
+        ev.message = std::string("plan-action: planner threw: ") + e.what();
+        emit_trace(ctx, std::move(ev));
+        emit_log(ctx, log_level::error, "planner", std::string("plan-action: planner threw: ") + e.what());
+        return status::failure;
+    }
+
+    if (result.status == planner_status::error || result.action.empty()) {
+        std::string message = "plan-action: planner error";
+        if (!result.error.empty()) {
+            message += ": ";
+            message += result.error;
+        }
+        trace_event ev = make_trace_event(trace_event_kind::error);
+        ev.node = n.id;
+        ev.message = message;
+        emit_trace(ctx, std::move(ev));
+        emit_log(ctx, log_level::error, "planner", std::move(message));
+        return status::failure;
+    }
+
+    for (double v : result.action) {
+        if (!std::isfinite(v)) {
+            trace_event ev = make_trace_event(trace_event_kind::error);
+            ev.node = n.id;
+            ev.message = "plan-action: non-finite action value";
+            emit_trace(ctx, std::move(ev));
+            emit_log(ctx, log_level::error, "planner", "plan-action: non-finite action value");
+            return status::failure;
+        }
+    }
+
+    ctx.bb_put(action_key, action_to_blackboard(result.action), request.node_name);
+    if (!meta_key.empty()) {
+        ctx.bb_put(meta_key, bb_value{plan_meta_to_json(result, request)}, request.node_name);
+    }
+
+    std::ostringstream msg;
+    msg << "status=" << planner_status_name(result.status) << " action=";
+    for (std::size_t i = 0; i < result.action.size(); ++i) {
+        if (i != 0) {
+            msg << ',';
+        }
+        msg << result.action[i];
+    }
+    msg << " confidence=" << result.confidence << " iters=" << result.stats.iters
+        << " time_ms=" << result.stats.time_used_ms;
+    emit_log(ctx, log_level::info, "planner", msg.str());
+
+    return status::success;
+}
 
 status tick_node(node_id id, tick_context& ctx) {
     const node& n = get_node(*ctx.inst.def, id);
@@ -334,6 +628,26 @@ status tick_node(node_id id, tick_context& ctx) {
                 ev.message = std::string("action threw: ") + e.what();
                 emit_trace(ctx, std::move(ev));
                 emit_log(ctx, log_level::error, "bt", std::string("action threw: ") + e.what());
+                return finalize(status::failure);
+            }
+        }
+
+        case node_kind::plan_action: {
+            std::vector<muslisp::value> args;
+            args.reserve(n.args.size());
+            muslisp::gc_root_scope roots(muslisp::default_gc());
+            for (const arg_value& compiled : n.args) {
+                args.push_back(materialize_arg(compiled));
+                roots.add(&args.back());
+            }
+            try {
+                return finalize(execute_plan_action(n, ctx, args));
+            } catch (const std::exception& e) {
+                trace_event ev = make_trace_event(trace_event_kind::error);
+                ev.node = n.id;
+                ev.message = std::string("plan-action failed: ") + e.what();
+                emit_trace(ctx, std::move(ev));
+                emit_log(ctx, log_level::error, "planner", std::string("plan-action failed: ") + e.what());
                 return finalize(status::failure);
             }
         }

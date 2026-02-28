@@ -895,6 +895,168 @@ void test_continuous_mcts_smoke_deterministic() {
     check_close(a1, a2, 1e-12, "mcts smoke should be deterministic for fixed seed");
 }
 
+void test_planner_mcts_builtin_determinism_bounds_and_budget() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    value out = eval_text(
+        "(begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'model_service \"toy-1d\") "
+        "  (map.set! req 'state 0.0) "
+        "  (map.set! req 'seed 42) "
+        "  (map.set! req 'budget_ms 8) "
+        "  (map.set! req 'iters_max 400) "
+        "  (define r1 (planner.mcts req)) "
+        "  (define r2 (planner.mcts req)) "
+        "  (list (map.get r1 'action nil) "
+        "        (map.get r2 'action nil) "
+        "        (map.get r1 'status 'none) "
+        "        (map.get (map.get r1 'stats nil) 'time_used_ms 0.0) "
+        "        (map.get (map.get r1 'stats nil) 'iters 0)))",
+        env);
+
+    const std::vector<value> fields = vector_from_list(out);
+    check(fields.size() == 5, "planner.mcts deterministic output shape mismatch");
+    check(print_value(fields[0]) == print_value(fields[1]), "planner.mcts should be deterministic for fixed seed/input");
+    check(is_symbol(fields[2]) && (symbol_name(fields[2]) == ":ok" || symbol_name(fields[2]) == ":timeout"),
+          "planner.mcts status should be :ok or :timeout");
+
+    const std::vector<value> action = vector_from_list(fields[0]);
+    check(!action.empty(), "planner.mcts action list should not be empty");
+    check(is_float(action[0]), "planner.mcts action should be float");
+    check(float_value(action[0]) >= -1.0 && float_value(action[0]) <= 1.0, "planner.mcts action should be clamped");
+
+    check(is_float(fields[3]) && float_value(fields[3]) >= 0.0, "planner.mcts stats.time_used_ms should be non-negative");
+    check(is_integer(fields[4]) && integer_value(fields[4]) > 0, "planner.mcts stats.iters should be positive");
+
+    value budget_out = eval_text(
+        "(begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'model_service \"toy-1d\") "
+        "  (map.set! req 'state 0.0) "
+        "  (map.set! req 'seed 99) "
+        "  (map.set! req 'budget_ms 1) "
+        "  (map.set! req 'iters_max 100000) "
+        "  (define r (planner.mcts req)) "
+        "  (list (map.get r 'status 'none) "
+        "        (map.get (map.get r 'stats nil) 'time_used_ms 0.0) "
+        "        (map.get (map.get r 'stats nil) 'iters 0)))",
+        env);
+
+    const std::vector<value> budget_fields = vector_from_list(budget_out);
+    check(budget_fields.size() == 3, "planner.mcts budget output shape mismatch");
+    check(is_symbol(budget_fields[0]), "planner.mcts budget status should be symbol");
+    check(is_float(budget_fields[1]), "planner.mcts budget time should be float");
+    check(float_value(budget_fields[1]) <= 40.0, "planner.mcts should honor bounded-time budget");
+    check(is_integer(budget_fields[2]) && integer_value(budget_fields[2]) > 0,
+          "planner.mcts budget run should still perform iterations");
+}
+
+void test_plan_action_node_blackboard_meta_and_logs() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    check(is_nil(eval_text("(planner.set-base-seed 4242)", env)), "planner.set-base-seed should return nil");
+    check(is_integer(eval_text("(planner.get-base-seed)", env)) &&
+              integer_value(eval_text("(planner.get-base-seed)", env)) == 4242,
+          "planner.get-base-seed should return configured value");
+    check(is_nil(eval_text("(planner.set-log-enabled #t)", env)), "planner.set-log-enabled should return nil");
+
+    (void)eval_text(
+        "(define tree "
+        "  (bt.compile "
+        "    '(seq "
+        "       (plan-action :name \"toy-plan\" :budget_ms 6 :iters_max 300 "
+        "                    :model_service \"toy-1d\" :state_key state :action_key action :meta_key plan-meta) "
+        "       (act apply-planned-1d state action state))))",
+        env);
+    check(string_value(eval_text("(write-to-string (bt.to-dsl tree))", env)).find("(plan-action") != std::string::npos,
+          "bt.to-dsl should include plan-action node");
+    (void)eval_text("(define inst-a (bt.new-instance tree))", env);
+    (void)eval_text("(define inst-b (bt.new-instance tree))", env);
+
+    check(symbol_name(eval_text("(bt.tick inst-a '((state 0.0)))", env)) == "success",
+          "plan-action tree tick should succeed");
+    check(symbol_name(eval_text("(bt.tick inst-b '((state 0.0)))", env)) == "success",
+          "plan-action tree tick on second instance should succeed");
+
+    bt::runtime_host& host = bt::default_runtime_host();
+    const std::int64_t inst_a_handle = bt_handle(eval_text("inst-a", env));
+    const std::int64_t inst_b_handle = bt_handle(eval_text("inst-b", env));
+    bt::instance* inst_a = host.find_instance(inst_a_handle);
+    bt::instance* inst_b = host.find_instance(inst_b_handle);
+    check(inst_a && inst_b, "plan-action test instances should exist");
+
+    const bt::bb_entry* action_a = inst_a->bb.get("action");
+    const bt::bb_entry* action_b = inst_b->bb.get("action");
+    check(action_a && action_b, "plan-action should write action key");
+
+    double action_a_value = 0.0;
+    double action_b_value = 0.0;
+    if (const double* f = std::get_if<double>(&action_a->value)) {
+        action_a_value = *f;
+    } else if (const std::vector<double>* vec = std::get_if<std::vector<double>>(&action_a->value)) {
+        check(!vec->empty(), "plan-action vector action should not be empty");
+        action_a_value = (*vec)[0];
+    } else {
+        throw std::runtime_error("plan-action action value should be numeric");
+    }
+    if (const double* f = std::get_if<double>(&action_b->value)) {
+        action_b_value = *f;
+    } else if (const std::vector<double>* vec = std::get_if<std::vector<double>>(&action_b->value)) {
+        check(!vec->empty(), "plan-action vector action should not be empty");
+        action_b_value = (*vec)[0];
+    } else {
+        throw std::runtime_error("plan-action action value should be numeric");
+    }
+    check_close(action_a_value, action_b_value, 1e-12,
+                "plan-action should be deterministic for same base seed/node/tick/state");
+
+    const bt::bb_entry* state_a = inst_a->bb.get("state");
+    check(state_a, "apply-planned-1d should update state");
+    check(std::holds_alternative<double>(state_a->value), "updated state should be float");
+    check(std::get<double>(state_a->value) > 0.0, "planned action should move state toward goal");
+
+    const bt::bb_entry* meta_a = inst_a->bb.get("plan-meta");
+    check(meta_a && std::holds_alternative<std::string>(meta_a->value), "plan-action should write meta key");
+    check(std::get<std::string>(meta_a->value).find("\"status\"") != std::string::npos,
+          "plan-action meta should include status");
+
+    value planner_logs = eval_text("(planner.logs.dump 10)", env);
+    check(is_string(planner_logs), "planner.logs.dump should return string");
+    check(string_value(planner_logs).find("\"node_name\":\"toy-plan\"") != std::string::npos,
+          "planner logs should include node name");
+    check(string_value(planner_logs).find("\"status\"") != std::string::npos,
+          "planner logs should include status field");
+
+    (void)eval_text(
+        "(define bad-tree "
+        "  (bt.compile "
+        "    '(plan-action :name \"bad\" :model_service \"toy-1d\" :state_key missing :action_key action)))",
+        env);
+    (void)eval_text("(define bad-inst (bt.new-instance bad-tree))", env);
+    check(symbol_name(eval_text("(bt.tick bad-inst)", env)) == "failure",
+          "plan-action should fail on missing state key");
+}
+
+void test_hash64_builtin() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+    value h1 = eval_text("(hash64 \"planner-seed\")", env);
+    value h2 = eval_text("(hash64 \"planner-seed\")", env);
+    value h3 = eval_text("(hash64 \"planner-seed-2\")", env);
+
+    check(is_integer(h1) && is_integer(h2) && is_integer(h3), "hash64 should return integer");
+    check(integer_value(h1) == integer_value(h2), "hash64 should be deterministic");
+    check(integer_value(h1) != integer_value(h3), "hash64 should vary with input");
+}
+
 void test_bt_compile_checks() {
     using namespace muslisp;
 
@@ -921,6 +1083,12 @@ void test_bt_compile_checks() {
     try {
         (void)eval_text("(bt.compile '(repeat -1 (succeed)))", env);
         throw std::runtime_error("expected bt.compile negative repeat count failure");
+    } catch (const lisp_error&) {
+    }
+
+    try {
+        (void)eval_text("(bt.compile '(plan-action :budget_ms))", env);
+        throw std::runtime_error("expected bt.compile plan-action key/value validation failure");
     } catch (const lisp_error&) {
     }
 }
@@ -1243,6 +1411,9 @@ int main() {
         {"vec gc/growth/fuzz", test_vec_gc_growth_and_fuzz},
         {"map gc/rehash/ops", test_map_gc_rehash_and_ops},
         {"continuous mcts smoke deterministic", test_continuous_mcts_smoke_deterministic},
+        {"planner.mcts determinism/bounds/budget", test_planner_mcts_builtin_determinism_bounds_and_budget},
+        {"plan-action node blackboard/meta/logs", test_plan_action_node_blackboard_meta_and_logs},
+        {"hash64 builtin", test_hash64_builtin},
         {"bt compile checks", test_bt_compile_checks},
         {"bt seq/running semantics", test_bt_seq_and_running_semantics},
         {"bt decorator semantics", test_bt_decorator_semantics},

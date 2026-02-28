@@ -18,6 +18,7 @@ This page is a summary and link hub for built-ins. Detailed behavior, errors, an
 
 - RNG: `rng.make`, `rng.uniform`, `rng.normal`, `rng.int`
 - Clock: `time.now-ms`
+- Hashing: `hash64`
 
 ## Mutable Containers
 
@@ -28,6 +29,13 @@ This page is a summary and link hub for built-ins. Detailed behavior, errors, an
 
 - IO: `print`, `write`, `write-to-string`, `save`
 - Heap/GC: `heap-stats`, `gc-stats`
+
+## Planning Services
+
+- planning call: `planner.mcts`
+- planner records: `planner.logs.dump`
+- planner sink config: `planner.set-log-path`, `planner.set-log-enabled`
+- planner seed controls: `planner.set-base-seed`, `planner.get-base-seed`
 
 ## BT Integration
 

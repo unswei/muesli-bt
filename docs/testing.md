@@ -16,6 +16,7 @@ Coverage includes:
 - BT runtime status propagation
 - decorators and reset behaviour
 - blackboard, trace, logs, scheduler stats
+- bounded-time planner service (`planner.mcts`) and `plan-action` node semantics
 - host wrappers and typed robot interface injection
 
 ## Run Tests

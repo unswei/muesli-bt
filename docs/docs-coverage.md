@@ -7,7 +7,7 @@ Checklist for keeping docs complete as features evolve.
 Audit language/runtime surfaces against code before updating this checklist:
 
 - special forms: evaluator special-form dispatch in `src/eval.cpp`
-- value/data types: runtime value type enum in `src/value.hpp`
+- value/data types: runtime value type enum in `include/muslisp/value.hpp`
 - built-ins: `install_core_builtins` registrations in `src/builtins.cpp`
 
 ## Manual Coverage (Conceptual Pages)
@@ -22,12 +22,16 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] BT intro -> [page](bt/intro.md)
 - [x] BT syntax -> [page](bt/syntax.md)
 - [x] BT semantics -> [page](bt/semantics.md)
+- [x] Bounded-time planning overview -> [page](bt/bounded-time-planning.md)
+- [x] PlanAction node reference -> [page](bt/plan-action-node.md)
+- [x] Planner configuration reference -> [page](bt/planner-configuration.md)
 - [x] BT blackboard -> [page](bt/blackboard.md)
 - [x] BT scheduler -> [page](bt/scheduler.md)
 - [x] BT integration -> [page](bt/robot-integration.md)
 - [x] Tracing -> [page](observability/tracing.md)
 - [x] Logging -> [page](observability/logging.md)
 - [x] Profiling -> [page](observability/profiling.md)
+- [x] Planner logging schema -> [page](observability/planner-logging.md)
 - [x] Architecture internals -> [page](internals/architecture.md)
 - [x] GC internals -> [page](internals/gc.md)
 - [x] Code map internals -> [page](internals/code-map.md)
@@ -72,6 +76,7 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `cdr` -> [page](language/reference/builtins/core/cdr.md)
 - [x] `cons` -> [page](language/reference/builtins/core/cons.md)
 - [x] `eq?` -> [page](language/reference/builtins/core/eq-q.md)
+- [x] `hash64` -> [page](language/reference/builtins/core/hash64.md)
 - [x] `list` -> [page](language/reference/builtins/core/list.md)
 - [x] `null?` -> [page](language/reference/builtins/core/null-q.md)
 
@@ -106,6 +111,14 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `rng.make` -> [page](language/reference/builtins/rng/rng-make.md)
 - [x] `rng.normal` -> [page](language/reference/builtins/rng/rng-normal.md)
 - [x] `rng.uniform` -> [page](language/reference/builtins/rng/rng-uniform.md)
+
+### Planning services
+- [x] `planner.get-base-seed` -> [page](language/reference/builtins/planner/planner-get-base-seed.md)
+- [x] `planner.logs.dump` -> [page](language/reference/builtins/planner/planner-logs-dump.md)
+- [x] `planner.mcts` -> [page](language/reference/builtins/planner/planner-mcts.md)
+- [x] `planner.set-base-seed` -> [page](language/reference/builtins/planner/planner-set-base-seed.md)
+- [x] `planner.set-log-enabled` -> [page](language/reference/builtins/planner/planner-set-log-enabled.md)
+- [x] `planner.set-log-path` -> [page](language/reference/builtins/planner/planner-set-log-path.md)
 
 ### Mutable vectors
 - [x] `vec.clear!` -> [page](language/reference/builtins/vec/vec-clear-bang.md)

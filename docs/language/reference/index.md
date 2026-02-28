@@ -45,6 +45,7 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`cdr`](builtins/core/cdr.md)
 - [`cons`](builtins/core/cons.md)
 - [`eq?`](builtins/core/eq-q.md)
+- [`hash64`](builtins/core/hash64.md)
 - [`list`](builtins/core/list.md)
 - [`null?`](builtins/core/null-q.md)
 
@@ -83,6 +84,15 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`rng.make`](builtins/rng/rng-make.md)
 - [`rng.normal`](builtins/rng/rng-normal.md)
 - [`rng.uniform`](builtins/rng/rng-uniform.md)
+
+### Planning services
+
+- [`planner.get-base-seed`](builtins/planner/planner-get-base-seed.md)
+- [`planner.logs.dump`](builtins/planner/planner-logs-dump.md)
+- [`planner.mcts`](builtins/planner/planner-mcts.md)
+- [`planner.set-base-seed`](builtins/planner/planner-set-base-seed.md)
+- [`planner.set-log-enabled`](builtins/planner/planner-set-log-enabled.md)
+- [`planner.set-log-path`](builtins/planner/planner-set-log-path.md)
 
 ### Mutable vectors
 
@@ -142,4 +152,3 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`bt.to-dsl`](builtins/bt/bt-to-dsl.md)
 - [`bt.trace.dump`](builtins/bt/bt-trace-dump.md)
 - [`bt.trace.snapshot`](builtins/bt/bt-trace-snapshot.md)
-

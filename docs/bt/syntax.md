@@ -58,6 +58,25 @@ Preferred authoring forms:
 
 `name` must match a registered action callback.
 
+### `plan-action`
+
+```lisp
+(plan-action key value key value ...)
+```
+
+`plan-action` is a built-in planning leaf that runs bounded-time MCTS and writes action output to blackboard.
+
+Common keys:
+
+- `:name`
+- `:budget_ms`
+- `:iters_max`
+- `:model_service`
+- `:state_key`
+- `:action_key`
+- `:meta_key`
+- `:seed_key`
+
 ## Decorators
 
 ### `invert`
@@ -111,3 +130,8 @@ Binary format notes:
 - unsupported/unknown versions are rejected
 
 Use DSL save/load when long-term portability is the priority.
+
+## See Also
+
+- [PlanAction Node Reference](plan-action-node.md)
+- [Planner Configuration Reference](planner-configuration.md)

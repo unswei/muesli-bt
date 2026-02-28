@@ -18,7 +18,8 @@ enum class node_kind {
     act,
     succeed,
     fail,
-    running
+    running,
+    plan_action
 };
 
 enum class arg_kind {

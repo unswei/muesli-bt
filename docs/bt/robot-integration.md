@@ -21,8 +21,24 @@ using action_fn = std::function<status(tick_context&, node_id, node_memory&, std
 - observability (`trace_buffer*`, `log_sink*`)
 - `clock_interface*`
 - `robot_interface*`
+- `planner_service*`
 
 `runtime_host` provides defaults and allows custom robot injection.
+
+## Planner Service Integration
+
+Host-side planning models are registered with `planner_service` and selected by name from `plan-action` and `planner.mcts`.
+
+Built-in model names:
+
+- `"toy-1d"`
+- `"ptz-track"`
+
+Custom model registration uses:
+
+```cpp
+host.planner_ref().register_model("my-model", my_model_ptr);
+```
 
 ## Condition Example (`target-visible`)
 
@@ -93,5 +109,6 @@ Recommended pattern:
 ## See Also
 
 - [Scheduler](scheduler.md)
+- [Bounded-Time Planning In BTs](bounded-time-planning.md)
 - [BT Semantics](semantics.md)
 - [Roadmap](../limitations-roadmap.md)

@@ -32,6 +32,7 @@ Ticks one instance and returns `success`, `failure`, or `running`.
 ## Notes
 
 - Optional input list updates blackboard before tick.
+- Input values may be numbers, strings, symbols, booleans, `nil`, or numeric lists.
 
 ## See Also
 

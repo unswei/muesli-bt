@@ -13,7 +13,7 @@
 
 namespace bt {
 
-using bb_value = std::variant<std::monostate, bool, std::int64_t, double, std::string>;
+using bb_value = std::variant<std::monostate, bool, std::int64_t, double, std::string, std::vector<double>>;
 
 struct bb_entry {
     bb_value value;

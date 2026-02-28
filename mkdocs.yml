@@ -33,7 +33,9 @@ nav:
           - Lisp Basics: examples/lisp-basics.md
           - Hello BT: examples/hello-bt.md
           - Recovery BT: examples/recovery-bt.md
-          - Continuous MCTS v1.1: examples/continuous-mcts.md
+          - Continuous MCTS: examples/continuous-mcts.md
+          - Planning BT (1D): examples/planner-bt-1d.md
+          - Planning BT (PTZ): examples/planner-bt-ptz.md
           - C++ Nodes: examples/cpp-nodes.md
   - Language:
       - Syntax: language/syntax.md
@@ -44,6 +46,9 @@ nav:
       - Introduction: bt/intro.md
       - Syntax: bt/syntax.md
       - Semantics: bt/semantics.md
+      - Bounded-Time Planning: bt/bounded-time-planning.md
+      - PlanAction Node: bt/plan-action-node.md
+      - Planner Configuration: bt/planner-configuration.md
       - Blackboard: bt/blackboard.md
       - Scheduler: bt/scheduler.md
       - Integration: bt/robot-integration.md
@@ -51,6 +56,7 @@ nav:
           - Tracing: observability/tracing.md
           - Logging: observability/logging.md
           - Profiling: observability/profiling.md
+          - Planner Logging: observability/planner-logging.md
   - Internals:
       - Architecture: internals/architecture.md
       - GC: internals/gc.md

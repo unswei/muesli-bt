@@ -1,6 +1,8 @@
 #include "bt/runtime_host.hpp"
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
@@ -85,6 +87,29 @@ double require_floaty_arg(const std::span<const muslisp::value> args, std::size_
     throw std::runtime_error(where + ": expected numeric argument");
 }
 
+std::vector<double> bb_value_as_vector(const bb_value& value, const std::string& where) {
+    if (const auto* i = std::get_if<std::int64_t>(&value)) {
+        return {static_cast<double>(*i)};
+    }
+    if (const auto* f = std::get_if<double>(&value)) {
+        return {*f};
+    }
+    if (const auto* vec = std::get_if<std::vector<double>>(&value)) {
+        return *vec;
+    }
+    throw std::runtime_error(where + ": expected numeric or numeric-vector blackboard value");
+}
+
+std::string require_key_arg_or_default(const std::span<const muslisp::value> args,
+                                       std::size_t index,
+                                       const std::string& where,
+                                       std::string default_key) {
+    if (index >= args.size()) {
+        return default_key;
+    }
+    return require_key_arg(args, index, where);
+}
+
 job_status status_from_memory(std::int64_t raw) {
     if (raw < 0 || raw > static_cast<std::int64_t>(job_status::unknown)) {
         return job_status::unknown;
@@ -121,6 +146,7 @@ std::int64_t runtime_host::create_instance(std::int64_t definition_handle) {
 
     const std::int64_t handle = next_instance_handle_++;
     auto inst = std::make_unique<instance>(def);
+    inst->instance_handle = handle;
     set_tick_budget_ms(*inst, 20);
     instances_[handle] = std::move(inst);
     return handle;
@@ -158,6 +184,7 @@ status runtime_host::tick_instance(std::int64_t handle) {
     svc.obs.logger = &logs_;
     svc.clock = clock_;
     svc.robot = robot_;
+    svc.planner = &planner_;
 
     return tick(*inst, registry_, svc);
 }
@@ -184,6 +211,14 @@ scheduler& runtime_host::scheduler_ref() {
 
 const scheduler& runtime_host::scheduler_ref() const {
     return scheduler_;
+}
+
+planner_service& runtime_host::planner_ref() {
+    return planner_;
+}
+
+const planner_service& runtime_host::planner_ref() const {
+    return planner_;
 }
 
 memory_log_sink& runtime_host::logs() noexcept {
@@ -227,6 +262,7 @@ void runtime_host::clear_all() {
     instances_.clear();
     registry_.clear();
     logs_.clear();
+    planner_.clear_records();
 }
 
 std::string runtime_host::dump_instance_stats(std::int64_t handle) const {
@@ -276,6 +312,10 @@ std::string runtime_host::dump_logs() const {
             << " msg=" << rec.message << '\n';
     }
     return out.str();
+}
+
+std::string runtime_host::dump_planner_records(std::size_t max_count) const {
+    return planner_.dump_recent_records(max_count);
 }
 
 runtime_host& default_runtime_host() {
@@ -335,6 +375,97 @@ void install_demo_callbacks(runtime_host& host) {
         const std::string key = require_key_arg(args, 0, "bb-put-float");
         const double v = require_floaty_arg(args, 1, "bb-put-float");
         ctx.bb_put(key, bb_value{v}, "bb-put-float");
+        return status::success;
+    });
+
+    reg.register_condition("goal-reached-1d", [](tick_context& ctx, std::span<const muslisp::value> args) {
+        const std::string state_key = require_key_arg_or_default(args, 0, "goal-reached-1d", "state");
+        const double goal = args.size() > 1 ? require_floaty_arg(args, 1, "goal-reached-1d") : 1.0;
+        const double tol = args.size() > 2 ? require_floaty_arg(args, 2, "goal-reached-1d") : 0.05;
+
+        const bb_entry* state_entry = ctx.bb_get(state_key);
+        if (!state_entry) {
+            return false;
+        }
+        const std::vector<double> state = bb_value_as_vector(state_entry->value, "goal-reached-1d");
+        if (state.empty()) {
+            return false;
+        }
+        return std::fabs(goal - state[0]) <= tol;
+    });
+
+    reg.register_action("apply-planned-1d", [](tick_context& ctx, node_id, node_memory&, std::span<const muslisp::value> args) {
+        const std::string state_key = require_key_arg_or_default(args, 0, "apply-planned-1d", "state");
+        const std::string action_key = require_key_arg_or_default(args, 1, "apply-planned-1d", "action");
+        const std::string out_key = require_key_arg_or_default(args, 2, "apply-planned-1d", state_key);
+
+        const bb_entry* state_entry = ctx.bb_get(state_key);
+        const bb_entry* action_entry = ctx.bb_get(action_key);
+        if (!state_entry || !action_entry) {
+            return status::failure;
+        }
+
+        const std::vector<double> state = bb_value_as_vector(state_entry->value, "apply-planned-1d state");
+        const std::vector<double> action = bb_value_as_vector(action_entry->value, "apply-planned-1d action");
+        if (state.empty() || action.empty()) {
+            return status::failure;
+        }
+
+        const double a = std::clamp(action[0], -1.0, 1.0);
+        const double x2 = state[0] + 0.25 * a;
+        ctx.bb_put(out_key, bb_value{x2}, "apply-planned-1d");
+        return status::success;
+    });
+
+    reg.register_condition("ptz-target-centered", [](tick_context& ctx, std::span<const muslisp::value> args) {
+        const std::string state_key = require_key_arg_or_default(args, 0, "ptz-target-centered", "ptz-state");
+        const double tol = args.size() > 1 ? require_floaty_arg(args, 1, "ptz-target-centered") : 0.05;
+        const bb_entry* state_entry = ctx.bb_get(state_key);
+        if (!state_entry) {
+            return false;
+        }
+        const std::vector<double> state = bb_value_as_vector(state_entry->value, "ptz-target-centered state");
+        if (state.size() < 4) {
+            return false;
+        }
+        const double dist = std::sqrt(state[2] * state[2] + state[3] * state[3]);
+        return dist <= tol;
+    });
+
+    reg.register_action("apply-planned-ptz", [](tick_context& ctx, node_id, node_memory&, std::span<const muslisp::value> args) {
+        const std::string state_key = require_key_arg_or_default(args, 0, "apply-planned-ptz", "ptz-state");
+        const std::string action_key = require_key_arg_or_default(args, 1, "apply-planned-ptz", "ptz-action");
+        const std::string out_key = require_key_arg_or_default(args, 2, "apply-planned-ptz", state_key);
+
+        const bb_entry* state_entry = ctx.bb_get(state_key);
+        const bb_entry* action_entry = ctx.bb_get(action_key);
+        if (!state_entry || !action_entry) {
+            return status::failure;
+        }
+
+        const std::vector<double> state = bb_value_as_vector(state_entry->value, "apply-planned-ptz state");
+        const std::vector<double> action = bb_value_as_vector(action_entry->value, "apply-planned-ptz action");
+        if (state.size() < 4 || action.size() < 2) {
+            return status::failure;
+        }
+
+        const double pan = state[0];
+        const double tilt = state[1];
+        const double bx = state[2];
+        const double by = state[3];
+        const double vx = state.size() > 4 ? state[4] : 0.0;
+        const double vy = state.size() > 5 ? state[5] : 0.0;
+
+        const double dpan = std::clamp(action[0], -0.25, 0.25);
+        const double dtilt = std::clamp(action[1], -0.25, 0.25);
+
+        const double pan2 = std::clamp(pan + dpan, -1.5, 1.5);
+        const double tilt2 = std::clamp(tilt + dtilt, -1.0, 1.0);
+        const double bx2 = std::clamp(bx + vx - dpan * 1.15, -2.0, 2.0);
+        const double by2 = std::clamp(by + vy - dtilt * 1.15, -2.0, 2.0);
+
+        std::vector<double> next_state{pan2, tilt2, bx2, by2, vx, vy};
+        ctx.bb_put(out_key, bb_value{next_state}, "apply-planned-ptz");
         return status::success;
     });
 

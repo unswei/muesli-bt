@@ -1,11 +1,13 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
 #include "bt/compiler.hpp"
+#include "bt/planner.hpp"
 #include "bt/runtime.hpp"
 
 namespace bt {
@@ -31,6 +33,9 @@ public:
     scheduler& scheduler_ref();
     const scheduler& scheduler_ref() const;
 
+    planner_service& planner_ref();
+    const planner_service& planner_ref() const;
+
     memory_log_sink& logs() noexcept;
     const memory_log_sink& logs() const noexcept;
 
@@ -50,6 +55,7 @@ public:
     std::string dump_instance_blackboard(std::int64_t handle) const;
     std::string dump_scheduler_stats() const;
     std::string dump_logs() const;
+    std::string dump_planner_records(std::size_t max_count = 200) const;
 
 private:
     std::int64_t next_definition_handle_ = 1;
@@ -61,6 +67,7 @@ private:
     registry registry_;
     thread_pool_scheduler scheduler_;
     memory_log_sink logs_;
+    planner_service planner_;
 
     std::unique_ptr<clock_interface> owned_clock_;
     std::unique_ptr<robot_interface> owned_robot_;

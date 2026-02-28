@@ -30,6 +30,9 @@ Each log record includes:
 | `(bt.log.dump)` | Alias | string |
 | `(bt.log.snapshot)` | Alias | string |
 | `(bt.clear-logs)` | Clear in-memory sink | `nil` |
+| `(planner.logs.dump [n])` | Dump recent planner records as JSON lines | string |
+| `(planner.set-log-path "path")` | Set planner JSON lines file path | `nil` |
+| `(planner.set-log-enabled #t/#f)` | Enable/disable planner JSON lines sink | `nil` |
 
 ## Where Logs Are Emitted Today
 
@@ -77,4 +80,5 @@ The runtime emits logs for:
 
 - [Tracing](tracing.md)
 - [Profiling](profiling.md)
+- [Planner Logging Schema](planner-logging.md)
 - [Roadmap](../limitations-roadmap.md)

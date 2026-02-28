@@ -99,6 +99,18 @@ public:
             return emit_node(std::move(n));
         }
 
+        if (form_name == "plan-action") {
+            if ((items.size() % 2u) == 0u) {
+                throw bt_compile_error("plan-action: expected key/value pairs");
+            }
+            node n;
+            n.kind = node_kind::plan_action;
+            for (std::size_t i = 1; i < items.size(); ++i) {
+                n.args.push_back(compile_arg(items[i]));
+            }
+            return emit_node(std::move(n));
+        }
+
         throw bt_compile_error("unknown BT form: " + form_name);
     }
 

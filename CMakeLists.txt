@@ -11,6 +11,7 @@ add_library(muesli_bt_core
     src/bt/compiler.cpp
     src/bt/instance.cpp
     src/bt/logging.cpp
+    src/bt/planner.cpp
     src/bt/profile.cpp
     src/bt/registry.cpp
     src/bt/runtime.cpp

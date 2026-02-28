@@ -103,6 +103,15 @@ Uses per-node retry counter.
 - may return `running` across ticks
 - can use `node_memory` to persist progress
 
+## Planner Leaf (`plan-action`)
+
+- reads state from configured blackboard key
+- runs planner with bounded budget (`budget_ms`) and iteration cap (`iters_max`)
+- writes chosen action to configured blackboard key
+- optionally writes compact metadata JSON to `meta_key`
+- returns `success` when action is produced
+- returns `failure` when state/config/model is invalid
+
 ## Error And Missing Callback Semantics
 
 If a condition/action callback is missing, runtime:
@@ -138,3 +147,8 @@ It does not implicitly clear trace/log buffers.
 - `seq` and `sel` are memoryless.
 - `running` is a status, not a thread.
 - long-running leaves should avoid blocking the tick thread.
+
+## See Also
+
+- [PlanAction Node Reference](plan-action-node.md)
+- [Planner Configuration Reference](planner-configuration.md)

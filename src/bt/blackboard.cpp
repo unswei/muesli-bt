@@ -59,6 +59,17 @@ std::string bb_value_repr(const bb_value& value) {
                 std::ostringstream out;
                 out << v;
                 return out.str();
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                std::ostringstream out;
+                out << '[';
+                for (std::size_t i = 0; i < v.size(); ++i) {
+                    if (i != 0) {
+                        out << ',';
+                    }
+                    out << v[i];
+                }
+                out << ']';
+                return out.str();
             } else {
                 return v;
             }
@@ -78,6 +89,8 @@ const char* bb_value_type_name(const bb_value& value) noexcept {
             return "float64";
         case 4:
             return "string";
+        case 5:
+            return "float64[]";
         default:
             return "unknown";
     }

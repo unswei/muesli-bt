@@ -7,11 +7,13 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <sstream>
 #include <utility>
 
 #include "bt/blackboard.hpp"
 #include "bt/compiler.hpp"
+#include "bt/planner.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/serialisation.hpp"
 #include "bt/status.hpp"
@@ -863,6 +865,21 @@ bt::bb_value to_bb_value(value v, const std::string& where) {
     if (is_string(v)) {
         return bt::bb_value{string_value(v)};
     }
+    if (is_proper_list(v)) {
+        const std::vector<value> items = vector_from_list(v);
+        std::vector<double> out;
+        out.reserve(items.size());
+        for (value item : items) {
+            if (is_integer(item)) {
+                out.push_back(static_cast<double>(integer_value(item)));
+            } else if (is_float(item)) {
+                out.push_back(float_value(item));
+            } else {
+                throw lisp_error(where + ": list values for blackboard must be numeric");
+            }
+        }
+        return bt::bb_value{std::move(out)};
+    }
     throw lisp_error(where + ": unsupported blackboard value type");
 }
 
@@ -890,6 +907,87 @@ void apply_tick_blackboard_inputs(bt::instance& inst, value entries) {
                     0,
                     "bt.tick");
     }
+}
+
+std::string normalize_option_key(std::string key) {
+    if (!key.empty() && key.front() == ':') {
+        key.erase(key.begin());
+    }
+    for (char& c : key) {
+        if (c == '-') {
+            c = '_';
+        }
+    }
+    return key;
+}
+
+std::optional<value> map_lookup_option(value map_obj, const std::string& normalized_key) {
+    for (const auto& [key, val] : map_obj->map_data) {
+        if (key.type != map_key_type::symbol && key.type != map_key_type::string) {
+            continue;
+        }
+        if (normalize_option_key(key.text_data) == normalized_key) {
+            return val;
+        }
+    }
+    return std::nullopt;
+}
+
+value map_lookup_option_or(value map_obj, const std::string& normalized_key, value default_value) {
+    const std::optional<value> found = map_lookup_option(map_obj, normalized_key);
+    return found.has_value() ? *found : default_value;
+}
+
+double require_number_value(value v, const std::string& where) {
+    if (is_integer(v)) {
+        return static_cast<double>(integer_value(v));
+    }
+    if (is_float(v)) {
+        return float_value(v);
+    }
+    throw lisp_error(where + ": expected numeric value");
+}
+
+std::vector<double> lisp_to_numeric_vector(value v, const std::string& where) {
+    if (is_integer(v) || is_float(v)) {
+        return {require_number_value(v, where)};
+    }
+    if (!is_proper_list(v)) {
+        throw lisp_error(where + ": expected numeric list or number");
+    }
+    const std::vector<value> items = vector_from_list(v);
+    std::vector<double> out;
+    out.reserve(items.size());
+    for (value item : items) {
+        out.push_back(require_number_value(item, where));
+    }
+    return out;
+}
+
+value numeric_vector_to_lisp_list(const std::vector<double>& values) {
+    std::vector<value> items;
+    items.reserve(values.size());
+    gc_root_scope roots(default_gc());
+    for (double v : values) {
+        items.push_back(make_float(v));
+        roots.add(&items.back());
+    }
+    return list_from_vector(items);
+}
+
+map_key symbol_key(const std::string& name) {
+    map_key key;
+    key.type = map_key_type::symbol;
+    key.text_data = name;
+    return key;
+}
+
+void map_set_symbol(value map_obj, const std::string& key_name, value v) {
+    map_obj->map_data[symbol_key(key_name)] = v;
+}
+
+value planner_status_symbol(bt::planner_status status) {
+    return make_symbol(std::string(":") + bt::planner_status_name(status));
 }
 
 value status_to_symbol(bt::status st) {
@@ -979,6 +1077,12 @@ value bt_node_to_dsl(const bt::definition& def, bt::node_id id) {
             break;
         case bt::node_kind::running:
             form.push_back(make_symbol("running"));
+            break;
+        case bt::node_kind::plan_action:
+            form.push_back(make_symbol("plan-action"));
+            for (const bt::arg_value& arg : n.args) {
+                form.push_back(bt_arg_to_lisp_value(arg));
+            }
             break;
     }
 
@@ -1229,6 +1333,246 @@ value builtin_bt_clear_logs(const std::vector<value>& args) {
     return make_nil();
 }
 
+value builtin_hash64(const std::vector<value>& args) {
+    require_arity("hash64", args, 1);
+    std::string text;
+    if (is_string(args[0])) {
+        text = string_value(args[0]);
+    } else if (is_symbol(args[0])) {
+        text = symbol_name(args[0]);
+    } else {
+        throw lisp_error("hash64: expected string or symbol");
+    }
+    const std::uint64_t h = bt::planner_service::hash64(text);
+    return make_integer(static_cast<std::int64_t>(h & 0x7fffffffffffffffull));
+}
+
+value builtin_planner_mcts(const std::vector<value>& args) {
+    require_arity("planner.mcts", args, 1);
+    const value request_map = require_map_arg(args[0], "planner.mcts");
+
+    bt::planner_request request;
+    request.run_id = "lisp";
+    request.node_name = "planner.mcts";
+
+    {
+        const value model_v = map_lookup_option_or(request_map, "model_service", make_symbol("toy-1d"));
+        if (is_symbol(model_v)) {
+            request.model_service = symbol_name(model_v);
+        } else if (is_string(model_v)) {
+            request.model_service = string_value(model_v);
+        } else {
+            throw lisp_error("planner.mcts: model_service must be symbol or string");
+        }
+    }
+
+    {
+        const std::optional<value> state_v = map_lookup_option(request_map, "state");
+        if (!state_v.has_value()) {
+            throw lisp_error("planner.mcts: missing required state");
+        }
+        request.state = lisp_to_numeric_vector(*state_v, "planner.mcts state");
+    }
+
+    if (const std::optional<value> budget_v = map_lookup_option(request_map, "budget_ms"); budget_v.has_value()) {
+        request.config.budget_ms = require_int_arg(*budget_v, "planner.mcts budget_ms");
+    }
+    if (const std::optional<value> iters_v = map_lookup_option(request_map, "iters_max"); iters_v.has_value()) {
+        request.config.iters_max = require_int_arg(*iters_v, "planner.mcts iters_max");
+    }
+    if (const std::optional<value> gamma_v = map_lookup_option(request_map, "gamma"); gamma_v.has_value()) {
+        request.config.gamma = require_number_value(*gamma_v, "planner.mcts gamma");
+    }
+    if (const std::optional<value> depth_v = map_lookup_option(request_map, "max_depth"); depth_v.has_value()) {
+        request.config.max_depth = require_int_arg(*depth_v, "planner.mcts max_depth");
+    }
+    if (const std::optional<value> c_v = map_lookup_option(request_map, "c_ucb"); c_v.has_value()) {
+        request.config.c_ucb = require_number_value(*c_v, "planner.mcts c_ucb");
+    }
+    if (const std::optional<value> k_v = map_lookup_option(request_map, "pw_k"); k_v.has_value()) {
+        request.config.pw_k = require_number_value(*k_v, "planner.mcts pw_k");
+    }
+    if (const std::optional<value> alpha_v = map_lookup_option(request_map, "pw_alpha"); alpha_v.has_value()) {
+        request.config.pw_alpha = require_number_value(*alpha_v, "planner.mcts pw_alpha");
+    }
+    if (const std::optional<value> rollout_v = map_lookup_option(request_map, "rollout_policy"); rollout_v.has_value()) {
+        if (is_symbol(*rollout_v)) {
+            request.config.rollout_policy = symbol_name(*rollout_v);
+        } else if (is_string(*rollout_v)) {
+            request.config.rollout_policy = string_value(*rollout_v);
+        } else {
+            throw lisp_error("planner.mcts: rollout_policy must be symbol or string");
+        }
+    }
+    if (const std::optional<value> sampler_v = map_lookup_option(request_map, "action_sampler"); sampler_v.has_value()) {
+        if (is_symbol(*sampler_v)) {
+            request.config.action_sampler = symbol_name(*sampler_v);
+        } else if (is_string(*sampler_v)) {
+            request.config.action_sampler = string_value(*sampler_v);
+        } else {
+            throw lisp_error("planner.mcts: action_sampler must be symbol or string");
+        }
+    }
+    if (const std::optional<value> fallback_v = map_lookup_option(request_map, "fallback_action"); fallback_v.has_value()) {
+        request.config.fallback_action = lisp_to_numeric_vector(*fallback_v, "planner.mcts fallback_action");
+    }
+
+    if (const std::optional<value> run_id_v = map_lookup_option(request_map, "run_id"); run_id_v.has_value()) {
+        if (is_symbol(*run_id_v)) {
+            request.run_id = symbol_name(*run_id_v);
+        } else if (is_string(*run_id_v)) {
+            request.run_id = string_value(*run_id_v);
+        } else {
+            throw lisp_error("planner.mcts: run_id must be symbol or string");
+        }
+    }
+    if (const std::optional<value> node_name_v = map_lookup_option(request_map, "node_name"); node_name_v.has_value()) {
+        if (is_symbol(*node_name_v)) {
+            request.node_name = symbol_name(*node_name_v);
+        } else if (is_string(*node_name_v)) {
+            request.node_name = string_value(*node_name_v);
+        } else {
+            throw lisp_error("planner.mcts: node_name must be symbol or string");
+        }
+    }
+    if (const std::optional<value> tick_idx_v = map_lookup_option(request_map, "tick_index"); tick_idx_v.has_value()) {
+        const std::int64_t tick_i = require_int_arg(*tick_idx_v, "planner.mcts tick_index");
+        if (tick_i < 0) {
+            throw lisp_error("planner.mcts: tick_index must be non-negative");
+        }
+        request.tick_index = static_cast<std::uint64_t>(tick_i);
+    }
+    if (const std::optional<value> state_key_v = map_lookup_option(request_map, "state_key"); state_key_v.has_value()) {
+        if (is_symbol(*state_key_v)) {
+            request.state_key = symbol_name(*state_key_v);
+        } else if (is_string(*state_key_v)) {
+            request.state_key = string_value(*state_key_v);
+        } else {
+            throw lisp_error("planner.mcts: state_key must be symbol or string");
+        }
+    }
+
+    if (const std::optional<value> seed_v = map_lookup_option(request_map, "seed"); seed_v.has_value()) {
+        if (is_integer(*seed_v)) {
+            const std::int64_t raw = integer_value(*seed_v);
+            if (raw < 0) {
+                throw lisp_error("planner.mcts: seed must be non-negative");
+            }
+            request.seed = static_cast<std::uint64_t>(raw);
+        } else if (is_float(*seed_v)) {
+            const double raw = float_value(*seed_v);
+            if (!std::isfinite(raw) || raw < 0.0) {
+                throw lisp_error("planner.mcts: seed must be non-negative finite");
+            }
+            request.seed = static_cast<std::uint64_t>(raw);
+        } else if (is_string(*seed_v) || is_symbol(*seed_v)) {
+            const std::string text = is_string(*seed_v) ? string_value(*seed_v) : symbol_name(*seed_v);
+            request.seed = bt::planner_service::hash64(text);
+        } else {
+            throw lisp_error("planner.mcts: unsupported seed type");
+        }
+    } else {
+        request.seed = bt::planner_service::hash64(write_value(args[0]));
+    }
+
+    bt::planner_result result = bt::default_runtime_host().planner_ref().plan(request);
+
+    gc_root_scope roots(default_gc());
+    value result_map = make_map();
+    roots.add(&result_map);
+
+    value action = numeric_vector_to_lisp_list(result.action);
+    roots.add(&action);
+    map_set_symbol(result_map, "action", action);
+    map_set_symbol(result_map, "status", planner_status_symbol(result.status));
+    map_set_symbol(result_map, "confidence", make_float(result.confidence));
+
+    value stats = make_map();
+    roots.add(&stats);
+    map_set_symbol(stats, "iters", make_integer(result.stats.iters));
+    map_set_symbol(stats, "root_visits", make_integer(result.stats.root_visits));
+    map_set_symbol(stats, "root_children", make_integer(result.stats.root_children));
+    map_set_symbol(stats, "widen_added", make_integer(result.stats.widen_added));
+    map_set_symbol(stats, "depth_max", make_integer(result.stats.depth_max));
+    map_set_symbol(stats, "depth_mean", make_float(result.stats.depth_mean));
+    map_set_symbol(stats, "time_used_ms", make_float(result.stats.time_used_ms));
+    map_set_symbol(stats, "value_est", make_float(result.stats.value_est));
+    map_set_symbol(stats, "seed", make_integer(static_cast<std::int64_t>(result.stats.seed & 0x7fffffffffffffffull)));
+
+    std::vector<value> top_entries;
+    top_entries.reserve(result.stats.top_k.size());
+    for (const bt::planner_top_choice& top : result.stats.top_k) {
+        value entry = make_map();
+        roots.add(&entry);
+        value top_action = numeric_vector_to_lisp_list(top.action);
+        roots.add(&top_action);
+        map_set_symbol(entry, "action", top_action);
+        map_set_symbol(entry, "visits", make_integer(top.visits));
+        map_set_symbol(entry, "q", make_float(top.q));
+        top_entries.push_back(entry);
+        roots.add(&top_entries.back());
+    }
+    value top_list = list_from_vector(top_entries);
+    roots.add(&top_list);
+    map_set_symbol(stats, "top_k", top_list);
+
+    map_set_symbol(result_map, "stats", stats);
+    if (!result.error.empty()) {
+        map_set_symbol(result_map, "error", make_string(result.error));
+    }
+
+    return result_map;
+}
+
+value builtin_planner_logs_dump(const std::vector<value>& args) {
+    if (args.size() > 1) {
+        throw lisp_error("planner.logs.dump: expected 0 or 1 arguments");
+    }
+    std::size_t max_count = 200;
+    if (!args.empty()) {
+        const std::int64_t raw = require_int_arg(args[0], "planner.logs.dump");
+        if (raw < 0) {
+            throw lisp_error("planner.logs.dump: expected non-negative max_count");
+        }
+        max_count = static_cast<std::size_t>(raw);
+    }
+    return make_string(bt::default_runtime_host().dump_planner_records(max_count));
+}
+
+value builtin_planner_set_log_path(const std::vector<value>& args) {
+    require_arity("planner.set-log-path", args, 1);
+    if (!is_string(args[0])) {
+        throw lisp_error("planner.set-log-path: expected string path");
+    }
+    bt::default_runtime_host().planner_ref().set_jsonl_path(string_value(args[0]));
+    return make_nil();
+}
+
+value builtin_planner_set_log_enabled(const std::vector<value>& args) {
+    require_arity("planner.set-log-enabled", args, 1);
+    if (!is_boolean(args[0])) {
+        throw lisp_error("planner.set-log-enabled: expected boolean");
+    }
+    bt::default_runtime_host().planner_ref().set_jsonl_enabled(boolean_value(args[0]));
+    return make_nil();
+}
+
+value builtin_planner_set_base_seed(const std::vector<value>& args) {
+    require_arity("planner.set-base-seed", args, 1);
+    const std::int64_t raw = require_int_arg(args[0], "planner.set-base-seed");
+    if (raw < 0) {
+        throw lisp_error("planner.set-base-seed: seed must be non-negative");
+    }
+    bt::default_runtime_host().planner_ref().set_base_seed(static_cast<std::uint64_t>(raw));
+    return make_nil();
+}
+
+value builtin_planner_get_base_seed(const std::vector<value>& args) {
+    require_arity("planner.get-base-seed", args, 0);
+    const std::uint64_t seed = bt::default_runtime_host().planner_ref().base_seed();
+    return make_integer(static_cast<std::int64_t>(seed & 0x7fffffffffffffffull));
+}
+
 }  // namespace
 
 void install_core_builtins(env_ptr global_env) {
@@ -1268,11 +1612,18 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "float?", builtin_float_pred);
     bind_primitive(global_env, "zero?", builtin_zero_pred);
     bind_primitive(global_env, "time.now-ms", builtin_time_now_ms);
+    bind_primitive(global_env, "hash64", builtin_hash64);
 
     bind_primitive(global_env, "rng.make", builtin_rng_make);
     bind_primitive(global_env, "rng.uniform", builtin_rng_uniform);
     bind_primitive(global_env, "rng.normal", builtin_rng_normal);
     bind_primitive(global_env, "rng.int", builtin_rng_int);
+    bind_primitive(global_env, "planner.mcts", builtin_planner_mcts);
+    bind_primitive(global_env, "planner.logs.dump", builtin_planner_logs_dump);
+    bind_primitive(global_env, "planner.set-log-path", builtin_planner_set_log_path);
+    bind_primitive(global_env, "planner.set-log-enabled", builtin_planner_set_log_enabled);
+    bind_primitive(global_env, "planner.set-base-seed", builtin_planner_set_base_seed);
+    bind_primitive(global_env, "planner.get-base-seed", builtin_planner_get_base_seed);
 
     bind_primitive(global_env, "vec.make", builtin_vec_make);
     bind_primitive(global_env, "vec.len", builtin_vec_len);

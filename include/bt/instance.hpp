@@ -17,6 +17,7 @@
 namespace bt {
 
 struct tick_context;
+class planner_service;
 
 struct node_memory {
     std::int64_t i0 = 0;
@@ -53,12 +54,14 @@ struct services {
     observability obs{};
     clock_interface* clock = nullptr;
     robot_interface* robot = nullptr;
+    planner_service* planner = nullptr;
 };
 
 struct instance {
     explicit instance(const definition* definition_ptr = nullptr, std::size_t trace_capacity = 4096);
 
     const definition* def = nullptr;
+    std::int64_t instance_handle = 0;
     std::unordered_map<node_id, node_memory> memory;
     blackboard bb;
     std::uint64_t tick_index = 0;

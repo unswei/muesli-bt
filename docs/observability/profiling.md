@@ -16,6 +16,7 @@ This page documents the profiling surfaces available today.
 | --- | --- | --- |
 | `(bt.stats inst)` | Tree + node runtime stats | string |
 | `(bt.scheduler.stats)` | Scheduler counters/timings | string |
+| `(planner.logs.dump [n])` | Planner per-call records (JSON lines text) | string |
 | `(bt.set-tick-budget-ms inst ms)` | Set tick overrun budget | `nil` |
 | `(heap-stats)` | Heap counters snapshot | `nil` (prints) |
 | `(gc-stats)` | Force GC then print counters | `nil` (prints) |
@@ -103,4 +104,5 @@ Printed counters include:
 
 - [Tracing](tracing.md)
 - [Logging](logging.md)
+- [Planner Logging Schema](planner-logging.md)
 - [Roadmap](../limitations-roadmap.md)

@@ -24,7 +24,7 @@ Each tick evaluates from the root and returns one status:
 
 - composites: control child flow (`seq`, `sel`)
 - decorators: transform child outcomes (`invert`, `repeat`, `retry`)
-- leaves: host callbacks (`cond`, `act`)
+- leaves: host callbacks (`cond`, `act`) and bounded-time planning (`plan-action`)
 
 This prepares you for the project BT DSL (domain-specific language) in [BT Syntax](syntax.md).
 

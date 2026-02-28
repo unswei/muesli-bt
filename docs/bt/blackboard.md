@@ -31,6 +31,7 @@ Supported blackboard value variants:
 - `int64`
 - `double`
 - `string`
+- `float64[]`
 
 ## Metadata Tracked Per Entry
 
@@ -82,6 +83,7 @@ Recommended style:
 - `target-visible`: bool from perception
 - `approach-retries`: int from action logic
 - `grasp-last-error`: string from grasp wrapper
+- `ptz-state`: float vector state for planner loops
 
 ## See Also
 

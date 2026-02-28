@@ -8,7 +8,7 @@ Reasoning:
 
 - stable pointers across Lisp and C++ boundaries
 - closure/environment cycle safety
-- manageable implementation complexity for v1
+- manageable implementation complexity
 
 ## What Is GC-Managed
 
@@ -29,7 +29,7 @@ Reasoning:
 
 - marking a `vec` walks all live elements and marks each referenced Lisp value
 - marking a `map` walks all stored mapped values and marks them
-- no write barrier is required in v1 because the collector is not generational
+- no write barrier is required because the collector is not generational
 
 ## Root Sources
 
