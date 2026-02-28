@@ -4,6 +4,7 @@ This example provides a cross-platform visual PyBullet demo with:
 
 - manual driving
 - muesli-bt executed control loops in BT modes
+- canonical `env.*` capability interface with a `pybullet` backend attachment
 - bounded-time continuous-action MCTS planning via `plan-action` node
 - stable JSONL logging + run metadata
 - BT DOT export + Graphviz rendering
@@ -149,7 +150,7 @@ If Graphviz is unavailable, the script still generates a `.dot` file.
 ## Files
 
 - `run_demo.py`: demo entrypoint, PyBullet sim adapter, manual controls
-- `native/`: demo-native C++/pybind pieces (`env.pybullet.run-loop`, racecar model, Python bridge module)
+- `native/`: demo-native C++/pybind pieces (`env.run-loop` backend adapter, `env.pybullet.*` compatibility builtins, racecar model, Python bridge module)
 - `bt/racecar_bt.mueslisp`: canonical BT DSL for diagram export
 - `scripts/plot_logs.py`: log-to-plot utility
 - `scripts/render_bt_dot.py`: DOT/SVG export helper

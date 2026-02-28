@@ -15,6 +15,10 @@ Run:
 ./build/dev/muslisp examples/repl_scripts/prm-2d-pq.lisp
 ```
 
+Step-by-step tutorial:
+
+- [PRM Tutorial (Step By Step)](tutorials/prm-step-by-step.md)
+
 ## What It Demonstrates
 
 - deterministic sampling with `(rng.make seed)`

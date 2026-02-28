@@ -43,6 +43,11 @@ This page is a summary and link hub for built-ins. Detailed behavior, errors, an
 - VLA logging config: `vla.logs.dump`, `vla.set-log-path`, `vla.set-log-enabled`, `vla.clear-logs`
 - observation handles: `image.make`, `image.info`, `blob.make`, `blob.info`
 
+## Environment Capability Interface
+
+- canonical interface: `env.info`, `env.attach`, `env.configure`, `env.reset`, `env.observe`, `env.act`, `env.step`, `env.run-loop`, `env.debug-draw`
+- transition aliases (legacy): `sim.info`, `sim.attach`, `sim.configure`, `sim.reset`, `sim.observe`, `sim.act`, `sim.step`, `sim.run-loop`, `sim.debug-draw`
+
 ## BT Integration
 
 - authoring/compile: `bt.compile`

@@ -10,6 +10,10 @@ Run:
 ./build/dev/muslisp examples/repl_scripts/dijkstra-grid-pq.lisp
 ```
 
+Step-by-step tutorial:
+
+- [Dijkstra Tutorial (Step By Step)](tutorials/dijkstra-step-by-step.md)
+
 ## What It Demonstrates
 
 - canonical shortest-path pattern with duplicate queue pushes

@@ -42,8 +42,12 @@ cmake --build --preset dev -j
 
 - [Getting Started](getting-started.md): install/build/run workflow
 - [A* Search Example](examples/a-star-search.md): full muslisp implementation
+- [A* Tutorial (Step By Step)](examples/tutorials/a-star-step-by-step.md): implementation walkthrough
 - [Dijkstra + PQ Example](examples/dijkstra-pq.md): shortest path with native priority queue
+- [Dijkstra Tutorial (Step By Step)](examples/tutorials/dijkstra-step-by-step.md): implementation walkthrough
 - [PRM + PQ Example](examples/prm-pq.md): simulator-free roadmap planning in pure muslisp
+- [PRM Tutorial (Step By Step)](examples/tutorials/prm-step-by-step.md): implementation walkthrough
+- [Language Built-ins Overview](language/builtins.md): includes `env.*` capability interface summary
 - [Language](language/syntax.md): syntax, semantics, and complete reference
 - [Behaviour Trees](bt/intro.md): DSL, runtime model, blackboard, scheduler, bounded-time planning, observability
 - [VLA Integration](bt/vla-integration.md): capability-based async vision-language-action orchestration

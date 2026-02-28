@@ -102,6 +102,20 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`planner.set-log-enabled`](builtins/planner/planner-set-log-enabled.md)
 - [`planner.set-log-path`](builtins/planner/planner-set-log-path.md)
 
+### Environment capability interface
+
+- [`env.info`](builtins/env/env-info.md)
+- [`env.attach`](builtins/env/env-attach.md)
+- [`env.configure`](builtins/env/env-configure.md)
+- [`env.reset`](builtins/env/env-reset.md)
+- [`env.observe`](builtins/env/env-observe.md)
+- [`env.act`](builtins/env/env-act.md)
+- [`env.step`](builtins/env/env-step.md)
+- [`env.run-loop`](builtins/env/env-run-loop.md)
+- [`env.debug-draw`](builtins/env/env-debug-draw.md)
+
+Legacy `sim.*` names remain temporary aliases to `env.*`.
+
 ### Capability introspection
 
 - [`cap.list`](builtins/cap/cap-list.md)

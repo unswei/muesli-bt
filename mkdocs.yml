@@ -44,8 +44,11 @@ nav:
           - Lisp Basics: examples/lisp-basics.md
           - Hello BT: examples/hello-bt.md
           - A* Search: examples/a-star-search.md
+          - A* Tutorial (Step By Step): examples/tutorials/a-star-step-by-step.md
           - Dijkstra (PQ): examples/dijkstra-pq.md
+          - Dijkstra Tutorial (Step By Step): examples/tutorials/dijkstra-step-by-step.md
           - PRM (PQ): examples/prm-pq.md
+          - PRM Tutorial (Step By Step): examples/tutorials/prm-step-by-step.md
           - Recovery BT: examples/recovery-bt.md
           - Continuous MCTS: examples/continuous-mcts.md
           - Planning BT (1D): examples/planner-bt-1d.md

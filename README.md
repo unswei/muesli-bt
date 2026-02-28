@@ -174,6 +174,16 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 - opaque media handles (`image_handle`, `blob_handle`) plus metadata accessors
 - structured per-job logs (JSONL sink + in-memory dump)
 
+### Environment capability layer
+
+- canonical backend-agnostic control surface:
+  - `env.info`, `env.attach`, `env.configure`
+  - `env.reset`, `env.observe`, `env.act`, `env.step`
+  - `env.run-loop`, `env.debug-draw`
+- transition aliases:
+  - `sim.*` forwards to `env.*`
+- backend-specific extensions remain under `env.backend.*` style namespaces (for example `env.pybullet.*`)
+
 ### Observability and control
 
 - trace/log rings and dump APIs
@@ -184,9 +194,13 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 
 - [Getting started](docs/getting-started.md)
 - [Example: A* search](docs/examples/a-star-search.md)
+- [Tutorial: A* (step by step)](docs/examples/tutorials/a-star-step-by-step.md)
 - [Example: Dijkstra with PQ](docs/examples/dijkstra-pq.md)
+- [Tutorial: Dijkstra (step by step)](docs/examples/tutorials/dijkstra-step-by-step.md)
 - [Example: PRM with PQ](docs/examples/prm-pq.md)
+- [Tutorial: PRM (step by step)](docs/examples/tutorials/prm-step-by-step.md)
 - [Language manual](docs/language/syntax.md)
+- [Built-ins overview (`env.*` included)](docs/language/builtins.md)
 - [Language reference index](docs/language/reference/index.md)
 - [Behaviour trees](docs/bt/intro.md)
 - [Bounded-time planning](docs/bt/bounded-time-planning.md)
@@ -217,7 +231,7 @@ ctest --test-dir build/dev --output-on-failure
 - `examples/bt/`: compact BT scripts
 - `examples/repl_scripts/`: end-to-end experiments and demos
 - `examples/pybullet_racecar/`: racecar demo package
-  - `native/`: demo-only C++ + pybind bridge code for `env.pybullet.run-loop`
+  - `native/`: demo-only C++ + pybind bridge code for `env.run-loop` / `env.pybullet.*`
 - `tests/`: unit/integration coverage
 - `docs/`: user and internals documentation
 

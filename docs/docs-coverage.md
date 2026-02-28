@@ -8,13 +8,16 @@ Audit language/runtime surfaces against code before updating this checklist:
 
 - special forms: evaluator special-form dispatch in `src/eval.cpp`
 - value/data types: runtime value type enum in `include/muslisp/value.hpp`
-- built-ins: `install_core_builtins` registrations in `src/builtins.cpp`
+- built-ins: `install_core_builtins` registrations in `src/builtins.cpp` and environment capability registrations in `src/env_builtins.cpp`
 
 ## Manual Coverage (Conceptual Pages)
 
 - [x] Home / landing page -> [page](index.md)
 - [x] Getting started -> [page](getting-started.md)
 - [x] Lisp basics orientation -> [page](lisp-basics.md)
+- [x] A* step-by-step tutorial -> [page](examples/tutorials/a-star-step-by-step.md)
+- [x] Dijkstra step-by-step tutorial -> [page](examples/tutorials/dijkstra-step-by-step.md)
+- [x] PRM step-by-step tutorial -> [page](examples/tutorials/prm-step-by-step.md)
 - [x] Language syntax -> [page](language/syntax.md)
 - [x] Language semantics -> [page](language/semantics.md)
 - [x] Built-ins overview hub -> [page](language/builtins.md)
@@ -130,6 +133,18 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `planner.set-base-seed` -> [page](language/reference/builtins/planner/planner-set-base-seed.md)
 - [x] `planner.set-log-enabled` -> [page](language/reference/builtins/planner/planner-set-log-enabled.md)
 - [x] `planner.set-log-path` -> [page](language/reference/builtins/planner/planner-set-log-path.md)
+
+### Environment capability interface
+- [x] `env.info` -> [page](language/reference/builtins/env/env-info.md)
+- [x] `env.attach` -> [page](language/reference/builtins/env/env-attach.md)
+- [x] `env.configure` -> [page](language/reference/builtins/env/env-configure.md)
+- [x] `env.reset` -> [page](language/reference/builtins/env/env-reset.md)
+- [x] `env.observe` -> [page](language/reference/builtins/env/env-observe.md)
+- [x] `env.act` -> [page](language/reference/builtins/env/env-act.md)
+- [x] `env.step` -> [page](language/reference/builtins/env/env-step.md)
+- [x] `env.run-loop` -> [page](language/reference/builtins/env/env-run-loop.md)
+- [x] `env.debug-draw` -> [page](language/reference/builtins/env/env-debug-draw.md)
+- [x] `sim.*` alias layer noted in env pages -> [page](language/reference/builtins/env/env-info.md)
 
 ### Capability services
 - [x] `cap.list` -> [page](language/reference/builtins/cap/cap-list.md)

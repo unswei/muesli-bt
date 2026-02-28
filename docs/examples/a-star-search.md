@@ -10,6 +10,10 @@ Run:
 ./build/dev/muslisp examples/repl_scripts/a-star-grid.lisp
 ```
 
+Step-by-step tutorial:
+
+- [A* Tutorial (Step By Step)](tutorials/a-star-step-by-step.md)
+
 ## What It Demonstrates
 
 - graph search in pure Lisp without host callbacks

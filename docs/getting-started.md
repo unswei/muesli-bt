@@ -70,8 +70,26 @@ Notes:
 
 - `dijkstra-grid-pq.lisp` prints `found`, total cost, path length, and step coordinates.
 - `prm-2d-pq.lisp` uses a fixed seed and prints deterministic summary fields (`seed`, accepted nodes, edge count, `found`, path stats).
+- Step-by-step walkthroughs:
+  - [A* tutorial](examples/tutorials/a-star-step-by-step.md)
+  - [Dijkstra tutorial](examples/tutorials/dijkstra-step-by-step.md)
+  - [PRM tutorial](examples/tutorials/prm-step-by-step.md)
 
 `(load "path/to/file.lisp")` is also available inside the REPL for runtime loading.
+
+## Environment Capability Interface (`env.*`)
+
+The runtime now exposes a backend-agnostic control surface:
+
+- `env.info`, `env.attach`, `env.configure`
+- `env.reset`, `env.observe`, `env.act`, `env.step`
+- `env.run-loop`, `env.debug-draw`
+
+Legacy `sim.*` names are temporary aliases to the same behavior.
+
+See the built-in reference index for exact signatures and error behavior:
+
+- [Language Reference Index](language/reference/index.md)
 
 ## Run Tests Directly
 
