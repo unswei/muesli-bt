@@ -1,4 +1,4 @@
-#include "pybullet_racecar/extension.hpp"
+#include "pybullet_racecar_common/extension.hpp"
 
 #include <algorithm>
 #include <array>

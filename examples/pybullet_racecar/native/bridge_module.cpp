@@ -18,7 +18,7 @@
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
 #include "muslisp/value.hpp"
-#include "pybullet_racecar/extension.hpp"
+#include "pybullet_racecar_common/extension.hpp"
 
 namespace py = pybind11;
 

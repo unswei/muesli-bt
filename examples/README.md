@@ -14,3 +14,4 @@ This directory contains runnable muesli-bt examples.
 - `bt/`: small BT language/runtime examples.
 - `repl_scripts/`: standalone Lisp algorithm and planner scripts.
 - `pybullet_racecar/`: PyBullet racecar showcase.
+- `pybullet_racecar_common/`: shared C++ extension plumbing for the PyBullet racecar demo.

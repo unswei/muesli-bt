@@ -13,7 +13,7 @@
 
 #include "bt/instance.hpp"
 #include "bt/logging.hpp"
-#include "pybullet_racecar/extension.hpp"
+#include "pybullet_racecar_common/extension.hpp"
 #include "racecar_demo.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/trace.hpp"

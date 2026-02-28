@@ -51,15 +51,15 @@ endif()
 
 add_library(muesli_bt_ext_pybullet_racecar
     examples/pybullet_racecar/native/racecar_demo.cpp
-    ext/pybullet_racecar/extension.cpp
+    examples/pybullet_racecar_common/extension.cpp
 )
 
 target_link_libraries(muesli_bt_ext_pybullet_racecar PUBLIC muesli_bt_core)
 target_include_directories(muesli_bt_ext_pybullet_racecar
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/pybullet_racecar/native
-        ${CMAKE_CURRENT_SOURCE_DIR}/ext
 )
 target_compile_features(muesli_bt_ext_pybullet_racecar PUBLIC cxx_std_20)
 
