@@ -12,6 +12,27 @@ permissions:
   contents: read
 
 jobs:
+  python-env:
+    name: python-env
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Validate unified Python environment
+        run: |
+          ./scripts/setup-python-env.sh .venv-py311
+          .venv-py311/bin/python -c "import pybullet, mkdocs; print('python env ok')"
+
   build-and-test:
     name: linux-${{ matrix.compiler }}
     runs-on: ubuntu-latest

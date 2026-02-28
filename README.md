@@ -47,6 +47,30 @@ Open a REPL:
 ./build/dev/muslisp
 ```
 
+## Unified Python Environment (Docs + PyBullet)
+
+Use one Python version for docs tooling and `pybullet`: Python `3.11`.
+
+Fast path:
+
+```bash
+./scripts/setup-python-env.sh
+```
+
+```bash
+uv run python --version
+uv venv --python 3.11 .venv-py311
+uv pip install --python .venv-py311/bin/python -r docs/requirements.txt
+CFLAGS='-Dfdopen=fdopen' CPPFLAGS='-Dfdopen=fdopen' \
+  uv pip install --python .venv-py311/bin/python pybullet
+```
+
+Then use that same environment for docs:
+
+```bash
+.venv-py311/bin/python -m mkdocs serve
+```
+
 ## A Small Hybrid Example
 
 This pattern keeps ticking while a VLA job runs, uses planner output when available, and falls back safely:
@@ -139,8 +163,7 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 Serve docs locally:
 
 ```bash
-python3 -m pip install -r docs/requirements.txt
-mkdocs serve
+.venv-py311/bin/python -m mkdocs serve
 ```
 
 ## Tests

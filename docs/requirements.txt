@@ -1,3 +1,4 @@
 mkdocs>=1.6,<2.0
 mkdocs-material>=9.5
 pymdown-extensions>=10.0
+pybullet>=3.2; python_version < "3.14"

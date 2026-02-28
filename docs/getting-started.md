@@ -7,7 +7,8 @@ This page gets a new developer from clone to runnable REPL, tests, and docs.
 - C++20 compiler (`clang++` or `g++`)
 - CMake 3.20+
 - Ninja
-- Python 3 (for MkDocs build)
+- Python 3.11 (single environment for docs + `pybullet`)
+- `uv` (recommended for Python environment management)
 
 ## Build And Test
 
@@ -72,22 +73,22 @@ Quick BT authoring example:
 
 ## Build Documentation
 
-Install docs dependencies:
+Create the unified Python environment (docs + `pybullet`):
 
 ```bash
-python3 -m pip install -r docs/requirements.txt
+./scripts/setup-python-env.sh
 ```
 
 Serve locally:
 
 ```bash
-mkdocs serve
+.venv-py311/bin/python -m mkdocs serve
 ```
 
 Build static docs:
 
 ```bash
-mkdocs build
+.venv-py311/bin/python -m mkdocs build
 ```
 
 ## Where Examples Live
@@ -101,7 +102,7 @@ mkdocs build
 : install Ninja (`brew install ninja` or `sudo apt install ninja-build`).
 
 - `mkdocs: command not found`
-: install docs dependencies with `python3 -m pip install -r docs/requirements.txt`.
+: use the unified environment: `./scripts/setup-python-env.sh`.
 
 - wrong compiler selected
 : set `CC` and `CXX` before configuring.
