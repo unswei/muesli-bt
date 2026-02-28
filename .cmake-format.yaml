@@ -1,0 +1,13 @@
+# cmake-format configuration
+line_width: 100
+tab_size: 2
+separate_ctrl_name_with_space: true
+separate_fn_name_with_space: false
+dangle_parens: true
+max_pargs_hwrap: 3
+max_lines_hwrap: 2
+command_case: lower
+keyword_case: lower
+always_wrap: []
+enable_sort: true
+autosort: true
