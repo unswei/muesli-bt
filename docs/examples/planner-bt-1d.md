@@ -18,3 +18,8 @@ What to look for:
 - `action` is updated each tick
 - `plan-meta` contains compact planner diagnostics
 - `planner.logs.dump` returns JSON lines records
+
+See also:
+
+- [Example: Async VLA Stub BT](vla-stub-bt.md)
+- [Example: Hybrid VLA Prior + MCTS](hybrid-vla-mcts.md)

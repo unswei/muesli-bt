@@ -36,6 +36,8 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`rng`](data-types/rng.md)
 - [`bt_def`](data-types/bt-def.md)
 - [`bt_instance`](data-types/bt-instance.md)
+- [`image_handle`](data-types/image-handle.md)
+- [`blob_handle`](data-types/blob-handle.md)
 
 ## Built-ins
 
@@ -78,6 +80,11 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 
 - [`time.now-ms`](builtins/time/time-now-ms.md)
 
+### JSON
+
+- [`json.encode`](builtins/json/json-encode.md)
+- [`json.decode`](builtins/json/json-decode.md)
+
 ### Random number generation
 
 - [`rng.int`](builtins/rng/rng-int.md)
@@ -93,6 +100,28 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`planner.set-base-seed`](builtins/planner/planner-set-base-seed.md)
 - [`planner.set-log-enabled`](builtins/planner/planner-set-log-enabled.md)
 - [`planner.set-log-path`](builtins/planner/planner-set-log-path.md)
+
+### Capability introspection
+
+- [`cap.list`](builtins/cap/cap-list.md)
+- [`cap.describe`](builtins/cap/cap-describe.md)
+
+### Media handles
+
+- [`image.make`](builtins/media/image-make.md)
+- [`image.info`](builtins/media/image-info.md)
+- [`blob.make`](builtins/media/blob-make.md)
+- [`blob.info`](builtins/media/blob-info.md)
+
+### VLA async services
+
+- [`vla.submit`](builtins/vla/vla-submit.md)
+- [`vla.poll`](builtins/vla/vla-poll.md)
+- [`vla.cancel`](builtins/vla/vla-cancel.md)
+- [`vla.logs.dump`](builtins/vla/vla-logs-dump.md)
+- [`vla.set-log-path`](builtins/vla/vla-set-log-path.md)
+- [`vla.set-log-enabled`](builtins/vla/vla-set-log-enabled.md)
+- [`vla.clear-logs`](builtins/vla/vla-clear-logs.md)
 
 ### Mutable vectors
 

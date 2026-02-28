@@ -9,6 +9,7 @@ Runs bounded-time MCTS using a host planner model and returns action plus diagno
 ## Arguments And Return
 
 - Arguments: map with at least `state`; optional planner/model fields (for example `model_service`, `budget_ms`, `iters_max`, `seed`)
+- Arguments: map with at least `state`; optional planner/model fields (for example `model_service`, `budget_ms`, `iters_max`, `seed`, `action_prior_mean`, `action_prior_sigma`, `action_prior_mix`)
 - Return: map containing `action`, `status`, `confidence`, `stats` (and optional `error`)
 
 ## Errors And Edge Cases

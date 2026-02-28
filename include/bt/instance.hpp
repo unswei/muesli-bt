@@ -18,6 +18,7 @@ namespace bt {
 
 struct tick_context;
 class planner_service;
+class vla_service;
 
 struct node_memory {
     std::int64_t i0 = 0;
@@ -55,6 +56,7 @@ struct services {
     clock_interface* clock = nullptr;
     robot_interface* robot = nullptr;
     planner_service* planner = nullptr;
+    vla_service* vla = nullptr;
 };
 
 struct instance {

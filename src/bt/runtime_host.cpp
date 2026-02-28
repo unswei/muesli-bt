@@ -126,6 +126,7 @@ std::int64_t status_to_memory(job_status st) {
 runtime_host::runtime_host()
     : scheduler_(0),
       logs_(4096),
+      vla_(&scheduler_),
       owned_clock_(std::make_unique<system_clock_service>()),
       owned_robot_(std::make_unique<demo_robot_service>()) {
     clock_ = owned_clock_.get();
@@ -185,6 +186,7 @@ status runtime_host::tick_instance(std::int64_t handle) {
     svc.clock = clock_;
     svc.robot = robot_;
     svc.planner = &planner_;
+    svc.vla = &vla_;
 
     return tick(*inst, registry_, svc);
 }
@@ -219,6 +221,14 @@ planner_service& runtime_host::planner_ref() {
 
 const planner_service& runtime_host::planner_ref() const {
     return planner_;
+}
+
+vla_service& runtime_host::vla_ref() {
+    return vla_;
+}
+
+const vla_service& runtime_host::vla_ref() const {
+    return vla_;
 }
 
 memory_log_sink& runtime_host::logs() noexcept {
@@ -263,6 +273,7 @@ void runtime_host::clear_all() {
     registry_.clear();
     logs_.clear();
     planner_.clear_records();
+    vla_.clear_records();
 }
 
 std::string runtime_host::dump_instance_stats(std::int64_t handle) const {
@@ -316,6 +327,10 @@ std::string runtime_host::dump_logs() const {
 
 std::string runtime_host::dump_planner_records(std::size_t max_count) const {
     return planner_.dump_recent_records(max_count);
+}
+
+std::string runtime_host::dump_vla_records(std::size_t max_count) const {
+    return vla_.dump_recent_records(max_count);
 }
 
 runtime_host& default_runtime_host() {

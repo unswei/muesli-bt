@@ -32,6 +32,8 @@ Supported blackboard value variants:
 - `double`
 - `string`
 - `float64[]`
+- `image_handle`
+- `blob_handle`
 
 ## Metadata Tracked Per Entry
 
@@ -84,6 +86,7 @@ Recommended style:
 - `approach-retries`: int from action logic
 - `grasp-last-error`: string from grasp wrapper
 - `ptz-state`: float vector state for planner loops
+- `obs-image`: image handle for async VLA requests
 
 ## See Also
 

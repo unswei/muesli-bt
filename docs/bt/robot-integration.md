@@ -22,6 +22,7 @@ using action_fn = std::function<status(tick_context&, node_id, node_memory&, std
 - `clock_interface*`
 - `robot_interface*`
 - `planner_service*`
+- `vla_service*`
 
 `runtime_host` provides defaults and allows custom robot injection.
 
@@ -39,6 +40,16 @@ Custom model registration uses:
 ```cpp
 host.planner_ref().register_model("my-model", my_model_ptr);
 ```
+
+## VLA Service Integration
+
+VLA integration is capability-based and async:
+
+- capabilities are introspectable (`cap.list`, `cap.describe`)
+- requests are submitted/polled/cancelled (`vla.submit`, `vla.poll`, `vla.cancel`)
+- image/blob observations are passed as handles (`image_handle`, `blob_handle`)
+
+Custom backends are registered host-side through `vla_service`.
 
 ## Condition Example (`target-visible`)
 
@@ -110,5 +121,6 @@ Recommended pattern:
 
 - [Scheduler](scheduler.md)
 - [Bounded-Time Planning In BTs](bounded-time-planning.md)
+- [VLA Integration In BTs](vla-integration.md)
 - [BT Semantics](semantics.md)
 - [Roadmap](../limitations-roadmap.md)

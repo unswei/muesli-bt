@@ -19,6 +19,9 @@
 - `:meta_key` optional key to write compact JSON metadata
 - `:seed_key` optional key to read deterministic seed
 - `:fallback_action` optional scalar fallback action
+- `:prior_key` optional key for prior action vector (for hybrid sampling)
+- `:prior_sigma` optional gaussian sigma when using prior-guided sampler
+- `:prior_mix` optional mixture ratio in `[0,1]` for prior-guided sampler
 
 ## Planner Parameters
 

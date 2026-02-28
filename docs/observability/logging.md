@@ -33,6 +33,10 @@ Each log record includes:
 | `(planner.logs.dump [n])` | Dump recent planner records as JSON lines | string |
 | `(planner.set-log-path "path")` | Set planner JSON lines file path | `nil` |
 | `(planner.set-log-enabled #t/#f)` | Enable/disable planner JSON lines sink | `nil` |
+| `(vla.logs.dump [n])` | Dump recent VLA records as JSON lines | string |
+| `(vla.set-log-path "path")` | Set VLA JSON lines file path | `nil` |
+| `(vla.set-log-enabled #t/#f)` | Enable/disable VLA JSON lines sink | `nil` |
+| `(vla.clear-logs)` | Clear in-memory VLA records | `nil` |
 
 ## Where Logs Are Emitted Today
 
@@ -74,11 +78,12 @@ The runtime emits logs for:
 - Log storage is process-local and memory-bounded.
 - Oldest records are evicted when sink capacity is reached.
 - `runtime_host` owns the default sink; logs are currently not per-instance.
-- File sinks and external exporters are roadmap work.
+- Planner and VLA records can be mirrored to JSON lines sinks.
 
 ## See Also
 
 - [Tracing](tracing.md)
 - [Profiling](profiling.md)
 - [Planner Logging Schema](planner-logging.md)
+- [VLA Logging Schema](vla-logging.md)
 - [Roadmap](../limitations-roadmap.md)

@@ -19,7 +19,10 @@ enum class node_kind {
     succeed,
     fail,
     running,
-    plan_action
+    plan_action,
+    vla_request,
+    vla_wait,
+    vla_cancel
 };
 
 enum class arg_kind {

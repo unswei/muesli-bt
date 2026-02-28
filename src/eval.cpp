@@ -509,6 +509,8 @@ value eval(value expr, env_ptr scope) {
         case value_type::rng:
         case value_type::bt_def:
         case value_type::bt_instance:
+        case value_type::image_handle:
+        case value_type::blob_handle:
             return expr;
         case value_type::symbol:
             return lookup(scope, symbol_name(expr));

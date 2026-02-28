@@ -21,6 +21,16 @@ Each `plan-action` tick does:
 6. write action to blackboard
 7. optionally write compact planning metadata
 
+## Hybrid Patterns
+
+Common combinations with async VLA nodes:
+
+1. VLA intent -> planner refinement: `vla-wait` writes a prior/goal key, then `plan-action` reads it.
+2. VLA prior sampler: set planner sampler to `"vla_mixture"` with `action_prior_mean`.
+3. Planner-first fallback: run `plan-action` in one branch and keep a VLA request/wait branch for recovery.
+
+`plan-action` accepts `:prior_key`, `:prior_sigma`, and `:prior_mix` for prior-guided sampling.
+
 ## Typical Tree Shape
 
 ```lisp
@@ -44,4 +54,5 @@ Each `plan-action` tick does:
 
 - [PlanAction Node Reference](plan-action-node.md)
 - [Planner Configuration Reference](planner-configuration.md)
+- [VLA Integration In BTs](vla-integration.md)
 - [Planner Logging Schema](../observability/planner-logging.md)

@@ -8,6 +8,7 @@
 
 #include "bt/blackboard.hpp"
 #include "bt/planner.hpp"
+#include "bt/vla.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
@@ -205,6 +206,359 @@ std::string plan_meta_to_json(const planner_result& result, const planner_reques
     return out.str();
 }
 
+double clamp_confidence(double value) {
+    if (!std::isfinite(value)) {
+        return 0.0;
+    }
+    return std::clamp(value, 0.0, 1.0);
+}
+
+std::int64_t ms_since_epoch(std::chrono::steady_clock::time_point tp) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
+}
+
+std::string json_escape(std::string_view text) {
+    std::string out;
+    out.reserve(text.size() + 8);
+    for (char c : text) {
+        switch (c) {
+            case '\\':
+                out += "\\\\";
+                break;
+            case '"':
+                out += "\\\"";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            case '\r':
+                out += "\\r";
+                break;
+            case '\t':
+                out += "\\t";
+                break;
+            default:
+                out.push_back(c);
+                break;
+        }
+    }
+    return out;
+}
+
+std::string vla_action_to_json(const vla_action& action) {
+    std::ostringstream out;
+    out << "{\"type\":\"" << vla_action_type_name(action.type) << "\"";
+    if (action.type == vla_action_type::continuous) {
+        out << ",\"u\":[";
+        for (std::size_t i = 0; i < action.u.size(); ++i) {
+            if (i != 0) {
+                out << ',';
+            }
+            out << action.u[i];
+        }
+        out << ']';
+    } else if (action.type == vla_action_type::discrete) {
+        out << ",\"id\":\"" << json_escape(action.discrete_id) << "\"";
+    } else {
+        out << ",\"steps\":[";
+        for (std::size_t i = 0; i < action.steps.size(); ++i) {
+            if (i != 0) {
+                out << ',';
+            }
+            out << vla_action_to_json(action.steps[i]);
+        }
+        out << ']';
+    }
+    out << '}';
+    return out.str();
+}
+
+std::string vla_poll_meta_json(const vla_poll& poll) {
+    std::ostringstream out;
+    out << '{' << "\"status\":\"" << vla_job_status_name(poll.status) << "\"";
+    if (poll.partial.has_value()) {
+        out << ",\"partial\":{\"sequence\":" << poll.partial->sequence << ",\"confidence\":" << poll.partial->confidence;
+        if (!poll.partial->text_chunk.empty()) {
+            out << ",\"text_chunk\":\"" << json_escape(poll.partial->text_chunk) << "\"";
+        }
+        if (poll.partial->action_candidate.has_value()) {
+            out << ",\"action_candidate\":" << vla_action_to_json(*poll.partial->action_candidate);
+        }
+        out << '}';
+    }
+    if (poll.final.has_value()) {
+        out << ",\"final\":{\"status\":\"" << vla_status_name(poll.final->status) << "\",\"confidence\":" << poll.final->confidence
+            << ",\"model\":{\"name\":\"" << json_escape(poll.final->model.name) << "\",\"version\":\""
+            << json_escape(poll.final->model.version) << "\"}";
+        if (!poll.final->explanation.empty()) {
+            out << ",\"explanation\":\"" << json_escape(poll.final->explanation) << "\"";
+        }
+        out << ",\"action\":" << vla_action_to_json(poll.final->action) << '}';
+    }
+    out << '}';
+    return out.str();
+}
+
+bool parse_bool_arg(const muslisp::value& v, const std::string& where) {
+    if (!muslisp::is_boolean(v)) {
+        throw bt_runtime_error(where + ": expected boolean");
+    }
+    return muslisp::boolean_value(v);
+}
+
+std::optional<std::uint64_t> seed_from_lisp_arg(const muslisp::value& v) {
+    if (muslisp::is_integer(v)) {
+        const std::int64_t raw = muslisp::integer_value(v);
+        if (raw < 0) {
+            return std::nullopt;
+        }
+        return static_cast<std::uint64_t>(raw);
+    }
+    if (muslisp::is_float(v)) {
+        const double raw = muslisp::float_value(v);
+        if (!std::isfinite(raw) || raw < 0.0) {
+            return std::nullopt;
+        }
+        return static_cast<std::uint64_t>(raw);
+    }
+    if (muslisp::is_symbol(v)) {
+        return vla_service::hash64(muslisp::symbol_name(v));
+    }
+    if (muslisp::is_string(v)) {
+        return vla_service::hash64(muslisp::string_value(v));
+    }
+    return std::nullopt;
+}
+
+std::optional<image_handle_ref> image_from_blackboard(const bb_value& value) {
+    if (const auto* image = std::get_if<image_handle_ref>(&value)) {
+        return *image;
+    }
+    return std::nullopt;
+}
+
+std::optional<blob_handle_ref> blob_from_blackboard(const bb_value& value) {
+    if (const auto* blob = std::get_if<blob_handle_ref>(&value)) {
+        return *blob;
+    }
+    return std::nullopt;
+}
+
+bool action_is_finite(const vla_action& action) {
+    if (action.type == vla_action_type::continuous) {
+        for (double u : action.u) {
+            if (!std::isfinite(u)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    if (action.type == vla_action_type::sequence) {
+        for (const vla_action& step : action.steps) {
+            if (!action_is_finite(step)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bb_value action_to_blackboard(const vla_action& action) {
+    if (action.type == vla_action_type::continuous) {
+        if (action.u.size() == 1) {
+            return bb_value{action.u[0]};
+        }
+        return bb_value{action.u};
+    }
+    if (action.type == vla_action_type::discrete) {
+        return bb_value{action.discrete_id};
+    }
+    return bb_value{vla_action_to_json(action)};
+}
+
+struct vla_request_options {
+    std::string node_name;
+    std::string job_key;
+    std::string instruction;
+    std::string instruction_key = "instruction";
+    std::string task_id = "task";
+    std::string task_id_key;
+    std::string state_key = "state";
+    std::string image_key;
+    std::string blob_key;
+    std::string capability = "vla.rt2";
+    std::string model_name = "rt2-stub";
+    std::string model_version = "stub-1";
+    std::string frame_id = "base";
+    std::int64_t deadline_ms = 20;
+    std::int64_t dims = 0;
+    double bound_lo = -1.0;
+    double bound_hi = 1.0;
+    double max_abs = 1.0;
+    double max_delta = 1.0;
+    std::optional<std::pair<double, double>> forbidden_range{};
+    std::string seed_key;
+    std::optional<std::uint64_t> fixed_seed{};
+};
+
+struct vla_wait_options {
+    std::string node_name;
+    std::string job_key;
+    std::string action_key = "action";
+    std::string meta_key;
+    double early_confidence = 1.1;
+    bool early_commit = false;
+    bool cancel_on_early_commit = true;
+    bool clear_job = true;
+};
+
+struct vla_cancel_options {
+    std::string node_name;
+    std::string job_key;
+};
+
+vla_request_options parse_vla_request_options(const node& n, const std::vector<muslisp::value>& args) {
+    vla_request_options opts;
+    opts.node_name = n.leaf_name.empty() ? ("vla-request-" + std::to_string(n.id)) : n.leaf_name;
+    opts.job_key = opts.node_name + ".job_id";
+
+    for (std::size_t i = 0; i < args.size(); i += 2) {
+        const std::string raw_key = arg_as_text(args[i], "vla-request");
+        const std::string key = normalize_plan_option(raw_key);
+        const muslisp::value value = args[i + 1];
+
+        if (key == "name") {
+            opts.node_name = arg_as_text(value, "vla-request :name");
+            opts.job_key = opts.node_name + ".job_id";
+        } else if (key == "job_key") {
+            opts.job_key = arg_as_text(value, "vla-request :job_key");
+        } else if (key == "instruction") {
+            opts.instruction = arg_as_text(value, "vla-request :instruction");
+        } else if (key == "instruction_key") {
+            opts.instruction_key = arg_as_text(value, "vla-request :instruction_key");
+        } else if (key == "task_id") {
+            opts.task_id = arg_as_text(value, "vla-request :task_id");
+        } else if (key == "task_key") {
+            opts.task_id_key = arg_as_text(value, "vla-request :task_key");
+        } else if (key == "state_key") {
+            opts.state_key = arg_as_text(value, "vla-request :state_key");
+        } else if (key == "image_key") {
+            opts.image_key = arg_as_text(value, "vla-request :image_key");
+        } else if (key == "blob_key") {
+            opts.blob_key = arg_as_text(value, "vla-request :blob_key");
+        } else if (key == "capability") {
+            opts.capability = arg_as_text(value, "vla-request :capability");
+        } else if (key == "model_name") {
+            opts.model_name = arg_as_text(value, "vla-request :model_name");
+        } else if (key == "model_version") {
+            opts.model_version = arg_as_text(value, "vla-request :model_version");
+        } else if (key == "frame_id") {
+            opts.frame_id = arg_as_text(value, "vla-request :frame_id");
+        } else if (key == "deadline_ms" || key == "budget_ms") {
+            opts.deadline_ms = arg_as_int(value, "vla-request :deadline_ms");
+        } else if (key == "dims") {
+            opts.dims = arg_as_int(value, "vla-request :dims");
+        } else if (key == "bound_lo") {
+            opts.bound_lo = arg_as_number(value, "vla-request :bound_lo");
+        } else if (key == "bound_hi") {
+            opts.bound_hi = arg_as_number(value, "vla-request :bound_hi");
+        } else if (key == "max_abs") {
+            opts.max_abs = arg_as_number(value, "vla-request :max_abs");
+        } else if (key == "max_delta") {
+            opts.max_delta = arg_as_number(value, "vla-request :max_delta");
+        } else if (key == "forbidden_lo") {
+            const double lo = arg_as_number(value, "vla-request :forbidden_lo");
+            if (!opts.forbidden_range.has_value()) {
+                opts.forbidden_range = std::make_pair(lo, lo);
+            } else {
+                opts.forbidden_range->first = lo;
+            }
+        } else if (key == "forbidden_hi") {
+            const double hi = arg_as_number(value, "vla-request :forbidden_hi");
+            if (!opts.forbidden_range.has_value()) {
+                opts.forbidden_range = std::make_pair(hi, hi);
+            } else {
+                opts.forbidden_range->second = hi;
+            }
+        } else if (key == "seed_key") {
+            opts.seed_key = arg_as_text(value, "vla-request :seed_key");
+        } else if (key == "seed") {
+            const std::optional<std::uint64_t> seed = seed_from_lisp_arg(value);
+            if (!seed.has_value()) {
+                throw bt_runtime_error("vla-request :seed: expected non-negative numeric/string/symbol");
+            }
+            opts.fixed_seed = seed;
+        } else {
+            throw bt_runtime_error("vla-request: unknown option: " + raw_key);
+        }
+    }
+
+    return opts;
+}
+
+vla_wait_options parse_vla_wait_options(const node& n, const std::vector<muslisp::value>& args) {
+    vla_wait_options opts;
+    opts.node_name = n.leaf_name.empty() ? ("vla-request-" + std::to_string(n.id)) : n.leaf_name;
+    opts.job_key = opts.node_name + ".job_id";
+
+    for (std::size_t i = 0; i < args.size(); i += 2) {
+        const std::string raw_key = arg_as_text(args[i], "vla-wait");
+        const std::string key = normalize_plan_option(raw_key);
+        const muslisp::value value = args[i + 1];
+
+        if (key == "name") {
+            opts.node_name = arg_as_text(value, "vla-wait :name");
+            opts.job_key = opts.node_name + ".job_id";
+        } else if (key == "job_key") {
+            opts.job_key = arg_as_text(value, "vla-wait :job_key");
+        } else if (key == "action_key") {
+            opts.action_key = arg_as_text(value, "vla-wait :action_key");
+        } else if (key == "meta_key") {
+            opts.meta_key = arg_as_text(value, "vla-wait :meta_key");
+        } else if (key == "early_confidence") {
+            opts.early_confidence = arg_as_number(value, "vla-wait :early_confidence");
+        } else if (key == "early_commit") {
+            opts.early_commit = parse_bool_arg(value, "vla-wait :early_commit");
+        } else if (key == "cancel_on_early_commit") {
+            opts.cancel_on_early_commit = parse_bool_arg(value, "vla-wait :cancel_on_early_commit");
+        } else if (key == "clear_job") {
+            opts.clear_job = parse_bool_arg(value, "vla-wait :clear_job");
+        } else {
+            throw bt_runtime_error("vla-wait: unknown option: " + raw_key);
+        }
+    }
+    return opts;
+}
+
+vla_cancel_options parse_vla_cancel_options(const node& n, const std::vector<muslisp::value>& args) {
+    vla_cancel_options opts;
+    opts.node_name = n.leaf_name.empty() ? ("vla-request-" + std::to_string(n.id)) : n.leaf_name;
+    opts.job_key = opts.node_name + ".job_id";
+
+    for (std::size_t i = 0; i < args.size(); i += 2) {
+        const std::string raw_key = arg_as_text(args[i], "vla-cancel");
+        const std::string key = normalize_plan_option(raw_key);
+        const muslisp::value value = args[i + 1];
+
+        if (key == "name") {
+            opts.node_name = arg_as_text(value, "vla-cancel :name");
+            opts.job_key = opts.node_name + ".job_id";
+        } else if (key == "job_key") {
+            opts.job_key = arg_as_text(value, "vla-cancel :job_key");
+        } else {
+            throw bt_runtime_error("vla-cancel: unknown option: " + raw_key);
+        }
+    }
+    return opts;
+}
+
+void clear_job_key_if_present(tick_context& ctx, const std::string& key, const std::string& writer_name) {
+    const bb_entry* existing = ctx.bb_get(key);
+    if (existing) {
+        ctx.bb_put(key, bb_value{std::monostate{}}, writer_name);
+    }
+}
+
 class tick_scope {
 public:
     tick_scope(tick_context& ctx, std::chrono::steady_clock::time_point started_at) : ctx_(ctx), started_at_(started_at) {}
@@ -308,6 +662,7 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
     std::string model_service = "toy-1d";
     std::string meta_key;
     std::string seed_key;
+    std::string prior_key;
 
     for (std::size_t i = 0; i < args.size(); i += 2) {
         const std::string raw_key = arg_as_text(args[i], "plan-action");
@@ -378,6 +733,18 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
             request.config.action_sampler = arg_as_text(value, "plan-action :action_sampler");
             continue;
         }
+        if (key == "prior_key") {
+            prior_key = arg_as_text(value, "plan-action :prior_key");
+            continue;
+        }
+        if (key == "prior_sigma") {
+            request.config.action_prior_sigma = arg_as_number(value, "plan-action :prior_sigma");
+            continue;
+        }
+        if (key == "prior_mix") {
+            request.config.action_prior_mix = arg_as_number(value, "plan-action :prior_mix");
+            continue;
+        }
         if (key == "top_k") {
             request.config.top_k = arg_as_int(value, "plan-action :top_k");
             continue;
@@ -408,6 +775,20 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
         emit_trace(ctx, std::move(ev));
         emit_log(ctx, log_level::error, "planner", e.what());
         return status::failure;
+    }
+
+    if (!prior_key.empty()) {
+        const bb_entry* prior_entry = ctx.bb_get(prior_key);
+        if (prior_entry) {
+            try {
+                request.config.action_prior_mean = state_from_blackboard(prior_entry->value, "plan-action prior");
+                if (!request.config.action_prior_mean.empty()) {
+                    request.config.action_sampler = "vla_mixture";
+                }
+            } catch (const std::exception&) {
+                // Ignore prior parse failures and keep default sampler.
+            }
+        }
     }
 
     bool has_explicit_seed = false;
@@ -479,6 +860,267 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
         << " time_ms=" << result.stats.time_used_ms;
     emit_log(ctx, log_level::info, "planner", msg.str());
 
+    return status::success;
+}
+
+status execute_vla_request(const node& n, tick_context& ctx, const std::vector<muslisp::value>& args) {
+    if (!ctx.svc.vla) {
+        trace_event ev = make_trace_event(trace_event_kind::error);
+        ev.node = n.id;
+        ev.message = "vla-request: VLA service is not available";
+        emit_trace(ctx, std::move(ev));
+        emit_log(ctx, log_level::error, "vla", "vla-request: VLA service is not available");
+        return status::failure;
+    }
+
+    const vla_request_options opts = parse_vla_request_options(n, args);
+
+    if (const bb_entry* existing = ctx.bb_get(opts.job_key); existing) {
+        if (const auto* existing_id = std::get_if<std::int64_t>(&existing->value); existing_id && *existing_id > 0) {
+            return status::running;
+        }
+    }
+
+    const bb_entry* state_entry = ctx.bb_get(opts.state_key);
+    if (!state_entry) {
+        emit_log(ctx, log_level::error, "vla", "vla-request: missing state key: " + opts.state_key);
+        return status::failure;
+    }
+
+    planner_vector state;
+    try {
+        state = state_from_blackboard(state_entry->value, "vla-request state");
+    } catch (const std::exception& e) {
+        emit_log(ctx, log_level::error, "vla", std::string("vla-request: invalid state: ") + e.what());
+        return status::failure;
+    }
+    if (state.empty()) {
+        emit_log(ctx, log_level::error, "vla", "vla-request: state must not be empty");
+        return status::failure;
+    }
+
+    std::string instruction = opts.instruction;
+    if (instruction.empty()) {
+        const bb_entry* instruction_entry = ctx.bb_get(opts.instruction_key);
+        if (!instruction_entry) {
+            emit_log(ctx, log_level::error, "vla", "vla-request: missing instruction key: " + opts.instruction_key);
+            return status::failure;
+        }
+        if (const auto* s = std::get_if<std::string>(&instruction_entry->value)) {
+            instruction = *s;
+        } else {
+            emit_log(ctx, log_level::error, "vla", "vla-request: instruction must be string");
+            return status::failure;
+        }
+    }
+
+    std::string task_id = opts.task_id;
+    if (!opts.task_id_key.empty()) {
+        const bb_entry* task_entry = ctx.bb_get(opts.task_id_key);
+        if (task_entry) {
+            if (const auto* s = std::get_if<std::string>(&task_entry->value)) {
+                task_id = *s;
+            } else if (const auto* i = std::get_if<std::int64_t>(&task_entry->value)) {
+                task_id = std::to_string(*i);
+            } else {
+                emit_log(ctx, log_level::error, "vla", "vla-request: task_key must map to string or int");
+                return status::failure;
+            }
+        }
+    }
+
+    const std::int64_t dims = (opts.dims > 0) ? opts.dims : static_cast<std::int64_t>(state.size());
+    if (dims <= 0) {
+        emit_log(ctx, log_level::error, "vla", "vla-request: dims must be > 0");
+        return status::failure;
+    }
+    if (!std::isfinite(opts.bound_lo) || !std::isfinite(opts.bound_hi) || opts.bound_lo > opts.bound_hi) {
+        emit_log(ctx, log_level::error, "vla", "vla-request: invalid bounds");
+        return status::failure;
+    }
+    if (opts.deadline_ms <= 0) {
+        emit_log(ctx, log_level::error, "vla", "vla-request: deadline_ms must be > 0");
+        return status::failure;
+    }
+
+    vla_request request;
+    request.capability = opts.capability;
+    request.task_id = task_id;
+    request.instruction = instruction;
+    request.deadline_ms = opts.deadline_ms;
+    request.model.name = opts.model_name;
+    request.model.version = opts.model_version;
+    request.node_name = opts.node_name;
+    request.run_id = "inst-" + std::to_string(ctx.inst.instance_handle);
+    request.tick_index = ctx.tick_index;
+    request.action_space.type = "continuous";
+    request.action_space.dims = dims;
+    request.action_space.bounds.assign(static_cast<std::size_t>(dims), {opts.bound_lo, opts.bound_hi});
+    request.constraints.max_abs_value = std::max(0.0, opts.max_abs);
+    request.constraints.max_delta = std::max(0.0, opts.max_delta);
+    if (opts.forbidden_range.has_value()) {
+        if (opts.forbidden_range->first > opts.forbidden_range->second) {
+            emit_log(ctx, log_level::error, "vla", "vla-request: forbidden range must be ordered");
+            return status::failure;
+        }
+        request.constraints.forbidden_ranges.push_back(*opts.forbidden_range);
+    }
+
+    request.observation.state = state;
+    request.observation.frame_id = opts.frame_id;
+    request.observation.timestamp_ms = ms_since_epoch(state_entry->last_write_ts);
+
+    if (!opts.image_key.empty()) {
+        const bb_entry* image_entry = ctx.bb_get(opts.image_key);
+        if (!image_entry) {
+            emit_log(ctx, log_level::error, "vla", "vla-request: missing image key: " + opts.image_key);
+            return status::failure;
+        }
+        const std::optional<image_handle_ref> image = image_from_blackboard(image_entry->value);
+        if (!image.has_value()) {
+            emit_log(ctx, log_level::error, "vla", "vla-request: image key does not hold image_handle");
+            return status::failure;
+        }
+        request.observation.image = *image;
+    }
+
+    if (!opts.blob_key.empty()) {
+        const bb_entry* blob_entry = ctx.bb_get(opts.blob_key);
+        if (!blob_entry) {
+            emit_log(ctx, log_level::error, "vla", "vla-request: missing blob key: " + opts.blob_key);
+            return status::failure;
+        }
+        const std::optional<blob_handle_ref> blob = blob_from_blackboard(blob_entry->value);
+        if (!blob.has_value()) {
+            emit_log(ctx, log_level::error, "vla", "vla-request: blob key does not hold blob_handle");
+            return status::failure;
+        }
+        request.observation.blob = *blob;
+    }
+
+    if (opts.fixed_seed.has_value()) {
+        request.seed = *opts.fixed_seed;
+    }
+    if (!opts.seed_key.empty()) {
+        const bb_entry* seed_entry = ctx.bb_get(opts.seed_key);
+        if (seed_entry) {
+            const std::optional<std::uint64_t> seeded = seed_from_blackboard(seed_entry->value);
+            if (seeded.has_value()) {
+                request.seed = *seeded;
+            }
+        }
+    }
+    if (!request.seed.has_value()) {
+        request.seed = vla_service::hash64(request.run_id + "::" + request.node_name + "::" + std::to_string(ctx.tick_index));
+    }
+
+    const vla_service::vla_job_id id = ctx.svc.vla->submit(request);
+    ctx.bb_put(opts.job_key, bb_value{static_cast<std::int64_t>(id)}, opts.node_name);
+
+    std::ostringstream msg;
+    msg << "submitted job=" << id << " capability=" << request.capability << " model=" << request.model.name
+        << " deadline_ms=" << request.deadline_ms;
+    emit_log(ctx, log_level::info, "vla", msg.str());
+    return status::running;
+}
+
+status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<muslisp::value>& args) {
+    if (!ctx.svc.vla) {
+        emit_log(ctx, log_level::error, "vla", "vla-wait: VLA service is not available");
+        return status::failure;
+    }
+
+    const vla_wait_options opts = parse_vla_wait_options(n, args);
+
+    const bb_entry* job_entry = ctx.bb_get(opts.job_key);
+    if (!job_entry) {
+        emit_log(ctx, log_level::error, "vla", "vla-wait: missing job key: " + opts.job_key);
+        return status::failure;
+    }
+    const auto* id_raw = std::get_if<std::int64_t>(&job_entry->value);
+    if (!id_raw || *id_raw <= 0) {
+        emit_log(ctx, log_level::error, "vla", "vla-wait: job key does not hold a valid job id");
+        return status::failure;
+    }
+
+    const auto id = static_cast<vla_service::vla_job_id>(*id_raw);
+    const vla_poll poll = ctx.svc.vla->poll(id);
+
+    if (!opts.meta_key.empty()) {
+        ctx.bb_put(opts.meta_key, bb_value{vla_poll_meta_json(poll)}, opts.node_name);
+    }
+
+    if ((poll.status == vla_job_status::queued || poll.status == vla_job_status::running ||
+         poll.status == vla_job_status::streaming) &&
+        opts.early_commit && poll.partial.has_value() && poll.partial->action_candidate.has_value() &&
+        clamp_confidence(poll.partial->confidence) >= opts.early_confidence && action_is_finite(*poll.partial->action_candidate)) {
+        ctx.bb_put(opts.action_key, action_to_blackboard(*poll.partial->action_candidate), opts.node_name);
+        if (opts.cancel_on_early_commit) {
+            (void)ctx.svc.vla->cancel(id);
+        }
+        if (opts.clear_job) {
+            clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+        }
+        emit_log(ctx,
+                 log_level::info,
+                 "vla",
+                 "vla-wait: early-committed partial action with confidence=" + std::to_string(poll.partial->confidence));
+        return status::success;
+    }
+
+    if (poll.status == vla_job_status::queued || poll.status == vla_job_status::running || poll.status == vla_job_status::streaming) {
+        return status::running;
+    }
+
+    if (poll.status == vla_job_status::done && poll.final.has_value() && poll.final->status == vla_status::ok &&
+        action_is_finite(poll.final->action)) {
+        ctx.bb_put(opts.action_key, action_to_blackboard(poll.final->action), opts.node_name);
+        if (opts.clear_job) {
+            clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+        }
+        emit_log(ctx, log_level::info, "vla", "vla-wait: committed final action");
+        return status::success;
+    }
+
+    if (opts.clear_job) {
+        clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+    }
+
+    std::string failure_reason = "vla-wait: job failed";
+    if (poll.final.has_value()) {
+        failure_reason = "vla-wait: status=" + std::string(vla_status_name(poll.final->status));
+        if (!poll.final->explanation.empty()) {
+            failure_reason += " ";
+            failure_reason += poll.final->explanation;
+        }
+    } else {
+        failure_reason = "vla-wait: job status=" + std::string(vla_job_status_name(poll.status));
+    }
+    emit_log(ctx, log_level::warn, "vla", failure_reason);
+    return status::failure;
+}
+
+status execute_vla_cancel(const node& n, tick_context& ctx, const std::vector<muslisp::value>& args) {
+    if (!ctx.svc.vla) {
+        emit_log(ctx, log_level::error, "vla", "vla-cancel: VLA service is not available");
+        return status::failure;
+    }
+
+    const vla_cancel_options opts = parse_vla_cancel_options(n, args);
+    const bb_entry* job_entry = ctx.bb_get(opts.job_key);
+    if (!job_entry) {
+        return status::success;
+    }
+    const auto* id_raw = std::get_if<std::int64_t>(&job_entry->value);
+    if (!id_raw || *id_raw <= 0) {
+        clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+        return status::success;
+    }
+
+    const auto id = static_cast<vla_service::vla_job_id>(*id_raw);
+    (void)ctx.svc.vla->cancel(id);
+    clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+    emit_log(ctx, log_level::info, "vla", "vla-cancel: cancelled job=" + std::to_string(id));
     return status::success;
 }
 
@@ -648,6 +1290,54 @@ status tick_node(node_id id, tick_context& ctx) {
                 ev.message = std::string("plan-action failed: ") + e.what();
                 emit_trace(ctx, std::move(ev));
                 emit_log(ctx, log_level::error, "planner", std::string("plan-action failed: ") + e.what());
+                return finalize(status::failure);
+            }
+        }
+
+        case node_kind::vla_request: {
+            std::vector<muslisp::value> args;
+            args.reserve(n.args.size());
+            muslisp::gc_root_scope roots(muslisp::default_gc());
+            for (const arg_value& compiled : n.args) {
+                args.push_back(materialize_arg(compiled));
+                roots.add(&args.back());
+            }
+            try {
+                return finalize(execute_vla_request(n, ctx, args));
+            } catch (const std::exception& e) {
+                emit_log(ctx, log_level::error, "vla", std::string("vla-request failed: ") + e.what());
+                return finalize(status::failure);
+            }
+        }
+
+        case node_kind::vla_wait: {
+            std::vector<muslisp::value> args;
+            args.reserve(n.args.size());
+            muslisp::gc_root_scope roots(muslisp::default_gc());
+            for (const arg_value& compiled : n.args) {
+                args.push_back(materialize_arg(compiled));
+                roots.add(&args.back());
+            }
+            try {
+                return finalize(execute_vla_wait(n, ctx, args));
+            } catch (const std::exception& e) {
+                emit_log(ctx, log_level::error, "vla", std::string("vla-wait failed: ") + e.what());
+                return finalize(status::failure);
+            }
+        }
+
+        case node_kind::vla_cancel: {
+            std::vector<muslisp::value> args;
+            args.reserve(n.args.size());
+            muslisp::gc_root_scope roots(muslisp::default_gc());
+            for (const arg_value& compiled : n.args) {
+                args.push_back(materialize_arg(compiled));
+                roots.add(&args.back());
+            }
+            try {
+                return finalize(execute_vla_cancel(n, ctx, args));
+            } catch (const std::exception& e) {
+                emit_log(ctx, log_level::error, "vla", std::string("vla-cancel failed: ") + e.what());
                 return finalize(status::failure);
             }
         }

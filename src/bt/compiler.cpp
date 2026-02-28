@@ -111,6 +111,24 @@ public:
             return emit_node(std::move(n));
         }
 
+        if (form_name == "vla-request" || form_name == "vla-wait" || form_name == "vla-cancel") {
+            if ((items.size() % 2u) == 0u) {
+                throw bt_compile_error(form_name + ": expected key/value pairs");
+            }
+            node n;
+            if (form_name == "vla-request") {
+                n.kind = node_kind::vla_request;
+            } else if (form_name == "vla-wait") {
+                n.kind = node_kind::vla_wait;
+            } else {
+                n.kind = node_kind::vla_cancel;
+            }
+            for (std::size_t i = 1; i < items.size(); ++i) {
+                n.args.push_back(compile_arg(items[i]));
+            }
+            return emit_node(std::move(n));
+        }
+
         throw bt_compile_error("unknown BT form: " + form_name);
     }
 

@@ -24,7 +24,7 @@ Each tick evaluates from the root and returns one status:
 
 - composites: control child flow (`seq`, `sel`)
 - decorators: transform child outcomes (`invert`, `repeat`, `retry`)
-- leaves: host callbacks (`cond`, `act`) and bounded-time planning (`plan-action`)
+- leaves: host callbacks (`cond`, `act`), bounded-time planning (`plan-action`), and async VLA orchestration (`vla-request`, `vla-wait`, `vla-cancel`)
 
 This prepares you for the project BT DSL (domain-specific language) in [BT Syntax](syntax.md).
 
@@ -32,3 +32,9 @@ Authoring helpers are available:
 
 - `(bt ...)` compiles one DSL form
 - `(defbt name ...)` defines a compiled tree
+
+## See Also
+
+- [BT Syntax](syntax.md)
+- [Bounded-Time Planning](bounded-time-planning.md)
+- [VLA Integration In BTs](vla-integration.md)

@@ -25,6 +25,9 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] Bounded-time planning overview -> [page](bt/bounded-time-planning.md)
 - [x] PlanAction node reference -> [page](bt/plan-action-node.md)
 - [x] Planner configuration reference -> [page](bt/planner-configuration.md)
+- [x] VLA integration overview -> [page](bt/vla-integration.md)
+- [x] VLA BT nodes reference -> [page](bt/vla-nodes.md)
+- [x] VLA request/response schema -> [page](bt/vla-request-response.md)
 - [x] BT blackboard -> [page](bt/blackboard.md)
 - [x] BT scheduler -> [page](bt/scheduler.md)
 - [x] BT integration -> [page](bt/robot-integration.md)
@@ -32,6 +35,7 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] Logging -> [page](observability/logging.md)
 - [x] Profiling -> [page](observability/profiling.md)
 - [x] Planner logging schema -> [page](observability/planner-logging.md)
+- [x] VLA logging schema -> [page](observability/vla-logging.md)
 - [x] Architecture internals -> [page](internals/architecture.md)
 - [x] GC internals -> [page](internals/gc.md)
 - [x] Code map internals -> [page](internals/code-map.md)
@@ -69,6 +73,8 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `rng` -> [page](language/reference/data-types/rng.md)
 - [x] `bt_def` -> [page](language/reference/data-types/bt-def.md)
 - [x] `bt_instance` -> [page](language/reference/data-types/bt-instance.md)
+- [x] `image_handle` -> [page](language/reference/data-types/image-handle.md)
+- [x] `blob_handle` -> [page](language/reference/data-types/blob-handle.md)
 
 ## Built-ins
 ### Core list/pair operations
@@ -106,6 +112,10 @@ Audit language/runtime surfaces against code before updating this checklist:
 ### Time
 - [x] `time.now-ms` -> [page](language/reference/builtins/time/time-now-ms.md)
 
+### JSON
+- [x] `json.encode` -> [page](language/reference/builtins/json/json-encode.md)
+- [x] `json.decode` -> [page](language/reference/builtins/json/json-decode.md)
+
 ### Random number generation
 - [x] `rng.int` -> [page](language/reference/builtins/rng/rng-int.md)
 - [x] `rng.make` -> [page](language/reference/builtins/rng/rng-make.md)
@@ -119,6 +129,25 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `planner.set-base-seed` -> [page](language/reference/builtins/planner/planner-set-base-seed.md)
 - [x] `planner.set-log-enabled` -> [page](language/reference/builtins/planner/planner-set-log-enabled.md)
 - [x] `planner.set-log-path` -> [page](language/reference/builtins/planner/planner-set-log-path.md)
+
+### Capability services
+- [x] `cap.list` -> [page](language/reference/builtins/cap/cap-list.md)
+- [x] `cap.describe` -> [page](language/reference/builtins/cap/cap-describe.md)
+
+### Media handles
+- [x] `image.make` -> [page](language/reference/builtins/media/image-make.md)
+- [x] `image.info` -> [page](language/reference/builtins/media/image-info.md)
+- [x] `blob.make` -> [page](language/reference/builtins/media/blob-make.md)
+- [x] `blob.info` -> [page](language/reference/builtins/media/blob-info.md)
+
+### VLA async services
+- [x] `vla.submit` -> [page](language/reference/builtins/vla/vla-submit.md)
+- [x] `vla.poll` -> [page](language/reference/builtins/vla/vla-poll.md)
+- [x] `vla.cancel` -> [page](language/reference/builtins/vla/vla-cancel.md)
+- [x] `vla.logs.dump` -> [page](language/reference/builtins/vla/vla-logs-dump.md)
+- [x] `vla.set-log-path` -> [page](language/reference/builtins/vla/vla-set-log-path.md)
+- [x] `vla.set-log-enabled` -> [page](language/reference/builtins/vla/vla-set-log-enabled.md)
+- [x] `vla.clear-logs` -> [page](language/reference/builtins/vla/vla-clear-logs.md)
 
 ### Mutable vectors
 - [x] `vec.clear!` -> [page](language/reference/builtins/vec/vec-clear-bang.md)

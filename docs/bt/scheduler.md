@@ -16,6 +16,7 @@ This page describes how `bt.tick` and background scheduler work together in the 
 - scheduler job lifecycle tracking (`queued`, `running`, `done`, `failed`, `cancelled`)
 - scheduler counters/timings via `bt.scheduler.stats`
 - reference async leaf pattern via `async-sleep-ms`
+- VLA async jobs (`vla.submit` / `vla.poll` / `vla.cancel`) and BT VLA nodes
 
 ## Lisp-Facing Scheduler Surfaces
 
@@ -23,6 +24,7 @@ This page describes how `bt.tick` and background scheduler work together in the 
 | --- | --- | --- |
 | `(bt.scheduler.stats)` | View scheduler counters/timings | Global scheduler stats from runtime host |
 | `(act async-sleep-ms <ms>)` | Demo async action pattern | Returns `running` until job completes |
+| `(vla.submit req)` + `(vla.poll id)` | Capability-backed async policy calls | Non-blocking, scheduler-owned lifecycle |
 | `(bt.tick inst)` | Advance async leaves | Polling/reconciliation happens on tick |
 | `(bt.trace.snapshot inst)` | See scheduler events | Includes submit/start/finish/cancel events |
 

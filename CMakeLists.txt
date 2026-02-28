@@ -20,6 +20,7 @@ add_library(muesli_bt_core
     src/bt/serialisation.cpp
     src/bt/status.cpp
     src/bt/trace.cpp
+    src/bt/vla.cpp
     src/builtins.cpp
     src/env.cpp
     src/eval.cpp

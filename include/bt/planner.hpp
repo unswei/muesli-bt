@@ -65,6 +65,9 @@ struct planner_config {
     planner_vector fallback_action{};
     std::string rollout_policy = "model_default";
     std::string action_sampler = "model_default";
+    planner_vector action_prior_mean{};
+    double action_prior_sigma = 0.2;
+    double action_prior_mix = 0.5;
 };
 
 enum class planner_status {

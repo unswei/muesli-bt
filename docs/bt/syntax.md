@@ -77,6 +77,30 @@ Common keys:
 - `:meta_key`
 - `:seed_key`
 
+### `vla-request`
+
+```lisp
+(vla-request key value key value ...)
+```
+
+Submits a non-blocking VLA job and returns `running`.
+
+### `vla-wait`
+
+```lisp
+(vla-wait key value key value ...)
+```
+
+Polls a VLA job and returns `running` until a terminal status is available.
+
+### `vla-cancel`
+
+```lisp
+(vla-cancel key value key value ...)
+```
+
+Cancels an in-flight VLA job id.
+
 ## Decorators
 
 ### `invert`
@@ -135,3 +159,5 @@ Use DSL save/load when long-term portability is the priority.
 
 - [PlanAction Node Reference](plan-action-node.md)
 - [Planner Configuration Reference](planner-configuration.md)
+- [VLA BT Nodes](vla-nodes.md)
+- [VLA Integration In BTs](vla-integration.md)

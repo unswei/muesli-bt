@@ -12,11 +12,12 @@ This page tracks likely next areas of work. It is intentionally short and groupe
 
 - explicit leaf `halt` lifecycle for long-running actions
 - memoryful composites (`mem-seq`, `mem-sel`)
-- expanded blackboard schemas and host object handle support
+- stronger blackboard schema validation and typed contracts for complex leaves
 
 ## Integrations
 
 - richer host service adapters for production robotics systems
+- additional VLA backends beyond stub/replay capability adapters
 - dedicated ROS2 adapter surface and packaging
 - external telemetry/export integrations
 

@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cctype>
 #include <cstdint>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -17,6 +19,7 @@
 #include "bt/runtime_host.hpp"
 #include "bt/serialisation.hpp"
 #include "bt/status.hpp"
+#include "bt/vla.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
@@ -865,6 +868,12 @@ bt::bb_value to_bb_value(value v, const std::string& where) {
     if (is_string(v)) {
         return bt::bb_value{string_value(v)};
     }
+    if (is_image_handle(v)) {
+        return bt::bb_value{bt::image_handle_ref{.id = image_handle_id(v)}};
+    }
+    if (is_blob_handle(v)) {
+        return bt::bb_value{bt::blob_handle_ref{.id = blob_handle_id(v)}};
+    }
     if (is_proper_list(v)) {
         const std::vector<value> items = vector_from_list(v);
         std::vector<double> out;
@@ -986,6 +995,689 @@ void map_set_symbol(value map_obj, const std::string& key_name, value v) {
     map_obj->map_data[symbol_key(key_name)] = v;
 }
 
+std::string require_text_value(value v, const std::string& where) {
+    if (is_string(v)) {
+        return string_value(v);
+    }
+    if (is_symbol(v)) {
+        return symbol_name(v);
+    }
+    throw lisp_error(where + ": expected string or symbol");
+}
+
+std::int64_t require_non_negative_int(value v, const std::string& where) {
+    const std::int64_t out = require_int_arg(v, where);
+    if (out < 0) {
+        throw lisp_error(where + ": expected non-negative integer");
+    }
+    return out;
+}
+
+std::string map_lookup_text_or(value map_obj, const std::string& key, std::string default_value, const std::string& where) {
+    const std::optional<value> found = map_lookup_option(map_obj, key);
+    if (!found.has_value()) {
+        return default_value;
+    }
+    return require_text_value(*found, where);
+}
+
+std::int64_t map_lookup_int_or(value map_obj, const std::string& key, std::int64_t default_value, const std::string& where) {
+    const std::optional<value> found = map_lookup_option(map_obj, key);
+    if (!found.has_value()) {
+        return default_value;
+    }
+    return require_int_arg(*found, where);
+}
+
+double map_lookup_number_or(value map_obj, const std::string& key, double default_value, const std::string& where) {
+    const std::optional<value> found = map_lookup_option(map_obj, key);
+    if (!found.has_value()) {
+        return default_value;
+    }
+    return require_number_value(*found, where);
+}
+
+std::vector<std::pair<double, double>> lisp_to_bounds(value v, const std::string& where) {
+    if (!is_proper_list(v)) {
+        throw lisp_error(where + ": expected list of [lo hi] pairs");
+    }
+    const std::vector<value> rows = vector_from_list(v);
+    std::vector<std::pair<double, double>> out;
+    out.reserve(rows.size());
+    for (value row : rows) {
+        if (!is_proper_list(row)) {
+            throw lisp_error(where + ": bounds row must be a 2-item list");
+        }
+        const std::vector<value> pair = vector_from_list(row);
+        if (pair.size() != 2) {
+            throw lisp_error(where + ": each bounds row must have exactly 2 items");
+        }
+        const double lo = require_number_value(pair[0], where);
+        const double hi = require_number_value(pair[1], where);
+        if (!std::isfinite(lo) || !std::isfinite(hi) || lo > hi) {
+            throw lisp_error(where + ": bounds values must be finite and ordered");
+        }
+        out.emplace_back(lo, hi);
+    }
+    return out;
+}
+
+std::vector<std::string> lisp_to_text_list(value v, const std::string& where) {
+    if (!is_proper_list(v)) {
+        throw lisp_error(where + ": expected list");
+    }
+    const std::vector<value> rows = vector_from_list(v);
+    std::vector<std::string> out;
+    out.reserve(rows.size());
+    for (value row : rows) {
+        out.push_back(require_text_value(row, where));
+    }
+    return out;
+}
+
+value keyword_symbol(std::string_view name) {
+    return make_symbol(std::string(":") + std::string(name));
+}
+
+value vla_job_status_symbol(bt::vla_job_status st) {
+    return keyword_symbol(bt::vla_job_status_name(st));
+}
+
+value vla_status_symbol(bt::vla_status st) {
+    return keyword_symbol(bt::vla_status_name(st));
+}
+
+value doubles_map_to_lisp_map(const std::unordered_map<std::string, double>& stats) {
+    value out = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&out);
+    for (const auto& [k, v] : stats) {
+        value vv = make_float(v);
+        roots.add(&vv);
+        map_set_symbol(out, k, vv);
+    }
+    return out;
+}
+
+value vla_action_to_lisp(const bt::vla_action& action) {
+    value out = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&out);
+    map_set_symbol(out, "type", keyword_symbol(bt::vla_action_type_name(action.type)));
+    if (action.type == bt::vla_action_type::continuous) {
+        value u = numeric_vector_to_lisp_list(action.u);
+        roots.add(&u);
+        map_set_symbol(out, "u", u);
+    } else if (action.type == bt::vla_action_type::discrete) {
+        value id = make_string(action.discrete_id);
+        roots.add(&id);
+        map_set_symbol(out, "id", id);
+    } else {
+        std::vector<value> steps;
+        steps.reserve(action.steps.size());
+        for (const auto& s : action.steps) {
+            value step = vla_action_to_lisp(s);
+            roots.add(&step);
+            steps.push_back(step);
+            roots.add(&steps.back());
+        }
+        value steps_list = list_from_vector(steps);
+        roots.add(&steps_list);
+        map_set_symbol(out, "steps", steps_list);
+    }
+    return out;
+}
+
+value vla_response_to_lisp(const bt::vla_response& response) {
+    value out = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&out);
+    map_set_symbol(out, "status", vla_status_symbol(response.status));
+
+    value action = vla_action_to_lisp(response.action);
+    roots.add(&action);
+    map_set_symbol(out, "action", action);
+    map_set_symbol(out, "confidence", make_float(response.confidence));
+
+    value model = make_map();
+    roots.add(&model);
+    map_set_symbol(model, "name", make_string(response.model.name));
+    map_set_symbol(model, "version", make_string(response.model.version));
+    map_set_symbol(out, "model", model);
+
+    if (!response.explanation.empty()) {
+        map_set_symbol(out, "explanation", make_string(response.explanation));
+    }
+
+    value stats = doubles_map_to_lisp_map(response.stats);
+    roots.add(&stats);
+    map_set_symbol(out, "stats", stats);
+    return out;
+}
+
+std::string json_escape(std::string_view input) {
+    std::string out;
+    out.reserve(input.size() + 8);
+    for (char c : input) {
+        switch (c) {
+            case '\\':
+                out += "\\\\";
+                break;
+            case '"':
+                out += "\\\"";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            case '\r':
+                out += "\\r";
+                break;
+            case '\t':
+                out += "\\t";
+                break;
+            default:
+                out.push_back(c);
+                break;
+        }
+    }
+    return out;
+}
+
+std::string map_key_to_json_object_key(const map_key& key) {
+    switch (key.type) {
+        case map_key_type::symbol:
+        case map_key_type::string:
+            return key.text_data;
+        case map_key_type::integer:
+            return std::to_string(key.integer_data);
+        case map_key_type::floating: {
+            std::ostringstream out;
+            out << key.float_data;
+            return out.str();
+        }
+    }
+    return "";
+}
+
+std::string value_to_json(value v);
+
+std::string list_to_json(value list_v) {
+    if (!is_proper_list(list_v)) {
+        throw lisp_error("json.encode: expected proper list");
+    }
+    const std::vector<value> items = vector_from_list(list_v);
+    std::ostringstream out;
+    out << '[';
+    for (std::size_t i = 0; i < items.size(); ++i) {
+        if (i != 0) {
+            out << ',';
+        }
+        out << value_to_json(items[i]);
+    }
+    out << ']';
+    return out.str();
+}
+
+std::string value_to_json(value v) {
+    if (is_nil(v)) {
+        return "null";
+    }
+    if (is_boolean(v)) {
+        return boolean_value(v) ? "true" : "false";
+    }
+    if (is_integer(v)) {
+        return std::to_string(integer_value(v));
+    }
+    if (is_float(v)) {
+        const double d = float_value(v);
+        if (!std::isfinite(d)) {
+            throw lisp_error("json.encode: non-finite floats are not supported");
+        }
+        std::ostringstream out;
+        out << d;
+        return out.str();
+    }
+    if (is_string(v)) {
+        return "\"" + json_escape(string_value(v)) + "\"";
+    }
+    if (is_symbol(v)) {
+        return "\"" + json_escape(symbol_name(v)) + "\"";
+    }
+    if (is_cons(v)) {
+        return list_to_json(v);
+    }
+    if (is_vec(v)) {
+        std::ostringstream out;
+        out << '[';
+        for (std::size_t i = 0; i < v->vec_data.size(); ++i) {
+            if (i != 0) {
+                out << ',';
+            }
+            out << value_to_json(v->vec_data[i]);
+        }
+        out << ']';
+        return out.str();
+    }
+    if (is_map(v)) {
+        std::ostringstream out;
+        out << '{';
+        bool first = true;
+        for (const auto& [k, mapped] : v->map_data) {
+            if (!first) {
+                out << ',';
+            }
+            first = false;
+            out << "\"" << json_escape(map_key_to_json_object_key(k)) << "\":" << value_to_json(mapped);
+        }
+        out << '}';
+        return out.str();
+    }
+    if (is_image_handle(v)) {
+        return "{\"type\":\"image_handle\",\"id\":" + std::to_string(image_handle_id(v)) + "}";
+    }
+    if (is_blob_handle(v)) {
+        return "{\"type\":\"blob_handle\",\"id\":" + std::to_string(blob_handle_id(v)) + "}";
+    }
+    throw lisp_error("json.encode: unsupported value type: " + std::string(type_name(type_of(v))));
+}
+
+class json_parser {
+public:
+    explicit json_parser(std::string_view input) : input_(input) {}
+
+    value parse_document() {
+        value out = parse_value();
+        skip_ws();
+        if (!eof()) {
+            throw lisp_error("json.decode: trailing characters");
+        }
+        return out;
+    }
+
+private:
+    [[nodiscard]] bool eof() const noexcept { return pos_ >= input_.size(); }
+    [[nodiscard]] char peek() const noexcept { return eof() ? '\0' : input_[pos_]; }
+    char get() noexcept { return eof() ? '\0' : input_[pos_++]; }
+
+    void skip_ws() {
+        while (!eof() && std::isspace(static_cast<unsigned char>(peek()))) {
+            ++pos_;
+        }
+    }
+
+    void expect(char c, const char* what) {
+        if (get() != c) {
+            throw lisp_error(std::string("json.decode: expected ") + what);
+        }
+    }
+
+    bool consume_if(char c) {
+        skip_ws();
+        if (peek() == c) {
+            ++pos_;
+            return true;
+        }
+        return false;
+    }
+
+    bool consume_literal(std::string_view literal) {
+        if (input_.substr(pos_, literal.size()) == literal) {
+            pos_ += literal.size();
+            return true;
+        }
+        return false;
+    }
+
+    value parse_value() {
+        skip_ws();
+        if (eof()) {
+            throw lisp_error("json.decode: unexpected end of input");
+        }
+        const char c = peek();
+        if (c == 'n') {
+            if (!consume_literal("null")) {
+                throw lisp_error("json.decode: invalid literal");
+            }
+            return make_nil();
+        }
+        if (c == 't') {
+            if (!consume_literal("true")) {
+                throw lisp_error("json.decode: invalid literal");
+            }
+            return make_boolean(true);
+        }
+        if (c == 'f') {
+            if (!consume_literal("false")) {
+                throw lisp_error("json.decode: invalid literal");
+            }
+            return make_boolean(false);
+        }
+        if (c == '"') {
+            return make_string(parse_string());
+        }
+        if (c == '[') {
+            return parse_array();
+        }
+        if (c == '{') {
+            return parse_object();
+        }
+        if (c == '-' || std::isdigit(static_cast<unsigned char>(c))) {
+            return parse_number();
+        }
+        throw lisp_error("json.decode: unexpected token");
+    }
+
+    std::string parse_string() {
+        expect('"', "\"");
+        std::string out;
+        while (!eof()) {
+            const char c = get();
+            if (c == '"') {
+                return out;
+            }
+            if (c == '\\') {
+                if (eof()) {
+                    throw lisp_error("json.decode: invalid escape");
+                }
+                const char esc = get();
+                switch (esc) {
+                    case '"':
+                    case '\\':
+                    case '/':
+                        out.push_back(esc);
+                        break;
+                    case 'b':
+                        out.push_back('\b');
+                        break;
+                    case 'f':
+                        out.push_back('\f');
+                        break;
+                    case 'n':
+                        out.push_back('\n');
+                        break;
+                    case 'r':
+                        out.push_back('\r');
+                        break;
+                    case 't':
+                        out.push_back('\t');
+                        break;
+                    default:
+                        throw lisp_error("json.decode: unsupported escape sequence");
+                }
+            } else {
+                out.push_back(c);
+            }
+        }
+        throw lisp_error("json.decode: unterminated string");
+    }
+
+    value parse_number() {
+        const std::size_t start = pos_;
+        if (peek() == '-') {
+            ++pos_;
+        }
+        if (!std::isdigit(static_cast<unsigned char>(peek()))) {
+            throw lisp_error("json.decode: invalid number");
+        }
+        while (std::isdigit(static_cast<unsigned char>(peek()))) {
+            ++pos_;
+        }
+        bool is_float_num = false;
+        if (peek() == '.') {
+            is_float_num = true;
+            ++pos_;
+            while (std::isdigit(static_cast<unsigned char>(peek()))) {
+                ++pos_;
+            }
+        }
+        if (peek() == 'e' || peek() == 'E') {
+            is_float_num = true;
+            ++pos_;
+            if (peek() == '+' || peek() == '-') {
+                ++pos_;
+            }
+            if (!std::isdigit(static_cast<unsigned char>(peek()))) {
+                throw lisp_error("json.decode: invalid exponent");
+            }
+            while (std::isdigit(static_cast<unsigned char>(peek()))) {
+                ++pos_;
+            }
+        }
+
+        const std::string token(input_.substr(start, pos_ - start));
+        if (!is_float_num) {
+            try {
+                return make_integer(std::stoll(token));
+            } catch (...) {
+                // Fall through to float parse.
+            }
+        }
+        const double parsed = std::strtod(token.c_str(), nullptr);
+        if (!std::isfinite(parsed)) {
+            throw lisp_error("json.decode: non-finite number");
+        }
+        return make_float(parsed);
+    }
+
+    value parse_array() {
+        expect('[', "[");
+        skip_ws();
+        std::vector<value> items;
+        gc_root_scope roots(default_gc());
+        if (consume_if(']')) {
+            return make_nil();
+        }
+        while (true) {
+            value item = parse_value();
+            roots.add(&item);
+            items.push_back(item);
+            roots.add(&items.back());
+            skip_ws();
+            if (consume_if(']')) {
+                return list_from_vector(items);
+            }
+            expect(',', ",");
+        }
+    }
+
+    value parse_object() {
+        expect('{', "{");
+        value out = make_map();
+        gc_root_scope roots(default_gc());
+        roots.add(&out);
+        skip_ws();
+        if (consume_if('}')) {
+            return out;
+        }
+        while (true) {
+            skip_ws();
+            if (peek() != '"') {
+                throw lisp_error("json.decode: expected string key");
+            }
+            const std::string key = parse_string();
+            skip_ws();
+            expect(':', ":");
+            value mapped = parse_value();
+            roots.add(&mapped);
+            map_key map_k;
+            map_k.type = map_key_type::string;
+            map_k.text_data = key;
+            out->map_data[map_k] = mapped;
+            skip_ws();
+            if (consume_if('}')) {
+                return out;
+            }
+            expect(',', ",");
+        }
+    }
+
+    std::string_view input_;
+    std::size_t pos_ = 0;
+};
+
+std::optional<std::uint64_t> maybe_seed_from_value(value v, const std::string& where) {
+    if (is_integer(v)) {
+        const std::int64_t raw = integer_value(v);
+        if (raw < 0) {
+            throw lisp_error(where + ": seed must be non-negative");
+        }
+        return static_cast<std::uint64_t>(raw);
+    }
+    if (is_float(v)) {
+        const double raw = float_value(v);
+        if (!std::isfinite(raw) || raw < 0.0) {
+            throw lisp_error(where + ": seed must be non-negative finite");
+        }
+        return static_cast<std::uint64_t>(raw);
+    }
+    if (is_string(v)) {
+        return bt::vla_service::hash64(string_value(v));
+    }
+    if (is_symbol(v)) {
+        return bt::vla_service::hash64(symbol_name(v));
+    }
+    return std::nullopt;
+}
+
+bt::vla_request parse_vla_request_map(value request_map) {
+    if (!is_map(request_map)) {
+        throw lisp_error("vla.submit: expected request map");
+    }
+
+    bt::vla_request req;
+    req.run_id = "lisp";
+    req.node_name = "vla.submit";
+
+    req.capability = map_lookup_text_or(request_map, "capability", req.capability, "vla.submit capability");
+    req.task_id = map_lookup_text_or(request_map, "task_id", req.task_id, "vla.submit task_id");
+    req.instruction = map_lookup_text_or(request_map, "instruction", req.instruction, "vla.submit instruction");
+    req.deadline_ms = map_lookup_int_or(request_map, "deadline_ms", req.deadline_ms, "vla.submit deadline_ms");
+    if (req.deadline_ms <= 0) {
+        throw lisp_error("vla.submit: deadline_ms must be > 0");
+    }
+    req.run_id = map_lookup_text_or(request_map, "run_id", req.run_id, "vla.submit run_id");
+    req.node_name = map_lookup_text_or(request_map, "node_name", req.node_name, "vla.submit node_name");
+    req.tick_index = static_cast<std::uint64_t>(
+        map_lookup_int_or(request_map, "tick_index", static_cast<std::int64_t>(req.tick_index), "vla.submit tick_index"));
+
+    if (const std::optional<value> seed_v = map_lookup_option(request_map, "seed"); seed_v.has_value()) {
+        req.seed = maybe_seed_from_value(*seed_v, "vla.submit seed");
+        if (!req.seed.has_value()) {
+            throw lisp_error("vla.submit: unsupported seed type");
+        }
+    }
+
+    {
+        const std::optional<value> model_v = map_lookup_option(request_map, "model");
+        if (model_v.has_value()) {
+            const value model_map = require_map_arg(*model_v, "vla.submit model");
+            req.model.name = map_lookup_text_or(model_map, "name", req.model.name, "vla.submit model.name");
+            req.model.version = map_lookup_text_or(model_map, "version", req.model.version, "vla.submit model.version");
+        }
+    }
+
+    {
+        const std::optional<value> obs_v = map_lookup_option(request_map, "observation");
+        if (obs_v.has_value()) {
+            const value obs_map = require_map_arg(*obs_v, "vla.submit observation");
+            if (const std::optional<value> image_v = map_lookup_option(obs_map, "image"); image_v.has_value()) {
+                if (!is_image_handle(*image_v)) {
+                    throw lisp_error("vla.submit observation.image: expected image_handle");
+                }
+                req.observation.image = bt::image_handle_ref{.id = image_handle_id(*image_v)};
+            }
+            if (const std::optional<value> blob_v = map_lookup_option(obs_map, "blob"); blob_v.has_value()) {
+                if (!is_blob_handle(*blob_v)) {
+                    throw lisp_error("vla.submit observation.blob: expected blob_handle");
+                }
+                req.observation.blob = bt::blob_handle_ref{.id = blob_handle_id(*blob_v)};
+            }
+            if (const std::optional<value> state_v = map_lookup_option(obs_map, "state"); state_v.has_value()) {
+                req.observation.state = lisp_to_numeric_vector(*state_v, "vla.submit observation.state");
+            }
+            req.observation.timestamp_ms = map_lookup_int_or(
+                obs_map, "timestamp_ms", req.observation.timestamp_ms, "vla.submit observation.timestamp_ms");
+            req.observation.frame_id =
+                map_lookup_text_or(obs_map, "frame_id", req.observation.frame_id, "vla.submit observation.frame_id");
+        }
+    }
+
+    {
+        const std::optional<value> space_v = map_lookup_option(request_map, "action_space");
+        if (!space_v.has_value()) {
+            throw lisp_error("vla.submit: missing action_space");
+        }
+        const value space_map = require_map_arg(*space_v, "vla.submit action_space");
+        req.action_space.type = map_lookup_text_or(space_map, "type", req.action_space.type, "vla.submit action_space.type");
+        req.action_space.dims = map_lookup_int_or(space_map, "dims", req.action_space.dims, "vla.submit action_space.dims");
+        if (req.action_space.dims <= 0) {
+            throw lisp_error("vla.submit: action_space.dims must be > 0");
+        }
+        if (const std::optional<value> bounds_v = map_lookup_option(space_map, "bounds"); bounds_v.has_value()) {
+            req.action_space.bounds = lisp_to_bounds(*bounds_v, "vla.submit action_space.bounds");
+        }
+        if (req.action_space.bounds.empty()) {
+            req.action_space.bounds.assign(static_cast<std::size_t>(req.action_space.dims), {-1.0, 1.0});
+        }
+        if (req.action_space.bounds.size() != static_cast<std::size_t>(req.action_space.dims)) {
+            throw lisp_error("vla.submit: action_space.bounds length must match dims");
+        }
+        if (const std::optional<value> units_v = map_lookup_option(space_map, "units"); units_v.has_value()) {
+            req.action_space.units = lisp_to_text_list(*units_v, "vla.submit action_space.units");
+        }
+        if (const std::optional<value> sem_v = map_lookup_option(space_map, "semantic"); sem_v.has_value()) {
+            req.action_space.semantic = lisp_to_text_list(*sem_v, "vla.submit action_space.semantic");
+        }
+    }
+
+    {
+        const std::optional<value> constraints_v = map_lookup_option(request_map, "constraints");
+        if (constraints_v.has_value()) {
+            const value constraints_map = require_map_arg(*constraints_v, "vla.submit constraints");
+            req.constraints.max_abs_value = map_lookup_number_or(
+                constraints_map, "max_abs_value", req.constraints.max_abs_value, "vla.submit constraints.max_abs_value");
+            req.constraints.max_delta =
+                map_lookup_number_or(constraints_map, "max_delta", req.constraints.max_delta, "vla.submit constraints.max_delta");
+            if (const std::optional<value> forb_v = map_lookup_option(constraints_map, "forbidden_ranges"); forb_v.has_value()) {
+                req.constraints.forbidden_ranges = lisp_to_bounds(*forb_v, "vla.submit constraints.forbidden_ranges");
+            }
+        }
+    }
+
+    return req;
+}
+
+value vla_poll_to_lisp(const bt::vla_poll& poll) {
+    value out = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&out);
+    map_set_symbol(out, "status", vla_job_status_symbol(poll.status));
+    if (poll.partial.has_value()) {
+        value partial = make_map();
+        roots.add(&partial);
+        map_set_symbol(partial, "sequence", make_integer(static_cast<std::int64_t>(poll.partial->sequence)));
+        map_set_symbol(partial, "confidence", make_float(poll.partial->confidence));
+        if (!poll.partial->text_chunk.empty()) {
+            map_set_symbol(partial, "text_chunk", make_string(poll.partial->text_chunk));
+        }
+        if (poll.partial->action_candidate.has_value()) {
+            value action_cand = vla_action_to_lisp(*poll.partial->action_candidate);
+            roots.add(&action_cand);
+            map_set_symbol(partial, "action_candidate", action_cand);
+        }
+        map_set_symbol(out, "partial", partial);
+    }
+    if (poll.final.has_value()) {
+        value final = vla_response_to_lisp(*poll.final);
+        roots.add(&final);
+        map_set_symbol(out, "final", final);
+    }
+    value stats = doubles_map_to_lisp_map(poll.stats);
+    roots.add(&stats);
+    map_set_symbol(out, "stats", stats);
+    return out;
+}
+
 value planner_status_symbol(bt::planner_status status) {
     return make_symbol(std::string(":") + bt::planner_status_name(status));
 }
@@ -1080,6 +1772,24 @@ value bt_node_to_dsl(const bt::definition& def, bt::node_id id) {
             break;
         case bt::node_kind::plan_action:
             form.push_back(make_symbol("plan-action"));
+            for (const bt::arg_value& arg : n.args) {
+                form.push_back(bt_arg_to_lisp_value(arg));
+            }
+            break;
+        case bt::node_kind::vla_request:
+            form.push_back(make_symbol("vla-request"));
+            for (const bt::arg_value& arg : n.args) {
+                form.push_back(bt_arg_to_lisp_value(arg));
+            }
+            break;
+        case bt::node_kind::vla_wait:
+            form.push_back(make_symbol("vla-wait"));
+            for (const bt::arg_value& arg : n.args) {
+                form.push_back(bt_arg_to_lisp_value(arg));
+            }
+            break;
+        case bt::node_kind::vla_cancel:
+            form.push_back(make_symbol("vla-cancel"));
             for (const bt::arg_value& arg : n.args) {
                 form.push_back(bt_arg_to_lisp_value(arg));
             }
@@ -1347,6 +2057,216 @@ value builtin_hash64(const std::vector<value>& args) {
     return make_integer(static_cast<std::int64_t>(h & 0x7fffffffffffffffull));
 }
 
+value builtin_json_encode(const std::vector<value>& args) {
+    require_arity("json.encode", args, 1);
+    return make_string(value_to_json(args[0]));
+}
+
+value builtin_json_decode(const std::vector<value>& args) {
+    require_arity("json.decode", args, 1);
+    if (!is_string(args[0])) {
+        throw lisp_error("json.decode: expected string");
+    }
+    json_parser parser(string_value(args[0]));
+    return parser.parse_document();
+}
+
+value require_image_handle_arg(value v, const std::string& where) {
+    if (!is_image_handle(v)) {
+        throw lisp_error(where + ": expected image_handle");
+    }
+    return v;
+}
+
+value require_blob_handle_arg(value v, const std::string& where) {
+    if (!is_blob_handle(v)) {
+        throw lisp_error(where + ": expected blob_handle");
+    }
+    return v;
+}
+
+value builtin_image_make(const std::vector<value>& args) {
+    require_arity("image.make", args, 6);
+    const std::int64_t width = require_int_arg(args[0], "image.make width");
+    const std::int64_t height = require_int_arg(args[1], "image.make height");
+    const std::int64_t channels = require_int_arg(args[2], "image.make channels");
+    const std::string encoding = require_text_value(args[3], "image.make encoding");
+    const std::int64_t timestamp_ms = require_int_arg(args[4], "image.make timestamp_ms");
+    const std::string frame_id = require_text_value(args[5], "image.make frame_id");
+
+    const bt::image_handle_ref handle = bt::default_runtime_host().vla_ref().create_image(
+        width, height, channels, encoding, timestamp_ms, frame_id);
+    return make_image_handle(handle.id);
+}
+
+value builtin_blob_make(const std::vector<value>& args) {
+    require_arity("blob.make", args, 4);
+    const std::int64_t size_bytes = require_int_arg(args[0], "blob.make size_bytes");
+    const std::string mime_type = require_text_value(args[1], "blob.make mime_type");
+    const std::int64_t timestamp_ms = require_int_arg(args[2], "blob.make timestamp_ms");
+    const std::string tag = require_text_value(args[3], "blob.make tag");
+
+    const bt::blob_handle_ref handle =
+        bt::default_runtime_host().vla_ref().create_blob(size_bytes, mime_type, timestamp_ms, tag);
+    return make_blob_handle(handle.id);
+}
+
+value builtin_image_info(const std::vector<value>& args) {
+    require_arity("image.info", args, 1);
+    const value image = require_image_handle_arg(args[0], "image.info");
+    const auto info = bt::default_runtime_host().vla_ref().get_image_info(bt::image_handle_ref{.id = image_handle_id(image)});
+    if (!info.has_value()) {
+        throw lisp_error("image.info: unknown handle");
+    }
+
+    value out = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&out);
+    map_set_symbol(out, "id", make_integer(info->id));
+    map_set_symbol(out, "w", make_integer(info->width));
+    map_set_symbol(out, "h", make_integer(info->height));
+    map_set_symbol(out, "channels", make_integer(info->channels));
+    map_set_symbol(out, "encoding", make_string(info->encoding));
+    map_set_symbol(out, "timestamp_ms", make_integer(info->timestamp_ms));
+    map_set_symbol(out, "frame_id", make_string(info->frame_id));
+    return out;
+}
+
+value builtin_blob_info(const std::vector<value>& args) {
+    require_arity("blob.info", args, 1);
+    const value blob = require_blob_handle_arg(args[0], "blob.info");
+    const auto info = bt::default_runtime_host().vla_ref().get_blob_info(bt::blob_handle_ref{.id = blob_handle_id(blob)});
+    if (!info.has_value()) {
+        throw lisp_error("blob.info: unknown handle");
+    }
+
+    value out = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&out);
+    map_set_symbol(out, "id", make_integer(info->id));
+    map_set_symbol(out, "size_bytes", make_integer(info->size_bytes));
+    map_set_symbol(out, "mime_type", make_string(info->mime_type));
+    map_set_symbol(out, "timestamp_ms", make_integer(info->timestamp_ms));
+    map_set_symbol(out, "tag", make_string(info->tag));
+    return out;
+}
+
+value builtin_cap_list(const std::vector<value>& args) {
+    require_arity("cap.list", args, 0);
+    const std::vector<std::string> names = bt::default_runtime_host().vla_ref().capabilities().list();
+    std::vector<value> out;
+    out.reserve(names.size());
+    gc_root_scope roots(default_gc());
+    for (const std::string& name : names) {
+        out.push_back(make_string(name));
+        roots.add(&out.back());
+    }
+    return list_from_vector(out);
+}
+
+value builtin_cap_describe(const std::vector<value>& args) {
+    require_arity("cap.describe", args, 1);
+    const std::string name = require_text_value(args[0], "cap.describe");
+    const auto cap = bt::default_runtime_host().vla_ref().capabilities().describe(name);
+    if (!cap.has_value()) {
+        throw lisp_error("cap.describe: unknown capability");
+    }
+
+    value out = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&out);
+    map_set_symbol(out, "name", make_string(cap->name));
+    map_set_symbol(out, "safety_class", make_string(cap->safety_class));
+    map_set_symbol(out, "cost_category", make_string(cap->cost_category));
+
+    auto schema_to_list = [&](const std::vector<bt::capability_field>& fields) -> value {
+        std::vector<value> rows;
+        rows.reserve(fields.size());
+        for (const auto& field : fields) {
+            value row = make_map();
+            roots.add(&row);
+            map_set_symbol(row, "name", make_string(field.name));
+            map_set_symbol(row, "type", make_string(field.type));
+            map_set_symbol(row, "required", make_boolean(field.required));
+            rows.push_back(row);
+            roots.add(&rows.back());
+        }
+        return list_from_vector(rows);
+    };
+
+    value req_schema = schema_to_list(cap->request_schema);
+    roots.add(&req_schema);
+    value res_schema = schema_to_list(cap->response_schema);
+    roots.add(&res_schema);
+    map_set_symbol(out, "request_schema", req_schema);
+    map_set_symbol(out, "response_schema", res_schema);
+    return out;
+}
+
+value builtin_vla_submit(const std::vector<value>& args) {
+    require_arity("vla.submit", args, 1);
+    bt::vla_request req = parse_vla_request_map(args[0]);
+    const bt::vla_service::vla_job_id id = bt::default_runtime_host().vla_ref().submit(req);
+    return make_integer(static_cast<std::int64_t>(id));
+}
+
+value builtin_vla_poll(const std::vector<value>& args) {
+    require_arity("vla.poll", args, 1);
+    const std::int64_t raw_id = require_non_negative_int(args[0], "vla.poll");
+    if (raw_id <= 0) {
+        throw lisp_error("vla.poll: job id must be > 0");
+    }
+    const bt::vla_poll poll = bt::default_runtime_host().vla_ref().poll(static_cast<bt::vla_service::vla_job_id>(raw_id));
+    return vla_poll_to_lisp(poll);
+}
+
+value builtin_vla_cancel(const std::vector<value>& args) {
+    require_arity("vla.cancel", args, 1);
+    const std::int64_t raw_id = require_non_negative_int(args[0], "vla.cancel");
+    if (raw_id <= 0) {
+        throw lisp_error("vla.cancel: job id must be > 0");
+    }
+    const bool cancelled =
+        bt::default_runtime_host().vla_ref().cancel(static_cast<bt::vla_service::vla_job_id>(raw_id));
+    return make_boolean(cancelled);
+}
+
+value builtin_vla_logs_dump(const std::vector<value>& args) {
+    if (args.size() > 1) {
+        throw lisp_error("vla.logs.dump: expected 0 or 1 arguments");
+    }
+    std::size_t max_count = 200;
+    if (!args.empty()) {
+        const std::int64_t raw = require_non_negative_int(args[0], "vla.logs.dump");
+        max_count = static_cast<std::size_t>(raw);
+    }
+    return make_string(bt::default_runtime_host().dump_vla_records(max_count));
+}
+
+value builtin_vla_set_log_path(const std::vector<value>& args) {
+    require_arity("vla.set-log-path", args, 1);
+    if (!is_string(args[0])) {
+        throw lisp_error("vla.set-log-path: expected string path");
+    }
+    bt::default_runtime_host().vla_ref().set_log_path(string_value(args[0]));
+    return make_nil();
+}
+
+value builtin_vla_set_log_enabled(const std::vector<value>& args) {
+    require_arity("vla.set-log-enabled", args, 1);
+    if (!is_boolean(args[0])) {
+        throw lisp_error("vla.set-log-enabled: expected boolean");
+    }
+    bt::default_runtime_host().vla_ref().set_log_enabled(boolean_value(args[0]));
+    return make_nil();
+}
+
+value builtin_vla_clear_logs(const std::vector<value>& args) {
+    require_arity("vla.clear-logs", args, 0);
+    bt::default_runtime_host().vla_ref().clear_records();
+    return make_nil();
+}
+
 value builtin_planner_mcts(const std::vector<value>& args) {
     require_arity("planner.mcts", args, 1);
     const value request_map = require_map_arg(args[0], "planner.mcts");
@@ -1412,6 +2332,17 @@ value builtin_planner_mcts(const std::vector<value>& args) {
         } else {
             throw lisp_error("planner.mcts: action_sampler must be symbol or string");
         }
+    }
+    if (const std::optional<value> prior_mean_v = map_lookup_option(request_map, "action_prior_mean");
+        prior_mean_v.has_value()) {
+        request.config.action_prior_mean = lisp_to_numeric_vector(*prior_mean_v, "planner.mcts action_prior_mean");
+    }
+    if (const std::optional<value> prior_sigma_v = map_lookup_option(request_map, "action_prior_sigma");
+        prior_sigma_v.has_value()) {
+        request.config.action_prior_sigma = require_number_value(*prior_sigma_v, "planner.mcts action_prior_sigma");
+    }
+    if (const std::optional<value> prior_mix_v = map_lookup_option(request_map, "action_prior_mix"); prior_mix_v.has_value()) {
+        request.config.action_prior_mix = require_number_value(*prior_mix_v, "planner.mcts action_prior_mix");
     }
     if (const std::optional<value> fallback_v = map_lookup_option(request_map, "fallback_action"); fallback_v.has_value()) {
         request.config.fallback_action = lisp_to_numeric_vector(*fallback_v, "planner.mcts fallback_action");
@@ -1613,11 +2544,26 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "zero?", builtin_zero_pred);
     bind_primitive(global_env, "time.now-ms", builtin_time_now_ms);
     bind_primitive(global_env, "hash64", builtin_hash64);
+    bind_primitive(global_env, "json.encode", builtin_json_encode);
+    bind_primitive(global_env, "json.decode", builtin_json_decode);
+    bind_primitive(global_env, "image.make", builtin_image_make);
+    bind_primitive(global_env, "image.info", builtin_image_info);
+    bind_primitive(global_env, "blob.make", builtin_blob_make);
+    bind_primitive(global_env, "blob.info", builtin_blob_info);
 
     bind_primitive(global_env, "rng.make", builtin_rng_make);
     bind_primitive(global_env, "rng.uniform", builtin_rng_uniform);
     bind_primitive(global_env, "rng.normal", builtin_rng_normal);
     bind_primitive(global_env, "rng.int", builtin_rng_int);
+    bind_primitive(global_env, "cap.list", builtin_cap_list);
+    bind_primitive(global_env, "cap.describe", builtin_cap_describe);
+    bind_primitive(global_env, "vla.submit", builtin_vla_submit);
+    bind_primitive(global_env, "vla.poll", builtin_vla_poll);
+    bind_primitive(global_env, "vla.cancel", builtin_vla_cancel);
+    bind_primitive(global_env, "vla.logs.dump", builtin_vla_logs_dump);
+    bind_primitive(global_env, "vla.set-log-path", builtin_vla_set_log_path);
+    bind_primitive(global_env, "vla.set-log-enabled", builtin_vla_set_log_enabled);
+    bind_primitive(global_env, "vla.clear-logs", builtin_vla_clear_logs);
     bind_primitive(global_env, "planner.mcts", builtin_planner_mcts);
     bind_primitive(global_env, "planner.logs.dump", builtin_planner_logs_dump);
     bind_primitive(global_env, "planner.set-log-path", builtin_planner_set_log_path);

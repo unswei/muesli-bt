@@ -35,5 +35,6 @@ cmake --build --preset dev -j
 - [Getting Started](getting-started.md): install/build/run workflow
 - [Language](language/syntax.md): syntax, semantics, and complete reference
 - [Behaviour Trees](bt/intro.md): DSL, runtime model, blackboard, scheduler, bounded-time planning, observability
+- [VLA Integration](bt/vla-integration.md): capability-based async vision-language-action orchestration
 - [Integration](bt/robot-integration.md): host callbacks and service wiring
 - [Roadmap](limitations-roadmap.md): planned next features and priorities

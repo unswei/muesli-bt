@@ -240,6 +240,18 @@ value make_bt_instance(std::int64_t handle) {
     return out;
 }
 
+value make_image_handle(std::int64_t handle) {
+    auto out = make_object(value_type::image_handle);
+    out->image_handle_data = handle;
+    return out;
+}
+
+value make_blob_handle(std::int64_t handle) {
+    auto out = make_object(value_type::blob_handle);
+    out->blob_handle_data = handle;
+    return out;
+}
+
 value_type type_of(value v) {
     if (!v) {
         throw lisp_error("null value");
@@ -277,6 +289,10 @@ std::string_view type_name(value_type t) {
             return "bt_def";
         case value_type::bt_instance:
             return "bt_instance";
+        case value_type::image_handle:
+            return "image_handle";
+        case value_type::blob_handle:
+            return "blob_handle";
     }
     return "unknown";
 }
@@ -339,6 +355,14 @@ bool is_bt_def(value v) {
 
 bool is_bt_instance(value v) {
     return v && v->type == value_type::bt_instance;
+}
+
+bool is_image_handle(value v) {
+    return v && v->type == value_type::image_handle;
+}
+
+bool is_blob_handle(value v) {
+    return v && v->type == value_type::blob_handle;
 }
 
 bool is_truthy(value v) {
@@ -416,6 +440,16 @@ std::int64_t bt_handle(value v) {
         throw lisp_error("bt_handle: expected bt_def or bt_instance");
     }
     return v->bt_handle_data;
+}
+
+std::int64_t image_handle_id(value v) {
+    require_type(v, value_type::image_handle, "image_handle_id");
+    return v->image_handle_data;
+}
+
+std::int64_t blob_handle_id(value v) {
+    require_type(v, value_type::blob_handle, "blob_handle_id");
+    return v->blob_handle_data;
 }
 
 value list_from_vector(const std::vector<value>& items) {

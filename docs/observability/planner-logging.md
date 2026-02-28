@@ -68,3 +68,4 @@ plt.show()
 
 - [Logging](logging.md)
 - [PlanAction Node Reference](../bt/plan-action-node.md)
+- [VLA Logging Schema](vla-logging.md)

@@ -19,6 +19,7 @@ This page is a summary and link hub for built-ins. Detailed behavior, errors, an
 - RNG: `rng.make`, `rng.uniform`, `rng.normal`, `rng.int`
 - Clock: `time.now-ms`
 - Hashing: `hash64`
+- JSON: `json.encode`, `json.decode`
 
 ## Mutable Containers
 
@@ -36,6 +37,10 @@ This page is a summary and link hub for built-ins. Detailed behavior, errors, an
 - planner records: `planner.logs.dump`
 - planner sink config: `planner.set-log-path`, `planner.set-log-enabled`
 - planner seed controls: `planner.set-base-seed`, `planner.get-base-seed`
+- capabilities: `cap.list`, `cap.describe`
+- async VLA jobs: `vla.submit`, `vla.poll`, `vla.cancel`
+- VLA logging config: `vla.logs.dump`, `vla.set-log-path`, `vla.set-log-enabled`, `vla.clear-logs`
+- observation handles: `image.make`, `image.info`, `blob.make`, `blob.info`
 
 ## BT Integration
 

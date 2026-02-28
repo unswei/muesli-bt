@@ -25,6 +25,7 @@
 - callback registry
 - scheduler
 - typed clock/robot service interfaces
+- planner and VLA services
 
 ## Dependency Direction
 
@@ -41,4 +42,5 @@ Preferred direction:
 3. `bt.new-instance` creates mutable instance
 4. host ticks instance repeatedly
 5. leaves call host callbacks and blackboard
-6. trace/log/stats provide inspectability
+6. planner/VLA services provide bounded-time and async decision APIs
+7. trace/log/stats provide inspectability

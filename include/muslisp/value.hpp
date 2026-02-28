@@ -28,7 +28,9 @@ enum class value_type {
     map,
     rng,
     bt_def,
-    bt_instance
+    bt_instance,
+    image_handle,
+    blob_handle
 };
 
 enum class map_key_type {
@@ -77,6 +79,8 @@ struct object final : gc_node {
     map_storage map_data;
     std::shared_ptr<rng_state> rng_data;
     std::int64_t bt_handle_data = 0;
+    std::int64_t image_handle_data = 0;
+    std::int64_t blob_handle_data = 0;
 
     void gc_mark_children(gc& heap) override;
     [[nodiscard]] std::size_t gc_size_bytes() const override;
@@ -96,6 +100,8 @@ value make_map();
 value make_rng(std::uint64_t seed);
 value make_bt_def(std::int64_t handle);
 value make_bt_instance(std::int64_t handle);
+value make_image_handle(std::int64_t handle);
+value make_blob_handle(std::int64_t handle);
 
 [[nodiscard]] value_type type_of(value v);
 [[nodiscard]] std::string_view type_name(value_type t);
@@ -115,6 +121,8 @@ value make_bt_instance(std::int64_t handle);
 [[nodiscard]] bool is_rng(value v);
 [[nodiscard]] bool is_bt_def(value v);
 [[nodiscard]] bool is_bt_instance(value v);
+[[nodiscard]] bool is_image_handle(value v);
+[[nodiscard]] bool is_blob_handle(value v);
 [[nodiscard]] bool is_truthy(value v);
 
 [[nodiscard]] bool boolean_value(value v);
@@ -130,6 +138,8 @@ value make_bt_instance(std::int64_t handle);
 [[nodiscard]] const std::vector<value>& closure_body(value v);
 [[nodiscard]] env_ptr closure_env(value v);
 [[nodiscard]] std::int64_t bt_handle(value v);
+[[nodiscard]] std::int64_t image_handle_id(value v);
+[[nodiscard]] std::int64_t blob_handle_id(value v);
 
 [[nodiscard]] value list_from_vector(const std::vector<value>& items);
 [[nodiscard]] std::vector<value> vector_from_list(value list_value);

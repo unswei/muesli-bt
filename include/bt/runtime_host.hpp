@@ -9,6 +9,7 @@
 #include "bt/compiler.hpp"
 #include "bt/planner.hpp"
 #include "bt/runtime.hpp"
+#include "bt/vla.hpp"
 
 namespace bt {
 
@@ -35,6 +36,8 @@ public:
 
     planner_service& planner_ref();
     const planner_service& planner_ref() const;
+    vla_service& vla_ref();
+    const vla_service& vla_ref() const;
 
     memory_log_sink& logs() noexcept;
     const memory_log_sink& logs() const noexcept;
@@ -56,6 +59,7 @@ public:
     std::string dump_scheduler_stats() const;
     std::string dump_logs() const;
     std::string dump_planner_records(std::size_t max_count = 200) const;
+    std::string dump_vla_records(std::size_t max_count = 200) const;
 
 private:
     std::int64_t next_definition_handle_ = 1;
@@ -68,6 +72,7 @@ private:
     thread_pool_scheduler scheduler_;
     memory_log_sink logs_;
     planner_service planner_;
+    vla_service vla_;
 
     std::unique_ptr<clock_interface> owned_clock_;
     std::unique_ptr<robot_interface> owned_robot_;

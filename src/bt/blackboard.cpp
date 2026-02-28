@@ -70,6 +70,10 @@ std::string bb_value_repr(const bb_value& value) {
                 }
                 out << ']';
                 return out.str();
+            } else if constexpr (std::is_same_v<T, image_handle_ref>) {
+                return std::string("image_handle(") + std::to_string(v.id) + ")";
+            } else if constexpr (std::is_same_v<T, blob_handle_ref>) {
+                return std::string("blob_handle(") + std::to_string(v.id) + ")";
             } else {
                 return v;
             }
@@ -91,6 +95,10 @@ const char* bb_value_type_name(const bb_value& value) noexcept {
             return "string";
         case 5:
             return "float64[]";
+        case 6:
+            return "image_handle";
+        case 7:
+            return "blob_handle";
         default:
             return "unknown";
     }

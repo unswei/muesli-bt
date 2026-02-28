@@ -10,10 +10,12 @@
 #include <vector>
 
 #include "bt/ast.hpp"
+#include "bt/vla.hpp"
 
 namespace bt {
 
-using bb_value = std::variant<std::monostate, bool, std::int64_t, double, std::string, std::vector<double>>;
+using bb_value =
+    std::variant<std::monostate, bool, std::int64_t, double, std::string, std::vector<double>, image_handle_ref, blob_handle_ref>;
 
 struct bb_entry {
     bb_value value;

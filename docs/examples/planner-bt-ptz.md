@@ -20,3 +20,8 @@ Outputs:
 
 - blackboard snapshot with `ptz-state`, `ptz-action`, `ptz-meta`
 - planner JSON records via `planner.logs.dump`
+
+Related:
+
+- [Example: Async VLA Stub BT](vla-stub-bt.md)
+- [VLA Integration In BTs](../bt/vla-integration.md)

@@ -953,6 +953,24 @@ void test_planner_mcts_builtin_determinism_bounds_and_budget() {
     check(float_value(budget_fields[1]) <= 40.0, "planner.mcts should honor bounded-time budget");
     check(is_integer(budget_fields[2]) && integer_value(budget_fields[2]) > 0,
           "planner.mcts budget run should still perform iterations");
+
+    value prior_out = eval_text(
+        "(begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'model_service \"toy-1d\") "
+        "  (map.set! req 'state 0.0) "
+        "  (map.set! req 'seed 123) "
+        "  (map.set! req 'budget_ms 6) "
+        "  (map.set! req 'iters_max 300) "
+        "  (map.set! req 'action_sampler \"vla_mixture\") "
+        "  (map.set! req 'action_prior_mean (list 0.6)) "
+        "  (map.set! req 'action_prior_sigma 0.1) "
+        "  (map.set! req 'action_prior_mix 0.8) "
+        "  (planner.mcts req))",
+        env);
+    check(is_map(prior_out), "planner.mcts prior-mix call should return map");
+    value prior_action = eval_text("(map.get (planner.mcts req) 'action nil)", env);
+    check(is_proper_list(prior_action), "planner.mcts prior-mix action should be list");
 }
 
 void test_plan_action_node_blackboard_meta_and_logs() {
@@ -1057,6 +1075,206 @@ void test_hash64_builtin() {
     check(integer_value(h1) != integer_value(h3), "hash64 should vary with input");
 }
 
+void test_json_and_handle_builtins() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    value img = eval_text("(image.make 320 240 3 \"rgb8\" 1234 \"cam0\")", env);
+    check(is_image_handle(img), "image.make should return image_handle");
+    value img_info = eval_text("(image.info (image.make 64 48 1 \"gray8\" 222 \"cam1\"))", env);
+    check(is_map(img_info), "image.info should return map");
+    check(integer_value(eval_text("(map.get (image.info (image.make 10 20 3 \"rgb8\" 555 \"cam2\")) 'w -1)", env)) == 10,
+          "image.info width mismatch");
+
+    value blob = eval_text("(blob.make 1024 \"application/octet-stream\" 777 \"snapshot\")", env);
+    check(is_blob_handle(blob), "blob.make should return blob_handle");
+    check(integer_value(eval_text("(map.get (blob.info (blob.make 99 \"text/plain\" 111 \"note\")) 'size_bytes -1)", env)) == 99,
+          "blob.info size mismatch");
+
+    value json_out = eval_text(
+        "(begin "
+        "  (define m (map.make)) "
+        "  (map.set! m 'a 1) "
+        "  (map.set! m 'b (list 2 3)) "
+        "  (define s (json.encode m)) "
+        "  (define d (json.decode s)) "
+        "  (list s (map.get d \"a\" -1) (map.get d \"b\" nil)))",
+        env);
+    const std::vector<value> fields = vector_from_list(json_out);
+    check(fields.size() == 3, "json roundtrip shape mismatch");
+    check(is_string(fields[0]), "json.encode should return string");
+    check(integer_value(fields[1]) == 1, "json.decode object key/value mismatch");
+    check(print_value(fields[2]) == "(2 3)", "json.decode array mismatch");
+}
+
+void test_vla_builtins_submit_poll_cancel_and_caps() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    value caps = eval_text("(cap.list)", env);
+    check(is_proper_list(caps), "cap.list should return list");
+    check(string_value(eval_text("(car (cap.list))", env)).find("vla.") != std::string::npos,
+          "cap.list should include vla capability");
+    check(is_map(eval_text("(cap.describe \"vla.rt2\")", env)), "cap.describe should return map");
+
+    (void)eval_text(
+        "(define req (map.make))"
+        "(map.set! req 'task_id \"task-demo\")"
+        "(map.set! req 'instruction \"move right\")"
+        "(map.set! req 'deadline_ms 30)"
+        "(map.set! req 'seed 42)"
+        "(let ((obs (map.make)))"
+        "  (map.set! obs 'state (list 0.1))"
+        "  (map.set! obs 'timestamp_ms 1000)"
+        "  (map.set! obs 'frame_id \"base\")"
+        "  (map.set! req 'observation obs))"
+        "(let ((space (map.make)))"
+        "  (map.set! space 'type ':continuous)"
+        "  (map.set! space 'dims 1)"
+        "  (map.set! space 'bounds (list (list -1.0 1.0)))"
+        "  (map.set! req 'action_space space))"
+        "(let ((con (map.make)))"
+        "  (map.set! con 'max_abs_value 1.0)"
+        "  (map.set! con 'max_delta 1.0)"
+        "  (map.set! req 'constraints con))"
+        "(let ((m (map.make)))"
+        "  (map.set! m 'name \"rt2-stub\")"
+        "  (map.set! m 'version \"stub-1\")"
+        "  (map.set! req 'model m))",
+        env);
+
+    value job = eval_text("(vla.submit req)", env);
+    check(is_integer(job) && integer_value(job) > 0, "vla.submit should return positive job id");
+    const std::int64_t job_id = integer_value(job);
+
+    bool done = false;
+    for (int i = 0; i < 80; ++i) {
+        value st = eval_text("(map.get (vla.poll " + std::to_string(job_id) + ") 'status ':none)", env);
+        check(is_symbol(st), "vla.poll status should be symbol");
+        const std::string name = symbol_name(st);
+        if (name == ":done") {
+            done = true;
+            break;
+        }
+        if (name == ":error" || name == ":timeout" || name == ":cancelled") {
+            throw std::runtime_error("vla.poll unexpectedly reached terminal non-done state: " + name);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    check(done, "vla job should complete");
+
+    value final_status =
+        eval_text("(map.get (map.get (vla.poll " + std::to_string(job_id) + ") 'final (map.make)) 'status ':none)", env);
+    check(is_symbol(final_status) && symbol_name(final_status) == ":ok", "vla final status should be :ok");
+    value final_action =
+        eval_text("(map.get (map.get (map.get (vla.poll " + std::to_string(job_id) + ") 'final (map.make)) 'action (map.make)) 'u nil)",
+                  env);
+    check(is_proper_list(final_action), "vla final action.u should be list");
+    const std::vector<value> action_items = vector_from_list(final_action);
+    check(action_items.size() == 1 && is_float(action_items[0]), "vla final action should be one float");
+    check(float_value(action_items[0]) >= -1.0 && float_value(action_items[0]) <= 1.0, "vla final action out of bounds");
+
+    value job2 = eval_text("(vla.submit req)", env);
+    check(is_integer(job2) && integer_value(job2) > 0, "second vla.submit should return positive job id");
+    value cancelled = eval_text("(vla.cancel " + std::to_string(integer_value(job2)) + ")", env);
+    check(is_boolean(cancelled), "vla.cancel should return boolean");
+
+    (void)eval_text(
+        "(define bad-req (map.make))"
+        "(map.set! bad-req 'task_id \"bad\")"
+        "(map.set! bad-req 'deadline_ms 20)"
+        "(let ((obs (map.make)))"
+        "  (map.set! obs 'state (list 0.0))"
+        "  (map.set! obs 'timestamp_ms 1000)"
+        "  (map.set! obs 'frame_id \"base\")"
+        "  (map.set! bad-req 'observation obs))"
+        "(let ((space (map.make)))"
+        "  (map.set! space 'type ':continuous)"
+        "  (map.set! space 'dims 1)"
+        "  (map.set! space 'bounds (list (list -1.0 1.0)))"
+        "  (map.set! bad-req 'action_space space))"
+        "(let ((con (map.make)))"
+        "  (map.set! con 'max_abs_value 1.0)"
+        "  (map.set! con 'max_delta 1.0)"
+        "  (map.set! bad-req 'constraints con))"
+        "(let ((m (map.make)))"
+        "  (map.set! m 'name \"rt2-stub\")"
+        "  (map.set! m 'version \"stub-1\")"
+        "  (map.set! bad-req 'model m))",
+        env);
+    value bad_job = eval_text("(vla.submit bad-req)", env);
+    check(is_integer(bad_job) && integer_value(bad_job) > 0, "bad request submit should still return job id");
+    value bad_status = eval_text("(map.get (vla.poll " + std::to_string(integer_value(bad_job)) + ") 'status ':none)", env);
+    check(is_symbol(bad_status) && symbol_name(bad_status) == ":error", "bad request should become error immediately");
+
+    value logs = eval_text("(vla.logs.dump 20)", env);
+    check(is_string(logs), "vla.logs.dump should return string");
+    check(string_value(logs).find("\"task_id\"") != std::string::npos, "vla logs should contain task_id");
+    check(string_value(logs).find("request.instruction is required") != std::string::npos,
+          "vla logs should include immediate validation errors");
+}
+
+void test_vla_bt_nodes_flow_and_cancel() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text(
+        "(define flow-tree "
+        "  (bt.compile "
+        "    '(sel "
+        "       (seq "
+        "         (vla-wait :name \"flow\" :job_key flow-job :action_key flow-action :meta_key flow-meta) "
+        "         (succeed)) "
+        "       (seq "
+        "         (act bb-put-float fallback-action 0.0) "
+        "         (vla-request :name \"flow\" :job_key flow-job :instruction \"move right\" "
+        "                      :state_key state :deadline_ms 30 :dims 1 :bound_lo -1.0 :bound_hi 1.0) "
+        "         (running)))))",
+        env);
+    (void)eval_text("(define flow-inst (bt.new-instance flow-tree))", env);
+
+    bool reached_success = false;
+    for (int i = 0; i < 80; ++i) {
+        value st = eval_text("(bt.tick flow-inst '((state 0.0)))", env);
+        check(is_symbol(st), "flow tree tick should return symbol");
+        const std::string name = symbol_name(st);
+        if (name == "success") {
+            reached_success = true;
+            break;
+        }
+        check(name == "running", "flow tree should be running until success");
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    check(reached_success, "flow tree should eventually succeed");
+
+    bt::runtime_host& host = bt::default_runtime_host();
+    bt::instance* flow_inst = host.find_instance(bt_handle(eval_text("flow-inst", env)));
+    check(flow_inst != nullptr, "flow instance should exist");
+    const bt::bb_entry* action_entry = flow_inst->bb.get("flow-action");
+    check(action_entry != nullptr, "vla-wait should write flow-action");
+
+    (void)eval_text(
+        "(define cancel-tree "
+        "  (bt.compile "
+        "    '(sel "
+        "       (seq (cond bb-has stop) (vla-cancel :name \"cancel-flow\" :job_key c-job) (succeed)) "
+        "       (vla-request :name \"cancel-flow\" :job_key c-job :instruction \"move\" "
+        "                    :state_key state :deadline_ms 50 :dims 1 :bound_lo -1.0 :bound_hi 1.0))))",
+        env);
+    (void)eval_text("(define cancel-inst (bt.new-instance cancel-tree))", env);
+
+    value first = eval_text("(bt.tick cancel-inst '((state 0.0)))", env);
+    check(is_symbol(first) && symbol_name(first) == "running", "cancel tree first tick should run request");
+    value second = eval_text("(bt.tick cancel-inst '((state 0.0) (stop #t)))", env);
+    check(is_symbol(second) && symbol_name(second) == "success", "cancel tree second tick should cancel and succeed");
+}
+
 void test_bt_compile_checks() {
     using namespace muslisp;
 
@@ -1089,6 +1307,12 @@ void test_bt_compile_checks() {
     try {
         (void)eval_text("(bt.compile '(plan-action :budget_ms))", env);
         throw std::runtime_error("expected bt.compile plan-action key/value validation failure");
+    } catch (const lisp_error&) {
+    }
+
+    try {
+        (void)eval_text("(bt.compile '(vla-request :instruction))", env);
+        throw std::runtime_error("expected bt.compile vla-request key/value validation failure");
     } catch (const lisp_error&) {
     }
 }
@@ -1414,6 +1638,9 @@ int main() {
         {"planner.mcts determinism/bounds/budget", test_planner_mcts_builtin_determinism_bounds_and_budget},
         {"plan-action node blackboard/meta/logs", test_plan_action_node_blackboard_meta_and_logs},
         {"hash64 builtin", test_hash64_builtin},
+        {"json and handle builtins", test_json_and_handle_builtins},
+        {"vla builtins submit/poll/cancel/caps", test_vla_builtins_submit_poll_cancel_and_caps},
+        {"vla bt nodes flow and cancel", test_vla_bt_nodes_flow_and_cancel},
         {"bt compile checks", test_bt_compile_checks},
         {"bt seq/running semantics", test_bt_seq_and_running_semantics},
         {"bt decorator semantics", test_bt_decorator_semantics},

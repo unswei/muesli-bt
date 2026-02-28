@@ -36,6 +36,8 @@ nav:
           - Continuous MCTS: examples/continuous-mcts.md
           - Planning BT (1D): examples/planner-bt-1d.md
           - Planning BT (PTZ): examples/planner-bt-ptz.md
+          - VLA Stub BT: examples/vla-stub-bt.md
+          - Hybrid VLA + MCTS: examples/hybrid-vla-mcts.md
           - C++ Nodes: examples/cpp-nodes.md
   - Language:
       - Syntax: language/syntax.md
@@ -49,6 +51,9 @@ nav:
       - Bounded-Time Planning: bt/bounded-time-planning.md
       - PlanAction Node: bt/plan-action-node.md
       - Planner Configuration: bt/planner-configuration.md
+      - VLA Integration: bt/vla-integration.md
+      - VLA Nodes: bt/vla-nodes.md
+      - VLA Request/Response: bt/vla-request-response.md
       - Blackboard: bt/blackboard.md
       - Scheduler: bt/scheduler.md
       - Integration: bt/robot-integration.md
@@ -57,6 +62,7 @@ nav:
           - Logging: observability/logging.md
           - Profiling: observability/profiling.md
           - Planner Logging: observability/planner-logging.md
+          - VLA Logging: observability/vla-logging.md
   - Internals:
       - Architecture: internals/architecture.md
       - GC: internals/gc.md

@@ -150,6 +150,16 @@ std::string print_impl(value v, bool readable) {
                 throw lisp_error(write_error_message(value_type::bt_instance));
             }
             return "<bt_instance:" + std::to_string(bt_handle(v)) + ">";
+        case value_type::image_handle:
+            if (readable) {
+                throw lisp_error(write_error_message(value_type::image_handle));
+            }
+            return "<image_handle:" + std::to_string(image_handle_id(v)) + ">";
+        case value_type::blob_handle:
+            if (readable) {
+                throw lisp_error(write_error_message(value_type::blob_handle));
+            }
+            return "<blob_handle:" + std::to_string(blob_handle_id(v)) + ">";
     }
 
     return "<unknown>";

@@ -23,6 +23,9 @@ This page describes request/config fields used by `plan-action` and `planner.mct
 - `pw_alpha` (float): progressive widening exponent
 - `rollout_policy` (symbol/string): rollout selector hint
 - `action_sampler` (symbol/string): sampler selector hint
+- `action_prior_mean` (number or numeric list): prior action mean for `\"vla_mixture\"`
+- `action_prior_sigma` (float): prior gaussian sigma
+- `action_prior_mix` (float): prior mixture ratio in `[0,1]`
 - `fallback_action` (number or numeric list): safe fallback action
 - `top_k` (int): number of root alternatives to keep in metadata
 
@@ -37,6 +40,8 @@ This page describes request/config fields used by `plan-action` and `planner.mct
 - `pw_k`: `2.0`
 - `pw_alpha`: `0.5`
 - `top_k`: `3`
+- `action_prior_sigma`: `0.2`
+- `action_prior_mix`: `0.5`
 
 ## Model Services Included
 
@@ -53,6 +58,10 @@ This page describes request/config fields used by `plan-action` and `planner.mct
   (map.set! req 'budget_ms 8)
   (map.set! req 'iters_max 600)
   (map.set! req 'seed 42)
+  (map.set! req 'action_sampler "vla_mixture")
+  (map.set! req 'action_prior_mean (list 0.2))
+  (map.set! req 'action_prior_sigma 0.15)
+  (map.set! req 'action_prior_mix 0.7)
   (planner.mcts req))
 ```
 

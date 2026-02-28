@@ -134,7 +134,7 @@ std::string read_string(std::ifstream& in, const std::string& where) {
 }
 
 bool is_valid_node_kind(std::uint8_t raw) {
-    return raw <= static_cast<std::uint8_t>(node_kind::plan_action);
+    return raw <= static_cast<std::uint8_t>(node_kind::vla_cancel);
 }
 
 bool is_valid_arg_kind(std::uint8_t raw) {
@@ -188,8 +188,11 @@ void validate_definition(const definition& def) {
                 }
                 break;
             case node_kind::plan_action:
+            case node_kind::vla_request:
+            case node_kind::vla_wait:
+            case node_kind::vla_cancel:
                 if (!n.children.empty()) {
-                    throw std::runtime_error("bt.load: plan-action node cannot have children");
+                    throw std::runtime_error("bt.load: planner/vla nodes cannot have children");
                 }
                 break;
         }

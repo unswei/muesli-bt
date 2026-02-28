@@ -425,6 +425,10 @@ planner_result planner_service::plan(const planner_request& request) {
     if (cfg.top_k < 0) {
         cfg.top_k = 0;
     }
+    if (cfg.action_prior_sigma < 0.0) {
+        cfg.action_prior_sigma = 0.0;
+    }
+    cfg.action_prior_mix = clamp_double(cfg.action_prior_mix, 0.0, 1.0);
 
     planner_rng rng(request.seed);
     mcts_node root;
@@ -467,7 +471,17 @@ planner_result planner_service::plan(const planner_request& request) {
         const bool allow_expand = static_cast<double>(node.children.size()) < child_cap;
 
         if (allow_expand) {
-            planner_vector action = model->clamp_action(model->sample_action(state, rng));
+            planner_vector sampled = model->sample_action(state, rng);
+            if (cfg.action_sampler == "vla_mixture" && !cfg.action_prior_mean.empty() &&
+                cfg.action_prior_mean.size() == model->action_dims() &&
+                rng.uniform(0.0, 1.0) < cfg.action_prior_mix) {
+                sampled = cfg.action_prior_mean;
+                for (double& dim : sampled) {
+                    dim = rng.normal(dim, cfg.action_prior_sigma);
+                }
+            }
+
+            planner_vector action = model->clamp_action(sampled);
             mcts_child child;
             child.action = action;
 

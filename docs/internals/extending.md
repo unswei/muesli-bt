@@ -23,6 +23,8 @@ Checklist:
 5. add compile/runtime tests
 6. document syntax and semantics pages
 
+For async capability leaves (`vla-request`, `vla-wait`, `vla-cancel`), keep tick calls non-blocking and route all external work through scheduler-owned services.
+
 ## Add A New Blackboard Value Type
 
 Checklist:
@@ -42,6 +44,16 @@ Checklist:
 3. use `node_memory` for multi-tick actions
 4. use blackboard writes deliberately with stable key naming
 5. add integration tests with deterministic outcomes
+
+## Add/Extend Capabilities
+
+Checklist:
+
+1. update capability descriptors in `src/bt/vla.cpp`
+2. keep request/response schemas explicit and validated
+3. ensure submit/poll/cancel remains non-blocking from BT ticks
+4. add logging/replay coverage
+5. document Lisp-facing builtins and BT node usage
 
 ## Extend Tracing
 

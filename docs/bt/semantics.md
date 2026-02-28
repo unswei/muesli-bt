@@ -112,6 +112,28 @@ Uses per-node retry counter.
 - returns `success` when action is produced
 - returns `failure` when state/config/model is invalid
 
+## VLA Leaves
+
+## `vla-request`
+
+- validates request inputs from configured keys/options
+- submits async job through host VLA service
+- writes `job_id` to blackboard
+- returns `running`
+
+## `vla-wait`
+
+- polls `job_id` through host VLA service
+- while queued/running/streaming: returns `running`
+- on valid terminal action: writes action to blackboard and returns `success`
+- on timeout/error/cancel/invalid: returns `failure` (and clears `job_id` unless configured otherwise)
+
+## `vla-cancel`
+
+- cancels job id at configured key when present
+- clears `job_id` key
+- returns `success` for idempotent control flow
+
 ## Error And Missing Callback Semantics
 
 If a condition/action callback is missing, runtime:
@@ -152,3 +174,4 @@ It does not implicitly clear trace/log buffers.
 
 - [PlanAction Node Reference](plan-action-node.md)
 - [Planner Configuration Reference](planner-configuration.md)
+- [VLA BT Nodes](vla-nodes.md)

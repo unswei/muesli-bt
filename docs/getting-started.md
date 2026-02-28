@@ -58,6 +58,8 @@ Quick BT authoring example:
 ./build/dev/muslisp examples/bt/hello_bt.lisp
 ./build/dev/muslisp examples/repl_scripts/planner-bt-1d.lisp
 ./build/dev/muslisp examples/repl_scripts/planner-bt-ptz.lisp
+./build/dev/muslisp examples/repl_scripts/vla-stub-bt.lisp
+./build/dev/muslisp examples/repl_scripts/hybrid-vla-mcts-1d.lisp
 ```
 
 `(load "path/to/file.lisp")` is also available inside the REPL for runtime loading.
