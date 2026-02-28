@@ -1,4 +1,5 @@
 .instructions/
+.webots/
 images/
 
 # cmake out-of-source builds
