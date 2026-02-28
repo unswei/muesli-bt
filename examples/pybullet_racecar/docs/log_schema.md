@@ -37,19 +37,29 @@ The demo writes one JSON object per control tick (`JSON Lines`).
 ### `planner` Object
 
 - `schema_version` (string, currently `planner.v1`)
+- `planner` (`mcts` | `mppi` | `ilqr`)
+- `status` (`ok` | `timeout` | `error` | `noaction`)
 - `budget_ms` (float)
 - `time_used_ms` (float)
-- `iters` (int)
-- `root_visits` (int)
-- `root_children` (int)
-- `widen_added` (int)
-- `depth_max` (int)
-- `depth_mean` (float)
-- `status` (`ok` | `timeout` | `noaction`)
+- `work_done` (int)
 - `confidence` (float)
-- `value_est` (float)
 - `action` (object: `steering`, `throttle`)
-- `top_k` (list of objects with `action`, `visits`, `q`)
+- `trace` (optional object, backend-specific)
+- `overrun` (optional bool)
+- `note` (optional string)
+
+Notes:
+
+- The internal planner metadata uses canonical action format (`action_schema` + `u` vector).
+- The racecar demo log projects that action to `{steering, throttle}` for convenience.
+
+#### `planner.trace` (backend-specific)
+
+When planner trace is present, keys follow `planner.v1`:
+
+- `mcts`: `root_visits`, `root_children`, `widen_added`, optional `top_k[{action, visits, q}]`
+- `mppi`: `n_samples`, `horizon`, optional `top_k[{action, weight, cost}]`
+- `ilqr`: `iters`, `cost_init`, `cost_final`, `reg_final`, optional `top_k`
 
 ## Metadata Schema
 
@@ -70,3 +80,4 @@ Required fields:
 - Additive changes only within `racecar_demo.v1`.
 - Any field removal/rename/type change requires a new `schema_version`.
 - `run_demo.py` validates top-level fields before writing each record (schema regression guard).
+- `planner` sub-object follows `planner.v1`; backend `trace` contents vary by selected planner.

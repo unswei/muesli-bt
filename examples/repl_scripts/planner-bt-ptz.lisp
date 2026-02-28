@@ -7,8 +7,9 @@
     (seq
       (plan-action
         :name "ptz-planner"
+        :planner "mcts"
         :budget_ms 12
-        :iters_max 1200
+        :work_max 1200
         :model_service "ptz-track"
         :state_key ptz-state
         :action_key ptz-action

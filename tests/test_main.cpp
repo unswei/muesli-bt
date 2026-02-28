@@ -1085,82 +1085,215 @@ void test_continuous_mcts_smoke_deterministic() {
     check_close(a1, a2, 1e-12, "mcts smoke should be deterministic for fixed seed");
 }
 
-void test_planner_mcts_builtin_determinism_bounds_and_budget() {
+void test_planner_plan_builtin_determinism_bounds_budget_and_sanity() {
     using namespace muslisp;
 
     reset_bt_runtime_host();
     env_ptr env = create_global_env();
 
+    try {
+        (void)eval_text("(planner.plan (map.make))", env);
+        throw std::runtime_error("expected planner.plan request validation failure");
+    } catch (const lisp_error&) {
+    }
+
     value out = eval_text(
         "(begin "
         "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"planner.request.v1\") "
+        "  (map.set! req 'planner \"mcts\") "
         "  (map.set! req 'model_service \"toy-1d\") "
         "  (map.set! req 'state 0.0) "
         "  (map.set! req 'seed 42) "
-        "  (map.set! req 'budget_ms 8) "
-        "  (map.set! req 'iters_max 400) "
-        "  (define r1 (planner.mcts req)) "
-        "  (define r2 (planner.mcts req)) "
-        "  (list (map.get r1 'action nil) "
-        "        (map.get r2 'action nil) "
+        "  (map.set! req 'budget_ms 16) "
+        "  (map.set! req 'work_max 400) "
+        "  (map.set! req 'bounds (list (list -0.4 0.4))) "
+        "  (define mcts (map.make)) "
+        "  (map.set! mcts 'max_depth 16) "
+        "  (map.set! req 'mcts mcts) "
+        "  (define r1 (planner.plan req)) "
+        "  (define r2 (planner.plan req)) "
+        "  (list (car (map.get (map.get r1 'action nil) 'u (list 0.0))) "
+        "        (car (map.get (map.get r2 'action nil) 'u (list 0.0))) "
         "        (map.get r1 'status 'none) "
-        "        (map.get (map.get r1 'stats nil) 'time_used_ms 0.0) "
-        "        (map.get (map.get r1 'stats nil) 'iters 0)))",
+        "        (map.get (map.get r1 'stats nil) 'time_used_ms 0) "
+        "        (map.get (map.get r1 'stats nil) 'work_done 0)))",
         env);
 
     const std::vector<value> fields = vector_from_list(out);
-    check(fields.size() == 5, "planner.mcts deterministic output shape mismatch");
-    check(print_value(fields[0]) == print_value(fields[1]), "planner.mcts should be deterministic for fixed seed/input");
+    check(fields.size() == 5, "planner.plan mcts deterministic output shape mismatch");
+    check(is_float(fields[0]) && is_float(fields[1]), "planner.plan mcts action should be float");
+    check_close(float_value(fields[0]), float_value(fields[1]), 1e-12, "planner.plan mcts should be deterministic");
+    check(float_value(fields[0]) >= -0.4 && float_value(fields[0]) <= 0.4, "planner.plan should clamp by bounds");
     check(is_symbol(fields[2]) && (symbol_name(fields[2]) == ":ok" || symbol_name(fields[2]) == ":timeout"),
-          "planner.mcts status should be :ok or :timeout");
-
-    const std::vector<value> action = vector_from_list(fields[0]);
-    check(!action.empty(), "planner.mcts action list should not be empty");
-    check(is_float(action[0]), "planner.mcts action should be float");
-    check(float_value(action[0]) >= -1.0 && float_value(action[0]) <= 1.0, "planner.mcts action should be clamped");
-
-    check(is_float(fields[3]) && float_value(fields[3]) >= 0.0, "planner.mcts stats.time_used_ms should be non-negative");
-    check(is_integer(fields[4]) && integer_value(fields[4]) > 0, "planner.mcts stats.iters should be positive");
+          "planner.plan mcts status should be :ok or :timeout");
+    check(is_integer(fields[3]) && integer_value(fields[3]) >= 0, "planner.plan time_used_ms should be non-negative int");
+    check(is_integer(fields[4]) && integer_value(fields[4]) > 0, "planner.plan work_done should be positive");
 
     value budget_out = eval_text(
         "(begin "
         "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"planner.request.v1\") "
+        "  (map.set! req 'planner \"mcts\") "
         "  (map.set! req 'model_service \"toy-1d\") "
         "  (map.set! req 'state 0.0) "
         "  (map.set! req 'seed 99) "
         "  (map.set! req 'budget_ms 1) "
-        "  (map.set! req 'iters_max 100000) "
-        "  (define r (planner.mcts req)) "
+        "  (map.set! req 'work_max 100000) "
+        "  (define r (planner.plan req)) "
         "  (list (map.get r 'status 'none) "
-        "        (map.get (map.get r 'stats nil) 'time_used_ms 0.0) "
-        "        (map.get (map.get r 'stats nil) 'iters 0)))",
+        "        (map.get (map.get r 'stats nil) 'time_used_ms 0) "
+        "        (map.get (map.get r 'stats nil) 'work_done 0)))",
         env);
 
     const std::vector<value> budget_fields = vector_from_list(budget_out);
-    check(budget_fields.size() == 3, "planner.mcts budget output shape mismatch");
-    check(is_symbol(budget_fields[0]), "planner.mcts budget status should be symbol");
-    check(is_float(budget_fields[1]), "planner.mcts budget time should be float");
-    check(float_value(budget_fields[1]) <= 40.0, "planner.mcts should honor bounded-time budget");
+    check(budget_fields.size() == 3, "planner.plan budget output shape mismatch");
+    check(is_symbol(budget_fields[0]), "planner.plan budget status should be symbol");
+    check(is_integer(budget_fields[1]), "planner.plan budget time should be integer");
+    check(integer_value(budget_fields[1]) <= 40, "planner.plan should honor bounded-time budget");
     check(is_integer(budget_fields[2]) && integer_value(budget_fields[2]) > 0,
-          "planner.mcts budget run should still perform iterations");
+          "planner.plan budget run should still perform work");
 
-    value prior_out = eval_text(
+    value mppi_det = eval_text(
         "(begin "
         "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"planner.request.v1\") "
+        "  (map.set! req 'planner \"mppi\") "
         "  (map.set! req 'model_service \"toy-1d\") "
         "  (map.set! req 'state 0.0) "
         "  (map.set! req 'seed 123) "
-        "  (map.set! req 'budget_ms 6) "
-        "  (map.set! req 'iters_max 300) "
-        "  (map.set! req 'action_sampler \"vla_mixture\") "
-        "  (map.set! req 'action_prior_mean (list 0.6)) "
-        "  (map.set! req 'action_prior_sigma 0.1) "
-        "  (map.set! req 'action_prior_mix 0.8) "
-        "  (planner.mcts req))",
+        "  (map.set! req 'budget_ms 16) "
+        "  (map.set! req 'work_max 128) "
+        "  (map.set! req 'horizon 12) "
+        "  (define cfg (map.make)) "
+        "  (map.set! cfg 'lambda 0.8) "
+        "  (map.set! cfg 'sigma (list 0.35)) "
+        "  (map.set! cfg 'n_samples 128) "
+        "  (map.set! req 'mppi cfg) "
+        "  (define r1 (planner.plan req)) "
+        "  (define r2 (planner.plan req)) "
+        "  (list (car (map.get (map.get r1 'action nil) 'u (list 0.0))) "
+        "        (car (map.get (map.get r2 'action nil) 'u (list 0.0))) "
+        "        (map.get r1 'status ':none)))",
         env);
-    check(is_map(prior_out), "planner.mcts prior-mix call should return map");
-    value prior_action = eval_text("(map.get (planner.mcts req) 'action nil)", env);
-    check(is_proper_list(prior_action), "planner.mcts prior-mix action should be list");
+    const std::vector<value> mppi_fields = vector_from_list(mppi_det);
+    check(mppi_fields.size() == 3, "planner.plan mppi deterministic shape mismatch");
+    check(is_float(mppi_fields[0]) && is_float(mppi_fields[1]), "planner.plan mppi actions should be float");
+    check_close(float_value(mppi_fields[0]), float_value(mppi_fields[1]), 1e-12,
+                "planner.plan mppi should be deterministic for fixed seed");
+    check(is_symbol(mppi_fields[2]) && (symbol_name(mppi_fields[2]) == ":ok" || symbol_name(mppi_fields[2]) == ":timeout"),
+          "planner.plan mppi status should be :ok or :timeout");
+
+    value ilqr_ok = eval_text(
+        "(begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"planner.request.v1\") "
+        "  (map.set! req 'planner \"ilqr\") "
+        "  (map.set! req 'model_service \"toy-1d\") "
+        "  (map.set! req 'state -1.0) "
+        "  (map.set! req 'seed 9) "
+        "  (map.set! req 'budget_ms 20) "
+        "  (map.set! req 'work_max 20) "
+        "  (map.set! req 'horizon 12) "
+        "  (define cfg (map.make)) "
+        "  (map.set! cfg 'max_iters 20) "
+        "  (map.set! cfg 'derivatives \"analytic\") "
+        "  (map.set! req 'ilqr cfg) "
+        "  (define r (planner.plan req)) "
+        "  (list (map.get r 'status ':none) "
+        "        (car (map.get (map.get r 'action nil) 'u (list 0.0)))))",
+        env);
+    const std::vector<value> ilqr_ok_fields = vector_from_list(ilqr_ok);
+    check(ilqr_ok_fields.size() == 2, "planner.plan ilqr output shape mismatch");
+    check(is_symbol(ilqr_ok_fields[0]) && (symbol_name(ilqr_ok_fields[0]) == ":ok" || symbol_name(ilqr_ok_fields[0]) == ":timeout"),
+          "planner.plan ilqr status should be :ok or :timeout");
+    check(is_float(ilqr_ok_fields[1]) && float_value(ilqr_ok_fields[1]) > 0.0,
+          "planner.plan ilqr should move positive from x=-1.0");
+
+    value ilqr_missing_deriv = eval_text(
+        "(begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"planner.request.v1\") "
+        "  (map.set! req 'planner \"ilqr\") "
+        "  (map.set! req 'model_service \"ptz-track\") "
+        "  (map.set! req 'state (list 0.0 0.0 0.0 0.0)) "
+        "  (map.set! req 'budget_ms 8) "
+        "  (map.set! req 'work_max 4) "
+        "  (map.set! req 'horizon 4) "
+        "  (define cfg (map.make)) "
+        "  (map.set! cfg 'derivatives \"analytic\") "
+        "  (map.set! req 'ilqr cfg) "
+        "  (planner.plan req))",
+        env);
+    check(is_map(ilqr_missing_deriv), "planner.plan ilqr missing-derivatives should return map");
+    check(symbol_name(eval_text("(map.get (planner.plan req) 'status ':none)", env)) == ":error",
+          "planner.plan ilqr analytic without derivatives should return :error");
+
+    value sanity = eval_text(
+        "(begin "
+        "  (define (step x u) (+ x (* 0.25 (clamp u -1.0 1.0)))) "
+        "  (define (run req x n) "
+        "    (if (= n 0) "
+        "        x "
+        "        (begin "
+        "          (map.set! req 'state x) "
+        "          (define r (planner.plan req)) "
+        "          (define u (car (map.get (map.get r 'action nil) 'u (list 0.0)))) "
+        "          (run req (step x u) (- n 1))))) "
+        "  (define mreq (map.make)) "
+        "  (map.set! mreq 'schema_version \"planner.request.v1\") "
+        "  (map.set! mreq 'planner \"mppi\") "
+        "  (map.set! mreq 'model_service \"toy-1d\") "
+        "  (map.set! mreq 'budget_ms 12) "
+        "  (map.set! mreq 'work_max 96) "
+        "  (map.set! mreq 'horizon 10) "
+        "  (define mcfg (map.make)) "
+        "  (map.set! mcfg 'lambda 1.0) "
+        "  (map.set! mcfg 'sigma (list 0.3)) "
+        "  (map.set! mcfg 'n_samples 96) "
+        "  (map.set! mreq 'mppi mcfg) "
+        "  (define ireq (map.make)) "
+        "  (map.set! ireq 'schema_version \"planner.request.v1\") "
+        "  (map.set! ireq 'planner \"ilqr\") "
+        "  (map.set! ireq 'model_service \"toy-1d\") "
+        "  (map.set! ireq 'budget_ms 20) "
+        "  (map.set! ireq 'work_max 16) "
+        "  (map.set! ireq 'horizon 10) "
+        "  (define icfg (map.make)) "
+        "  (map.set! icfg 'max_iters 16) "
+        "  (map.set! icfg 'derivatives \"analytic\") "
+        "  (map.set! ireq 'ilqr icfg) "
+        "  (list (run mreq -1.0 8) (run ireq -1.0 8)))",
+        env);
+    const std::vector<value> sanity_fields = vector_from_list(sanity);
+    check(sanity_fields.size() == 2, "planner sanity output shape mismatch");
+    check(is_float(sanity_fields[0]) && float_value(sanity_fields[0]) > -0.95, "mppi should improve 1D integrator");
+    check(is_float(sanity_fields[1]) && float_value(sanity_fields[1]) > -0.95, "ilqr should improve 1D integrator");
+
+    value uni = eval_text(
+        "(begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"planner.request.v1\") "
+        "  (map.set! req 'planner \"mppi\") "
+        "  (map.set! req 'model_service \"toy-unicycle\") "
+        "  (map.set! req 'state (list 0.0 0.0 0.0 1.0 0.0)) "
+        "  (map.set! req 'budget_ms 12) "
+        "  (map.set! req 'work_max 96) "
+        "  (map.set! req 'horizon 12) "
+        "  (define cfg (map.make)) "
+        "  (map.set! cfg 'lambda 1.0) "
+        "  (map.set! cfg 'sigma (list 0.25 0.35)) "
+        "  (map.set! cfg 'n_samples 96) "
+        "  (map.set! req 'mppi cfg) "
+        "  (define r (planner.plan req)) "
+        "  (list (map.get r 'status ':none) "
+        "        (car (map.get (map.get r 'action nil) 'u (list 0.0)))))",
+        env);
+    const std::vector<value> uni_fields = vector_from_list(uni);
+    check(uni_fields.size() == 2, "toy-unicycle planner output shape mismatch");
+    check(is_symbol(uni_fields[0]) && (symbol_name(uni_fields[0]) == ":ok" || symbol_name(uni_fields[0]) == ":timeout"),
+          "toy-unicycle mppi status should be :ok or :timeout");
+    check(is_float(uni_fields[1]) && float_value(uni_fields[1]) > 0.0, "toy-unicycle mppi should command forward velocity");
 }
 
 void test_plan_action_node_blackboard_meta_and_logs() {
@@ -1179,7 +1312,7 @@ void test_plan_action_node_blackboard_meta_and_logs() {
         "(define tree "
         "  (bt.compile "
         "    '(seq "
-        "       (plan-action :name \"toy-plan\" :budget_ms 6 :iters_max 300 "
+        "       (plan-action :name \"toy-plan\" :planner :mcts :budget_ms 20 :work_max 300 "
         "                    :model_service \"toy-1d\" :state_key state :action_key action :meta_key plan-meta) "
         "       (act apply-planned-1d state action state))))",
         env);
@@ -1252,6 +1385,54 @@ void test_plan_action_node_blackboard_meta_and_logs() {
     (void)eval_text("(define bad-inst (bt.new-instance bad-tree))", env);
     check(symbol_name(eval_text("(bt.tick bad-inst)", env)) == "failure",
           "plan-action should fail on missing state key");
+}
+
+void test_plan_action_node_with_all_planner_backends() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    (void)eval_text(
+        "(define tree-mcts "
+        "  (bt.compile '(plan-action :name \"mcts-node\" :planner :mcts :budget_ms 24 :work_max 240 "
+        "                          :model_service \"toy-1d\" :state_key state :action_key action)))",
+        env);
+    (void)eval_text(
+        "(define tree-mppi "
+        "  (bt.compile '(plan-action :name \"mppi-node\" :planner :mppi :budget_ms 24 :work_max 96 "
+        "                          :horizon 10 :lambda 1.0 :sigma 0.3 :n_samples 96 "
+        "                          :model_service \"toy-1d\" :state_key state :action_key action)))",
+        env);
+    (void)eval_text(
+        "(define tree-ilqr "
+        "  (bt.compile '(plan-action :name \"ilqr-node\" :planner :ilqr :budget_ms 24 :work_max 12 "
+        "                          :horizon 10 :max_iters 12 :derivatives :analytic "
+        "                          :model_service \"toy-1d\" :state_key state :action_key action)))",
+        env);
+
+    (void)eval_text("(define inst-mcts (bt.new-instance tree-mcts))", env);
+    (void)eval_text("(define inst-mppi (bt.new-instance tree-mppi))", env);
+    (void)eval_text("(define inst-ilqr (bt.new-instance tree-ilqr))", env);
+
+    check(symbol_name(eval_text("(bt.tick inst-mcts '((state -1.0)))", env)) == "success",
+          "plan-action mcts backend should succeed");
+    check(symbol_name(eval_text("(bt.tick inst-mppi '((state -1.0)))", env)) == "success",
+          "plan-action mppi backend should succeed");
+    check(symbol_name(eval_text("(bt.tick inst-ilqr '((state -1.0)))", env)) == "success",
+          "plan-action ilqr backend should succeed");
+
+    bt::runtime_host& host = bt::default_runtime_host();
+    const std::int64_t h_mcts = bt_handle(eval_text("inst-mcts", env));
+    const std::int64_t h_mppi = bt_handle(eval_text("inst-mppi", env));
+    const std::int64_t h_ilqr = bt_handle(eval_text("inst-ilqr", env));
+    bt::instance* i_mcts = host.find_instance(h_mcts);
+    bt::instance* i_mppi = host.find_instance(h_mppi);
+    bt::instance* i_ilqr = host.find_instance(h_ilqr);
+    check(i_mcts && i_mppi && i_ilqr, "backend test instances should exist");
+    check(i_mcts->bb.get("action") != nullptr, "mcts backend should publish action");
+    check(i_mppi->bb.get("action") != nullptr, "mppi backend should publish action");
+    check(i_ilqr->bb.get("action") != nullptr, "ilqr backend should publish action");
 }
 
 void test_hash64_builtin() {
@@ -2010,7 +2191,7 @@ void test_racecar_planner_model_and_sim_get_state_builtin() {
         "(define tree "
         "  (bt.compile "
         "    '(seq "
-        "       (plan-action :name \"race\" :budget_ms 4 :iters_max 120 "
+        "       (plan-action :name \"race\" :planner :mcts :budget_ms 8 :work_max 120 "
         "                    :model_service \"racecar-kinematic-v1\" :state_key state :action_key action :meta_key plan-meta) "
         "       (act apply-action action))))",
         env);
@@ -2263,8 +2444,9 @@ int main() {
         {"map gc/rehash/ops", test_map_gc_rehash_and_ops},
         {"pq builtins gc/errors", test_pq_builtins_gc_and_errors},
         {"continuous mcts smoke deterministic", test_continuous_mcts_smoke_deterministic},
-        {"planner.mcts determinism/bounds/budget", test_planner_mcts_builtin_determinism_bounds_and_budget},
+        {"planner.plan determinism/bounds/budget/sanity", test_planner_plan_builtin_determinism_bounds_budget_and_sanity},
         {"plan-action node blackboard/meta/logs", test_plan_action_node_blackboard_meta_and_logs},
+        {"plan-action node all planner backends", test_plan_action_node_with_all_planner_backends},
         {"hash64 builtin", test_hash64_builtin},
         {"json and handle builtins", test_json_and_handle_builtins},
         {"vla builtins submit/poll/cancel/caps", test_vla_builtins_submit_poll_cancel_and_caps},

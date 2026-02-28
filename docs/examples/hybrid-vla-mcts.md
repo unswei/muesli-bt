@@ -1,6 +1,6 @@
-# Example: Hybrid VLA Prior + MCTS
+# Example: Hybrid VLA + Planner
 
-This script requests a VLA action proposal, then feeds it into `planner.mcts` as a prior mixture sampler.
+This script demonstrates combining VLA proposal logic with host-side planning through `planner.plan`.
 
 Script path:
 
@@ -14,6 +14,6 @@ Run:
 
 What to look for:
 
-- `vla.submit` + `vla.poll` produce a structured action proposal
-- planner request uses `action_sampler = "vla_mixture"`
-- prior parameters (`action_prior_mean`, `action_prior_sigma`, `action_prior_mix`) influence root sampling
+- `vla.submit` + `vla.poll` produce structured proposal metadata
+- planner requests use unified `planner.request.v1`
+- backend selection is explicit via `planner` (`mcts`, `mppi`, `ilqr`)

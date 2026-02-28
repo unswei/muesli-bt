@@ -16,7 +16,7 @@ Coverage includes:
 - BT runtime status propagation
 - decorators and reset behaviour
 - blackboard, trace, logs, scheduler stats
-- bounded-time planner service (`planner.mcts`) and `plan-action` node semantics
+- bounded-time planner service (`planner.plan`) and `plan-action` node semantics
 - async capability/VLA surface (`cap.*`, `vla.*`, handle metadata, JSON conversion)
 - VLA BT nodes (`vla-request`, `vla-wait`, `vla-cancel`) including cancel flow
 - host wrappers and typed robot interface injection

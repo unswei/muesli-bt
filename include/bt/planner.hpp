@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -37,6 +38,91 @@ struct planner_step_result {
     bool done = false;
 };
 
+struct planner_bound {
+    double lo = -1.0;
+    double hi = 1.0;
+};
+
+struct planner_action {
+    std::string action_schema;
+    planner_vector u;
+};
+
+struct planner_constraints {
+    planner_vector max_du;
+    double smoothness_weight = 0.0;
+    double collision_weight = 0.0;
+    double goal_tolerance = 0.0;
+    bool has_smoothness_weight = false;
+    bool has_collision_weight = false;
+    bool has_goal_tolerance = false;
+};
+
+enum class planner_backend {
+    mcts,
+    mppi,
+    ilqr
+};
+
+enum class planner_ilqr_derivatives_mode {
+    analytic,
+    finite_diff
+};
+
+struct planner_mcts_config {
+    double c_ucb = 1.2;
+    double pw_k = 2.0;
+    double pw_alpha = 0.5;
+    std::int64_t max_depth = 25;
+    double gamma = 0.95;
+    std::string rollout_policy = "model_default";
+    std::string action_sampler = "model_default";
+    std::int64_t default_iters = 2000;
+    std::int64_t time_check_interval = 8;
+};
+
+struct planner_mppi_config {
+    double lambda = 1.0;
+    planner_vector sigma{};
+    std::int64_t n_samples = 128;
+    std::int64_t n_elite = 0;
+    planner_vector u_init{};
+    planner_vector u_nominal{};
+};
+
+struct planner_ilqr_config {
+    std::int64_t max_iters = 30;
+    double reg_init = 1.0;
+    double reg_factor = 10.0;
+    double tol_cost = 1.0e-4;
+    double tol_grad = 1.0e-4;
+    planner_vector u_init{};
+    planner_ilqr_derivatives_mode derivatives = planner_ilqr_derivatives_mode::analytic;
+    double fd_eps = 1.0e-4;
+};
+
+struct planner_linearisation {
+    std::size_t state_dim = 0;
+    std::size_t action_dim = 0;
+    std::vector<double> A;
+    std::vector<double> B;
+};
+
+struct planner_quadratic_cost {
+    double l0 = 0.0;
+    planner_vector l_x;
+    planner_vector l_u;
+    std::vector<double> l_xx;
+    std::vector<double> l_uu;
+    std::vector<double> l_xu;
+};
+
+struct planner_terminal_quadratic_cost {
+    double l0 = 0.0;
+    planner_vector l_x;
+    std::vector<double> l_xx;
+};
+
 class planner_model {
 public:
     virtual ~planner_model() = default;
@@ -50,24 +136,29 @@ public:
     [[nodiscard]] virtual planner_vector zero_action() const = 0;
     [[nodiscard]] virtual bool validate_state(const planner_vector& state) const;
     [[nodiscard]] virtual std::size_t action_dims() const = 0;
-};
 
-struct planner_config {
-    std::int64_t budget_ms = 20;
-    std::int64_t iters_max = 2000;
-    double gamma = 0.95;
-    std::int64_t max_depth = 25;
-    double c_ucb = 1.2;
-    double pw_k = 2.0;
-    double pw_alpha = 0.5;
-    std::int64_t time_check_interval = 8;
-    std::int64_t top_k = 3;
-    planner_vector fallback_action{};
-    std::string rollout_policy = "model_default";
-    std::string action_sampler = "model_default";
-    planner_vector action_prior_mean{};
-    double action_prior_sigma = 0.2;
-    double action_prior_mix = 0.5;
+    [[nodiscard]] virtual std::vector<planner_bound> action_bounds() const;
+    [[nodiscard]] virtual std::int64_t default_horizon() const;
+    [[nodiscard]] virtual std::int64_t default_dt_ms() const;
+
+    [[nodiscard]] virtual bool rollout_cost(const planner_vector& state,
+                                            const std::vector<planner_vector>& action_sequence,
+                                            double& cost) const;
+
+    [[nodiscard]] virtual bool deterministic_step(const planner_vector& state,
+                                                  const planner_vector& action,
+                                                  planner_step_result& out) const;
+
+    [[nodiscard]] virtual bool linearise_dynamics(const planner_vector& state,
+                                                  const planner_vector& action,
+                                                  planner_linearisation& out) const;
+
+    [[nodiscard]] virtual bool quadraticise_cost(const planner_vector& state,
+                                                 const planner_vector& action,
+                                                 planner_quadratic_cost& out) const;
+
+    [[nodiscard]] virtual bool quadraticise_terminal_cost(const planner_vector& state,
+                                                          planner_terminal_quadratic_cost& out) const;
 };
 
 enum class planner_status {
@@ -77,30 +168,80 @@ enum class planner_status {
     error
 };
 
-struct planner_top_choice {
-    planner_vector action;
+struct planner_top_choice_mcts {
+    planner_action action;
     std::int64_t visits = 0;
     double q = 0.0;
 };
 
-struct planner_stats {
-    std::int64_t iters = 0;
+struct planner_top_choice_mppi {
+    planner_action action;
+    double weight = 0.0;
+    double cost = 0.0;
+};
+
+struct planner_trace_mcts {
+    bool available = false;
     std::int64_t root_visits = 0;
     std::int64_t root_children = 0;
     std::int64_t widen_added = 0;
-    std::int64_t depth_max = 0;
-    double depth_mean = 0.0;
-    double time_used_ms = 0.0;
-    double value_est = 0.0;
+    std::vector<planner_top_choice_mcts> top_k{};
+};
+
+struct planner_trace_mppi {
+    bool available = false;
+    std::int64_t n_samples = 0;
+    std::int64_t horizon = 0;
+    std::vector<planner_top_choice_mppi> top_k{};
+};
+
+struct planner_trace_ilqr {
+    bool available = false;
+    std::int64_t iters = 0;
+    double cost_init = 0.0;
+    double cost_final = 0.0;
+    double reg_final = 0.0;
+    std::vector<planner_top_choice_mppi> top_k{};
+};
+
+struct planner_trace {
+    planner_trace_mcts mcts;
+    planner_trace_mppi mppi;
+    planner_trace_ilqr ilqr;
+};
+
+struct planner_stats {
+    std::int64_t budget_ms = 0;
+    std::int64_t time_used_ms = 0;
+    std::int64_t work_done = 0;
     std::uint64_t seed = 0;
-    std::vector<planner_top_choice> top_k{};
+    bool overrun = false;
+    std::string note;
 };
 
 struct planner_request {
+    std::string schema_version = "planner.request.v1";
+    planner_backend planner = planner_backend::mcts;
     std::string model_service = "toy-1d";
     planner_vector state;
-    planner_config config;
+
+    std::int64_t budget_ms = 20;
+    std::int64_t work_max = 0;
+    std::int64_t horizon = 0;
+    std::int64_t dt_ms = 0;
+
+    std::vector<planner_bound> bounds{};
+    planner_constraints constraints{};
+    std::int64_t top_k = 3;
+
     std::uint64_t seed = 0;
+    planner_action safe_action{};
+    std::string action_schema;
+
+    planner_mcts_config mcts{};
+    planner_mppi_config mppi{};
+    planner_ilqr_config ilqr{};
+
     std::string run_id = "default";
     std::uint64_t tick_index = 0;
     std::string node_name = "planner";
@@ -108,10 +249,13 @@ struct planner_request {
 };
 
 struct planner_result {
+    std::string schema_version = "planner.result.v1";
+    planner_backend planner = planner_backend::mcts;
     planner_status status = planner_status::error;
-    planner_vector action;
+    planner_action action;
     double confidence = 0.0;
     planner_stats stats{};
+    planner_trace trace{};
     std::string error;
 };
 
@@ -121,21 +265,18 @@ struct planner_record {
     std::string run_id;
     std::uint64_t tick_index = 0;
     std::string node_name;
-    std::int64_t budget_ms = 0;
-    double time_used_ms = 0.0;
-    std::int64_t iters = 0;
-    std::int64_t root_visits = 0;
-    std::int64_t root_children = 0;
-    std::int64_t widen_added = 0;
-    planner_vector action;
-    double confidence = 0.0;
-    double value_est = 0.0;
+    planner_backend planner = planner_backend::mcts;
     planner_status status = planner_status::error;
-    std::int64_t depth_max = 0;
-    double depth_mean = 0.0;
+    std::int64_t budget_ms = 0;
+    std::int64_t time_used_ms = 0;
+    std::int64_t work_done = 0;
+    planner_action action;
+    double confidence = 0.0;
     std::uint64_t seed = 0;
+    bool overrun = false;
+    std::string note;
+    planner_trace trace{};
     std::string state_key;
-    std::vector<planner_top_choice> top_k{};
 };
 
 class planner_service {
@@ -183,5 +324,10 @@ private:
 };
 
 [[nodiscard]] const char* planner_status_name(planner_status status) noexcept;
+[[nodiscard]] const char* planner_backend_name(planner_backend planner) noexcept;
+[[nodiscard]] const char* planner_ilqr_derivatives_mode_name(planner_ilqr_derivatives_mode mode) noexcept;
+[[nodiscard]] bool planner_backend_from_string(std::string_view text, planner_backend& out) noexcept;
+[[nodiscard]] bool planner_ilqr_derivatives_mode_from_string(std::string_view text,
+                                                             planner_ilqr_derivatives_mode& out) noexcept;
 
 }  // namespace bt

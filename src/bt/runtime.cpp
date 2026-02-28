@@ -22,6 +22,8 @@ trace_event make_trace_event(trace_event_kind kind) {
     return ev;
 }
 
+std::string json_escape(std::string_view text);
+
 std::int64_t ns_since_epoch(std::chrono::steady_clock::time_point tp) {
     return std::chrono::duration_cast<std::chrono::nanoseconds>(tp.time_since_epoch()).count();
 }
@@ -180,29 +182,90 @@ std::optional<std::uint64_t> seed_from_blackboard(const bb_value& value) {
     return std::nullopt;
 }
 
-bb_value action_to_blackboard(const planner_vector& action) {
-    if (action.size() == 1) {
-        return bb_value{action[0]};
+bb_value action_to_blackboard(const planner_action& action) {
+    if (action.u.size() == 1) {
+        return bb_value{action.u[0]};
     }
-    return bb_value{action};
+    return bb_value{action.u};
 }
 
 std::string plan_meta_to_json(const planner_result& result, const planner_request& request) {
     std::ostringstream out;
-    out << '{' << "\"status\":\"" << planner_status_name(result.status) << "\","
+    out << '{' << "\"schema_version\":\"planner.v1\","
+        << "\"planner\":\"" << planner_backend_name(result.planner) << "\","
+        << "\"status\":\"" << planner_status_name(result.status) << "\","
         << "\"tick_index\":" << request.tick_index << ',' << "\"seed\":" << request.seed << ','
-        << "\"budget_ms\":" << request.config.budget_ms << ',' << "\"time_used_ms\":" << result.stats.time_used_ms << ','
-        << "\"iters\":" << result.stats.iters << ',' << "\"root_visits\":" << result.stats.root_visits << ','
-        << "\"root_children\":" << result.stats.root_children << ',' << "\"widen_added\":" << result.stats.widen_added << ','
-        << "\"confidence\":" << result.confidence << ',' << "\"value_est\":" << result.stats.value_est << ','
-        << "\"action\":[";
-    for (std::size_t i = 0; i < result.action.size(); ++i) {
+        << "\"budget_ms\":" << result.stats.budget_ms << ',' << "\"time_used_ms\":" << result.stats.time_used_ms << ','
+        << "\"work_done\":" << result.stats.work_done << ',' << "\"confidence\":" << result.confidence << ','
+        << "\"action\":{\"action_schema\":\"" << json_escape(result.action.action_schema) << "\",\"u\":[";
+    for (std::size_t i = 0; i < result.action.u.size(); ++i) {
         if (i != 0) {
             out << ',';
         }
-        out << result.action[i];
+        out << result.action.u[i];
     }
     out << "]}";
+
+    if (result.planner == planner_backend::mcts && result.trace.mcts.available) {
+        out << ",\"trace\":{\"root_visits\":" << result.trace.mcts.root_visits
+            << ",\"root_children\":" << result.trace.mcts.root_children
+            << ",\"widen_added\":" << result.trace.mcts.widen_added;
+        if (!result.trace.mcts.top_k.empty()) {
+            out << ",\"top_k\":[";
+            for (std::size_t i = 0; i < result.trace.mcts.top_k.size(); ++i) {
+                if (i != 0) {
+                    out << ',';
+                }
+                const planner_top_choice_mcts& top = result.trace.mcts.top_k[i];
+                out << "{\"action\":{\"action_schema\":\"" << json_escape(top.action.action_schema) << "\",\"u\":[";
+                for (std::size_t j = 0; j < top.action.u.size(); ++j) {
+                    if (j != 0) {
+                        out << ',';
+                    }
+                    out << top.action.u[j];
+                }
+                out << "]},\"visits\":" << top.visits << ",\"q\":" << top.q << '}';
+            }
+            out << ']';
+        }
+        out << '}';
+    } else if (result.planner == planner_backend::mppi && result.trace.mppi.available) {
+        out << ",\"trace\":{\"n_samples\":" << result.trace.mppi.n_samples
+            << ",\"horizon\":" << result.trace.mppi.horizon;
+        if (!result.trace.mppi.top_k.empty()) {
+            out << ",\"top_k\":[";
+            for (std::size_t i = 0; i < result.trace.mppi.top_k.size(); ++i) {
+                if (i != 0) {
+                    out << ',';
+                }
+                const planner_top_choice_mppi& top = result.trace.mppi.top_k[i];
+                out << "{\"action\":{\"action_schema\":\"" << json_escape(top.action.action_schema) << "\",\"u\":[";
+                for (std::size_t j = 0; j < top.action.u.size(); ++j) {
+                    if (j != 0) {
+                        out << ',';
+                    }
+                    out << top.action.u[j];
+                }
+                out << "]},\"weight\":" << top.weight << ",\"cost\":" << top.cost << '}';
+            }
+            out << ']';
+        }
+        out << '}';
+    } else if (result.planner == planner_backend::ilqr && result.trace.ilqr.available) {
+        out << ",\"trace\":{\"iters\":" << result.trace.ilqr.iters << ",\"cost_init\":" << result.trace.ilqr.cost_init
+            << ",\"cost_final\":" << result.trace.ilqr.cost_final << ",\"reg_final\":" << result.trace.ilqr.reg_final << '}';
+    }
+
+    if (result.stats.overrun) {
+        out << ",\"overrun\":true";
+    }
+    if (!result.stats.note.empty()) {
+        out << ",\"note\":\"" << json_escape(result.stats.note) << "\"";
+    }
+    if (!result.error.empty()) {
+        out << ",\"error\":\"" << json_escape(result.error) << "\"";
+    }
+    out << '}';
     return out.str();
 }
 
@@ -653,6 +716,7 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
     }
 
     planner_request request;
+    request.schema_version = "planner.request.v1";
     request.node_name = n.leaf_name.empty() ? ("plan-action-" + std::to_string(n.id)) : n.leaf_name;
     request.tick_index = ctx.tick_index;
     request.run_id = "inst-" + std::to_string(ctx.inst.instance_handle);
@@ -662,7 +726,9 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
     std::string model_service = "toy-1d";
     std::string meta_key;
     std::string seed_key;
-    std::string prior_key;
+    std::string safe_action_key;
+    std::string sigma_key;
+    std::string max_du_key;
 
     for (std::size_t i = 0; i < args.size(); i += 2) {
         const std::string raw_key = arg_as_text(args[i], "plan-action");
@@ -673,12 +739,29 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
             request.node_name = arg_as_text(value, "plan-action :name");
             continue;
         }
-        if (key == "budget_ms") {
-            request.config.budget_ms = arg_as_int(value, "plan-action :budget_ms");
+        if (key == "planner") {
+            const std::string planner_name = arg_as_text(value, "plan-action :planner");
+            planner_backend backend = planner_backend::mcts;
+            if (!planner_backend_from_string(planner_name, backend)) {
+                throw bt_runtime_error("plan-action: unsupported planner: " + planner_name);
+            }
+            request.planner = backend;
             continue;
         }
-        if (key == "iters_max") {
-            request.config.iters_max = arg_as_int(value, "plan-action :iters_max");
+        if (key == "budget_ms") {
+            request.budget_ms = arg_as_int(value, "plan-action :budget_ms");
+            continue;
+        }
+        if (key == "work_max" || key == "iters_max") {
+            request.work_max = arg_as_int(value, "plan-action :work_max");
+            continue;
+        }
+        if (key == "horizon") {
+            request.horizon = arg_as_int(value, "plan-action :horizon");
+            continue;
+        }
+        if (key == "dt_ms") {
+            request.dt_ms = arg_as_int(value, "plan-action :dt_ms");
             continue;
         }
         if (key == "model_service") {
@@ -701,52 +784,128 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
             seed_key = arg_as_text(value, "plan-action :seed_key");
             continue;
         }
-        if (key == "fallback_action") {
-            request.config.fallback_action = {arg_as_number(value, "plan-action :fallback_action")};
+        if (key == "safe_action_key") {
+            safe_action_key = arg_as_text(value, "plan-action :safe_action_key");
             continue;
         }
-        if (key == "gamma") {
-            request.config.gamma = arg_as_number(value, "plan-action :gamma");
+        if (key == "safe_action" || key == "fallback_action") {
+            request.safe_action.u = {arg_as_number(value, "plan-action :safe_action")};
             continue;
         }
-        if (key == "max_depth") {
-            request.config.max_depth = arg_as_int(value, "plan-action :max_depth");
-            continue;
-        }
-        if (key == "c_ucb") {
-            request.config.c_ucb = arg_as_number(value, "plan-action :c_ucb");
-            continue;
-        }
-        if (key == "pw_k") {
-            request.config.pw_k = arg_as_number(value, "plan-action :pw_k");
-            continue;
-        }
-        if (key == "pw_alpha") {
-            request.config.pw_alpha = arg_as_number(value, "plan-action :pw_alpha");
-            continue;
-        }
-        if (key == "rollout_policy") {
-            request.config.rollout_policy = arg_as_text(value, "plan-action :rollout_policy");
-            continue;
-        }
-        if (key == "action_sampler") {
-            request.config.action_sampler = arg_as_text(value, "plan-action :action_sampler");
-            continue;
-        }
-        if (key == "prior_key") {
-            prior_key = arg_as_text(value, "plan-action :prior_key");
-            continue;
-        }
-        if (key == "prior_sigma") {
-            request.config.action_prior_sigma = arg_as_number(value, "plan-action :prior_sigma");
-            continue;
-        }
-        if (key == "prior_mix") {
-            request.config.action_prior_mix = arg_as_number(value, "plan-action :prior_mix");
+        if (key == "action_schema") {
+            request.action_schema = arg_as_text(value, "plan-action :action_schema");
             continue;
         }
         if (key == "top_k") {
-            request.config.top_k = arg_as_int(value, "plan-action :top_k");
+            request.top_k = arg_as_int(value, "plan-action :top_k");
+            continue;
+        }
+
+        if (key == "gamma") {
+            request.mcts.gamma = arg_as_number(value, "plan-action :gamma");
+            continue;
+        }
+        if (key == "max_depth") {
+            request.mcts.max_depth = arg_as_int(value, "plan-action :max_depth");
+            continue;
+        }
+        if (key == "c_ucb") {
+            request.mcts.c_ucb = arg_as_number(value, "plan-action :c_ucb");
+            continue;
+        }
+        if (key == "pw_k") {
+            request.mcts.pw_k = arg_as_number(value, "plan-action :pw_k");
+            continue;
+        }
+        if (key == "pw_alpha") {
+            request.mcts.pw_alpha = arg_as_number(value, "plan-action :pw_alpha");
+            continue;
+        }
+        if (key == "rollout_policy") {
+            request.mcts.rollout_policy = arg_as_text(value, "plan-action :rollout_policy");
+            continue;
+        }
+        if (key == "action_sampler") {
+            request.mcts.action_sampler = arg_as_text(value, "plan-action :action_sampler");
+            continue;
+        }
+
+        if (key == "lambda") {
+            request.mppi.lambda = arg_as_number(value, "plan-action :lambda");
+            continue;
+        }
+        if (key == "sigma") {
+            request.mppi.sigma = {arg_as_number(value, "plan-action :sigma")};
+            continue;
+        }
+        if (key == "sigma_key") {
+            sigma_key = arg_as_text(value, "plan-action :sigma_key");
+            continue;
+        }
+        if (key == "n_samples") {
+            request.mppi.n_samples = arg_as_int(value, "plan-action :n_samples");
+            continue;
+        }
+        if (key == "n_elite") {
+            request.mppi.n_elite = arg_as_int(value, "plan-action :n_elite");
+            continue;
+        }
+
+        if (key == "max_iters") {
+            request.ilqr.max_iters = arg_as_int(value, "plan-action :max_iters");
+            continue;
+        }
+        if (key == "reg_init") {
+            request.ilqr.reg_init = arg_as_number(value, "plan-action :reg_init");
+            continue;
+        }
+        if (key == "reg_factor") {
+            request.ilqr.reg_factor = arg_as_number(value, "plan-action :reg_factor");
+            continue;
+        }
+        if (key == "tol_cost") {
+            request.ilqr.tol_cost = arg_as_number(value, "plan-action :tol_cost");
+            continue;
+        }
+        if (key == "tol_grad") {
+            request.ilqr.tol_grad = arg_as_number(value, "plan-action :tol_grad");
+            continue;
+        }
+        if (key == "fd_eps") {
+            request.ilqr.fd_eps = arg_as_number(value, "plan-action :fd_eps");
+            continue;
+        }
+        if (key == "derivatives") {
+            const std::string mode_text = arg_as_text(value, "plan-action :derivatives");
+            planner_ilqr_derivatives_mode mode = planner_ilqr_derivatives_mode::analytic;
+            if (!planner_ilqr_derivatives_mode_from_string(mode_text, mode)) {
+                throw bt_runtime_error("plan-action: unsupported derivatives mode: " + mode_text);
+            }
+            request.ilqr.derivatives = mode;
+            continue;
+        }
+
+        if (key == "max_du") {
+            request.constraints.max_du = {arg_as_number(value, "plan-action :max_du")};
+            continue;
+        }
+        if (key == "max_du_key") {
+            max_du_key = arg_as_text(value, "plan-action :max_du_key");
+            continue;
+        }
+        if (key == "smoothness_weight") {
+            request.constraints.smoothness_weight = arg_as_number(value, "plan-action :smoothness_weight");
+            request.constraints.has_smoothness_weight = true;
+            continue;
+        }
+        if (key == "collision_weight") {
+            request.constraints.collision_weight = arg_as_number(value, "plan-action :collision_weight");
+            request.constraints.has_collision_weight = true;
+            continue;
+        }
+        if (key == "goal_tolerance") {
+            request.constraints.goal_tolerance = arg_as_number(value, "plan-action :goal_tolerance");
+            request.constraints.has_goal_tolerance = true;
             continue;
         }
 
@@ -777,18 +936,38 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
         return status::failure;
     }
 
-    if (!prior_key.empty()) {
-        const bb_entry* prior_entry = ctx.bb_get(prior_key);
-        if (prior_entry) {
+    if (!safe_action_key.empty()) {
+        const bb_entry* safe_entry = ctx.bb_get(safe_action_key);
+        if (safe_entry) {
             try {
-                request.config.action_prior_mean = state_from_blackboard(prior_entry->value, "plan-action prior");
-                if (!request.config.action_prior_mean.empty()) {
-                    request.config.action_sampler = "vla_mixture";
-                }
-            } catch (const std::exception&) {
-                // Ignore prior parse failures and keep default sampler.
+                request.safe_action.u = state_from_blackboard(safe_entry->value, "plan-action safe_action");
+            } catch (const std::exception& e) {
+                emit_log(ctx, log_level::warn, "planner", std::string("plan-action: invalid safe_action_key: ") + e.what());
             }
         }
+    }
+    if (!sigma_key.empty()) {
+        const bb_entry* sigma_entry = ctx.bb_get(sigma_key);
+        if (sigma_entry) {
+            try {
+                request.mppi.sigma = state_from_blackboard(sigma_entry->value, "plan-action sigma");
+            } catch (const std::exception& e) {
+                emit_log(ctx, log_level::warn, "planner", std::string("plan-action: invalid sigma_key: ") + e.what());
+            }
+        }
+    }
+    if (!max_du_key.empty()) {
+        const bb_entry* max_du_entry = ctx.bb_get(max_du_key);
+        if (max_du_entry) {
+            try {
+                request.constraints.max_du = state_from_blackboard(max_du_entry->value, "plan-action max_du");
+            } catch (const std::exception& e) {
+                emit_log(ctx, log_level::warn, "planner", std::string("plan-action: invalid max_du_key: ") + e.what());
+            }
+        }
+    }
+    if (!request.safe_action.u.empty()) {
+        request.safe_action.action_schema = request.action_schema.empty() ? "action.u.v1" : request.action_schema;
     }
 
     bool has_explicit_seed = false;
@@ -818,8 +997,8 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
         return status::failure;
     }
 
-    if (result.status == planner_status::error || result.action.empty()) {
-        std::string message = "plan-action: planner error";
+    if (result.action.u.empty()) {
+        std::string message = "plan-action: planner returned empty action";
         if (!result.error.empty()) {
             message += ": ";
             message += result.error;
@@ -832,7 +1011,7 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
         return status::failure;
     }
 
-    for (double v : result.action) {
+    for (double v : result.action.u) {
         if (!std::isfinite(v)) {
             trace_event ev = make_trace_event(trace_event_kind::error);
             ev.node = n.id;
@@ -849,16 +1028,32 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
     }
 
     std::ostringstream msg;
-    msg << "status=" << planner_status_name(result.status) << " action=";
-    for (std::size_t i = 0; i < result.action.size(); ++i) {
+    msg << "planner=" << planner_backend_name(result.planner) << " status=" << planner_status_name(result.status)
+        << " action=";
+    for (std::size_t i = 0; i < result.action.u.size(); ++i) {
         if (i != 0) {
             msg << ',';
         }
-        msg << result.action[i];
+        msg << result.action.u[i];
     }
-    msg << " confidence=" << result.confidence << " iters=" << result.stats.iters
+    msg << " confidence=" << result.confidence << " work=" << result.stats.work_done
         << " time_ms=" << result.stats.time_used_ms;
     emit_log(ctx, log_level::info, "planner", msg.str());
+
+    if (result.status != planner_status::ok) {
+        std::string message = "plan-action: planner status is not :ok";
+        if (!result.error.empty()) {
+            message += ": ";
+            message += result.error;
+        }
+        trace_event ev = make_trace_event(result.status == planner_status::error ? trace_event_kind::error
+                                                                                  : trace_event_kind::warning);
+        ev.node = n.id;
+        ev.message = message;
+        emit_trace(ctx, std::move(ev));
+        emit_log(ctx, result.status == planner_status::error ? log_level::error : log_level::warn, "planner", message);
+        return status::failure;
+    }
 
     return status::success;
 }

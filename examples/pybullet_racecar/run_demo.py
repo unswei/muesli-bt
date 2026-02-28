@@ -457,8 +457,9 @@ def build_muesli_bt_dsl(mode: str, args: argparse.Namespace) -> str:
             "    (seq "
             "      (plan-action "
             "        :name \"racecar-plan\" "
+            "        :planner \"mcts\" "
             f"        :budget_ms {budget_ms} "
-            f"        :iters_max {int(args.iters_max)} "
+            f"        :work_max {int(args.work_max)} "
             f"        :max_depth {int(args.max_depth)} "
             f"        :gamma {float(args.gamma)} "
             f"        :pw_k {float(args.pw_k)} "
@@ -482,27 +483,35 @@ def planner_payload_from_meta(meta_json: str) -> Optional[Dict[str, object]]:
     if not isinstance(meta, dict):
         return None
 
-    action_list = meta.get("action", [0.0, 0.0])
-    if not isinstance(action_list, list):
-        action_list = [0.0, 0.0]
-    steering = float(action_list[0]) if len(action_list) > 0 else 0.0
-    throttle = float(action_list[1]) if len(action_list) > 1 else 0.0
-    return {
+    action_u: List[float] = [0.0, 0.0]
+    raw_action = meta.get("action")
+    if isinstance(raw_action, dict):
+        raw_u = raw_action.get("u")
+        if isinstance(raw_u, list):
+            action_u = [float(v) for v in raw_u[:2]]
+    elif isinstance(raw_action, list):
+        action_u = [float(v) for v in raw_action[:2]]
+    while len(action_u) < 2:
+        action_u.append(0.0)
+
+    payload: Dict[str, object] = {
         "schema_version": PLANNER_SCHEMA_VERSION,
+        "planner": str(meta.get("planner", "")),
+        "status": str(meta.get("status", "noaction")),
         "budget_ms": float(meta.get("budget_ms", 0.0)),
         "time_used_ms": float(meta.get("time_used_ms", 0.0)),
-        "iters": int(meta.get("iters", 0)),
-        "root_visits": int(meta.get("root_visits", 0)),
-        "root_children": int(meta.get("root_children", 0)),
-        "widen_added": int(meta.get("widen_added", 0)),
-        "depth_max": int(meta.get("depth_max", 0)),
-        "depth_mean": float(meta.get("depth_mean", 0.0)),
-        "status": str(meta.get("status", "noaction")),
+        "work_done": int(meta.get("work_done", meta.get("iters", 0))),
         "confidence": float(meta.get("confidence", 0.0)),
-        "value_est": float(meta.get("value_est", 0.0)),
-        "action": {"steering": steering, "throttle": throttle},
-        "top_k": [],
+        "action": {"steering": action_u[0], "throttle": action_u[1]},
     }
+    trace = meta.get("trace")
+    if isinstance(trace, dict):
+        payload["trace"] = trace
+    if "overrun" in meta:
+        payload["overrun"] = bool(meta.get("overrun"))
+    if isinstance(meta.get("note"), str) and meta.get("note"):
+        payload["note"] = str(meta.get("note"))
+    return payload
 
 
 class BridgeRacecarSimAdapter:
@@ -686,7 +695,9 @@ class BridgeRacecarSimAdapter:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="PyBullet racecar showcase demo for muesli-bt style BT + bounded-time MCTS.")
+    parser = argparse.ArgumentParser(
+        description="PyBullet racecar showcase demo for muesli-bt style BT + bounded-time planning."
+    )
     parser.add_argument("--mode", choices=("manual", "bt_basic", "bt_obstacles", "bt_planner"), default="manual")
     parser.add_argument("--duration-sec", type=float, default=35.0)
     parser.add_argument("--physics-hz", type=float, default=240.0)
@@ -700,7 +711,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--goal-x", type=float, default=7.0)
     parser.add_argument("--goal-y", type=float, default=3.0)
     parser.add_argument("--budget-ms", type=float, default=20.0, help="Planner budget per tick in milliseconds.")
-    parser.add_argument("--iters-max", type=int, default=1200, help="Planner maximum iterations per tick.")
+    parser.add_argument(
+        "--work-max",
+        "--iters-max",
+        dest="work_max",
+        type=int,
+        default=1200,
+        help="Planner secondary work cap per tick.",
+    )
     parser.add_argument("--max-depth", type=int, default=18, help="Planner rollout depth.")
     parser.add_argument("--pw-k", type=float, default=2.0, help="Progressive widening k.")
     parser.add_argument("--pw-alpha", type=float, default=0.5, help="Progressive widening alpha.")

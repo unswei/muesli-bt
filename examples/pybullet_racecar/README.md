@@ -5,7 +5,7 @@ This example provides a cross-platform visual PyBullet demo with:
 - manual driving
 - muesli-bt executed control loops in BT modes
 - canonical `env.*` capability interface with a `pybullet` backend attachment
-- bounded-time continuous-action MCTS planning via `plan-action` node
+- bounded-time planning via planner-agnostic `plan-action` (internally `planner.plan`)
 - stable JSONL logging + run metadata
 - BT DOT export + Graphviz rendering
 
@@ -84,22 +84,23 @@ PYTHONPATH=build/dev/python \
   .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_obstacles
 ```
 
-### Step 4: Hybrid BT + bounded-time MCTS planning
+### Step 4: Hybrid BT + bounded-time planning (`:planner "mcts"` in this demo)
 
 ```bash
 PYTHONPATH=build/dev/python \
-  .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 20
+  .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 20 --work-max 1200
 ```
 
 BT modes keep default pacing (`--bt-sim-speed 1.0`). Increase this value to make BT simulation advance faster per tick.
+The `bt_planner` tree routes through unified `planner.plan`; this script currently sets `:planner "mcts"` with MCTS config keys.
 
 Budget sweep example:
 
 ```bash
-PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 5
-PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 10
-PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 20
-PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 50
+PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 5 --work-max 1200
+PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 10 --work-max 1200
+PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 20 --work-max 1200
+PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_racecar/run_demo.py --mode bt_planner --budget-ms 50 --work-max 1200
 ```
 
 Headless (CI/remote):

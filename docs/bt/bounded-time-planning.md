@@ -1,35 +1,22 @@
 # Bounded-Time Planning In BTs
 
-`plan-action` lets a behaviour tree run bounded-time MCTS inside a tick and publish best-so-far actions.
+`plan-action` runs `planner.plan` under an explicit per-tick budget.
 
 ## Why Use It
 
-- keep BT control flow explicit (`success`/`failure`/`running`)
-- keep planning budget explicit per tick (`budget_ms`, `iters_max`)
-- get deterministic replay with seed controls
-- keep planner internals observable through structured records
+- planner backend can be switched per node (`mcts`, `mppi`, `ilqr`)
+- bounded execution via `budget_ms` and `work_max`
+- deterministic replay via `seed` / `seed_key`
+- unified diagnostics (`planner.v1` + planner-specific `trace`)
 
 ## Tick Flow
 
-Each `plan-action` tick does:
-
 1. read state from blackboard
-2. derive or read seed
-3. run planner until iteration cap or deadline
-4. choose best action (or safe fallback)
-5. clamp to model bounds
-6. write action to blackboard
-7. optionally write compact planning metadata
-
-## Hybrid Patterns
-
-Common combinations with async VLA nodes:
-
-1. VLA intent -> planner refinement: `vla-wait` writes a prior/goal key, then `plan-action` reads it.
-2. VLA prior sampler: set planner sampler to `"vla_mixture"` with `action_prior_mean`.
-3. Planner-first fallback: run `plan-action` in one branch and keep a VLA request/wait branch for recovery.
-
-`plan-action` accepts `:prior_key`, `:prior_sigma`, and `:prior_mix` for prior-guided sampling.
+2. build `planner.request.v1`
+3. call planner backend until budget/work cap
+4. write action to blackboard
+5. optionally write planner metadata JSON
+6. return `success` only when status is `:ok`
 
 ## Typical Tree Shape
 
@@ -40,19 +27,27 @@ Common combinations with async VLA nodes:
     (seq
       (plan-action
         :name "one-d-planner"
+        :planner :mcts
         :model_service "toy-1d"
         :state_key state
         :action_key action
         :meta_key plan-meta
-        :budget_ms 8
-        :iters_max 800)
+        :budget_ms 10
+        :work_max 600)
       (act apply-planned-1d state action state)
       (running))))
 ```
+
+## Backend Selection
+
+- `:planner :mcts` for tree-search style lookahead
+- `:planner :mppi` for sampling MPC
+- `:planner :ilqr` for deterministic optimization (requires derivatives policy support)
+
+Use BT control flow to decide when to switch backend or fallback branch.
 
 ## See Also
 
 - [PlanAction Node Reference](plan-action-node.md)
 - [Planner Configuration Reference](planner-configuration.md)
-- [VLA Integration In BTs](vla-integration.md)
 - [Planner Logging Schema](../observability/planner-logging.md)

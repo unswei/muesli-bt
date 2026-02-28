@@ -7,8 +7,9 @@
     (seq
       (plan-action
         :name "one-d-planner"
+        :planner "mcts"
         :budget_ms 8
-        :iters_max 800
+        :work_max 800
         :model_service "toy-1d"
         :state_key state
         :action_key action

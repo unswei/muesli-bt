@@ -32,12 +32,13 @@ Behavior:
 Behavior:
 
 - Safety branch preempts planning.
-- Planner branch runs bounded-time continuous MCTS and writes best-so-far action.
-- If planner does not publish a valid action, host fallback `[0.0, 0.0]` is applied.
+- Planner branch runs planner-agnostic `plan-action` (internally `planner.plan`); this demo config selects `:planner "mcts"`.
+- `plan-action` returns `success` only when planner status is `:ok`; on `:timeout`/`:error`/`:noaction`, the branch fails.
+- Host loop applies fallback `[0.0, 0.0]` if no valid planner action is available after the BT tick.
 
 ## Introspection
 
 Per tick logs keep `racecar_demo.v1` unchanged, with optional:
 
 - `bt.status`
-- `planner` block derived from planner meta when planning executes
+- `planner` block derived from unified planner meta (`planner.v1`) when planning executes

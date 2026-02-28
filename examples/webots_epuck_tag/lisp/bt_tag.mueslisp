@@ -11,17 +11,15 @@
     (seq
       (cond bb-truthy evader_seen)
       (plan-action :name "epuck-tag-pursue"
+                   :planner "mcts"
                    :budget_ms 8
-                   :iters_max 220
+                   :work_max 220
                    :max_depth 10
                    :gamma 0.95
                    :pw_k 1.4
                    :pw_alpha 0.50
                    :model_service "epuck-intercept-v1"
                    :state_key planner_state
-                   :prior_key planner_prior
-                   :prior_sigma 0.18
-                   :prior_mix 0.82
                    :action_key planner_action
                    :meta_key planner_meta
                    :top_k 5)

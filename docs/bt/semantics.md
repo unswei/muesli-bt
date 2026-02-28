@@ -106,11 +106,11 @@ Uses per-node retry counter.
 ## Planner Leaf (`plan-action`)
 
 - reads state from configured blackboard key
-- runs planner with bounded budget (`budget_ms`) and iteration cap (`iters_max`)
+- runs planner with bounded budget (`budget_ms`) and work cap (`work_max`)
 - writes chosen action to configured blackboard key
 - optionally writes compact metadata JSON to `meta_key`
-- returns `success` when action is produced
-- returns `failure` when state/config/model is invalid
+- returns `success` only when planner status is `:ok`
+- returns `failure` when planner status is `:timeout`, `:error`, `:noaction`, or when state/config/model is invalid
 
 ## VLA Leaves
 

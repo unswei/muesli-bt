@@ -99,7 +99,7 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 
 - [`planner.get-base-seed`](builtins/planner/planner-get-base-seed.md)
 - [`planner.logs.dump`](builtins/planner/planner-logs-dump.md)
-- [`planner.mcts`](builtins/planner/planner-mcts.md)
+- [`planner.plan`](builtins/planner/planner-plan.md)
 - [`planner.set-base-seed`](builtins/planner/planner-set-base-seed.md)
 - [`planner.set-log-enabled`](builtins/planner/planner-set-log-enabled.md)
 - [`planner.set-log-path`](builtins/planner/planner-set-log-path.md)

@@ -65,12 +65,14 @@ Preferred authoring forms:
 ```
 
 `plan-action` is a built-in planning leaf that runs bounded-time MCTS and writes action output to blackboard.
+`plan-action` is planner-agnostic and dispatches to `planner.plan`.
 
 Common keys:
 
 - `:name`
+- `:planner`
 - `:budget_ms`
-- `:iters_max`
+- `:work_max`
 - `:model_service`
 - `:state_key`
 - `:action_key`

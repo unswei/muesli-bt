@@ -1,6 +1,6 @@
 ;; Hybrid sampling example:
 ;; 1) ask VLA stub for an action proposal
-;; 2) pass proposal to planner.mcts as a prior mixture sampler
+;; 2) warm-start planner.plan (MPPI backend) from that proposal
 
 (define vreq (map.make))
 (map.set! vreq 'task_id "hybrid-demo")
@@ -45,14 +45,25 @@
   (map.get (map.get (map.get vpoll 'final (map.make)) 'action (map.make)) 'u (list 0.0)))
 
 (define preq (map.make))
+(map.set! preq 'schema_version "planner.request.v1")
+(map.set! preq 'planner "mppi")
 (map.set! preq 'model_service "toy-1d")
-(map.set! preq 'state 0.0)
+(map.set! preq 'state (list 0.0))
 (map.set! preq 'seed 42)
 (map.set! preq 'budget_ms 8)
-(map.set! preq 'iters_max 500)
-(map.set! preq 'action_sampler "vla_mixture")
-(map.set! preq 'action_prior_mean prior)
-(map.set! preq 'action_prior_sigma 0.15)
-(map.set! preq 'action_prior_mix 0.7)
+(map.set! preq 'work_max 500)
+(map.set! preq 'horizon 16)
 
-(print (planner.mcts preq))
+(define safe (map.make))
+(map.set! safe 'action_schema "action.u.v1")
+(map.set! safe 'u prior)
+(map.set! preq 'safe_action safe)
+
+(define mppi (map.make))
+(map.set! mppi 'lambda 0.5)
+(map.set! mppi 'sigma (list 0.15))
+(map.set! mppi 'n_samples 500)
+(map.set! mppi 'u_nominal prior)
+(map.set! preq 'mppi mppi)
+
+(print (planner.plan preq))

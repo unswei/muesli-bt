@@ -34,7 +34,7 @@ This page is a summary and link hub for built-ins. Detailed behaviour, errors, a
 
 ## Planning Services
 
-- planning call: `planner.mcts`
+- planning call: `planner.plan`
 - planner records: `planner.logs.dump`
 - planner sink config: `planner.set-log-path`, `planner.set-log-enabled`
 - planner seed controls: `planner.set-base-seed`, `planner.get-base-seed`

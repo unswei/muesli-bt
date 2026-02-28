@@ -13,7 +13,7 @@ A compact Lisp runtime with an integrated Behaviour Tree engine, bounded-time pl
 When control loops need to stay responsive, three things matter:
 
 - decision logic that stays readable (`bt`/`defbt` in Lisp)
-- compute-heavy reasoning that respects strict tick budgets (`plan-action` / `planner.mcts`)
+- compute-heavy reasoning that respects strict tick budgets (`plan-action` / `planner.plan`)
 - asynchronous model calls that can stream and be cancelled (`vla.submit` / `vla.poll` / `vla.cancel`)
 
 muesli-bt keeps those concerns in one place with explicit runtime semantics and built-in observability.
@@ -120,11 +120,12 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
       (act apply-planned-1d state action state)
       (succeed))
     (seq
-      (plan-action :name "mcts"
+      (plan-action :name "planner"
+                   :planner "mcts"
                    :state_key state
                    :action_key action
                    :budget_ms 10
-                   :iters_max 300)
+                   :work_max 300)
       (act apply-planned-1d state action state)
       (succeed))
     (seq
@@ -162,8 +163,8 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 ### Bounded-time planning
 
 - `plan-action` node for strict per-tick budgeted planning
-- `planner.mcts` service for direct scripted experiments
-- progressive widening + UCB style search with deterministic seeding hooks
+- `planner.plan` service for direct scripted experiments
+- backend selection across MCTS, MPPI, and iLQR
 - structured planner stats and logs
 
 ### VLA capability layer

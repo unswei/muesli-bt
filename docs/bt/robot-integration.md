@@ -28,7 +28,7 @@ using action_fn = std::function<status(tick_context&, node_id, node_memory&, std
 
 ## Planner Service Integration
 
-Host-side planning models are registered with `planner_service` and selected by name from `plan-action` and `planner.mcts`.
+Host-side planning models are registered with `planner_service` and selected by name from `plan-action` and `planner.plan`.
 
 Built-in model names:
 

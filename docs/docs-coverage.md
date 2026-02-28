@@ -131,7 +131,7 @@ Audit language/runtime surfaces against code before updating this checklist:
 ### Planning services
 - [x] `planner.get-base-seed` -> [page](language/reference/builtins/planner/planner-get-base-seed.md)
 - [x] `planner.logs.dump` -> [page](language/reference/builtins/planner/planner-logs-dump.md)
-- [x] `planner.mcts` -> [page](language/reference/builtins/planner/planner-mcts.md)
+- [x] `planner.plan` -> [page](language/reference/builtins/planner/planner-plan.md)
 - [x] `planner.set-base-seed` -> [page](language/reference/builtins/planner/planner-set-base-seed.md)
 - [x] `planner.set-log-enabled` -> [page](language/reference/builtins/planner/planner-set-log-enabled.md)
 - [x] `planner.set-log-path` -> [page](language/reference/builtins/planner/planner-set-log-path.md)
