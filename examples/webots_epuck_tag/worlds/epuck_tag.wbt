@@ -1,0 +1,61 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "webots://projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "webots://projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "webots://projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "webots://projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "webots://projects/robots/gctronic/e-puck/protos/E-puckGroundSensors.proto"
+
+WorldInfo {
+  title "Muesli-BT e-puck pursuit-evasion"
+}
+Viewpoint {
+  orientation 0.29 0.63 -0.72 1.02
+  position -1.02 0.88 1.05
+  follow "EPUCK_MAIN"
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  rotation 0 0 1 -1.5708
+  floorSize 1.2 1.2
+  floorTileSize 1.2 1.2
+  wallHeight 0.06
+  floorAppearance PBRAppearance {
+    baseColor 0.92 0.94 0.94
+    roughness 0.85
+    metalness 0
+  }
+}
+DEF MID_BLOCK Solid {
+  translation 0 0 0.025
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.66 0.66 0.7
+      }
+      geometry DEF MID_BLOCK_GEOM Box {
+        size 0.12 0.12 0.05
+      }
+    }
+  ]
+  name "mid_block"
+  boundingObject USE MID_BLOCK_GEOM
+}
+DEF EPUCK_MAIN E-puck {
+  translation -0.38 -0.39 0
+  rotation 0 0 1 0.5
+  supervisor TRUE
+  controller "muesli_epuck"
+  groundSensorsSlot [
+    E-puckGroundSensors {
+    }
+  ]
+}
+DEF EVADER E-puck {
+  translation 0.28 0.28 0
+  rotation 0 0 1 -2.2
+  controller "<none>"
+}

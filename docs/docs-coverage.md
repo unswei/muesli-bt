@@ -54,6 +54,8 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `begin` -> [page](language/reference/special-forms/begin.md)
 - [x] `let` -> [page](language/reference/special-forms/let.md)
 - [x] `cond` -> [page](language/reference/special-forms/cond.md)
+- [x] `and` -> [page](language/reference/special-forms/and.md)
+- [x] `or` -> [page](language/reference/special-forms/or.md)
 - [x] `quasiquote` -> [page](language/reference/special-forms/quasiquote.md)
 - [x] `unquote` -> [page](language/reference/special-forms/unquote.md)
 - [x] `unquote-splicing` -> [page](language/reference/special-forms/unquote-splicing.md)

@@ -8,9 +8,6 @@
 (define (max2 a b)
   (if (> a b) a b))
 
-(define (bool-or a b)
-  (if a #t b))
-
 (define (make-action left right)
   (begin
     (define action (map.make))
@@ -80,8 +77,8 @@
     (define front-signal (max2 (+ (nth proximity 0) (nth proximity 1))
                                (+ (nth proximity 6) (nth proximity 7))))
 
-    (define collision-imminent (bool-or (> pmax 0.44) (> front-signal 0.60)))
-    (define wall-detected (bool-or (> side-signal 0.50) (> front-signal 0.50)))
+    (define collision-imminent (or (> pmax 0.44) (> front-signal 0.60)))
+    (define wall-detected (or (> side-signal 0.50) (> front-signal 0.50)))
 
     (define avoid-action (compute-avoid-action proximity min-obstacle))
     (define wall-action (compute-wall-action proximity))

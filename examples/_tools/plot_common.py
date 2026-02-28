@@ -30,3 +30,12 @@ def tick_of(row: JsonMap, fallback: int) -> int:
         return int(value)
     except (TypeError, ValueError):
         return fallback
+
+
+def nested_get(row: JsonMap, path: str, default: Any = None) -> Any:
+    current: Any = row
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return default
+        current = current[part]
+    return current

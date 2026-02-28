@@ -13,6 +13,8 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`begin`](special-forms/begin.md)
 - [`let`](special-forms/let.md)
 - [`cond`](special-forms/cond.md)
+- [`and`](special-forms/and.md)
+- [`or`](special-forms/or.md)
 - [`quasiquote`](special-forms/quasiquote.md)
 - [`unquote`](special-forms/unquote.md)
 - [`unquote-splicing`](special-forms/unquote-splicing.md)

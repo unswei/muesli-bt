@@ -1,0 +1,126 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "webots://projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "webots://projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "webots://projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "webots://projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "webots://projects/robots/gctronic/e-puck/protos/E-puckGroundSensors.proto"
+
+WorldInfo {
+  title "Muesli-BT e-puck goal seeking"
+}
+Viewpoint {
+  orientation 0.28 0.62 -0.73 1.00
+  position -0.93 0.78 0.98
+  follow "EPUCK_MAIN"
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  rotation 0 0 1 -1.5708
+  floorSize 1.2 1.2
+  floorTileSize 1.2 1.2
+  wallHeight 0.06
+  floorAppearance PBRAppearance {
+    baseColor 0.93 0.93 0.9
+    roughness 0.8
+    metalness 0
+  }
+}
+DEF BOX_A Solid {
+  translation -0.08 0.18 0.025
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.88 0.25 0.15
+        roughness 0.4
+      }
+      geometry DEF BOX_A_GEOM Box {
+        size 0.14 0.08 0.05
+      }
+    }
+  ]
+  name "box_a"
+  boundingObject USE BOX_A_GEOM
+}
+DEF BOX_B Solid {
+  translation 0.22 -0.06 0.025
+  rotation 0 0 1 1.1
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.28 0.45 0.92
+        roughness 0.45
+      }
+      geometry DEF BOX_B_GEOM Box {
+        size 0.12 0.06 0.05
+      }
+    }
+  ]
+  name "box_b"
+  boundingObject USE BOX_B_GEOM
+}
+DEF BOX_C Solid {
+  translation -0.24 -0.17 0.025
+  rotation 0 0 1 -0.5
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.18 0.74 0.48
+        roughness 0.45
+      }
+      geometry DEF BOX_C_GEOM Box {
+        size 0.07 0.16 0.05
+      }
+    }
+  ]
+  name "box_c"
+  boundingObject USE BOX_C_GEOM
+}
+DEF BOX_D Solid {
+  translation 0.05 0.36 0.025
+  rotation 0 0 1 0.7
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.53 0.53 0.56
+        roughness 0.45
+      }
+      geometry DEF BOX_D_GEOM Box {
+        size 0.08 0.2 0.05
+      }
+    }
+  ]
+  name "box_d"
+  boundingObject USE BOX_D_GEOM
+}
+DEF GOAL Solid {
+  translation 0.37 0.38 0.01
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.98 0.84 0.2
+        emissiveColor 0.35 0.29 0.06
+        roughness 0.35
+      }
+      geometry DEF GOAL_GEOM Cylinder {
+        radius 0.04
+        height 0.02
+      }
+    }
+  ]
+  name "goal"
+  boundingObject USE GOAL_GEOM
+}
+DEF EPUCK_MAIN E-puck {
+  translation -0.42 -0.4 0
+  rotation 0 0 1 0.4
+  supervisor TRUE
+  controller "muesli_epuck"
+  groundSensorsSlot [
+    E-puckGroundSensors {
+    }
+  ]
+}

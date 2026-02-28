@@ -113,6 +113,32 @@ Semantics:
 - `else` is allowed only as final clause
 - no match returns `nil`
 
+### `and`
+
+```lisp
+(and expr1 expr2 ...)
+```
+
+Semantics:
+
+- evaluates left-to-right
+- returns first falsey value (`#f` or `nil`) immediately
+- returns final value when all values are truthy
+- zero-argument form returns `#t`
+
+### `or`
+
+```lisp
+(or expr1 expr2 ...)
+```
+
+Semantics:
+
+- evaluates left-to-right
+- returns first truthy value immediately
+- returns `nil` when no truthy value is found
+- zero-argument form returns `nil`
+
 ### `quasiquote`
 
 ```lisp

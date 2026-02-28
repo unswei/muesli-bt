@@ -276,6 +276,32 @@ value eval_if(const std::vector<value>& args, env_ptr scope) {
     return make_nil();
 }
 
+value eval_and(const std::vector<value>& args, env_ptr scope) {
+    gc_root_scope roots(default_gc());
+    value last = make_boolean(true);
+    roots.add(&last);
+    for (value arg : args) {
+        last = eval(arg, scope);
+        if (!is_truthy(last)) {
+            return last;
+        }
+    }
+    return last;
+}
+
+value eval_or(const std::vector<value>& args, env_ptr scope) {
+    gc_root_scope roots(default_gc());
+    value result = make_nil();
+    roots.add(&result);
+    for (value arg : args) {
+        result = eval(arg, scope);
+        if (is_truthy(result)) {
+            return result;
+        }
+    }
+    return make_nil();
+}
+
 value eval_let(const std::vector<value>& args, env_ptr scope) {
     expect_min("let", args, 2);
     value bindings_expr = args[0];
@@ -431,6 +457,14 @@ value eval_list_form(value expr, env_ptr scope) {
 
     if (is_symbol_named(head, "let")) {
         return eval_let(raw_args, scope);
+    }
+
+    if (is_symbol_named(head, "and")) {
+        return eval_and(raw_args, scope);
+    }
+
+    if (is_symbol_named(head, "or")) {
+        return eval_or(raw_args, scope);
     }
 
     if (is_symbol_named(head, "cond")) {

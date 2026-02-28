@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 
-from plot_common import ensure_dir, load_jsonl, tick_of
+from plot_common import ensure_dir, load_jsonl, nested_get, tick_of
 
 
 JsonMap = Dict[str, Any]
@@ -49,8 +49,6 @@ def plot_budget(rows: List[JsonMap], out_dir: Path) -> None:
         budget = row.get("budget")
         if not isinstance(budget, dict):
             continue
-        if "tick_time_ms" not in budget:
-            continue
         tick_time = as_float(budget.get("tick_time_ms"))
         tick_budget = as_float(budget.get("tick_budget_ms"))
         if tick_time is None or tick_budget is None:
@@ -77,15 +75,15 @@ def plot_budget(rows: List[JsonMap], out_dir: Path) -> None:
     ax_hist.set_ylabel("count")
     ax_hist.grid(alpha=0.25)
 
-    out_path = out_dir / "budget_adherence.png"
-    fig.savefig(out_path, dpi=150)
+    fig.savefig(out_dir / "budget_adherence.png", dpi=150)
     plt.close(fig)
 
 
 def plot_planner_confidence(rows: List[Tuple[int, JsonMap]], out_dir: Path) -> None:
-    filtered = [(tick, planner) for tick, planner in rows if bool(planner.get("used", False))]
     points: List[Tuple[int, float]] = []
-    for tick, planner in filtered:
+    for tick, planner in rows:
+        if not bool(planner.get("used", False)):
+            continue
         conf = as_float(planner.get("confidence"))
         if conf is None:
             continue
@@ -103,6 +101,50 @@ def plot_planner_confidence(rows: List[Tuple[int, JsonMap]], out_dir: Path) -> N
     ax.set_ylabel("confidence")
     ax.grid(alpha=0.25)
     fig.savefig(out_dir / "planner_confidence.png", dpi=150)
+    plt.close(fig)
+
+
+def plot_progressive_widening(rows: List[Tuple[int, JsonMap]], out_dir: Path) -> None:
+    ticks: List[int] = []
+    widen_added: List[float] = []
+    root_children: List[float] = []
+
+    for tick, planner in rows:
+        if not bool(planner.get("used", False)):
+            continue
+        wa = as_float(planner.get("widen_added"))
+        rc = as_float(planner.get("root_children"))
+        if wa is None and rc is None:
+            continue
+        ticks.append(tick)
+        widen_added.append(wa if wa is not None else 0.0)
+        root_children.append(rc if rc is not None else 0.0)
+
+    if not ticks:
+        return
+
+    cumulative_widen: List[float] = []
+    total = 0.0
+    for value in widen_added:
+        total += value
+        cumulative_widen.append(total)
+
+    fig, (ax_top, ax_bottom) = plt.subplots(2, 1, figsize=(10, 7), constrained_layout=True)
+    ax_top.plot(ticks, widen_added, color="#2a9d8f", linewidth=1.5, label="widen_added")
+    ax_top.plot(ticks, root_children, color="#264653", linewidth=1.3, label="root_children")
+    ax_top.set_title("Progressive Widening per Tick")
+    ax_top.set_xlabel("tick")
+    ax_top.set_ylabel("count")
+    ax_top.grid(alpha=0.25)
+    ax_top.legend()
+
+    ax_bottom.plot(ticks, cumulative_widen, color="#e76f51", linewidth=1.7)
+    ax_bottom.set_title("Cumulative Widen Added")
+    ax_bottom.set_xlabel("tick")
+    ax_bottom.set_ylabel("cumulative count")
+    ax_bottom.grid(alpha=0.25)
+
+    fig.savefig(out_dir / "progressive_widening.png", dpi=150)
     plt.close(fig)
 
 
@@ -184,56 +226,26 @@ def plot_root_distribution(rows: List[Tuple[int, JsonMap]], out_dir: Path, every
     plt.close(fig)
 
 
-def plot_min_obstacle(rows: List[JsonMap], out_dir: Path) -> None:
+def plot_series(rows: List[JsonMap], out_dir: Path, key_path: str, title: str, ylabel: str, out_name: str) -> None:
     ticks: List[int] = []
     values: List[float] = []
     for i, row in enumerate(rows):
-        obs = row.get("obs")
-        if not isinstance(obs, dict) or "min_obstacle" not in obs:
-            continue
-        min_obstacle = as_float(obs.get("min_obstacle"))
-        if min_obstacle is None:
+        value = as_float(nested_get(row, key_path))
+        if value is None:
             continue
         ticks.append(tick_of(row, i + 1))
-        values.append(min_obstacle)
+        values.append(value)
 
     if not ticks:
         return
 
     fig, ax = plt.subplots(figsize=(10, 3.8), constrained_layout=True)
-    ax.plot(ticks, values, color="#9b2226", linewidth=1.7)
-    ax.set_title("Minimum Obstacle Distance Proxy")
+    ax.plot(ticks, values, linewidth=1.7, color="#005f73")
+    ax.set_title(title)
     ax.set_xlabel("tick")
-    ax.set_ylabel("min_obstacle")
+    ax.set_ylabel(ylabel)
     ax.grid(alpha=0.25)
-    fig.savefig(out_dir / "min_obstacle.png", dpi=150)
-    plt.close(fig)
-
-
-def plot_line_error(rows: List[JsonMap], out_dir: Path) -> None:
-    ticks: List[int] = []
-    values: List[float] = []
-    for i, row in enumerate(rows):
-        obs = row.get("obs")
-        if not isinstance(obs, dict) or "line_error" not in obs:
-            continue
-        line_error = as_float(obs.get("line_error"))
-        if line_error is None:
-            continue
-        ticks.append(tick_of(row, i + 1))
-        values.append(line_error)
-
-    if not ticks:
-        return
-
-    fig, ax = plt.subplots(figsize=(10, 3.8), constrained_layout=True)
-    ax.plot(ticks, values, color="#005f73", linewidth=1.7)
-    ax.axhline(0.0, color="#444444", linestyle="--", linewidth=1.0)
-    ax.set_title("Line Following Error")
-    ax.set_xlabel("tick")
-    ax.set_ylabel("line_error")
-    ax.grid(alpha=0.25)
-    fig.savefig(out_dir / "line_error.png", dpi=150)
+    fig.savefig(out_dir / out_name, dpi=150)
     plt.close(fig)
 
 
@@ -272,6 +284,92 @@ def plot_wheel_speeds(rows: List[JsonMap], out_dir: Path) -> None:
     plt.close(fig)
 
 
+def plot_action_scatter(rows: List[JsonMap], out_dir: Path) -> None:
+    left: List[float] = []
+    right: List[float] = []
+    ticks: List[int] = []
+
+    for i, row in enumerate(rows):
+        u = nested_get(row, "action.u")
+        if not isinstance(u, list) or len(u) < 2:
+            continue
+        lu = as_float(u[0])
+        ru = as_float(u[1])
+        if lu is None or ru is None:
+            continue
+        left.append(lu)
+        right.append(ru)
+        ticks.append(tick_of(row, i + 1))
+
+    if not ticks:
+        return
+
+    fig, ax = plt.subplots(figsize=(6.8, 6.4), constrained_layout=True)
+    scatter = ax.scatter(left, right, c=ticks, cmap="viridis", s=12, alpha=0.8)
+    ax.set_title("Sampled Action Scatter")
+    ax.set_xlabel("left wheel")
+    ax.set_ylabel("right wheel")
+    ax.grid(alpha=0.25)
+    fig.colorbar(scatter, ax=ax, label="tick")
+    fig.savefig(out_dir / "action_scatter.png", dpi=150)
+    plt.close(fig)
+
+
+def plot_path_xy(rows: List[JsonMap], out_dir: Path) -> None:
+    xs: List[float] = []
+    ys: List[float] = []
+
+    goal_xy: Tuple[float, float] | None = None
+    base_xy: Tuple[float, float] | None = None
+
+    for row in rows:
+        robot_xy = nested_get(row, "obs.robot_xy")
+        if isinstance(robot_xy, list) and len(robot_xy) >= 2:
+            rx = as_float(robot_xy[0])
+            ry = as_float(robot_xy[1])
+            if rx is not None and ry is not None:
+                xs.append(rx)
+                ys.append(ry)
+
+        if goal_xy is None:
+            g = nested_get(row, "obs.goal_xy")
+            if isinstance(g, list) and len(g) >= 2:
+                gx = as_float(g[0])
+                gy = as_float(g[1])
+                if gx is not None and gy is not None:
+                    goal_xy = (gx, gy)
+
+        if base_xy is None:
+            b = nested_get(row, "obs.base_xy")
+            if isinstance(b, list) and len(b) >= 2:
+                bx = as_float(b[0])
+                by = as_float(b[1])
+                if bx is not None and by is not None:
+                    base_xy = (bx, by)
+
+    if len(xs) < 2:
+        return
+
+    fig, ax = plt.subplots(figsize=(6.8, 6.2), constrained_layout=True)
+    ax.plot(xs, ys, color="#264653", linewidth=1.6, label="robot path")
+    ax.scatter([xs[0]], [ys[0]], color="#2a9d8f", s=36, label="start")
+    ax.scatter([xs[-1]], [ys[-1]], color="#e76f51", s=36, label="end")
+
+    if goal_xy is not None:
+        ax.scatter([goal_xy[0]], [goal_xy[1]], color="#f4a261", marker="*", s=120, label="goal")
+    if base_xy is not None:
+        ax.scatter([base_xy[0]], [base_xy[1]], color="#457b9d", marker="s", s=52, label="base")
+
+    ax.set_title("2D Robot Path")
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.axis("equal")
+    ax.grid(alpha=0.25)
+    ax.legend(loc="best")
+    fig.savefig(out_dir / "path_xy.png", dpi=150)
+    plt.close(fig)
+
+
 def main() -> int:
     args = parse_args()
     rows = load_jsonl(args.log_jsonl)
@@ -283,10 +381,20 @@ def main() -> int:
     planner = planner_rows(rows)
     plot_budget(rows, out_dir)
     plot_planner_confidence(planner, out_dir)
+    plot_progressive_widening(planner, out_dir)
     plot_root_distribution(planner, out_dir, every=max(1, args.every), k=max(1, args.k))
-    plot_min_obstacle(rows, out_dir)
-    plot_line_error(rows, out_dir)
+
+    plot_series(rows, out_dir, "obs.min_obstacle", "Minimum Obstacle Distance Proxy", "min_obstacle", "min_obstacle.png")
+    plot_series(rows, out_dir, "obs.line_error", "Line Following Error", "line_error", "line_error.png")
+    plot_series(rows, out_dir, "obs.goal_dist", "Goal Distance", "goal_dist", "goal_distance.png")
+    plot_series(rows, out_dir, "obs.target_dist", "Foraging Target Distance", "target_dist", "target_distance.png")
+    plot_series(rows, out_dir, "obs.evader_dist", "Relative Distance to Evader", "evader_dist", "evader_distance.png")
+    plot_series(rows, out_dir, "obs.collected", "Collected Pucks", "count", "collected_over_time.png")
+    plot_series(rows, out_dir, "obs.intercepts", "Intercept Count", "count", "intercepts_over_time.png")
+
     plot_wheel_speeds(rows, out_dir)
+    plot_action_scatter(rows, out_dir)
+    plot_path_xy(rows, out_dir)
 
     print(f"Saved plots to: {out_dir}")
     return 0

@@ -115,6 +115,21 @@ if(MUESLI_BT_BUILD_WEBOTS_EXAMPLES)
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/webots_epuck_line/controllers/muesli_epuck/muesli_epuck.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/webots_epuck_line/controllers/muesli_epuck
     )
+    add_webots_epuck_controller(
+        muesli_webots_epuck_goal
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/webots_epuck_goal/controllers/muesli_epuck/muesli_epuck.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/webots_epuck_goal/controllers/muesli_epuck
+    )
+    add_webots_epuck_controller(
+        muesli_webots_epuck_foraging
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/webots_epuck_foraging/controllers/muesli_epuck/muesli_epuck.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/webots_epuck_foraging/controllers/muesli_epuck
+    )
+    add_webots_epuck_controller(
+        muesli_webots_epuck_tag
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/webots_epuck_tag/controllers/muesli_epuck/muesli_epuck.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/webots_epuck_tag/controllers/muesli_epuck
+    )
 endif()
 
 if(MUESLI_BT_BUILD_PYTHON_BRIDGE)

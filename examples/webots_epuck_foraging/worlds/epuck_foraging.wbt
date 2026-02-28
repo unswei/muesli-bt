@@ -1,0 +1,135 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "webots://projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "webots://projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "webots://projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "webots://projects/robots/gctronic/e-puck/protos/E-puck.proto"
+EXTERNPROTO "webots://projects/robots/gctronic/e-puck/protos/E-puckGroundSensors.proto"
+
+WorldInfo {
+  title "Muesli-BT e-puck foraging"
+}
+Viewpoint {
+  orientation 0.27 0.64 -0.71 1.04
+  position -0.98 0.86 1.01
+  follow "EPUCK_MAIN"
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  rotation 0 0 1 -1.5708
+  floorSize 1.2 1.2
+  floorTileSize 1.2 1.2
+  wallHeight 0.06
+  floorAppearance PBRAppearance {
+    baseColor 0.95 0.95 0.95
+    roughness 0.85
+    metalness 0
+  }
+}
+DEF BASE Solid {
+  translation -0.36 -0.36 0.01
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.18 0.42 0.9
+        emissiveColor 0.04 0.09 0.18
+        roughness 0.4
+      }
+      geometry DEF BASE_GEOM Cylinder {
+        radius 0.06
+        height 0.02
+      }
+    }
+  ]
+  name "base"
+  boundingObject USE BASE_GEOM
+}
+DEF PUCK_1 Solid {
+  translation 0.21 0.24 0.018
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.92 0.23 0.17
+      }
+      geometry DEF PUCK_1_GEOM Sphere {
+        radius 0.018
+      }
+    }
+  ]
+  name "puck_1"
+  boundingObject USE PUCK_1_GEOM
+}
+DEF PUCK_2 Solid {
+  translation 0.31 -0.17 0.018
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.18 0.79 0.34
+      }
+      geometry DEF PUCK_2_GEOM Sphere {
+        radius 0.018
+      }
+    }
+  ]
+  name "puck_2"
+  boundingObject USE PUCK_2_GEOM
+}
+DEF PUCK_3 Solid {
+  translation -0.08 0.36 0.018
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.99 0.8 0.23
+      }
+      geometry DEF PUCK_3_GEOM Sphere {
+        radius 0.018
+      }
+    }
+  ]
+  name "puck_3"
+  boundingObject USE PUCK_3_GEOM
+}
+DEF BOX_F1 Solid {
+  translation -0.02 0.06 0.025
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.68 0.66 0.62
+      }
+      geometry DEF BOX_F1_GEOM Box {
+        size 0.1 0.08 0.05
+      }
+    }
+  ]
+  name "box_f1"
+  boundingObject USE BOX_F1_GEOM
+}
+DEF BOX_F2 Solid {
+  translation 0.18 -0.33 0.025
+  rotation 0 0 1 0.8
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.62 0.62 0.66
+      }
+      geometry DEF BOX_F2_GEOM Box {
+        size 0.08 0.16 0.05
+      }
+    }
+  ]
+  name "box_f2"
+  boundingObject USE BOX_F2_GEOM
+}
+DEF EPUCK_MAIN E-puck {
+  translation -0.34 -0.29 0
+  rotation 0 0 1 0.85
+  supervisor TRUE
+  controller "muesli_epuck"
+  groundSensorsSlot [
+    E-puckGroundSensors {
+    }
+  ]
+}

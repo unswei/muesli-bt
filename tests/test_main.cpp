@@ -350,6 +350,30 @@ void test_let_and_cond_forms() {
     }
 }
 
+void test_and_or_forms() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+
+    value and_empty = eval_text("(and)", env);
+    check(is_boolean(and_empty) && boolean_value(and_empty), "and with zero args should be true");
+
+    value and_value = eval_text("(and #t 7)", env);
+    check(is_integer(and_value) && integer_value(and_value) == 7, "and should return last truthy value");
+
+    value or_empty = eval_text("(or)", env);
+    check(is_nil(or_empty), "or with zero args should be nil");
+
+    value or_value = eval_text("(or #f nil 42)", env);
+    check(is_integer(or_value) && integer_value(or_value) == 42, "or should return first truthy value");
+
+    value and_short = eval_text("(begin (define x 0) (and #f (define x 1)) x)", env);
+    check(is_integer(and_short) && integer_value(and_short) == 0, "and should short-circuit");
+
+    value or_short = eval_text("(begin (define y 0) (or 1 (define y 1)) y)", env);
+    check(is_integer(or_short) && integer_value(or_short) == 0, "or should short-circuit");
+}
+
 void test_bt_authoring_sugar() {
     using namespace muslisp;
 
@@ -395,11 +419,18 @@ void test_load_write_save_and_roundtrip() {
     reset_bt_runtime_host();
     env_ptr env = create_global_env();
 
-    const value original = eval_text("'(1 \"line\\nnext\" #t 2.5 nil foo)", env);
-    const value serialised = eval_text("(write-to-string '(1 \"line\\nnext\" #t 2.5 nil foo))", env);
+    gc_root_scope roots(default_gc());
+    value original = eval_text("'(1 \"line\\nnext\" #t 2.5 nil foo)", env);
+    roots.add(&original);
+    value serialised = eval_text("(write-to-string '(1 \"line\\nnext\" #t 2.5 nil foo))", env);
+    roots.add(&serialised);
     check(is_string(serialised), "write-to-string should return string");
-    const value reparsed = read_one(string_value(serialised));
-    check(print_value(reparsed) == print_value(original), "write-to-string should round-trip through reader");
+    value reparsed = read_one(string_value(serialised));
+    roots.add(&reparsed);
+    const std::string reparsed_text = print_value(reparsed);
+    const std::string original_text = print_value(original);
+    check(reparsed_text == original_text,
+          "write-to-string should round-trip through reader (expected " + original_text + ", got " + reparsed_text + ")");
 
     const auto save_path = temp_file_path("save_value");
     const std::string save_path_lisp = lisp_string_literal(save_path.string());
@@ -2217,6 +2248,7 @@ int main() {
         {"closures and function define sugar", test_closures_and_function_define_sugar},
         {"quasiquote semantics and errors", test_quasiquote_semantics_and_errors},
         {"let and cond forms", test_let_and_cond_forms},
+        {"and/or forms", test_and_or_forms},
         {"bt authoring sugar", test_bt_authoring_sugar},
         {"load/write/save and roundtrip", test_load_write_save_and_roundtrip},
         {"bt dsl save/load roundtrip", test_bt_dsl_save_load_roundtrip},

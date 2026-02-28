@@ -52,10 +52,9 @@ examples/webots_epuck_line/logs/*
 !examples/webots_epuck_line/logs/.gitkeep
 examples/webots_epuck_line/out/*
 !examples/webots_epuck_line/out/.gitkeep
-examples/webots_epuck_obstacle/controllers/muesli_epuck/muesli_epuck
-examples/webots_epuck_obstacle/controllers/muesli_epuck/build/
-examples/webots_epuck_line/controllers/muesli_epuck/muesli_epuck
-examples/webots_epuck_line/controllers/muesli_epuck/build/
+examples/webots_epuck_*/controllers/muesli_epuck/muesli_epuck
+examples/webots_epuck_*/controllers/muesli_epuck/build/
+examples/_tools/__pycache__/
 
 # generic example run artefacts
 examples/**/logs/*

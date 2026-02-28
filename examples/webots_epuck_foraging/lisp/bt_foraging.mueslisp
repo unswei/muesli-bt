@@ -1,0 +1,47 @@
+(defbt foraging-tree
+  (sel
+    (seq
+      (cond bb-truthy collision_imminent)
+      (act select-action act_recover 4)
+      (running))
+    (seq
+      (cond bb-truthy carrying)
+      (plan-action :name "epuck-forage-return"
+                   :budget_ms 10
+                   :iters_max 260
+                   :max_depth 12
+                   :gamma 0.96
+                   :pw_k 1.5
+                   :pw_alpha 0.50
+                   :model_service "epuck-target-v1"
+                   :state_key planner_state
+                   :prior_key planner_prior
+                   :prior_sigma 0.16
+                   :prior_mix 0.85
+                   :action_key planner_action
+                   :meta_key planner_meta
+                   :top_k 5)
+      (act select-action planner_action 3)
+      (running))
+    (seq
+      (cond bb-truthy target_visible)
+      (plan-action :name "epuck-forage-approach"
+                   :budget_ms 10
+                   :iters_max 260
+                   :max_depth 12
+                   :gamma 0.96
+                   :pw_k 1.5
+                   :pw_alpha 0.50
+                   :model_service "epuck-target-v1"
+                   :state_key planner_state
+                   :prior_key planner_prior
+                   :prior_sigma 0.16
+                   :prior_mix 0.85
+                   :action_key planner_action
+                   :meta_key planner_meta
+                   :top_k 5)
+      (act select-action planner_action 2)
+      (running))
+    (seq
+      (act select-action act_search 1)
+      (running))))
