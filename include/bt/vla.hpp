@@ -301,7 +301,7 @@ private:
     std::vector<vla_record> records_;
     std::size_t record_capacity_ = 4096;
     bool log_enabled_ = true;
-    std::string log_path_ = "vla-records.jsonl";
+    std::string log_path_ = "logs/vla-records.jsonl";
 };
 
 [[nodiscard]] const char* vla_status_name(vla_status status) noexcept;

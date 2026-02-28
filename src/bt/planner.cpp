@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <limits>
@@ -756,6 +757,11 @@ std::string planner_service::record_to_json(const planner_record& record) const 
 void planner_service::append_jsonl_line(const std::string& line) {
     const std::string path = jsonl_path_;
     std::lock_guard<std::mutex> lock(file_mutex_);
+    const std::filesystem::path fs_path(path);
+    if (fs_path.has_parent_path()) {
+        std::error_code ec;
+        std::filesystem::create_directories(fs_path.parent_path(), ec);
+    }
     std::ofstream out(path, std::ios::app);
     if (!out) {
         return;

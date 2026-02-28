@@ -20,7 +20,7 @@ Sets JSON lines output file path for VLA records.
 ### Minimal
 
 ```lisp
-(vla.set-log-path "vla-records.jsonl")
+(vla.set-log-path "logs/vla-records.jsonl")
 ```
 
 ### Realistic

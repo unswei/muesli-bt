@@ -3,7 +3,7 @@
 Planner calls emit structured records to:
 
 - in-memory planner ring (via `planner.logs.dump`)
-- JSON lines file sink (`planner-records.jsonl` by default)
+- JSON lines file sink (`logs/planner-records.jsonl` by default)
 
 Use:
 
@@ -49,7 +49,7 @@ import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-rows = [json.loads(line) for line in Path("planner-records.jsonl").read_text().splitlines() if line.strip()]
+rows = [json.loads(line) for line in Path("logs/planner-records.jsonl").read_text().splitlines() if line.strip()]
 rows = [r for r in rows if r.get("node_name") == "toy-plan"]
 
 ticks = [r["tick_index"] for r in rows]

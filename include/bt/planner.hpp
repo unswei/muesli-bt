@@ -176,7 +176,7 @@ private:
     std::size_t record_capacity_ = 4096;
 
     bool jsonl_enabled_ = true;
-    std::string jsonl_path_ = "planner-records.jsonl";
+    std::string jsonl_path_ = "logs/planner-records.jsonl";
 
     mutable std::mutex mutex_;
     mutable std::mutex file_mutex_;

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <limits>
@@ -1021,6 +1022,11 @@ std::string vla_service::record_to_json(const vla_record& record) const {
 void vla_service::append_jsonl_line(const std::string& line) {
     const std::string path = log_path_;
     std::lock_guard<std::mutex> lock(file_mutex_);
+    const std::filesystem::path fs_path(path);
+    if (fs_path.has_parent_path()) {
+        std::error_code ec;
+        std::filesystem::create_directories(fs_path.parent_path(), ec);
+    }
     std::ofstream out(path, std::ios::app);
     if (!out) {
         return;

@@ -20,7 +20,7 @@ Sets the JSON lines output file path for planner records.
 ### Minimal
 
 ```lisp
-(planner.set-log-path "planner-records.jsonl")
+(planner.set-log-path "logs/planner-records.jsonl")
 ```
 
 ### Realistic
