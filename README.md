@@ -217,7 +217,7 @@ ctest --test-dir build/dev --output-on-failure
 - `examples/bt/`: compact BT scripts
 - `examples/repl_scripts/`: end-to-end experiments and demos
 - `examples/pybullet_racecar/`: racecar demo package
-  - `native/`: demo-only C++ + pybind bridge code for `sim.run-loop`
+  - `native/`: demo-only C++ + pybind bridge code for `env.pybullet.run-loop`
 - `tests/`: unit/integration coverage
 - `docs/`: user and internals documentation
 

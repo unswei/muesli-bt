@@ -15,7 +15,6 @@ add_library(muesli_bt_core
     src/bt/logging.cpp
     src/bt/planner.cpp
     src/bt/profile.cpp
-    examples/pybullet_racecar/native/racecar_demo.cpp
     src/bt/registry.cpp
     src/bt/runtime.cpp
     src/bt/runtime_host.cpp
@@ -27,6 +26,7 @@ add_library(muesli_bt_core
     src/builtins.cpp
     src/env.cpp
     src/eval.cpp
+    src/extensions.cpp
     src/gc.cpp
     src/printer.cpp
     src/reader.cpp
@@ -36,7 +36,6 @@ add_library(muesli_bt_core
 target_include_directories(muesli_bt_core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/examples/pybullet_racecar/native
 )
 
 target_compile_features(muesli_bt_core PUBLIC cxx_std_20)
@@ -47,10 +46,39 @@ else()
     target_compile_options(muesli_bt_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
+add_library(muesli_bt_ext_pybullet_racecar
+    examples/pybullet_racecar/native/racecar_demo.cpp
+    ext/pybullet_racecar/extension.cpp
+)
+
+target_link_libraries(muesli_bt_ext_pybullet_racecar PUBLIC muesli_bt_core)
+target_include_directories(muesli_bt_ext_pybullet_racecar
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/examples/pybullet_racecar/native
+        ${CMAKE_CURRENT_SOURCE_DIR}/ext
+)
+target_compile_features(muesli_bt_ext_pybullet_racecar PUBLIC cxx_std_20)
+
 add_executable(muslisp src/main.cpp)
 target_link_libraries(muslisp PRIVATE muesli_bt_core)
 
 if(MUESLI_BT_BUILD_PYTHON_BRIDGE)
+    if(NOT Python3_EXECUTABLE)
+        set(MUESLI_BT_LOCAL_PYTHON "${CMAKE_CURRENT_SOURCE_DIR}/.venv-py311/bin/python")
+        if(EXISTS "${MUESLI_BT_LOCAL_PYTHON}")
+            # Keep bridge/demo builds aligned with the pinned Python used by scripts/demo-setup.sh.
+            set(Python3_EXECUTABLE "${MUESLI_BT_LOCAL_PYTHON}" CACHE FILEPATH "Python interpreter for muesli_bt bridge build" FORCE)
+            if(NOT DEFINED Python3_FIND_VIRTUALENV)
+                set(Python3_FIND_VIRTUALENV ONLY)
+            endif()
+            if(NOT DEFINED Python3_FIND_STRATEGY)
+                set(Python3_FIND_STRATEGY LOCATION)
+            endif()
+            message(STATUS "MUESLI_BT_BUILD_PYTHON_BRIDGE: auto-selecting ${Python3_EXECUTABLE}")
+        endif()
+    endif()
+
     find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
     find_package(pybind11 CONFIG QUIET)
 
@@ -65,12 +93,16 @@ if(MUESLI_BT_BUILD_PYTHON_BRIDGE)
             list(APPEND CMAKE_PREFIX_PATH "${PYBIND11_CMAKE_DIR}")
             find_package(pybind11 CONFIG REQUIRED)
         else()
-            message(FATAL_ERROR "pybind11 not found. Install pybind11 into the selected Python environment.")
+            message(FATAL_ERROR
+                "pybind11 not found for Python3_EXECUTABLE='${Python3_EXECUTABLE}'. "
+                "Install it with '${Python3_EXECUTABLE} -m pip install pybind11' "
+                "or run 'make demo-setup' to provision the pinned demo environment."
+            )
         endif()
     endif()
 
     pybind11_add_module(muesli_bt_bridge examples/pybullet_racecar/native/bridge_module.cpp)
-    target_link_libraries(muesli_bt_bridge PRIVATE muesli_bt_core)
+    target_link_libraries(muesli_bt_bridge PRIVATE muesli_bt_ext_pybullet_racecar)
     target_include_directories(muesli_bt_bridge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
     set_target_properties(muesli_bt_bridge PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/python")
 endif()
@@ -78,6 +110,6 @@ endif()
 enable_testing()
 
 add_executable(muslisp_tests tests/test_main.cpp)
-target_link_libraries(muslisp_tests PRIVATE muesli_bt_core)
+target_link_libraries(muslisp_tests PRIVATE muesli_bt_ext_pybullet_racecar)
 
 add_test(NAME muslisp_tests COMMAND muslisp_tests)

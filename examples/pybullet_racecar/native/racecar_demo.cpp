@@ -122,28 +122,28 @@ bool read_bb_number(const bb_entry* entry, double& out) {
 
 void validate_state_schema(const racecar_state& state) {
     if (state.state_schema != "racecar_state.v1") {
-        throw std::runtime_error("sim.get-state: state_schema must be racecar_state.v1");
+        throw std::runtime_error("env.pybullet.get-state: state_schema must be racecar_state.v1");
     }
     if (state.goal.size() < 2) {
-        throw std::runtime_error("sim.get-state: goal must be [gx gy]");
+        throw std::runtime_error("env.pybullet.get-state: goal must be [gx gy]");
     }
     if (state.state_vec.empty()) {
-        throw std::runtime_error("sim.get-state: state_vec must not be empty");
+        throw std::runtime_error("env.pybullet.get-state: state_vec must not be empty");
     }
     for (double v : state.state_vec) {
         if (!std::isfinite(v)) {
-            throw std::runtime_error("sim.get-state: state_vec contains non-finite value");
+            throw std::runtime_error("env.pybullet.get-state: state_vec contains non-finite value");
         }
     }
     for (double v : state.rays) {
         if (!std::isfinite(v)) {
-            throw std::runtime_error("sim.get-state: rays contains non-finite value");
+            throw std::runtime_error("env.pybullet.get-state: rays contains non-finite value");
         }
     }
-    (void)finite_or_throw(state.x, "sim.get-state x");
-    (void)finite_or_throw(state.y, "sim.get-state y");
-    (void)finite_or_throw(state.yaw, "sim.get-state yaw");
-    (void)finite_or_throw(state.speed, "sim.get-state speed");
+    (void)finite_or_throw(state.x, "env.pybullet.get-state x");
+    (void)finite_or_throw(state.y, "env.pybullet.get-state y");
+    (void)finite_or_throw(state.yaw, "env.pybullet.get-state yaw");
+    (void)finite_or_throw(state.speed, "env.pybullet.get-state speed");
 }
 
 struct extracted_action {
@@ -295,22 +295,22 @@ void write_state_to_blackboard(instance& inst,
                                const racecar_loop_options& options,
                                std::uint64_t tick_index,
                                std::chrono::steady_clock::time_point now) {
-    inst.bb.put(options.action_key, bb_value{std::monostate{}}, tick_index, now, 0, "sim.run-loop");
+    inst.bb.put(options.action_key, bb_value{std::monostate{}}, tick_index, now, 0, "env.pybullet.run-loop");
     if (!options.planner_meta_key.empty()) {
-        inst.bb.put(options.planner_meta_key, bb_value{std::monostate{}}, tick_index, now, 0, "sim.run-loop");
+        inst.bb.put(options.planner_meta_key, bb_value{std::monostate{}}, tick_index, now, 0, "env.pybullet.run-loop");
     }
-    inst.bb.put(options.state_key, bb_value{state.state_vec}, tick_index, now, 0, "sim.run-loop");
-    inst.bb.put("state_schema", bb_value{state.state_schema}, tick_index, now, 0, "sim.run-loop");
-    inst.bb.put("x", bb_value{state.x}, tick_index, now, 0, "sim.run-loop");
-    inst.bb.put("y", bb_value{state.y}, tick_index, now, 0, "sim.run-loop");
-    inst.bb.put("yaw", bb_value{state.yaw}, tick_index, now, 0, "sim.run-loop");
-    inst.bb.put("speed", bb_value{state.speed}, tick_index, now, 0, "sim.run-loop");
-    inst.bb.put("rays", bb_value{state.rays}, tick_index, now, 0, "sim.run-loop");
-    inst.bb.put("goal", bb_value{state.goal}, tick_index, now, 0, "sim.run-loop");
-    inst.bb.put("collision_imminent", bb_value{state.collision_imminent}, tick_index, now, 0, "sim.run-loop");
-    inst.bb.put("collision_count", bb_value{state.collision_count}, tick_index, now, 0, "sim.run-loop");
-    inst.bb.put("t_ms", bb_value{state.t_ms}, tick_index, now, 0, "sim.run-loop");
-    inst.bb.put("distance_to_goal", bb_value{distance_to_goal(state)}, tick_index, now, 0, "sim.run-loop");
+    inst.bb.put(options.state_key, bb_value{state.state_vec}, tick_index, now, 0, "env.pybullet.run-loop");
+    inst.bb.put("state_schema", bb_value{state.state_schema}, tick_index, now, 0, "env.pybullet.run-loop");
+    inst.bb.put("x", bb_value{state.x}, tick_index, now, 0, "env.pybullet.run-loop");
+    inst.bb.put("y", bb_value{state.y}, tick_index, now, 0, "env.pybullet.run-loop");
+    inst.bb.put("yaw", bb_value{state.yaw}, tick_index, now, 0, "env.pybullet.run-loop");
+    inst.bb.put("speed", bb_value{state.speed}, tick_index, now, 0, "env.pybullet.run-loop");
+    inst.bb.put("rays", bb_value{state.rays}, tick_index, now, 0, "env.pybullet.run-loop");
+    inst.bb.put("goal", bb_value{state.goal}, tick_index, now, 0, "env.pybullet.run-loop");
+    inst.bb.put("collision_imminent", bb_value{state.collision_imminent}, tick_index, now, 0, "env.pybullet.run-loop");
+    inst.bb.put("collision_count", bb_value{state.collision_count}, tick_index, now, 0, "env.pybullet.run-loop");
+    inst.bb.put("t_ms", bb_value{state.t_ms}, tick_index, now, 0, "env.pybullet.run-loop");
+    inst.bb.put("distance_to_goal", bb_value{distance_to_goal(state)}, tick_index, now, 0, "env.pybullet.run-loop");
 }
 
 }  // namespace
@@ -336,7 +336,7 @@ void clear_racecar_demo_state() {
 racecar_state racecar_get_state() {
     const std::shared_ptr<racecar_sim_adapter> adapter = racecar_sim_adapter_ptr();
     if (!adapter) {
-        throw std::runtime_error("sim.get-state: racecar sim adapter is not installed");
+        throw std::runtime_error("env.pybullet.get-state: racecar sim adapter is not installed");
     }
     racecar_state state = adapter->get_state();
     validate_state_schema(state);
@@ -346,7 +346,7 @@ racecar_state racecar_get_state() {
 void racecar_apply_action(double steering, double throttle) {
     const std::shared_ptr<racecar_sim_adapter> adapter = racecar_sim_adapter_ptr();
     if (!adapter) {
-        throw std::runtime_error("sim.apply-action: racecar sim adapter is not installed");
+        throw std::runtime_error("env.pybullet.apply-action: racecar sim adapter is not installed");
     }
     adapter->apply_action(clamp_double(steering, -1.0, 1.0), clamp_double(throttle, -1.0, 1.0));
 }
@@ -354,10 +354,10 @@ void racecar_apply_action(double steering, double throttle) {
 void racecar_step(std::int64_t steps) {
     const std::shared_ptr<racecar_sim_adapter> adapter = racecar_sim_adapter_ptr();
     if (!adapter) {
-        throw std::runtime_error("sim.step: racecar sim adapter is not installed");
+        throw std::runtime_error("env.pybullet.step: racecar sim adapter is not installed");
     }
     if (steps < 1) {
-        throw std::runtime_error("sim.step: steps must be >= 1");
+        throw std::runtime_error("env.pybullet.step: steps must be >= 1");
     }
     adapter->step(steps);
 }
@@ -365,7 +365,7 @@ void racecar_step(std::int64_t steps) {
 void racecar_reset() {
     const std::shared_ptr<racecar_sim_adapter> adapter = racecar_sim_adapter_ptr();
     if (!adapter) {
-        throw std::runtime_error("sim.reset: racecar sim adapter is not installed");
+        throw std::runtime_error("env.pybullet.reset: racecar sim adapter is not installed");
     }
     adapter->reset();
 }
@@ -373,7 +373,7 @@ void racecar_reset() {
 void racecar_debug_draw() {
     const std::shared_ptr<racecar_sim_adapter> adapter = racecar_sim_adapter_ptr();
     if (!adapter) {
-        throw std::runtime_error("sim.debug-draw: racecar sim adapter is not installed");
+        throw std::runtime_error("env.pybullet.debug-draw: racecar sim adapter is not installed");
     }
     adapter->debug_draw();
 }
@@ -392,26 +392,26 @@ const char* racecar_loop_status_name(racecar_loop_status status) noexcept {
 
 racecar_loop_result run_racecar_loop(runtime_host& host, std::int64_t instance_handle, const racecar_loop_options& options) {
     if (options.tick_hz <= 0.0 || !std::isfinite(options.tick_hz)) {
-        throw std::runtime_error("sim.run-loop: :tick_hz must be finite and > 0");
+        throw std::runtime_error("env.pybullet.run-loop: :tick_hz must be finite and > 0");
     }
     if (options.max_ticks <= 0) {
-        throw std::runtime_error("sim.run-loop: :max_ticks must be > 0");
+        throw std::runtime_error("env.pybullet.run-loop: :max_ticks must be > 0");
     }
     if (options.steps_per_tick <= 0) {
-        throw std::runtime_error("sim.run-loop: :steps_per_tick must be > 0");
+        throw std::runtime_error("env.pybullet.run-loop: :steps_per_tick must be > 0");
     }
     if (options.state_key.empty() || options.action_key.empty()) {
-        throw std::runtime_error("sim.run-loop: :state_key and :action_key must be non-empty");
+        throw std::runtime_error("env.pybullet.run-loop: :state_key and :action_key must be non-empty");
     }
 
     const std::shared_ptr<racecar_sim_adapter> adapter = racecar_sim_adapter_ptr();
     if (!adapter) {
-        throw std::runtime_error("sim.run-loop: racecar sim adapter is not installed");
+        throw std::runtime_error("env.pybullet.run-loop: racecar sim adapter is not installed");
     }
 
     instance* inst = host.find_instance(instance_handle);
     if (!inst) {
-        throw std::runtime_error("sim.run-loop: unknown bt instance");
+        throw std::runtime_error("env.pybullet.run-loop: unknown bt instance");
     }
 
     const auto tick_period = std::chrono::duration<double>(1.0 / options.tick_hz);

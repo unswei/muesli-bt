@@ -13,12 +13,12 @@
 
 #include "bt/instance.hpp"
 #include "bt/logging.hpp"
+#include "pybullet_racecar/extension.hpp"
 #include "racecar_demo.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/trace.hpp"
 #include "muslisp/env.hpp"
 #include "muslisp/error.hpp"
-#include "muslisp/builtins.hpp"
 #include "muslisp/eval.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
@@ -53,6 +53,12 @@ void reset_bt_runtime_host() {
     bt::runtime_host& host = bt::default_runtime_host();
     host.clear_all();
     bt::install_demo_callbacks(host);
+}
+
+muslisp::env_ptr create_env_with_pybullet_extension() {
+    muslisp::runtime_config config;
+    config.extension_register_hook = muslisp::ext::pybullet_racecar::register_extension;
+    return muslisp::create_global_env(config);
 }
 
 std::filesystem::path temp_file_path(const std::string& stem, const std::string& extension = ".lisp") {
@@ -1913,26 +1919,25 @@ void test_racecar_planner_model_and_sim_get_state_builtin() {
     bt::install_racecar_demo_callbacks(host);
     check(host.planner_ref().has_model("racecar-kinematic-v1"), "planner should register racecar-kinematic-v1 model");
 
-    env_ptr env = create_global_env();
-    install_racecar_demo_builtins(env);
+    env_ptr env = create_env_with_pybullet_extension();
 
     auto adapter = std::make_shared<mock_racecar_adapter>();
     bt::set_racecar_sim_adapter(adapter);
 
     value state_meta = eval_text(
         "(begin "
-        "  (define s (sim.get-state)) "
+        "  (define s (env.pybullet.get-state)) "
         "  (list (map.get s 'state_schema \"none\") "
         "        (map.get s 'x -1.0) "
         "        (map.get s 'collision_count -1)))",
         env);
     const auto state_fields = vector_from_list(state_meta);
-    check(state_fields.size() == 3, "sim.get-state metadata shape mismatch");
+    check(state_fields.size() == 3, "env.pybullet.get-state metadata shape mismatch");
     check(is_string(state_fields[0]) && string_value(state_fields[0]) == "racecar_state.v1",
-          "sim.get-state should expose state_schema");
-    check(is_float(state_fields[1]), "sim.get-state should expose x as float");
+          "env.pybullet.get-state should expose state_schema");
+    check(is_float(state_fields[1]), "env.pybullet.get-state should expose x as float");
     check(is_integer(state_fields[2]) && integer_value(state_fields[2]) == 0,
-          "sim.get-state should expose collision_count as int");
+          "env.pybullet.get-state should expose collision_count as int");
 
     (void)eval_text(
         "(define loop-tree "
@@ -1941,13 +1946,13 @@ void test_racecar_planner_model_and_sim_get_state_builtin() {
     (void)eval_text("(define loop-inst (bt.new-instance loop-tree))", env);
     (void)eval_text(
         "(define loop-result "
-        "(sim.run-loop loop-inst \"tick_hz\" 1000 \"max_ticks\" 3 \"state_key\" 'state \"action_key\" 'action "
+        "(env.pybullet.run-loop loop-inst \"tick_hz\" 1000 \"max_ticks\" 3 \"state_key\" 'state \"action_key\" 'action "
         "\"steps_per_tick\" 1 \"mode\" \"test\"))",
         env);
-    check(is_symbol(eval_text("(map.get loop-result 'status ':none)", env)), "sim.run-loop status should be symbol");
+    check(is_symbol(eval_text("(map.get loop-result 'status ':none)", env)), "env.pybullet.run-loop status should be symbol");
     check(symbol_name(eval_text("(map.get loop-result 'status ':none)", env)) == ":stopped",
-          "sim.run-loop should stop on max ticks");
-    check(integer_value(eval_text("(map.get loop-result 'ticks -1)", env)) == 3, "sim.run-loop tick count mismatch");
+          "env.pybullet.run-loop should stop on max ticks");
+    check(integer_value(eval_text("(map.get loop-result 'ticks -1)", env)) == 3, "env.pybullet.run-loop tick count mismatch");
 
     (void)eval_text(
         "(define tree "
@@ -1969,6 +1974,27 @@ void test_racecar_planner_model_and_sim_get_state_builtin() {
     check(action_vec && action_vec->size() >= 2, "racecar plan-action should output [steering throttle]");
 
     bt::clear_racecar_demo_state();
+}
+
+void test_pybullet_extension_symbols_absent_in_core_env() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    try {
+        (void)eval_text("env.pybullet.get-state", env);
+        throw std::runtime_error("expected env.pybullet.get-state to be unbound in core-only env");
+    } catch (const name_error&) {
+    }
+}
+
+void test_pybullet_extension_symbols_present_with_hook() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_env_with_pybullet_extension();
+    const value sym = eval_text("env.pybullet.get-state", env);
+    check(is_primitive(sym), "env.pybullet.get-state should resolve to a primitive with extension hook");
 }
 
 }  // namespace
@@ -2011,9 +2037,11 @@ int main() {
         {"bt blackboard/trace/stats builtins", test_bt_blackboard_trace_and_stats_builtins},
         {"bt scheduler-backed action", test_bt_scheduler_backed_action},
         {"bt tick with blackboard input", test_bt_tick_with_blackboard_input},
+        {"pybullet symbols absent in core env", test_pybullet_extension_symbols_absent_in_core_env},
+        {"pybullet symbols present with hook", test_pybullet_extension_symbols_present_with_hook},
         {"racecar run-loop contract", test_racecar_loop_contract},
         {"racecar run-loop error safe-action", test_racecar_loop_error_safe_action},
-        {"racecar planner model + sim.get-state", test_racecar_planner_model_and_sim_get_state_builtin},
+        {"racecar planner model + env.pybullet.get-state", test_racecar_planner_model_and_sim_get_state_builtin},
         {"phase5 ring buffer bounds", test_phase5_ring_buffer_bounds},
         {"phase6 sample wrappers tree", test_phase6_sample_wrappers_tree},
         {"phase6 custom robot interface", test_phase6_custom_robot_interface},

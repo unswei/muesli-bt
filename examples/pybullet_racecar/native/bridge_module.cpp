@@ -13,12 +13,12 @@
 #include "racecar_demo.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/status.hpp"
-#include "muslisp/builtins.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/eval.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
 #include "muslisp/value.hpp"
+#include "pybullet_racecar/extension.hpp"
 
 namespace py = pybind11;
 
@@ -347,7 +347,11 @@ private:
 
 class runtime_bridge {
 public:
-    runtime_bridge() : env_(muslisp::create_global_env()) {}
+    runtime_bridge() {
+        muslisp::runtime_config config;
+        config.extension_register_hook = muslisp::ext::pybullet_racecar::register_extension;
+        env_ = muslisp::create_global_env(config);
+    }
     ~runtime_bridge() {
         bt::clear_racecar_demo_state();
         sim_adapter_.reset();
@@ -369,7 +373,6 @@ public:
         sim_adapter_ = std::make_shared<python_racecar_sim_adapter>(std::move(sim_adapter));
         bt::set_racecar_sim_adapter(sim_adapter_);
         bt::install_racecar_demo_callbacks(bt::default_runtime_host());
-        muslisp::install_racecar_demo_builtins(env_);
     }
 
     std::int64_t load_bt_dsl(const std::string& path) {

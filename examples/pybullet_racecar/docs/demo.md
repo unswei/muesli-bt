@@ -4,7 +4,7 @@
 
 The agent drives a PyBullet racecar from start pose to a goal marker while avoiding static box obstacles.
 
-In BT modes, the control loop is executed by `muesli_bt_bridge` and the C++ builtin `sim.run-loop`
+In BT modes, the control loop is executed by `muesli_bt_bridge` and the C++ builtin `env.pybullet.run-loop`
 (observe -> BT tick -> action extract -> actuation -> sim step -> log callback).
 
 State used by control:

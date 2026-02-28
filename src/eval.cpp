@@ -549,12 +549,20 @@ value eval_source(std::string_view source, env_ptr scope) {
     return last;
 }
 
-env_ptr create_global_env() {
+env_ptr create_global_env(const runtime_config& config) {
     env_ptr global = make_env();
     install_core_builtins(global);
+    if (config.extension_register_hook) {
+        registrar reg(global);
+        config.extension_register_hook(&reg, config.extension_register_user);
+    }
     bt::install_demo_callbacks(bt::default_runtime_host());
     default_gc().register_root_env(global);
     return global;
+}
+
+env_ptr create_global_env() {
+    return create_global_env(runtime_config{});
 }
 
 }  // namespace muslisp
