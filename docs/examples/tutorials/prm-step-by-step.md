@@ -1,115 +1,323 @@
 # PRM Tutorial (Step By Step)
 
-This tutorial explains how `examples/repl_scripts/prm-2d-pq.lisp` implements a full simulator-free PRM planner in pure muslisp.
+This tutorial walks through `examples/repl_scripts/prm-2d-pq.lisp` in execution order.
 
-## Goal
+Each code block is taken from the real script. If you read all steps in sequence, you have the complete implementation.
 
-Plan a collision-free path in continuous 2D by:
+## Step 1: Global Parameters, Bounds And Geometry Helpers
 
-1. sampling valid free-space nodes
-2. connecting each node to local neighbors with a collision-checked local planner
-3. running graph shortest path (`pq.*` Dijkstra) over the roadmap
-
-## Step 1: Set Deterministic Parameters
-
-The script starts with deterministic, reproducible settings:
-
-- `seed`
-- `target-nodes`
-- `max-sample-attempts`
-- `k-neighbors`
-- `edge-steps`
-
-Using `(rng.make seed)` ensures repeated runs generate the same roadmap and result.
-
-## Step 2: Define State Space And Obstacles
-
-World bounds:
-
-- `[x-min, x-max]`
-- `[y-min, y-max]`
-
-Obstacles are circles stored as `(cx cy r)` tuples inside `obstacles` vector.
-
-## Step 3: Build Collision Predicates
-
-The planner defines:
-
-- `state-valid?`: point is in bounds and outside all circles
-- `edge-valid?`: line segment is valid by discretized interpolation
-
-`edge-valid-loop` samples `edge-steps` points along each segment and rejects if any sample collides.
-
-## Step 4: Sample Valid Nodes
-
-`sample-valid-nodes!` repeatedly draws random points and keeps only valid ones:
+This section defines reproducible run parameters, world bounds, start/goal points, and distance helpers.
 
 ```lisp
-(let ((x (rng.uniform rng x-min x-max))
-      (y (rng.uniform rng y-min y-max)))
-  ...)
+(begin
+  ;; PRM in pure muslisp: 2D point robot with circular obstacles.
+  ;; Uses pq.* for roadmap shortest path (Dijkstra).
+
+  (define seed 17)
+  (define target-nodes 56)
+  (define max-sample-attempts 6000)
+  (define k-neighbors 8)
+  (define edge-steps 14)
+  (define inf 1000000000.0)
+
+  (define x-min 0.0)
+  (define x-max 10.0)
+  (define y-min 0.0)
+  (define y-max 8.0)
+
+  (define start (list 0.7 0.8))
+  (define goal (list 9.2 7.1))
+
+  (define (pt-x p)
+    (car p))
+
+  (define (pt-y p)
+    (car (cdr p)))
+
+  (define (dist2 x1 y1 x2 y2)
+    (+ (* (- x1 x2) (- x1 x2))
+       (* (- y1 y2) (- y1 y2))))
+
+  (define (distance x1 y1 x2 y2)
+    (sqrt (dist2 x1 y1 x2 y2)))
 ```
 
-The roadmap vector `nodes` is initialized with:
+## Step 2: Obstacles And Collision Tests
 
-- node `0` = start
-- node `1` = goal
+This section stores circular obstacles and defines both point and edge validity checks.
 
-then additional sampled nodes are appended.
+```lisp
+  (define obstacles (vec.make))
+  (define (add-obstacle! cx cy r)
+    (vec.push! obstacles (list cx cy r)))
 
-## Step 5: Pick k Neighbor Candidates
+  (add-obstacle! 3.0 2.0 1.0)
+  (add-obstacle! 5.2 4.6 1.2)
+  (add-obstacle! 7.4 2.2 1.0)
+  (add-obstacle! 2.5 6.0 0.9)
+  (add-obstacle! 7.8 6.1 0.9)
 
-For each node `i`, `collect-candidates!` scans all nodes and keeps the nearest `k-neighbors`.
+  (define (outside-obstacles? x y idx)
+    (if (>= idx (vec.len obstacles))
+        #t
+        (let ((obs (vec.get obstacles idx)))
+          (let ((cx (car obs))
+                (cy (car (cdr obs)))
+                (r (car (cdr (cdr obs)))))
+            (if (< (dist2 x y cx cy) (* r r))
+                #f
+                (outside-obstacles? x y (+ idx 1)))))))
 
-Because there is no full sort primitive, a fixed-size candidate set is maintained with:
+  (define (state-valid? x y)
+    (if (< x x-min)
+        #f
+        (if (> x x-max)
+            #f
+            (if (< y y-min)
+                #f
+                (if (> y y-max)
+                    #f
+                    (outside-obstacles? x y 0))))))
 
-- `idxv`: candidate node IDs
-- `distv`: candidate distances
-- `worst-index`: replace the current worst candidate when a better one appears
+  (define (edge-valid-loop x1 y1 x2 y2 i)
+    (if (> i edge-steps)
+        #t
+        (let ((t (/ i edge-steps)))
+          (let ((x (+ x1 (* t (- x2 x1))))
+                (y (+ y1 (* t (- y2 y1)))))
+            (if (state-valid? x y)
+                (edge-valid-loop x1 y1 x2 y2 (+ i 1))
+                #f)))))
 
-## Step 6: Connect Collision-Free Edges
+  (define (edge-valid? x1 y1 x2 y2)
+    (edge-valid-loop x1 y1 x2 y2 0))
+```
 
-`connect-candidates!` attempts edges from node `i` to each candidate:
+## Step 3: Random Sampling And k-Candidate Selection
 
-1. avoid duplicate undirected edges via `j > i`
-2. run `edge-valid?` for geometric collision checking
-3. on success, add symmetric adjacency entries with edge cost = Euclidean distance
+This section samples valid roadmap nodes, then keeps the nearest `k-neighbors` candidates for each node.
 
-`build-roadmap!` repeats this for all nodes and returns `edge-count`.
+```lisp
+  (define (sample-valid-nodes! rng nodes accepted attempts)
+    (if (>= accepted target-nodes)
+        accepted
+        (if (>= attempts max-sample-attempts)
+            accepted
+            (let ((x (rng.uniform rng x-min x-max))
+                  (y (rng.uniform rng y-min y-max)))
+              (if (state-valid? x y)
+                  (begin
+                    (vec.push! nodes (list x y))
+                    (sample-valid-nodes! rng nodes (+ accepted 1) (+ attempts 1)))
+                  (sample-valid-nodes! rng nodes accepted (+ attempts 1)))))))
 
-## Step 7: Run Graph Dijkstra On The Roadmap
+  (define (worst-index distv idx worst-idx worst-value)
+    (if (>= idx (vec.len distv))
+        worst-idx
+        (let ((v (vec.get distv idx)))
+          (if (> v worst-value)
+              (worst-index distv (+ idx 1) idx v)
+              (worst-index distv (+ idx 1) worst-idx worst-value)))))
 
-`graph-dijkstra` reuses the same duplicate-push + stale-skip strategy as the grid Dijkstra example:
+  (define (consider-neighbor-candidate! idxv distv j d)
+    (if (< (vec.len idxv) k-neighbors)
+        (begin
+          (vec.push! idxv j)
+          (vec.push! distv d))
+        (let ((wi (worst-index distv 1 0 (vec.get distv 0))))
+          (if (< d (vec.get distv wi))
+              (begin
+                (vec.set! idxv wi j)
+                (vec.set! distv wi d))
+              nil))))
 
-- priority queue key: current best path cost
-- relax each adjacency edge
-- stop when goal node ID `1` is finalized
+  (define (collect-candidates! nodes i j idxv distv)
+    (if (>= j (vec.len nodes))
+        nil
+        (if (= i j)
+            (collect-candidates! nodes i (+ j 1) idxv distv)
+            (let ((pi (vec.get nodes i))
+                  (pj (vec.get nodes j)))
+              (let ((d (distance (pt-x pi) (pt-y pi) (pt-x pj) (pt-y pj))))
+                (begin
+                  (consider-neighbor-candidate! idxv distv j d)
+                  (collect-candidates! nodes i (+ j 1) idxv distv)))))))
+```
 
-## Step 8: Reconstruct Path In Node Space
+The candidate logic avoids sorting all neighbours by maintaining a fixed-size best set.
 
-`reconstruct-path` follows `prev` links from goal node back to start node, then reverses.
+## Step 4: Roadmap Edge Construction
 
-`print-path` maps node IDs to coordinates and emits ordered steps.
+This section inserts undirected edges and builds the final adjacency map.
 
-## Step 9: Interpret Output
+```lisp
+  (define (add-edge! adj a b cost)
+    (begin
+      (vec.push! (map.get adj a nil) (list b cost))
+      (vec.push! (map.get adj b nil) (list a cost))
+      nil))
 
-The script prints:
+  (define (connect-candidates! nodes adj i idxv idx edges)
+    (if (>= idx (vec.len idxv))
+        edges
+        (let ((j (vec.get idxv idx)))
+          (if (> j i)
+              (let ((pi (vec.get nodes i))
+                    (pj (vec.get nodes j)))
+                (let ((x1 (pt-x pi))
+                      (y1 (pt-y pi))
+                      (x2 (pt-x pj))
+                      (y2 (pt-y pj)))
+                  (let ((d (distance x1 y1 x2 y2)))
+                    (if (edge-valid? x1 y1 x2 y2)
+                        (begin
+                          (add-edge! adj i j d)
+                          (connect-candidates! nodes adj i idxv (+ idx 1) (+ edges 1)))
+                        (connect-candidates! nodes adj i idxv (+ idx 1) edges)))))
+              (connect-candidates! nodes adj i idxv (+ idx 1) edges)))))
 
-- seed
-- accepted node count
-- edge count and `k`
-- `found` + `expanded_nodes`
-- if found: `path_len` and `path_cost`
-- per-step `(x y)` coordinates
+  (define (init-adj! adj i n)
+    (if (>= i n)
+        nil
+        (begin
+          (map.set! adj i (vec.make))
+          (init-adj! adj (+ i 1) n))))
 
-## Practical Extensions
+  (define (build-roadmap! nodes adj i edges)
+    (if (>= i (vec.len nodes))
+        edges
+        (let ((idxv (vec.make))
+              (distv (vec.make)))
+          (begin
+            (collect-candidates! nodes i 0 idxv distv)
+            (build-roadmap! nodes adj (+ i 1) (connect-candidates! nodes adj i idxv 0 edges))))))
+```
 
-- replace naive all-pairs candidate scan with spatial hashing or k-d trees
-- adapt `edge-steps` by edge length
-- add post-processing (shortcut smoothing) on final path
+## Step 5: Graph Dijkstra On The Roadmap
+
+This section runs shortest path over the built roadmap, still using duplicate `pq.push!` entries and stale-entry skipping.
+
+```lisp
+  (define (relax-edges! edgev idx current current-dist pq dist prev)
+    (if (>= idx (vec.len edgev))
+        nil
+        (let ((edge (vec.get edgev idx)))
+          (let ((nb (car edge))
+                (w (car (cdr edge))))
+            (let ((new-dist (+ current-dist w)))
+              (begin
+                (if (< new-dist (map.get dist nb inf))
+                    (begin
+                      (map.set! dist nb new-dist)
+                      (map.set! prev nb current)
+                      (pq.push! pq new-dist nb))
+                    nil)
+                (relax-edges! edgev (+ idx 1) current current-dist pq dist prev)))))))
+
+  (define (graph-dijkstra-loop goal-id adj pq dist prev closed expansions)
+    (if (pq.empty? pq)
+        (list #f dist prev expansions)
+        (let ((entry (pq.pop! pq)))
+          (let ((current-dist (car entry))
+                (current (car (cdr entry))))
+            (if (map.has? closed current)
+                (graph-dijkstra-loop goal-id adj pq dist prev closed expansions)
+                (if (> current-dist (+ (map.get dist current inf) 0.000000001))
+                    (graph-dijkstra-loop goal-id adj pq dist prev closed expansions)
+                    (begin
+                      (map.set! closed current #t)
+                      (if (= current goal-id)
+                          (list #t dist prev expansions)
+                          (begin
+                            (relax-edges! (map.get adj current (vec.make)) 0 current current-dist pq dist prev)
+                            (graph-dijkstra-loop goal-id adj pq dist prev closed (+ expansions 1)))))))))))
+
+  (define (graph-dijkstra adj start-id goal-id)
+    (let ((pq (pq.make))
+          (dist (map.make))
+          (prev (map.make))
+          (closed (map.make)))
+      (begin
+        (map.set! dist start-id 0.0)
+        (map.set! prev start-id start-id)
+        (pq.push! pq 0.0 start-id)
+        (graph-dijkstra-loop goal-id adj pq dist prev closed 0))))
+```
+
+## Step 6: Path Reconstruction And Printing
+
+These helpers convert the roadmap path into ordered 2D coordinates for final output.
+
+```lisp
+  (define (reverse-copy src idx dst)
+    (if (< idx 0)
+        dst
+        (begin
+          (vec.push! dst (vec.get src idx))
+          (reverse-copy src (- idx 1) dst))))
+
+  (define (reconstruct-rev prev current rev)
+    (vec.push! rev current)
+    (if (map.has? prev current)
+        (let ((parent (map.get prev current current)))
+          (if (= parent current)
+              rev
+              (reconstruct-rev prev parent rev)))
+        rev))
+
+  (define (reconstruct-path prev goal-id)
+    (let ((rev (vec.make)))
+      (begin
+        (reconstruct-rev prev goal-id rev)
+        (reverse-copy rev (- (vec.len rev) 1) (vec.make)))))
+
+  (define (print-path nodes path idx)
+    (if (>= idx (vec.len path))
+        nil
+        (let ((node-id (vec.get path idx)))
+          (let ((pt (vec.get nodes node-id)))
+            (begin
+              (print (list 'step idx (list (pt-x pt) (pt-y pt))))
+              (print-path nodes path (+ idx 1)))))))
+```
+
+## Step 7: Execute Full PRM Pipeline And Print Results
+
+This final block seeds the RNG, samples nodes, builds the roadmap, runs shortest path, and prints summaries.
+
+```lisp
+  (define rng (rng.make seed))
+  (define nodes (vec.make))
+  (vec.push! nodes start)
+  (vec.push! nodes goal)
+
+  (define accepted (sample-valid-nodes! rng nodes 2 0))
+
+  (define adj (map.make))
+  (init-adj! adj 0 accepted)
+  (define edge-count (build-roadmap! nodes adj 0 0))
+
+  (define result (graph-dijkstra adj 0 1))
+  (define found (car result))
+  (define dist (car (cdr result)))
+  (define prev (car (cdr (cdr result))))
+  (define expansions (car (cdr (cdr (cdr result)))))
+
+  (print (list 'prm2d 'seed seed))
+  (print (list 'accepted_nodes accepted 'target_nodes target-nodes))
+  (print (list 'edge_count edge-count 'k k-neighbors))
+  (print (list 'found found 'expanded_nodes expansions))
+
+  (if found
+      (let ((path (reconstruct-path prev 1))
+            (cost (map.get dist 1 inf)))
+        (begin
+          (print (list 'path_len (vec.len path) 'path_cost cost))
+          (print-path nodes path 0)))
+      (print 'no-path)))
+```
 
 ## See Also
 
 - [PRM Example Overview](../prm-pq.md)
 - [Dijkstra Tutorial](dijkstra-step-by-step.md)
-

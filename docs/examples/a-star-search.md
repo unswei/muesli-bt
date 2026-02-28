@@ -23,7 +23,7 @@ Step-by-step tutorial:
   - `map.make`, `map.get`, `map.set!`, `map.has?`, `map.del!`
 - recursive control flow for:
   - open-set best-node selection
-  - neighbor expansion
+  - neighbour expansion
   - path reconstruction
 - Manhattan heuristic over a grid
 

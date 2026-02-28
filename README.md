@@ -57,7 +57,7 @@ Run pure Lisp PRM demo (deterministic seed + `pq.*` shortest path):
 ./build/dev/muslisp examples/repl_scripts/prm-2d-pq.lisp
 ```
 
-Run async VLA demo with fallback behavior:
+Run async VLA demo with fallback behaviour:
 
 ```bash
 ./build/dev/muslisp examples/repl_scripts/vla-stub-bt.lisp

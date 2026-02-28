@@ -4,7 +4,7 @@ This script runs a PTZ-style tracking loop:
 
 - `plan-action` calls the `ptz-track` planner model within a per-tick budget
 - `apply-planned-ptz` applies the selected `(dpan, dtilt)` action
-- the tree keeps ticking until the target is near image center
+- the tree keeps ticking until the target is near image centre
 
 Script path:
 

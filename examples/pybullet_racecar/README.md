@@ -156,4 +156,4 @@ If Graphviz is unavailable, the script still generates a `.dot` file.
 - `scripts/render_bt_dot.py`: DOT/SVG export helper
 - `docs/demo.md`: long-form walkthrough
 - `docs/log_schema.md`: stable log schema
-- `docs/bt_nodes.md`: node-level behavior summary
+- `docs/bt_nodes.md`: node-level behaviour summary

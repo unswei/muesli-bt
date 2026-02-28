@@ -1,131 +1,221 @@
 # Dijkstra Tutorial (Step By Step)
 
-This tutorial explains how `examples/repl_scripts/dijkstra-grid-pq.lisp` implements weighted-grid Dijkstra using native `pq.*` builtins.
+This tutorial walks through `examples/repl_scripts/dijkstra-grid-pq.lisp` in execution order.
 
-## Goal
+Each code block is taken from the script itself. Read the steps in sequence and you will cover the complete file.
 
-Compute the minimum-cost path on a weighted 2D grid where:
+## Step 1: Grid, Obstacles And Terrain Costs
 
-- each move cost is `cell-cost(neighbor)`
-- obstacles are blocked
-- all costs are non-negative
-
-## Step 1: Encode Nodes And Coordinates
-
-Like the A* example, node IDs are `id = x + y * width`.
-
-The script precomputes:
-
-- `id->x`
-- `id->y`
-
-for fast decode during output.
-
-## Step 2: Define Obstacles And Terrain Costs
-
-Two map layers are used:
-
-- `obstacles`: blocked cells
-- `terrain`: optional per-cell weights
-
-`cell-cost` reads `terrain` with fallback `1.0`.
-
-## Step 3: Initialize Dijkstra Structures
-
-`dijkstra-search` creates:
-
-- `open` as `(pq.make)` storing `(priority, node)`
-- `dist` map (best known distance)
-- `prev` map (parent links)
-- `closed` map (finalized nodes)
-
-Start state:
-
-- `dist[start] = 0.0`
-- `prev[start] = start`
-- `(pq.push! open 0.0 start)`
-
-## Step 4: Pop Best Candidate
-
-`dijkstra-loop` repeatedly pops:
+This section sets up node encoding, reverse coordinate tables, blocked cells, and weighted terrain.
 
 ```lisp
-(let ((entry (pq.pop! open)))
-  (let ((current-dist (car entry))
-        (current (car (cdr entry))))
+(begin
+  ;; Dijkstra shortest path on a weighted grid using the native pq.* builtins.
+  ;; This intentionally uses duplicate queue inserts + stale-distance skipping.
+
+  (define width 8)
+  (define height 6)
+  (define inf 1000000000.0)
+
+  (define (xy->id x y)
+    (+ x (* y width)))
+
+  (define id->x (map.make))
+  (define id->y (map.make))
+
+  (define (init-coords x y)
+    (if (>= y height)
+        nil
+        (if (>= x width)
+            (init-coords 0 (+ y 1))
+            (let ((id (xy->id x y)))
+              (begin
+                (map.set! id->x id x)
+                (map.set! id->y id y)
+                (init-coords (+ x 1) y))))))
+
+  (init-coords 0 0)
+
+  (define obstacles (map.make))
+  (define (block! x y)
+    (map.set! obstacles (xy->id x y) #t))
+
+  ;; Wall with a gap and a few additional blocked cells.
+  (block! 3 0)
+  (block! 3 1)
+  (block! 3 3)
+  (block! 3 4)
+  (block! 5 2)
+  (block! 5 3)
+
+  ;; Terrain costs: default 1.0, selected cells are heavier.
+  (define terrain (map.make))
+  (define (set-cost! x y c)
+    (map.set! terrain (xy->id x y) c))
+
+  (set-cost! 1 2 2.5)
+  (set-cost! 2 2 2.0)
+  (set-cost! 4 4 3.0)
+  (set-cost! 6 1 2.2)
+  (set-cost! 6 4 2.8)
+
+  (define (cell-cost id)
+    (map.get terrain id 1.0))
 ```
 
-The popped priority is the candidate shortest distance for that node.
+## Step 2: Path Reconstruction Helpers
 
-## Step 5: Handle Duplicate Pushes (No Decrease-Key)
-
-This implementation intentionally uses duplicate inserts:
-
-- whenever a better route is found, push a new `(new-dist, node)` pair
-- old queue entries become stale
-
-Two guards skip stale work:
-
-1. if node already in `closed`, skip
-2. if popped `current-dist` is greater than `dist[current] + epsilon`, skip
-
-This is a standard Dijkstra pattern when decrease-key is unavailable.
-
-## Step 6: Relax Outgoing Neighbors
-
-`expand-neighbors` checks up to four grid moves.
-
-`relax-neighbor` performs:
-
-1. skip blocked cell
-2. `new-dist = current-dist + cell-cost(neighbor)`
-3. if `new-dist < dist[neighbor]`:
-   - update `dist[neighbor]`
-   - set `prev[neighbor] = current`
-   - push `(new-dist, neighbor)` into queue
-
-## Step 7: Stop Conditions
-
-Loop terminates when:
-
-- queue is empty -> no path
-- goal is popped as a valid current node -> success
-
-The result tuple contains:
-
-- `found`
-- `dist` map
-- `prev` map
-- expansion count
-
-## Step 8: Reconstruct Path
-
-`reconstruct-path` follows `prev` from goal to start, then reverses.
-
-Total cost is read directly from:
+These helpers collect parent links in reverse order and then reverse the vector for final output.
 
 ```lisp
-(map.get dist goal inf)
+  (define (reverse-copy src idx dst)
+    (if (< idx 0)
+        dst
+        (begin
+          (vec.push! dst (vec.get src idx))
+          (reverse-copy src (- idx 1) dst))))
+
+  (define (reconstruct-rev prev current rev)
+    (vec.push! rev current)
+    (if (map.has? prev current)
+        (let ((parent (map.get prev current current)))
+          (if (= parent current)
+              rev
+              (reconstruct-rev prev parent rev)))
+        rev))
+
+  (define (reconstruct-path prev goal)
+    (let ((rev (vec.make)))
+      (begin
+        (reconstruct-rev prev goal rev)
+        (reverse-copy rev (- (vec.len rev) 1) (vec.make)))))
 ```
 
-## Step 9: Output
+## Step 3: Edge Relaxation And Neighbour Expansion
 
-Printed fields include:
+`relax-neighbor` performs the Dijkstra update for one candidate neighbour.
 
-- `found`
-- `expanded_nodes`
-- `total_cost`
-- `path_len`
-- per-step `(x y)` coordinates
+`expand-neighbors` applies it to the four-connected grid.
 
-## Practical Extensions
+```lisp
+  (define (relax-neighbor nb current current-dist open dist prev)
+    (if (map.has? obstacles nb)
+        nil
+        (let ((new-dist (+ current-dist (cell-cost nb))))
+          (if (< new-dist (map.get dist nb inf))
+              (begin
+                (map.set! dist nb new-dist)
+                (map.set! prev nb current)
+                (pq.push! open new-dist nb))
+              nil))))
 
-- use 8-connected moves (diagonals) with corresponding move costs
-- feed roadmap graphs instead of grids (see PRM tutorial)
-- switch to A* by adding a heuristic term to queue priorities
+  (define (expand-neighbors current current-dist open dist prev)
+    (let ((x (map.get id->x current 0))
+          (y (map.get id->y current 0)))
+      (begin
+        (if (> x 0)
+            (relax-neighbor (xy->id (- x 1) y) current current-dist open dist prev)
+            nil)
+        (if (< (+ x 1) width)
+            (relax-neighbor (xy->id (+ x 1) y) current current-dist open dist prev)
+            nil)
+        (if (> y 0)
+            (relax-neighbor (xy->id x (- y 1)) current current-dist open dist prev)
+            nil)
+        (if (< (+ y 1) height)
+            (relax-neighbor (xy->id x (+ y 1)) current current-dist open dist prev)
+            nil)
+        nil)))
+```
+
+## Step 4: Main Dijkstra Loop
+
+This loop pops queue entries, skips stale entries, finalises nodes, and expands outward until goal or exhaustion.
+
+```lisp
+  (define (dijkstra-loop goal open dist prev closed expansions)
+    (if (pq.empty? open)
+        (list #f dist prev expansions)
+        (let ((entry (pq.pop! open)))
+          (let ((current-dist (car entry))
+                (current (car (cdr entry))))
+            (if (map.has? closed current)
+                (dijkstra-loop goal open dist prev closed expansions)
+                (if (> current-dist (+ (map.get dist current inf) 0.000000001))
+                    (dijkstra-loop goal open dist prev closed expansions)
+                    (begin
+                      (map.set! closed current #t)
+                      (if (= current goal)
+                          (list #t dist prev expansions)
+                          (begin
+                            (expand-neighbors current current-dist open dist prev)
+                            (dijkstra-loop goal open dist prev closed (+ expansions 1)))))))))))
+```
+
+The `current-dist` stale-entry check is what allows duplicate queue pushes without a decrease-key primitive.
+
+## Step 5: Search Wrapper And Result Accessors
+
+This section initialises runtime maps/queue and defines helper accessors.
+
+```lisp
+  (define (dijkstra-search start goal)
+    (let ((open (pq.make))
+          (dist (map.make))
+          (prev (map.make))
+          (closed (map.make)))
+      (begin
+        (map.set! dist start 0.0)
+        (map.set! prev start start)
+        (pq.push! open 0.0 start)
+        (dijkstra-loop goal open dist prev closed 0))))
+
+  (define (result-found? result)
+    (car result))
+
+  (define (result-dist result)
+    (car (cdr result)))
+
+  (define (result-prev result)
+    (car (cdr (cdr result))))
+
+  (define (result-expansions result)
+    (car (cdr (cdr (cdr result)))))
+```
+
+## Step 6: Execute And Print
+
+The file finishes by running the search and printing summary plus path details.
+
+```lisp
+  (define (print-path path idx)
+    (if (>= idx (vec.len path))
+        nil
+        (let ((id (vec.get path idx)))
+          (begin
+            (print (list 'step idx (list (map.get id->x id -1) (map.get id->y id -1))))
+            (print-path path (+ idx 1))))))
+
+  (define start (xy->id 0 0))
+  (define goal (xy->id 7 5))
+  (define result (dijkstra-search start goal))
+
+  (print (list 'dijkstra 'weighted-grid (list width height)))
+  (print (list 'start (list 0 0) 'goal (list 7 5)))
+  (print (list 'found (result-found? result)))
+  (print (list 'expanded_nodes (result-expansions result)))
+
+  (if (result-found? result)
+      (let ((path (reconstruct-path (result-prev result) goal))
+            (cost (map.get (result-dist result) goal inf)))
+        (begin
+          (print (list 'total_cost cost))
+          (print (list 'path_len (vec.len path)))
+          (print-path path 0)))
+      (print 'no-path)))
+```
 
 ## See Also
 
 - [Dijkstra Example Overview](../dijkstra-pq.md)
 - [PRM Tutorial](prm-step-by-step.md)
-

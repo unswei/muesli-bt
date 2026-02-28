@@ -9,7 +9,7 @@ This page describes how `bt.tick` and background scheduler work together in the 
 - async outcomes are reconciled on later ticks
 - scheduler activity is observable through stats and trace events
 
-## Available Behavior
+## Available Behaviour
 
 - host-driven ticking via `bt.tick`
 - background scheduler with worker threads

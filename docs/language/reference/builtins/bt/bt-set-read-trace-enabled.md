@@ -31,7 +31,7 @@ Enables/disables `bb_read` trace events.
 
 ## Notes
 
-- Use when debugging blackboard-read behavior.
+- Use when debugging blackboard-read behaviour.
 
 ## See Also
 

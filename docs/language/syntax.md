@@ -2,7 +2,7 @@
 
 This page documents the concrete syntax accepted by the current reader.
 
-For exact signatures, argument behavior, and error details, use the [Language Reference Index](reference/index.md).
+For exact signatures, argument behaviour, and error details, use the [Language Reference Index](reference/index.md).
 
 ## Literals
 

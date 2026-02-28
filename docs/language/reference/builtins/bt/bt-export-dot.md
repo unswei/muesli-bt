@@ -4,7 +4,7 @@
 
 ## What It Does
 
-Exports a compiled behavior tree definition to a Graphviz DOT file.
+Exports a compiled behaviour tree definition to a Graphviz DOT file.
 
 ## Arguments And Return
 

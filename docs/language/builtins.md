@@ -1,6 +1,6 @@
 # Built-ins Overview
 
-This page is a summary and link hub for built-ins. Detailed behavior, errors, and runnable examples are documented in [Language Reference Index](reference/index.md).
+This page is a summary and link hub for built-ins. Detailed behaviour, errors, and runnable examples are documented in [Language Reference Index](reference/index.md).
 
 ## Core
 

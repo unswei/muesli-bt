@@ -2,7 +2,7 @@
 
 This index links to one reference page per implemented language feature and builtin.
 
-Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) for conceptual behavior; use this section for exact signatures and edge cases.
+Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) for conceptual behaviour; use this section for exact signatures and edge cases.
 
 ## Core Syntax And Special Forms
 

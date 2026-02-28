@@ -41,7 +41,7 @@ Submits the action for the next control tick.
 
 ## Notes
 
-- Bounds/clamping behavior is backend/schema dependent.
+- Bounds/clamping behaviour is backend/schema dependent.
 - `sim.act` is a temporary alias.
 
 ## See Also

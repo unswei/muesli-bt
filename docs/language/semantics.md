@@ -2,7 +2,7 @@
 
 This page describes how expressions are evaluated in the current implementation.
 
-Use the [Language Reference Index](reference/index.md) when you need exact signatures, argument validation, or edge-case behavior for individual forms and built-ins.
+Use the [Language Reference Index](reference/index.md) when you need exact signatures, argument validation, or edge-case behaviour for individual forms and built-ins.
 
 ## Evaluation Model
 

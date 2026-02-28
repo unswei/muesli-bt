@@ -31,7 +31,7 @@ Returns scheduler counters and timings.
 
 ## Notes
 
-- Useful for async behavior diagnostics.
+- Useful for async behaviour diagnostics.
 
 ## See Also
 
