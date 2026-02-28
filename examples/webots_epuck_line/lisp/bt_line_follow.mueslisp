@@ -7,18 +7,21 @@
     (seq
       (cond bb-truthy line_found)
       (plan-action :name "epuck-line-plan"
-                   :budget_ms 8
-                   :iters_max 260
-                   :max_depth 10
+                   :budget_ms 10
+                   :iters_max 320
+                   :max_depth 12
                    :gamma 0.95
-                   :pw_k 1.8
-                   :pw_alpha 0.55
+                   :pw_k 1.6
+                   :pw_alpha 0.50
                    :model_service "epuck-line-v1"
                    :state_key planner_state
+                   :prior_key planner_prior
+                   :prior_sigma 0.12
+                   :prior_mix 0.90
                    :action_key planner_action
                    :meta_key planner_meta
                    :top_k 5)
-      (act select-action planner_action 2)
+      (act select-action act_follow 2)
       (running))
     (seq
       (act select-action act_search 3)

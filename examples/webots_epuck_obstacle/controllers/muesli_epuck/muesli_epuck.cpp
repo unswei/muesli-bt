@@ -248,15 +248,18 @@ public:
                                                bt::planner_rng& rng) const override {
         const bt::planner_vector u = clamp_action(action);
         const double line_error = state.empty() ? 0.0 : state[0];
+        const double line_strength = state.size() > 1 ? state[1] : 0.5;
         const double steer = (u[1] - u[0]) / (2.0 * kMaxWheelSpeed);
-        const double noise = rng.normal(0.0, 0.01);
+        const double noise_error = rng.normal(0.0, 0.01);
+        const double noise_strength = rng.normal(0.0, 0.02);
 
-        const double next_error = clampd(0.82 * line_error + 0.55 * steer + noise, -2.0, 2.0);
-        const bool done = std::fabs(next_error) > 1.2;
+        const double next_error = clampd(0.72 * line_error + 0.40 * steer + noise_error, -1.5, 1.5);
+        const double next_strength = clampd(0.80 * line_strength + 0.20 * (1.0 - std::fabs(next_error)) + noise_strength, 0.0, 1.0);
+        const bool done = next_strength < 0.05;
 
         bt::planner_step_result out;
-        out.next_state = {next_error};
-        out.reward = -std::fabs(next_error) - 0.02 * std::fabs(steer);
+        out.next_state = {next_error, next_strength};
+        out.reward = next_strength - std::fabs(next_error) - 0.02 * std::fabs(steer);
         if (done) {
             out.reward -= 1.0;
         }
@@ -265,8 +268,10 @@ public:
     }
 
     [[nodiscard]] bt::planner_vector sample_action(const bt::planner_vector&, bt::planner_rng& rng) const override {
-        const double left = rng.uniform(-kMaxWheelSpeed, kMaxWheelSpeed);
-        const double right = rng.uniform(-kMaxWheelSpeed, kMaxWheelSpeed);
+        const double base = rng.uniform(2.4, 4.6);
+        const double steer = rng.uniform(-1.1, 1.1);
+        const double left = clampd(base + 1.8 * steer, 0.0, kMaxWheelSpeed);
+        const double right = clampd(base - 1.8 * steer, 0.0, kMaxWheelSpeed);
         return {left, right};
     }
 
@@ -280,21 +285,21 @@ public:
 
     [[nodiscard]] bt::planner_vector clamp_action(const bt::planner_vector& action) const override {
         if (action.empty()) {
-            return {0.0, 0.0};
+            return {2.8, 2.8};
         }
         if (action.size() == 1) {
-            const double v = clampd(action[0], -kMaxWheelSpeed, kMaxWheelSpeed);
+            const double v = clampd(action[0], 0.0, kMaxWheelSpeed);
             return {v, v};
         }
-        return {clampd(action[0], -kMaxWheelSpeed, kMaxWheelSpeed), clampd(action[1], -kMaxWheelSpeed, kMaxWheelSpeed)};
+        return {clampd(action[0], 0.0, kMaxWheelSpeed), clampd(action[1], 0.0, kMaxWheelSpeed)};
     }
 
     [[nodiscard]] bt::planner_vector zero_action() const override {
-        return {0.0, 0.0};
+        return {2.8, 2.8};
     }
 
     [[nodiscard]] bool validate_state(const bt::planner_vector& state) const override {
-        return state.size() >= 1 && std::isfinite(state[0]);
+        return state.size() >= 2 && std::isfinite(state[0]) && std::isfinite(state[1]);
     }
 
     [[nodiscard]] std::size_t action_dims() const override {
@@ -371,12 +376,17 @@ struct epuck_devices {
         right_motor->setPosition(INFINITY);
         left_motor->setVelocity(0.0);
         right_motor->setVelocity(0.0);
+
+        // Prime sensor values so the first observation does not contain startup NaNs.
+        robot->step(time_step_ms);
     }
 
     [[nodiscard]] std::array<double, 8> read_proximity_normalised() const {
         std::array<double, 8> values{};
         for (int i = 0; i < 8; ++i) {
-            values[static_cast<std::size_t>(i)] = clampd(proximity[i]->getValue() / 4096.0, 0.0, 1.0);
+            const double raw = proximity[i]->getValue();
+            const double finite = std::isfinite(raw) ? raw : 0.0;
+            values[static_cast<std::size_t>(i)] = clampd(finite / 4096.0, 0.0, 1.0);
         }
         return values;
     }
@@ -388,7 +398,9 @@ struct epuck_devices {
                 values[static_cast<std::size_t>(i)] = 1.0;
                 continue;
             }
-            values[static_cast<std::size_t>(i)] = clampd(ground[i]->getValue() / 1000.0, 0.0, 1.0);
+            const double raw = ground[i]->getValue();
+            const double finite = std::isfinite(raw) ? raw : 1000.0;
+            values[static_cast<std::size_t>(i)] = clampd(finite / 1000.0, 0.0, 1.0);
         }
         return values;
     }
@@ -515,7 +527,11 @@ public:
             muslisp::value ground_list = numeric_vector_to_lisp_list(ground_vec);
             roots.add(&ground_list);
 
-            const double line_error = clampd(ground[2] - ground[0], -1.0, 1.0);
+            const double dark_left = clampd(1.0 - ground[0], 0.0, 1.0);
+            const double dark_centre = clampd(1.0 - ground[1], 0.0, 1.0);
+            const double dark_right = clampd(1.0 - ground[2], 0.0, 1.0);
+            const double dark_sum = dark_left + dark_centre + dark_right;
+            const double line_error = dark_sum > 1e-6 ? clampd((dark_right - dark_left) / dark_sum, -1.0, 1.0) : 0.0;
 
             map_set_symbol(obs, "ground", ground_list);
             map_set_symbol(obs, "line_error", muslisp::make_float(line_error));

@@ -8,6 +8,9 @@
 (define (max2 a b)
   (if (> a b) a b))
 
+(define (bool-or a b)
+  (if a #t b))
+
 (define (make-action left right)
   (begin
     (define action (map.make))
@@ -38,10 +41,13 @@
   (begin
     (define right-signal (+ (+ (nth proximity 0) (nth proximity 1)) (nth proximity 2)))
     (define left-signal (+ (+ (nth proximity 5) (nth proximity 6)) (nth proximity 7)))
-    (define turn-gain (clamp (* 5.0 (- 0.35 min-obstacle)) 0.8 4.8))
+    (define pmax (clamp (- 1.0 min-obstacle) 0.0 1.0))
+    (define closeness (clamp (/ (- pmax 0.36) 0.14) 0.0 1.0))
+    (define turn-gain (+ 1.2 (* 4.2 closeness)))
+    (define forward (clamp (- 1.8 (* 2.2 closeness)) -1.0 1.2))
     (if (> right-signal left-signal)
-        (list (- turn-gain) turn-gain)
-        (list turn-gain (- turn-gain)))))
+        (list (- forward turn-gain) (+ forward turn-gain))
+        (list (+ forward turn-gain) (- forward turn-gain)))))
 
 (define (compute-wall-action proximity)
   (begin
@@ -49,29 +55,33 @@
     (define right-wall (/ (+ (+ (nth proximity 0) (nth proximity 1)) (nth proximity 2)) 3.0))
     (define follow-left (> left-wall right-wall))
     (define side-dist (if follow-left left-wall right-wall))
-    (define error (- 0.45 side-dist))
-    (define corr (clamp (* 3.2 error) -1.6 1.6))
-    (define base 3.1)
+    (define error (- side-dist 0.16))
+    (define corr (clamp (* 7.0 error) -1.4 1.4))
+    (define base 2.7)
     (if follow-left
-        (list (- base corr) (+ base corr))
-        (list (+ base corr) (- base corr)))))
+        (list (+ base corr) (- base corr))
+        (list (- base corr) (+ base corr)))))
 
 (define (compute-roam-action)
   (begin
-    (define bias (rng.uniform roam-rng -0.55 0.55))
-    (define base 3.4)
+    (define bias (rng.uniform roam-rng -0.85 0.85))
+    (define base 2.6)
     (list (+ base bias) (- base bias))))
 
 (define (on_tick obs)
   (begin
     (define proximity (map.get obs 'proximity (list 0 0 0 0 0 0 0 0)))
     (define min-obstacle (map.get obs 'min_obstacle 1.0))
+    (define pmax (clamp (- 1.0 min-obstacle) 0.0 1.0))
 
     (define right-signal (+ (+ (nth proximity 0) (nth proximity 1)) (nth proximity 2)))
     (define left-signal (+ (+ (nth proximity 5) (nth proximity 6)) (nth proximity 7)))
+    (define side-signal (max2 right-signal left-signal))
+    (define front-signal (max2 (+ (nth proximity 0) (nth proximity 1))
+                               (+ (nth proximity 6) (nth proximity 7))))
 
-    (define collision-imminent (< min-obstacle 0.20))
-    (define wall-detected (> (max2 right-signal left-signal) 0.85))
+    (define collision-imminent (bool-or (> pmax 0.44) (> front-signal 0.60)))
+    (define wall-detected (bool-or (> side-signal 0.50) (> front-signal 0.50)))
 
     (define avoid-action (compute-avoid-action proximity min-obstacle))
     (define wall-action (compute-wall-action proximity))

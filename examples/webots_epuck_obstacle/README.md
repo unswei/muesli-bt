@@ -53,6 +53,27 @@ Schema notes:
 - `schema_version: "epuck_demo.v1"`
 - per tick includes `tick`, `t_ms`, `bt.active_path`, `obs`, `action.u`, `budget.tick_budget_ms`, `budget.tick_time_ms`
 
+## Behaviour tuning notes
+
+Current obstacle behaviour is tuned for the included arena and e-puck proximity normalisation (`raw / 4096.0`):
+
+- collision branch triggers when `pmax > 0.44` or front pair sum `> 0.60`
+- wall-follow branch triggers when side/front activity `> 0.50`
+- roam uses lower base speed with mild steering noise
+
+If the robot still drives into a wall for your machine/Webots version, retune the thresholds in
+`lisp/main.mueslisp`:
+
+- increase collision sensitivity by lowering `0.44` or `0.60`
+- reduce wall-follow sensitivity by raising `0.50`
+- lower roam base speed (`base`) for a more conservative gait
+
+When tuning, clear old logs first so plots and stats reflect one run only:
+
+```bash
+rm -f examples/webots_epuck_obstacle/logs/obstacle.jsonl
+```
+
 ## Plot generation
 
 BT active path timeline:

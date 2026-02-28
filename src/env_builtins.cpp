@@ -815,7 +815,8 @@ value builtin_env_run_loop(const std::vector<value>& args) {
         final_obs = obs;
     }
 
-    const auto start = std::chrono::steady_clock::now();
+    const auto tick_period = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+        std::chrono::duration<double>(1.0 / static_cast<double>(tick_hz)));
     std::int64_t episodes_completed = std::min<std::int64_t>(1, episode_max);
     std::int64_t ticks = 0;
     std::int64_t fallback_count = 0;
@@ -863,9 +864,9 @@ value builtin_env_run_loop(const std::vector<value>& args) {
 
             const auto action_candidate = extract_action_from_on_tick(on_tick_result);
 
-            const auto tick_deadline =
-                start + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                            std::chrono::duration<double>(static_cast<double>(k + 1) / static_cast<double>(tick_hz)));
+            // Use a per-tick deadline so long external pauses (e.g. paused simulator UI)
+            // do not permanently force fallback actions after resume.
+            const auto tick_deadline = tick_started + tick_period;
             if (std::chrono::steady_clock::now() > tick_deadline) {
                 overrun = true;
                 ++overrun_count;
