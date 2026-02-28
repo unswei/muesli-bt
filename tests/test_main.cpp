@@ -842,6 +842,126 @@ void test_map_gc_rehash_and_ops() {
     }
 }
 
+void test_pq_builtins_gc_and_errors() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+
+    value pq_value = eval_text("(pq.make)", env);
+    check(is_pq(pq_value), "pq.make should return pq handle");
+
+    value empty_meta = eval_text("(begin (define q0 (pq.make)) (list (pq.len q0) (pq.empty? q0)))", env);
+    {
+        const auto fields = vector_from_list(empty_meta);
+        check(fields.size() == 2, "pq empty metadata shape mismatch");
+        check(is_integer(fields[0]) && integer_value(fields[0]) == 0, "pq.len should start at zero");
+        check(is_boolean(fields[1]) && boolean_value(fields[1]), "pq.empty? should be true for new queue");
+    }
+
+    auto check_pair = [&](value pair_value, double expected_priority, const std::string& expected_symbol, const std::string& where) {
+        const auto pair = vector_from_list(pair_value);
+        check(pair.size() == 2, where + ": pair shape mismatch");
+        check(is_float(pair[0]), where + ": priority should be float");
+        check_close(float_value(pair[0]), expected_priority, 1e-12, where + ": priority mismatch");
+        check(is_symbol(pair[1]), where + ": payload should be symbol");
+        check(symbol_name(pair[1]) == expected_symbol, where + ": payload symbol mismatch");
+    };
+
+    value ordered = eval_text(
+        "(begin "
+        "  (define q1 (pq.make)) "
+        "  (list "
+        "    (pq.push! q1 3 'c) "
+        "    (pq.push! q1 1.5 'b) "
+        "    (pq.push! q1 1 'a) "
+        "    (pq.pop! q1) "
+        "    (pq.pop! q1) "
+        "    (pq.pop! q1) "
+        "    (pq.empty? q1)))",
+        env);
+    {
+        const auto fields = vector_from_list(ordered);
+        check(fields.size() == 7, "pq ordering result shape mismatch");
+        check(is_integer(fields[0]) && integer_value(fields[0]) == 1, "pq.push! should return size=1");
+        check(is_integer(fields[1]) && integer_value(fields[1]) == 2, "pq.push! should return size=2");
+        check(is_integer(fields[2]) && integer_value(fields[2]) == 3, "pq.push! should return size=3");
+        check_pair(fields[3], 1.0, "a", "pq.pop order[0]");
+        check_pair(fields[4], 1.5, "b", "pq.pop order[1]");
+        check_pair(fields[5], 3.0, "c", "pq.pop order[2]");
+        check(is_boolean(fields[6]) && boolean_value(fields[6]), "pq.empty? should be true after draining");
+    }
+
+    value tie_order = eval_text(
+        "(begin "
+        "  (define q2 (pq.make)) "
+        "  (pq.push! q2 2 'first) "
+        "  (pq.push! q2 2.0 'second) "
+        "  (list (pq.pop! q2) (pq.pop! q2)))",
+        env);
+    {
+        const auto fields = vector_from_list(tie_order);
+        check(fields.size() == 2, "pq tie-order result shape mismatch");
+        check_pair(fields[0], 2.0, "first", "pq tie-order[0]");
+        check_pair(fields[1], 2.0, "second", "pq tie-order[1]");
+    }
+
+    value peek_meta = eval_text(
+        "(begin "
+        "  (define q3 (pq.make)) "
+        "  (pq.push! q3 4 'x) "
+        "  (list (pq.peek q3) (pq.len q3) (pq.pop! q3) (pq.empty? q3)))",
+        env);
+    {
+        const auto fields = vector_from_list(peek_meta);
+        check(fields.size() == 4, "pq.peek metadata shape mismatch");
+        check_pair(fields[0], 4.0, "x", "pq.peek pair");
+        check(is_integer(fields[1]) && integer_value(fields[1]) == 1, "pq.peek should not mutate queue");
+        check_pair(fields[2], 4.0, "x", "pq.pop after peek");
+        check(is_boolean(fields[3]) && boolean_value(fields[3]), "queue should be empty after pop");
+    }
+
+    eval_text(
+        "(begin "
+        "  (define qgc (pq.make)) "
+        "  (define (fill i) "
+        "    (if (= i 64) "
+        "        nil "
+        "        (begin "
+        "          (pq.push! qgc i (list 'node i (list i (+ i 1)))) "
+        "          (fill (+ i 1))))) "
+        "  (fill 0))",
+        env);
+    default_gc().collect();
+    for (int i = 0; i < 64; ++i) {
+        value entry = eval_text("(pq.pop! qgc)", env);
+        const auto pair = vector_from_list(entry);
+        check(pair.size() == 2, "pq gc payload pair shape mismatch");
+        check(is_float(pair[0]), "pq gc payload priority should be float");
+        check_close(float_value(pair[0]), static_cast<double>(i), 1e-12, "pq gc payload priority mismatch");
+        const std::string expected = "(node " + std::to_string(i) + " (" + std::to_string(i) + " " + std::to_string(i + 1) + "))";
+        check(print_value(pair[1]) == expected, "pq gc payload value mismatch");
+        if ((i % 9) == 0) {
+            default_gc().collect();
+        }
+    }
+    check(boolean_value(eval_text("(pq.empty? qgc)", env)), "pq should be empty after gc-drain loop");
+
+    auto expect_lisp_error = [&](const std::string& expr, const std::string& label) {
+        try {
+            (void)eval_text(expr, env);
+            throw std::runtime_error("expected lisp_error: " + label);
+        } catch (const lisp_error&) {
+        }
+    };
+
+    expect_lisp_error("(begin (define qe (pq.make)) (pq.pop! qe))", "pq.pop! on empty");
+    expect_lisp_error("(begin (define qe (pq.make)) (pq.peek qe))", "pq.peek on empty");
+    expect_lisp_error("(begin (define qe (pq.make)) (pq.push! qe 'bad 1))", "pq.push! non-numeric priority");
+    expect_lisp_error("(begin (define qe (pq.make)) (pq.push! qe (/ 1 0) 1))", "pq.push! infinite priority");
+    expect_lisp_error("(begin (define qe (pq.make)) (pq.push! qe (/ 0 0) 1))", "pq.push! nan priority");
+    expect_lisp_error("(write-to-string (pq.make))", "write-to-string should reject pq");
+}
+
 void test_continuous_mcts_smoke_deterministic() {
     using namespace muslisp;
 
@@ -1876,6 +1996,7 @@ int main() {
         {"rng determinism and ranges", test_rng_determinism_and_ranges},
         {"vec gc/growth/fuzz", test_vec_gc_growth_and_fuzz},
         {"map gc/rehash/ops", test_map_gc_rehash_and_ops},
+        {"pq builtins gc/errors", test_pq_builtins_gc_and_errors},
         {"continuous mcts smoke deterministic", test_continuous_mcts_smoke_deterministic},
         {"planner.mcts determinism/bounds/budget", test_planner_mcts_builtin_determinism_bounds_and_budget},
         {"plan-action node blackboard/meta/logs", test_plan_action_node_blackboard_meta_and_logs},

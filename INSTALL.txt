@@ -82,6 +82,14 @@ Pure Lisp algorithm example (A*):
 
   ./build/dev/muslisp examples/repl_scripts/a-star-grid.lisp
 
+Pure Lisp algorithm example (Dijkstra with native pq.*):
+
+  ./build/dev/muslisp examples/repl_scripts/dijkstra-grid-pq.lisp
+
+Pure Lisp planning example (PRM with deterministic seed + pq.*):
+
+  ./build/dev/muslisp examples/repl_scripts/prm-2d-pq.lisp
+
 PyBullet racecar demo:
 
   make demo-run MODE=bt_planner
@@ -116,3 +124,6 @@ Make sure ~/.local/bin is on PATH, then run:
 - Slow manual movement:
   Increase actuator scale for manual mode, for example:
     --manual-action-scale 6
+
+- PRM output mismatch across runs:
+  Confirm seed is unchanged in `examples/repl_scripts/prm-2d-pq.lisp`.

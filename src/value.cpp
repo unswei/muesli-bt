@@ -107,6 +107,11 @@ void object::gc_mark_children(gc& heap) {
                 heap.mark_value(mapped);
             }
             break;
+        case value_type::pq:
+            for (const pq_entry& entry : pq_data) {
+                heap.mark_value(entry.payload);
+            }
+            break;
         default:
             break;
     }
@@ -219,6 +224,13 @@ value make_map() {
     return make_object(value_type::map);
 }
 
+value make_pq(std::size_t capacity) {
+    auto out = make_object(value_type::pq);
+    out->pq_data.reserve(capacity);
+    out->pq_next_sequence = 0;
+    return out;
+}
+
 value make_rng(std::uint64_t seed) {
     auto out = make_object(value_type::rng);
     out->rng_data = std::make_shared<rng_state>();
@@ -283,6 +295,8 @@ std::string_view type_name(value_type t) {
             return "vec";
         case value_type::map:
             return "map";
+        case value_type::pq:
+            return "pq";
         case value_type::rng:
             return "rng";
         case value_type::bt_def:
@@ -343,6 +357,10 @@ bool is_vec(value v) {
 
 bool is_map(value v) {
     return v && v->type == value_type::map;
+}
+
+bool is_pq(value v) {
+    return v && v->type == value_type::pq;
 }
 
 bool is_rng(value v) {

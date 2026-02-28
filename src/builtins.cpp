@@ -64,6 +64,13 @@ value require_map_arg(value v, const std::string& where) {
     return v;
 }
 
+value require_pq_arg(value v, const std::string& where) {
+    if (!is_pq(v)) {
+        throw lisp_error(where + ": expected pq");
+    }
+    return v;
+}
+
 value require_rng_arg(value v, const std::string& where) {
     if (!is_rng(v) || !v->rng_data) {
         throw lisp_error(where + ": expected rng");
@@ -204,6 +211,43 @@ bool contains_float(const std::vector<value>& args) {
         }
     }
     return false;
+}
+
+double require_pq_priority(value v, const std::string& where) {
+    if (is_integer(v)) {
+        return static_cast<double>(integer_value(v));
+    }
+    if (is_float(v)) {
+        const double out = float_value(v);
+        if (!std::isfinite(out)) {
+            throw lisp_error(where + ": priority must be finite");
+        }
+        return out;
+    }
+    throw lisp_error(where + ": expected numeric priority");
+}
+
+bool pq_heap_compare(const pq_entry& lhs, const pq_entry& rhs) {
+    if (lhs.priority != rhs.priority) {
+        return lhs.priority > rhs.priority;
+    }
+    return lhs.sequence > rhs.sequence;
+}
+
+value pq_entry_to_pair(const pq_entry& entry) {
+    gc_root_scope roots(default_gc());
+    value priority = make_float(entry.priority);
+    value payload = entry.payload;
+    roots.add(&priority);
+    roots.add(&payload);
+
+    std::vector<value> pair;
+    pair.reserve(2);
+    pair.push_back(priority);
+    pair.push_back(payload);
+    roots.add(&pair[0]);
+    roots.add(&pair[1]);
+    return list_from_vector(pair);
 }
 
 std::uint64_t splitmix64_next(std::uint64_t& state) {
@@ -772,6 +816,67 @@ value builtin_map_keys(const std::vector<value>& args) {
         roots.add(&keys.back());
     }
     return list_from_vector(keys);
+}
+
+value builtin_pq_make(const std::vector<value>& args) {
+    if (args.size() > 1) {
+        throw lisp_error("pq.make: expected 0 or 1 arguments");
+    }
+    std::size_t capacity = 4;
+    if (args.size() == 1) {
+        capacity = require_non_negative_capacity(args[0], "pq.make");
+    }
+    return make_pq(capacity);
+}
+
+value builtin_pq_len(const std::vector<value>& args) {
+    require_arity("pq.len", args, 1);
+    value pq_obj = require_pq_arg(args[0], "pq.len");
+    return make_integer(to_int64_size(pq_obj->pq_data.size(), "pq.len"));
+}
+
+value builtin_pq_empty(const std::vector<value>& args) {
+    require_arity("pq.empty?", args, 1);
+    value pq_obj = require_pq_arg(args[0], "pq.empty?");
+    return make_boolean(pq_obj->pq_data.empty());
+}
+
+value builtin_pq_push(const std::vector<value>& args) {
+    require_arity("pq.push!", args, 3);
+    value pq_obj = require_pq_arg(args[0], "pq.push!");
+    const double priority = require_pq_priority(args[1], "pq.push!");
+    if (pq_obj->pq_next_sequence == std::numeric_limits<std::uint64_t>::max()) {
+        throw lisp_error("pq.push!: insertion sequence overflow");
+    }
+
+    pq_entry entry;
+    entry.priority = priority;
+    entry.sequence = pq_obj->pq_next_sequence++;
+    entry.payload = args[2];
+    pq_obj->pq_data.push_back(entry);
+    std::push_heap(pq_obj->pq_data.begin(), pq_obj->pq_data.end(), pq_heap_compare);
+    return make_integer(to_int64_size(pq_obj->pq_data.size(), "pq.push!"));
+}
+
+value builtin_pq_peek(const std::vector<value>& args) {
+    require_arity("pq.peek", args, 1);
+    value pq_obj = require_pq_arg(args[0], "pq.peek");
+    if (pq_obj->pq_data.empty()) {
+        throw lisp_error("pq.peek: priority queue is empty");
+    }
+    return pq_entry_to_pair(pq_obj->pq_data.front());
+}
+
+value builtin_pq_pop(const std::vector<value>& args) {
+    require_arity("pq.pop!", args, 1);
+    value pq_obj = require_pq_arg(args[0], "pq.pop!");
+    if (pq_obj->pq_data.empty()) {
+        throw lisp_error("pq.pop!: priority queue is empty");
+    }
+    std::pop_heap(pq_obj->pq_data.begin(), pq_obj->pq_data.end(), pq_heap_compare);
+    const pq_entry out = pq_obj->pq_data.back();
+    pq_obj->pq_data.pop_back();
+    return pq_entry_to_pair(out);
 }
 
 void print_gc_snapshot(const gc_stats_snapshot& snapshot) {
@@ -2813,6 +2918,13 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "map.set!", builtin_map_set);
     bind_primitive(global_env, "map.del!", builtin_map_del);
     bind_primitive(global_env, "map.keys", builtin_map_keys);
+
+    bind_primitive(global_env, "pq.make", builtin_pq_make);
+    bind_primitive(global_env, "pq.len", builtin_pq_len);
+    bind_primitive(global_env, "pq.empty?", builtin_pq_empty);
+    bind_primitive(global_env, "pq.push!", builtin_pq_push);
+    bind_primitive(global_env, "pq.peek", builtin_pq_peek);
+    bind_primitive(global_env, "pq.pop!", builtin_pq_pop);
 
     bind_primitive(global_env, "heap-stats", builtin_heap_stats);
     bind_primitive(global_env, "gc-stats", builtin_gc_stats);

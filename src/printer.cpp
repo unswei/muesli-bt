@@ -135,6 +135,11 @@ std::string print_impl(value v, bool readable) {
                 throw lisp_error(write_error_message(value_type::map));
             }
             return "<map:" + std::to_string(v->map_data.size()) + ">";
+        case value_type::pq:
+            if (readable) {
+                throw lisp_error(write_error_message(value_type::pq));
+            }
+            return "<pq:" + std::to_string(v->pq_data.size()) + ">";
         case value_type::rng:
             if (readable) {
                 throw lisp_error(write_error_message(value_type::rng));

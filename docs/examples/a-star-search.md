@@ -13,6 +13,7 @@ Run:
 ## What It Demonstrates
 
 - graph search in pure Lisp without host callbacks
+- a deliberate non-PQ baseline open-set implementation (vector + best-node scan)
 - mutable container usage:
   - `vec.make`, `vec.push!`, `vec.get`, `vec.set!`, `vec.pop!`
   - `map.make`, `map.get`, `map.set!`, `map.has?`, `map.del!`

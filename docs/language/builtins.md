@@ -25,6 +25,7 @@ This page is a summary and link hub for built-ins. Detailed behavior, errors, an
 
 - vectors: `vec.make`, `vec.len`, `vec.get`, `vec.set!`, `vec.push!`, `vec.pop!`, `vec.clear!`, `vec.reserve!`
 - maps: `map.make`, `map.get`, `map.has?`, `map.set!`, `map.del!`, `map.keys`
+- priority queues: `pq.make`, `pq.len`, `pq.empty?`, `pq.push!`, `pq.peek`, `pq.pop!`
 
 ## IO And Runtime Introspection
 

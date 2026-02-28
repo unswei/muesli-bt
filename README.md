@@ -45,6 +45,18 @@ Run pure Lisp A* grid-search demo:
 ./build/dev/muslisp examples/repl_scripts/a-star-grid.lisp
 ```
 
+Run pure Lisp Dijkstra grid-search demo (using native `pq.*`):
+
+```bash
+./build/dev/muslisp examples/repl_scripts/dijkstra-grid-pq.lisp
+```
+
+Run pure Lisp PRM demo (deterministic seed + `pq.*` shortest path):
+
+```bash
+./build/dev/muslisp examples/repl_scripts/prm-2d-pq.lisp
+```
+
 Run async VLA demo with fallback behavior:
 
 ```bash
@@ -172,6 +184,8 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 
 - [Getting started](docs/getting-started.md)
 - [Example: A* search](docs/examples/a-star-search.md)
+- [Example: Dijkstra with PQ](docs/examples/dijkstra-pq.md)
+- [Example: PRM with PQ](docs/examples/prm-pq.md)
 - [Language manual](docs/language/syntax.md)
 - [Language reference index](docs/language/reference/index.md)
 - [Behaviour trees](docs/bt/intro.md)

@@ -30,16 +30,20 @@ cmake --build --preset dev -j
   (list 'ok 'ready))
 ```
 
-3. Run a complete algorithm example (A* search).
+3. Run complete algorithm examples (A*, Dijkstra+PQ, PRM+PQ).
 
 ```bash
 ./build/dev/muslisp examples/repl_scripts/a-star-grid.lisp
+./build/dev/muslisp examples/repl_scripts/dijkstra-grid-pq.lisp
+./build/dev/muslisp examples/repl_scripts/prm-2d-pq.lisp
 ```
 
 ## Manual Sections
 
 - [Getting Started](getting-started.md): install/build/run workflow
 - [A* Search Example](examples/a-star-search.md): full muslisp implementation
+- [Dijkstra + PQ Example](examples/dijkstra-pq.md): shortest path with native priority queue
+- [PRM + PQ Example](examples/prm-pq.md): simulator-free roadmap planning in pure muslisp
 - [Language](language/syntax.md): syntax, semantics, and complete reference
 - [Behaviour Trees](bt/intro.md): DSL, runtime model, blackboard, scheduler, bounded-time planning, observability
 - [VLA Integration](bt/vla-integration.md): capability-based async vision-language-action orchestration

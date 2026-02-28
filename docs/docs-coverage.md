@@ -70,6 +70,7 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `closure` -> [page](language/reference/data-types/closure.md)
 - [x] `vec` -> [page](language/reference/data-types/vec.md)
 - [x] `map` -> [page](language/reference/data-types/map.md)
+- [x] `pq` -> [page](language/reference/data-types/pq.md)
 - [x] `rng` -> [page](language/reference/data-types/rng.md)
 - [x] `bt_def` -> [page](language/reference/data-types/bt-def.md)
 - [x] `bt_instance` -> [page](language/reference/data-types/bt-instance.md)
@@ -166,6 +167,14 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `map.keys` -> [page](language/reference/builtins/map/map-keys.md)
 - [x] `map.make` -> [page](language/reference/builtins/map/map-make.md)
 - [x] `map.set!` -> [page](language/reference/builtins/map/map-set-bang.md)
+
+### Priority queues
+- [x] `pq.make` -> [page](language/reference/builtins/pq/pq-make.md)
+- [x] `pq.len` -> [page](language/reference/builtins/pq/pq-len.md)
+- [x] `pq.empty?` -> [page](language/reference/builtins/pq/pq-empty-q.md)
+- [x] `pq.push!` -> [page](language/reference/builtins/pq/pq-push-bang.md)
+- [x] `pq.peek` -> [page](language/reference/builtins/pq/pq-peek.md)
+- [x] `pq.pop!` -> [page](language/reference/builtins/pq/pq-pop-bang.md)
 
 ### IO and persistence
 - [x] `print` -> [page](language/reference/builtins/io/print.md)

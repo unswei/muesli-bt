@@ -26,6 +26,7 @@ enum class value_type {
     closure,
     vec,
     map,
+    pq,
     rng,
     bt_def,
     bt_instance,
@@ -61,6 +62,12 @@ struct rng_state {
     double spare_normal = 0.0;
 };
 
+struct pq_entry {
+    double priority = 0.0;
+    std::uint64_t sequence = 0;
+    value payload = nullptr;
+};
+
 struct object final : gc_node {
     explicit object(value_type value_type_tag);
 
@@ -77,6 +84,8 @@ struct object final : gc_node {
     env_ptr closure_env_data = nullptr;
     std::vector<value> vec_data;
     map_storage map_data;
+    std::vector<pq_entry> pq_data;
+    std::uint64_t pq_next_sequence = 0;
     std::shared_ptr<rng_state> rng_data;
     std::int64_t bt_handle_data = 0;
     std::int64_t image_handle_data = 0;
@@ -97,6 +106,7 @@ value make_primitive(const std::string& name, primitive_fn fn);
 value make_closure(const std::vector<std::string>& params, const std::vector<value>& body, env_ptr captured_env);
 value make_vec(std::size_t capacity = 0);
 value make_map();
+value make_pq(std::size_t capacity = 0);
 value make_rng(std::uint64_t seed);
 value make_bt_def(std::int64_t handle);
 value make_bt_instance(std::int64_t handle);
@@ -118,6 +128,7 @@ value make_blob_handle(std::int64_t handle);
 [[nodiscard]] bool is_closure(value v);
 [[nodiscard]] bool is_vec(value v);
 [[nodiscard]] bool is_map(value v);
+[[nodiscard]] bool is_pq(value v);
 [[nodiscard]] bool is_rng(value v);
 [[nodiscard]] bool is_bt_def(value v);
 [[nodiscard]] bool is_bt_instance(value v);

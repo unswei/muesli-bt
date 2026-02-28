@@ -33,6 +33,7 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`closure`](data-types/closure.md)
 - [`vec`](data-types/vec.md)
 - [`map`](data-types/map.md)
+- [`pq`](data-types/pq.md)
 - [`rng`](data-types/rng.md)
 - [`bt_def`](data-types/bt-def.md)
 - [`bt_instance`](data-types/bt-instance.md)
@@ -142,6 +143,15 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`map.keys`](builtins/map/map-keys.md)
 - [`map.make`](builtins/map/map-make.md)
 - [`map.set!`](builtins/map/map-set-bang.md)
+
+### Priority queues
+
+- [`pq.make`](builtins/pq/pq-make.md)
+- [`pq.len`](builtins/pq/pq-len.md)
+- [`pq.empty?`](builtins/pq/pq-empty-q.md)
+- [`pq.push!`](builtins/pq/pq-push-bang.md)
+- [`pq.peek`](builtins/pq/pq-peek.md)
+- [`pq.pop!`](builtins/pq/pq-pop-bang.md)
 
 ### IO and persistence
 
