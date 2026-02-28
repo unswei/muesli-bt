@@ -1,35 +1,31 @@
-# Limitations, Trade-Offs, And Roadmap
+# Roadmap
 
-## Current Limitations
+This page tracks likely next areas of work. It is intentionally short and grouped by theme.
 
-- no `set!`, `set-car!`, or `set-cdr!`
-- no general macro system (`defmacro` is not implemented)
-- memoryless `seq` and `sel` only
-- no explicit leaf `halt` contract
-- blackboard value types are intentionally small (`nil/bool/int64/double/string`)
-- trace/log ring buffers are bounded in-memory stores
+## Language
 
-## Completed Recently
+- richer macro support beyond quasiquote templates
+- additional data-structure ergonomics around `vec`/`map`
+- broader persistence and interchange helpers where needed
 
-- BT authoring sugar: `(bt ...)`, `(defbt ...)`
-- quasiquote reader/evaluator support: backquote, unquote, unquote-splicing
-- Lisp convenience forms: `let`, `cond`
-- source loading: `(load "file.lisp")`
-- readable serialisation: `write`, `write-to-string`, `save`
-- BT DSL portability APIs: `bt.to-dsl`, `bt.save-dsl`, `bt.load-dsl`
-- compiled BT serialisation with versioned `MBT1` format: `bt.save`, `bt.load`
+## Behaviour Tree Runtime
 
-## Why These Choices Were Made
+- explicit leaf `halt` lifecycle for long-running actions
+- memoryful composites (`mem-seq`, `mem-sel`)
+- expanded blackboard schemas and host object handle support
 
-- keep semantics easy to reason about
-- keep host integration boundaries small
-- ship usable BT authoring/runtime behaviour early
-- prioritise inspectability over framework complexity
+## Integrations
 
-## Planned Later
+- richer host service adapters for production robotics systems
+- dedicated ROS2 adapter surface and packaging
+- external telemetry/export integrations
 
-- explicit `halt` semantics for long-running leaves
-- memoryful composite variants (`mem-seq`, `mem-sel`)
-- richer blackboard schemas and host object handles
-- richer macro facilities beyond quasiquote templates
-- external telemetry exporters and deeper profiling pipeline
+## Tooling
+
+- stronger docs and link validation in CI
+- benchmark and profiling workflows for common BT patterns
+- improved packaging of runnable examples
+
+## Contributing
+
+Contributions are welcome. Prefer small, focused changes with tests and matching docs updates, especially when adding or changing language/BT primitives.

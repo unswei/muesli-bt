@@ -13,7 +13,7 @@ using condition_fn = std::function<bool(tick_context&, std::span<const muslisp::
 using action_fn = std::function<status(tick_context&, node_id, node_memory&, std::span<const muslisp::value>)>;
 ```
 
-## Typed Host Services (v1)
+## Typed Host Services
 
 `bt::services` currently supports typed integration points:
 
@@ -89,3 +89,9 @@ Recommended pattern:
 - define trees with `defbt`
 - keep callback names stable with host registry names
 - use `bt.save-dsl` for portable artefacts when you need to export/import trees
+
+## See Also
+
+- [Scheduler](scheduler.md)
+- [BT Semantics](semantics.md)
+- [Roadmap](../limitations-roadmap.md)

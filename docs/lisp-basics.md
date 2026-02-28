@@ -97,4 +97,4 @@ Example:
 
 `load` reads and evaluates forms from file in order and returns the last value.
 
-Next: [Language Syntax](language/syntax.md) and [Language Semantics](language/semantics.md).
+Next: [Language Syntax](language/syntax.md), [Language Semantics](language/semantics.md), and the [Language Reference Index](language/reference/index.md).

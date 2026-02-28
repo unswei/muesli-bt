@@ -1,85 +1,39 @@
 # muesli-bt
 
-muesli-bt is a tiny Lisp runtime with built-in behaviour tree (BT) support, implemented in modern C++.
+muesli-bt is a compact Lisp runtime with an integrated behaviour tree (BT) engine in modern C++.
 
-The project exists to provide:
+It solves a common robotics and control problem: keeping task logic readable in scripts while preserving explicit runtime semantics and host-side integration points.
 
-- clear BT authoring in Lisp
-- explicit, testable BT semantics (`success`, `failure`, `running`)
-- practical host-side C++ integration for robotics work
+## Who It Is For
 
-## What It Is For
+- robotics and autonomy engineers who want scriptable BT logic
+- systems programmers embedding a small Lisp runtime in C++
+- teams that need deterministic tests, traceability, and low integration overhead
 
-- prototyping task-level robot logic
-- integrating host callbacks for conditions and actions
-- inspecting execution with trace, logs, and blackboard dumps
-- extending a compact runtime without heavy dependencies
+## Recommended Start
 
-## What It Is Not For
+1. Build and run a shipped BT script.
 
-- macro-heavy general Lisp development
-- hard real-time guarantees
-- full BT halting semantics in v1
-- visual BT editing pipelines
-
-## v1 Scope
-
-Implemented in v1 (phases 1-6):
-
-- Lisp core (reader, evaluator, closures, core built-ins)
-- non-moving mark/sweep GC
-- BT compiler and runtime core
-- decorators and per-node instance memory
-- inspectability (blackboard metadata, trace, logs, stats)
-- typed host services with sample robotics wrappers
-
-Planned later (v2+):
-
-- explicit `halt` contracts for leaves
-- memoryful sequence/selector variants
-
-## Architecture Sketch
-
-```text
-+-------------------------------+
-| Lisp Layer                    |
-| - reader / parser             |
-| - evaluator / closures        |
-| - built-ins (bt.* included)   |
-+---------------+---------------+
-                |
-                v
-+-------------------------------+
-| BT Layer                      |
-| - bt/defbt/bt.compile (BT DSL -> nodes)   |
-| - tick runtime                |
-| - instance memory             |
-| - blackboard                  |
-| - trace / profiling           |
-+---------------+---------------+
-                |
-                v
-+-------------------------------+
-| Host Integration Layer        |
-| - condition/action registry   |
-| - typed services              |
-| - scheduler / clock / robot   |
-+-------------------------------+
+```bash
+cmake --preset dev
+cmake --build --preset dev -j
+./build/dev/muslisp examples/bt/hello_bt.lisp
 ```
 
-## First BT Example
+2. Open the REPL and run a small language sample.
 
 ```lisp
-(defbt tree
-  (sel
-    (seq
-      (cond target-visible)
-      (act approach-target)
-      (act grasp))
-    (act search-target)))
-
-(define inst (bt.new-instance tree))
-(bt.tick inst)
+(begin
+  (define x 10)
+  (define y 2.5)
+  (print (+ x y))
+  (list 'ok 'ready))
 ```
 
-Next: [Getting Started](getting-started.md).
+## Manual Sections
+
+- [Getting Started](getting-started.md): install/build/run workflow
+- [Language](language/syntax.md): syntax, semantics, and complete reference
+- [Behaviour Trees](bt/intro.md): DSL, runtime model, blackboard, scheduler, observability
+- [Integration](bt/robot-integration.md): host callbacks and service wiring
+- [Roadmap](limitations-roadmap.md): planned next features and priorities

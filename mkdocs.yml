@@ -25,34 +25,37 @@ markdown_extensions:
   - pymdownx.details
 
 nav:
-  - Project Overview: index.md
-  - Getting Started: getting-started.md
-  - Lisp Basics: lisp-basics.md
+  - Home: index.md
+  - Getting Started:
+      - Getting Started: getting-started.md
+      - Lisp Basics: lisp-basics.md
+      - Examples:
+          - Lisp Basics: examples/lisp-basics.md
+          - Hello BT: examples/hello-bt.md
+          - Recovery BT: examples/recovery-bt.md
+          - Continuous MCTS v1.1: examples/continuous-mcts.md
+          - C++ Nodes: examples/cpp-nodes.md
   - Language:
       - Syntax: language/syntax.md
       - Semantics: language/semantics.md
-      - Built-ins: language/builtins.md
+      - Built-ins Overview: language/builtins.md
+      - Reference Index: language/reference/index.md
   - Behaviour Trees:
-      - Intro: bt/intro.md
+      - Introduction: bt/intro.md
       - Syntax: bt/syntax.md
       - Semantics: bt/semantics.md
       - Blackboard: bt/blackboard.md
       - Scheduler: bt/scheduler.md
-      - Robot Integration: bt/robot-integration.md
-  - Observability:
-      - Logging: observability/logging.md
-      - Tracing: observability/tracing.md
-      - Profiling: observability/profiling.md
+      - Integration: bt/robot-integration.md
+      - Observability:
+          - Tracing: observability/tracing.md
+          - Logging: observability/logging.md
+          - Profiling: observability/profiling.md
   - Internals:
       - Architecture: internals/architecture.md
       - GC: internals/gc.md
       - Code Map: internals/code-map.md
       - Extending: internals/extending.md
-  - Examples:
-      - Lisp Basics: examples/lisp-basics.md
-      - Hello BT: examples/hello-bt.md
-      - Recovery BT: examples/recovery-bt.md
-      - Continuous MCTS v1.1: examples/continuous-mcts.md
-      - C++ Nodes: examples/cpp-nodes.md
-  - Testing: testing.md
-  - Limitations and Roadmap: limitations-roadmap.md
+      - Testing And Verification: testing.md
+      - Docs Coverage: docs-coverage.md
+  - Roadmap: limitations-roadmap.md

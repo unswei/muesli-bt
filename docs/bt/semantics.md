@@ -135,6 +135,6 @@ It does not implicitly clear trace/log buffers.
 
 ## Common Gotchas
 
-- `seq` and `sel` are memoryless in v1.
+- `seq` and `sel` are memoryless.
 - `running` is a status, not a thread.
 - long-running leaves should avoid blocking the tick thread.

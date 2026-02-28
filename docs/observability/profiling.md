@@ -1,22 +1,14 @@
 # Profiling And Performance
 
-This page documents current profiling surfaces in v1.
+This page documents the profiling surfaces available today.
 
-## Current Implementation State
-
-Implemented now:
+## Available Features
 
 - per-tree tick duration and overrun counters
 - per-node duration and return-status counters
 - scheduler throughput/timing counters
 - configurable tick budget warnings
 - GC/heap counters for allocation pressure context
-
-Not implemented yet:
-
-- no built-in percentile/histogram reporting
-- no time-series export pipeline
-- no per-instance scheduler partitioning in the default host
 
 ## Commands Available Now
 
@@ -100,3 +92,15 @@ Printed counters include:
 
 - Debug builds are preferred for semantic validation and instrumentation checks.
 - Release builds are preferred for representative performance measurements.
+
+## Known Boundaries
+
+- percentile/histogram reports are not built in
+- time-series export is not built in
+- scheduler metrics are global in the default host
+
+## See Also
+
+- [Tracing](tracing.md)
+- [Logging](logging.md)
+- [Roadmap](../limitations-roadmap.md)

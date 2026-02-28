@@ -2,7 +2,7 @@
 
 The blackboard is per-instance shared state for BT leaves.
 
-Scope model in v1:
+Scope model:
 
 - per-instance only
 - no process-global shared blackboard
@@ -22,7 +22,7 @@ Avoid:
 - storing unrelated meanings under one key
 - large opaque payloads without clear ownership
 
-## Value Types In v1
+## Value Types
 
 Supported blackboard value variants:
 
@@ -82,3 +82,9 @@ Recommended style:
 - `target-visible`: bool from perception
 - `approach-retries`: int from action logic
 - `grasp-last-error`: string from grasp wrapper
+
+## See Also
+
+- [BT Semantics](semantics.md)
+- [Tracing](../observability/tracing.md)
+- [Roadmap](../limitations-roadmap.md)

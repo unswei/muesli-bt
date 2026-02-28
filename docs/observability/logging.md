@@ -1,21 +1,13 @@
 # Logging
 
-This page describes logging as implemented now in muesli-bt.
+This page describes the logging surfaces available in muesli-bt.
 
-## Current Implementation State
-
-Implemented now:
+## Available Features
 
 - bounded in-memory log sink (`memory_log_sink`)
 - thread-safe writes via internal mutex
 - structured log records (sequence, time, level, tick, node, category, message)
 - Lisp dump/clear commands
-
-Not implemented yet:
-
-- no file sink in v1
-- no built-in external exporter (`spdlog`, OpenTelemetry, etc.)
-- no built-in server-side filtering API on dump commands
 
 ## Record Structure
 
@@ -41,7 +33,7 @@ Each log record includes:
 
 ## Where Logs Are Emitted Today
 
-The runtime currently emits logs for:
+The runtime emits logs for:
 
 - BT runtime errors (for example missing callbacks or thrown leaf exceptions)
 - tick budget overruns (`warn`, category `bt`)
@@ -78,4 +70,11 @@ The runtime currently emits logs for:
 
 - Log storage is process-local and memory-bounded.
 - Oldest records are evicted when sink capacity is reached.
-- `runtime_host` owns the default sink; logs are not per-instance in v1.
+- `runtime_host` owns the default sink; logs are currently not per-instance.
+- File sinks and external exporters are roadmap work.
+
+## See Also
+
+- [Tracing](tracing.md)
+- [Profiling](profiling.md)
+- [Roadmap](../limitations-roadmap.md)

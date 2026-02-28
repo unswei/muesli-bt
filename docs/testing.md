@@ -16,7 +16,7 @@ Coverage includes:
 - BT runtime status propagation
 - decorators and reset behaviour
 - blackboard, trace, logs, scheduler stats
-- phase-6 host wrappers and typed robot interface injection
+- host wrappers and typed robot interface injection
 
 ## Run Tests
 
