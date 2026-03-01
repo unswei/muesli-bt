@@ -432,14 +432,14 @@ void install_demo_callbacks(runtime_host& host) {
         return status::success;
     });
 
-    reg.register_condition("ptz-target-centered", [](tick_context& ctx, std::span<const muslisp::value> args) {
-        const std::string state_key = require_key_arg_or_default(args, 0, "ptz-target-centered", "ptz-state");
-        const double tol = args.size() > 1 ? require_floaty_arg(args, 1, "ptz-target-centered") : 0.05;
+    reg.register_condition("ptz-target-centred", [](tick_context& ctx, std::span<const muslisp::value> args) {
+        const std::string state_key = require_key_arg_or_default(args, 0, "ptz-target-centred", "ptz-state");
+        const double tol = args.size() > 1 ? require_floaty_arg(args, 1, "ptz-target-centred") : 0.05;
         const bb_entry* state_entry = ctx.bb_get(state_key);
         if (!state_entry) {
             return false;
         }
-        const std::vector<double> state = bb_value_as_vector(state_entry->value, "ptz-target-centered state");
+        const std::vector<double> state = bb_value_as_vector(state_entry->value, "ptz-target-centred state");
         if (state.size() < 4) {
             return false;
         }

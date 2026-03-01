@@ -18,7 +18,7 @@ def parse_args() -> argparse.Namespace:
     demo_root = here.parent
     repo_root = demo_root.parent.parent
     parser = argparse.ArgumentParser(description="Export racecar BT to DOT and render with Graphviz.")
-    parser.add_argument("--bt", type=Path, default=demo_root / "bt" / "racecar_bt.mueslisp")
+    parser.add_argument("--bt", type=Path, default=demo_root / "bt" / "racecar_bt.lisp")
     parser.add_argument("--muslisp", type=Path, default=repo_root / "build" / "dev" / "muslisp")
     parser.add_argument("--out", type=Path, default=demo_root / "out" / "bt.svg")
     return parser.parse_args()

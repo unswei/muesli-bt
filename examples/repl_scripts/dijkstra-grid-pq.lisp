@@ -73,7 +73,7 @@
         (reconstruct-rev prev goal rev)
         (reverse-copy rev (- (vec.len rev) 1) (vec.make)))))
 
-  (define (relax-neighbor nb current current-dist open dist prev)
+  (define (relax-neighbour nb current current-dist open dist prev)
     (if (map.has? obstacles nb)
         nil
         (let ((new-dist (+ current-dist (cell-cost nb))))
@@ -84,21 +84,21 @@
                 (pq.push! open new-dist nb))
               nil))))
 
-  (define (expand-neighbors current current-dist open dist prev)
+  (define (expand-neighbours current current-dist open dist prev)
     (let ((x (map.get id->x current 0))
           (y (map.get id->y current 0)))
       (begin
         (if (> x 0)
-            (relax-neighbor (xy->id (- x 1) y) current current-dist open dist prev)
+            (relax-neighbour (xy->id (- x 1) y) current current-dist open dist prev)
             nil)
         (if (< (+ x 1) width)
-            (relax-neighbor (xy->id (+ x 1) y) current current-dist open dist prev)
+            (relax-neighbour (xy->id (+ x 1) y) current current-dist open dist prev)
             nil)
         (if (> y 0)
-            (relax-neighbor (xy->id x (- y 1)) current current-dist open dist prev)
+            (relax-neighbour (xy->id x (- y 1)) current current-dist open dist prev)
             nil)
         (if (< (+ y 1) height)
-            (relax-neighbor (xy->id x (+ y 1)) current current-dist open dist prev)
+            (relax-neighbour (xy->id x (+ y 1)) current current-dist open dist prev)
             nil)
         nil)))
 
@@ -117,7 +117,7 @@
                       (if (= current goal)
                           (list #t dist prev expansions)
                           (begin
-                            (expand-neighbors current current-dist open dist prev)
+                            (expand-neighbours current current-dist open dist prev)
                             (dijkstra-loop goal open dist prev closed (+ expansions 1)))))))))))
 
   (define (dijkstra-search start goal)

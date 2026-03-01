@@ -1,4 +1,4 @@
-(load "lisp/bt_obstacle_wallfollow.mueslisp")
+(load "lisp/bt_obstacle_wallfollow.lisp")
 
 (define (nth xs idx)
   (if (= idx 0)

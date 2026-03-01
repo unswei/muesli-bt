@@ -3,7 +3,7 @@
 
 (defbt ptz-track-loop
   (sel
-    (cond ptz-target-centered ptz-state 0.05)
+    (cond ptz-target-centred ptz-state 0.05)
     (seq
       (plan-action
         :name "ptz-planner"

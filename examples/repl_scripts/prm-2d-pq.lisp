@@ -5,7 +5,7 @@
   (define seed 17)
   (define target-nodes 56)
   (define max-sample-attempts 6000)
-  (define k-neighbors 8)
+  (define k-neighbours 8)
   (define edge-steps 14)
   (define inf 1000000000.0)
 
@@ -96,8 +96,8 @@
               (worst-index distv (+ idx 1) idx v)
               (worst-index distv (+ idx 1) worst-idx worst-value)))))
 
-  (define (consider-neighbor-candidate! idxv distv j d)
-    (if (< (vec.len idxv) k-neighbors)
+  (define (consider-neighbour-candidate! idxv distv j d)
+    (if (< (vec.len idxv) k-neighbours)
         (begin
           (vec.push! idxv j)
           (vec.push! distv d))
@@ -117,7 +117,7 @@
                   (pj (vec.get nodes j)))
               (let ((d (distance (pt-x pi) (pt-y pi) (pt-x pj) (pt-y pj))))
                 (begin
-                  (consider-neighbor-candidate! idxv distv j d)
+                  (consider-neighbour-candidate! idxv distv j d)
                   (collect-candidates! nodes i (+ j 1) idxv distv)))))))
 
   (define (add-edge! adj a b cost)
@@ -256,7 +256,7 @@
 
   (print (list 'prm2d 'seed seed))
   (print (list 'accepted_nodes accepted 'target_nodes target-nodes))
-  (print (list 'edge_count edge-count 'k k-neighbors))
+  (print (list 'edge_count edge-count 'k k-neighbours))
   (print (list 'found found 'expanded_nodes expansions))
 
   (if found

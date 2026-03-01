@@ -1158,7 +1158,7 @@ int main(int argc, char** argv) {
         muslisp::env_ptr env = muslisp::create_global_env(config);
 
         const std::filesystem::path example_root = resolve_example_root(argc > 0 ? argv[0] : nullptr);
-        const std::filesystem::path lisp_entry = example_root / "lisp" / "main.mueslisp";
+        const std::filesystem::path lisp_entry = example_root / "lisp" / "main.lisp";
 
         std::error_code ec;
         std::filesystem::current_path(example_root, ec);

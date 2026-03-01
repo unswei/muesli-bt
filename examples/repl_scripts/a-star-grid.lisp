@@ -88,7 +88,7 @@
             nil)
         (vec.pop! v))))
 
-  (define (consider-neighbor nb current goal open open-set closed came g f)
+  (define (consider-neighbour nb current goal open open-set closed came g f)
     (if (map.has? closed nb)
         nil
         (if (map.has? obstacles nb)
@@ -106,21 +106,21 @@
                           (map.set! open-set nb #t))))
                   nil)))))
 
-  (define (expand-neighbors current goal open open-set closed came g f)
+  (define (expand-neighbours current goal open open-set closed came g f)
     (let ((x (map.get id->x current 0))
           (y (map.get id->y current 0)))
       (begin
         (if (> x 0)
-            (consider-neighbor (xy->id (- x 1) y) current goal open open-set closed came g f)
+            (consider-neighbour (xy->id (- x 1) y) current goal open open-set closed came g f)
             nil)
         (if (< (+ x 1) width)
-            (consider-neighbor (xy->id (+ x 1) y) current goal open open-set closed came g f)
+            (consider-neighbour (xy->id (+ x 1) y) current goal open open-set closed came g f)
             nil)
         (if (> y 0)
-            (consider-neighbor (xy->id x (- y 1)) current goal open open-set closed came g f)
+            (consider-neighbour (xy->id x (- y 1)) current goal open open-set closed came g f)
             nil)
         (if (< (+ y 1) height)
-            (consider-neighbor (xy->id x (+ y 1)) current goal open open-set closed came g f)
+            (consider-neighbour (xy->id x (+ y 1)) current goal open open-set closed came g f)
             nil)
         nil)))
 
@@ -136,7 +136,7 @@
                   (list #t (reconstruct-path came current) expansions)
                   (begin
                     (map.set! closed current #t)
-                    (expand-neighbors current goal open open-set closed came g f)
+                    (expand-neighbours current goal open open-set closed came g f)
                     (astar-loop goal open open-set closed came g f (+ expansions 1)))))))))
 
   (define (astar-search start goal)

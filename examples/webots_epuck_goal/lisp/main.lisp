@@ -1,9 +1,12 @@
-(load "lisp/bt_tag.mueslisp")
+(load "lisp/bt_goal_seek.lisp")
 
 (define (nth xs idx)
   (if (= idx 0)
       (car xs)
       (nth (cdr xs) (- idx 1))))
+
+(define (max2 a b)
+  (if (> a b) a b))
 
 (define (make-action left right)
   (begin
@@ -14,12 +17,10 @@
 
 (define (branch-path branch-id)
   (if (= branch-id 1)
-      (list "root" "search")
+      (list "root" "collision" "avoid")
       (if (= branch-id 2)
-          (list "root" "pursue")
-          (if (= branch-id 3)
-              (list "root" "block")
-              (list "root" "recover")))))
+          (list "root" "goal" "plan_goal")
+          (list "root" "roam"))))
 
 (define (make-bt-map branch-id)
   (begin
@@ -27,12 +28,7 @@
     (define status-by-node (map.make))
     (map.set! bt 'active_path (branch-path branch-id))
     (map.set! status-by-node "root" "running")
-    (map.set! status-by-node "branch"
-      (if (= branch-id 1)
-          "search"
-          (if (= branch-id 2)
-              "pursue"
-              (if (= branch-id 3) "block" "recover"))))
+    (map.set! status-by-node "branch" (if (= branch-id 1) "avoid" (if (= branch-id 2) "goal" "roam")))
     (map.set! bt 'status_by_node status-by-node)
     bt))
 
@@ -70,66 +66,58 @@
     (map.set! planner 'top_k (topk->u (map.get planner-meta "top_k" nil)))
     planner))
 
-(define search-rng (rng.make 919293))
+(define roam-rng (rng.make 848484))
 
-(define (make-search-action)
+(define (compute-roam-action)
   (begin
-    (define speed (rng.uniform search-rng 1.6 2.3))
-    (define direction (rng.uniform search-rng -1.0 1.0))
-    (if (> direction 0)
-        (list speed (- speed))
-        (list (- speed) speed))))
+    (define speed (rng.uniform roam-rng 2.0 2.8))
+    (define turn (rng.uniform roam-rng -1.0 1.0))
+    (list (clamp (+ speed turn) -6.28 6.28)
+          (clamp (- speed turn) -6.28 6.28))))
 
-(define (compute-recover-action obstacle-front)
+(define (compute-avoid-action proximity obstacle-front)
   (begin
-    (define turn (+ 2.0 (* 2.0 obstacle-front)))
-    (list (- turn) turn)))
+    (define right (+ (+ (nth proximity 0) (nth proximity 1)) (nth proximity 2)))
+    (define left (+ (+ (nth proximity 5) (nth proximity 6)) (nth proximity 7)))
+    (define turn (+ 1.4 (* 3.4 (clamp obstacle-front 0.0 1.0))))
+    (if (> right left)
+        (list (- turn) turn)
+        (list turn (- turn)))))
 
-(define (compute-block-action evader-bearing)
+(define (compute-goal-action goal-dist goal-bearing obstacle-front)
   (begin
-    (define steer (clamp (* 3.0 evader-bearing) -2.4 2.4))
-    (define base 1.6)
-    (list (clamp (+ base steer) -6.28 6.28)
-          (clamp (- base steer) -6.28 6.28))))
-
-(define (compute-pursue-action evader-dist evader-bearing obstacle-front)
-  (begin
-    (define base (clamp (+ 2.3 (* 1.9 (clamp evader-dist 0.0 1.1))) 1.4 5.2))
-    (define steer (clamp (+ (* 3.0 evader-bearing) (* 1.3 obstacle-front)) -2.1 2.1))
+    (define base (clamp (+ 2.1 (* 2.0 (clamp goal-dist 0.0 1.2))) 1.4 5.2))
+    (define steer (clamp (+ (* 3.0 goal-bearing) (* 1.8 obstacle-front)) -2.0 2.0))
     (list (clamp (+ base steer) -6.28 6.28)
           (clamp (- base steer) -6.28 6.28))))
 
 (define (on_tick obs)
   (begin
-    (define evader-seen (map.get obs 'evader_seen #f))
-    (define evader-dist (map.get obs 'evader_dist 2.0))
-    (define evader-bearing (map.get obs 'evader_bearing 0.0))
+    (define proximity (map.get obs 'proximity (list 0 0 0 0 0 0 0 0)))
+    (define goal-dist (map.get obs 'goal_dist 1.0))
+    (define goal-bearing (map.get obs 'goal_bearing 0.0))
     (define obstacle-front (map.get obs 'obstacle_front (- 1.0 (map.get obs 'min_obstacle 1.0))))
-    (define intercepts (map.get obs 'intercepts 0))
 
-    (define collision-imminent (> obstacle-front 0.52))
-    (define block-mode (and evader-seen (< evader-dist 0.16)))
+    (define collision-imminent (or (> obstacle-front 0.45) (< (map.get obs 'min_obstacle 1.0) 0.56)))
+    (define goal-available (< goal-dist 2.5))
 
-    (define search-action (make-search-action))
-    (define recover-action (compute-recover-action obstacle-front))
-    (define block-action (compute-block-action evader-bearing))
-    (define pursue-action (compute-pursue-action evader-dist evader-bearing obstacle-front))
+    (define avoid-action (compute-avoid-action proximity obstacle-front))
+    (define goal-action (compute-goal-action goal-dist goal-bearing obstacle-front))
+    (define roam-action (compute-roam-action))
 
     (define tick-inputs
       (list
         (list 'collision_imminent collision-imminent)
-        (list 'block_mode block-mode)
-        (list 'evader_seen evader-seen)
-        (list 'act_search search-action)
-        (list 'act_recover recover-action)
-        (list 'act_block block-action)
-        (list 'planner_state (list evader-dist evader-bearing obstacle-front))
-        (list 'planner_prior pursue-action)))
+        (list 'goal_available goal-available)
+        (list 'act_avoid avoid-action)
+        (list 'act_roam roam-action)
+        (list 'planner_state (list goal-dist goal-bearing obstacle-front))
+        (list 'planner_prior goal-action)))
 
     (bt.tick inst tick-inputs)
 
-    (define bt-action (bt.blackboard.get inst 'action_vec search-action))
-    (define branch-id (bt.blackboard.get inst 'active_branch 1))
+    (define bt-action (bt.blackboard.get inst 'action_vec roam-action))
+    (define branch-id (bt.blackboard.get inst 'active_branch 3))
 
     (define planner-meta-raw (bt.blackboard.get inst 'planner_meta "{}"))
     (define planner-meta (json.decode planner-meta-raw))
@@ -138,7 +126,7 @@
     (define action-vec
       (if (= branch-id 2)
           (if (< planner-confidence 0.04)
-              pursue-action
+              goal-action
               bt-action)
           bt-action))
 
@@ -147,29 +135,29 @@
     (map.set! out 'action (make-action (nth action-vec 0) (nth action-vec 1)))
     (map.set! out 'bt (make-bt-map branch-id))
     (map.set! out 'planner (if (= branch-id 2) (planner-from-meta planner-meta) (planner-unused)))
-    (map.set! out 'done (>= intercepts 5))
+    (map.set! out 'done (< goal-dist 0.08))
     out))
 
 (env.attach "webots")
 
 (define env-cfg (map.make))
-(map.set! env-cfg 'demo "tag")
-(map.set! env-cfg 'obs_schema "epuck.tag.obs.v1")
+(map.set! env-cfg 'demo "goal")
+(map.set! env-cfg 'obs_schema "epuck.goal.obs.v1")
 (map.set! env-cfg 'tick_hz 20)
 (map.set! env-cfg 'steps_per_tick 1)
 (map.set! env-cfg 'realtime #t)
 (env.configure env-cfg)
 
-(define inst (bt.new-instance tag-tree))
-(bt.export-dot tag-tree "out/tree.dot")
+(define inst (bt.new-instance goal-tree))
+(bt.export-dot goal-tree "out/tree.dot")
 
 (define safe-action (make-action 0.0 0.0))
 (define run-cfg (map.make))
 (map.set! run-cfg 'tick_hz 20)
-(map.set! run-cfg 'max_ticks 3600)
+(map.set! run-cfg 'max_ticks 3200)
 (map.set! run-cfg 'safe_action safe-action)
 (map.set! run-cfg 'realtime #t)
-(map.set! run-cfg 'log_path "logs/tag.jsonl")
+(map.set! run-cfg 'log_path "logs/goal.jsonl")
 (map.set! run-cfg 'schema_version "epuck_demo.v1")
 
 (env.run-loop run-cfg on_tick)
