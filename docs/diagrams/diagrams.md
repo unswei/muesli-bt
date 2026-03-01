@@ -23,6 +23,9 @@ python3 scripts/render-doc-diagrams.py
 
 The docs build also runs the Python renderer automatically through an MkDocs pre-build hook.
 
+CI verifies that each committed `docs/diagrams/src/*.dot` has a committed matching
+`docs/diagrams/gen/*.svg`.
+
 ## Tooling
 
 - required tool: Graphviz (`dot`)

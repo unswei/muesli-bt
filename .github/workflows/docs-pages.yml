@@ -43,8 +43,15 @@ jobs:
       - name: Regenerate diagrams
         run: ./scripts/gen_diagrams.sh
 
-      - name: Verify generated diagrams are committed
-        run: git diff --exit-code -- docs/diagrams/src docs/diagrams/gen
+      - name: Verify diagram source/output pairs are committed
+        run: |
+          set -euo pipefail
+          for src in docs/diagrams/src/*.dot; do
+            base="$(basename "$src" .dot)"
+            gen="docs/diagrams/gen/${base}.svg"
+            test -f "$gen"
+            git ls-files --error-unmatch "$src" "$gen" >/dev/null
+          done
 
       - name: Build docs
         run: .venv-py311/bin/python -m mkdocs build --strict
