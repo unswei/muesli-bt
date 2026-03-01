@@ -4,7 +4,7 @@
 
 ## What It Does
 
-Clears global runtime-host logs.
+Clears global runtime-[host](../../../../terminology.md#host) logs.
 
 ## Arguments And Return
 

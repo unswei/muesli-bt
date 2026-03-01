@@ -193,7 +193,10 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 
 ## Documentation Map
 
+- [Getting oriented](docs/getting-oriented/what-is-muesli-bt.md)
+- [Terminology](docs/terminology.md)
 - [Getting started](docs/getting-started.md)
+- [Examples overview](docs/examples/index.md)
 - [Example: A* search](docs/examples/a-star-search.md)
 - [Tutorial: A* (step by step)](docs/examples/tutorials/a-star-step-by-step.md)
 - [Example: Dijkstra with PQ](docs/examples/dijkstra-pq.md)
@@ -204,8 +207,11 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 - [Built-ins overview (`env.*` included)](docs/language/builtins.md)
 - [Language reference index](docs/language/reference/index.md)
 - [Behaviour trees](docs/bt/intro.md)
-- [Bounded-time planning](docs/bt/bounded-time-planning.md)
-- [PlanAction node reference](docs/bt/plan-action-node.md)
+- [Planning overview](docs/planning/overview.md)
+- [`planner.plan` request/result](docs/planning/planner-plan.md)
+- [`plan-action` node integration](docs/planning/plan-action-node.md)
+- [Integration overview](docs/integration/overview.md)
+- [`env.*` integration API](docs/integration/env-api.md)
 - [VLA integration](docs/bt/vla-integration.md)
 - [VLA nodes reference](docs/bt/vla-nodes.md)
 - [VLA request/response schema](docs/bt/vla-request-response.md)

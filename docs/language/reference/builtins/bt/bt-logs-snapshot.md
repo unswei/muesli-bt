@@ -4,7 +4,7 @@
 
 ## What It Does
 
-Returns runtime-host logs (snapshot alias).
+Returns runtime-[host](../../../../terminology.md#host) logs (snapshot alias).
 
 ## Arguments And Return
 

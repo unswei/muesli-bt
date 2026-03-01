@@ -1,6 +1,6 @@
 # VLA Integration In BTs
 
-This runtime exposes VLA access through host capabilities and async jobs.
+This runtime exposes VLA access through [host](../terminology.md#host) capabilities and async jobs.
 
 Key principles:
 

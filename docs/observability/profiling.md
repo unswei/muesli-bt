@@ -98,7 +98,7 @@ Printed counters include:
 
 - percentile/histogram reports are not built in
 - time-series export is not built in
-- scheduler metrics are global in the default host
+- scheduler metrics are global in the default [host](../terminology.md#host)
 
 ## See Also
 

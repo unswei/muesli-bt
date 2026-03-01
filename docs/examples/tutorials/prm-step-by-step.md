@@ -16,7 +16,7 @@ This section defines reproducible run parameters, world bounds, start/goal point
   (define seed 17)
   (define target-nodes 56)
   (define max-sample-attempts 6000)
-  (define k-neighbors 8)
+  (define k-neighbours 8)
   (define edge-steps 14)
   (define inf 1000000000.0)
 
@@ -95,7 +95,7 @@ This section stores circular obstacles and defines both point and edge validity 
 
 ## Step 3: Random Sampling And k-Candidate Selection
 
-This section samples valid roadmap nodes, then keeps the nearest `k-neighbors` candidates for each node.
+This section samples valid roadmap nodes, then keeps the nearest `k-neighbours` candidates for each node.
 
 ```lisp
   (define (sample-valid-nodes! rng nodes accepted attempts)
@@ -119,8 +119,8 @@ This section samples valid roadmap nodes, then keeps the nearest `k-neighbors` c
               (worst-index distv (+ idx 1) idx v)
               (worst-index distv (+ idx 1) worst-idx worst-value)))))
 
-  (define (consider-neighbor-candidate! idxv distv j d)
-    (if (< (vec.len idxv) k-neighbors)
+  (define (consider-neighbour-candidate! idxv distv j d)
+    (if (< (vec.len idxv) k-neighbours)
         (begin
           (vec.push! idxv j)
           (vec.push! distv d))
@@ -140,7 +140,7 @@ This section samples valid roadmap nodes, then keeps the nearest `k-neighbors` c
                   (pj (vec.get nodes j)))
               (let ((d (distance (pt-x pi) (pt-y pi) (pt-x pj) (pt-y pj))))
                 (begin
-                  (consider-neighbor-candidate! idxv distv j d)
+                  (consider-neighbour-candidate! idxv distv j d)
                   (collect-candidates! nodes i (+ j 1) idxv distv)))))))
 ```
 
@@ -305,7 +305,7 @@ This final block seeds the RNG, samples nodes, builds the roadmap, runs shortest
 
   (print (list 'prm2d 'seed seed))
   (print (list 'accepted_nodes accepted 'target_nodes target-nodes))
-  (print (list 'edge_count edge-count 'k k-neighbors))
+  (print (list 'edge_count edge-count 'k k-neighbours))
   (print (list 'found found 'expanded_nodes expansions))
 
   (if found

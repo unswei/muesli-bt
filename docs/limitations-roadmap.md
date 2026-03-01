@@ -16,7 +16,7 @@ This page tracks likely next areas of work. It is intentionally short and groupe
 
 ## Integrations
 
-- richer host service adapters for production robotics systems
+- richer [host](terminology.md#host) service adapters for production robotics systems
 - additional VLA backends beyond stub/replay capability adapters
 - dedicated ROS2 adapter surface and packaging
 - external telemetry/export integrations

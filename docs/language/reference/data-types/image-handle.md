@@ -4,7 +4,7 @@
 
 ## What It Does
 
-Opaque handle for host-managed image observations.
+Opaque handle for [host](../../../terminology.md#host)-managed image observations.
 
 ## Arguments And Return
 

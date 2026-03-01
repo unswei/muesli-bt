@@ -49,9 +49,9 @@ Use this page to find where to implement specific changes.
 ## Where Do I Change X?
 
 - add Lisp builtin: `src/builtins.cpp` (general builtins) or `src/env_builtins.cpp` (`env.*` capability interface)
-- add BT DSL (domain-specific language) node/decorator: `include/bt/ast.hpp`, `src/bt/compiler.cpp`, `src/bt/runtime.cpp`, tests
+- add BT language (DSL: a small purpose-built language for behaviour trees) node/decorator: `include/bt/ast.hpp`, `src/bt/compiler.cpp`, `src/bt/runtime.cpp`, tests
 - add blackboard value type: `include/bt/blackboard.hpp`, `src/bt/blackboard.cpp`, dump/trace paths, tests
 - add trace field/event: `include/bt/trace.hpp`, `src/bt/runtime.cpp`, dump helpers, tests
-- add host wrappers/services: `include/bt/instance.hpp`, `include/bt/runtime_host.hpp`, `src/bt/runtime_host.cpp`, tests
+- add [host](../terminology.md#host) wrappers/services: `include/bt/instance.hpp`, `include/bt/runtime_host.hpp`, `src/bt/runtime_host.cpp`, tests
 - add capability/VLA job service: `include/bt/vla.hpp`, `src/bt/vla.cpp`, `src/builtins.cpp`, tests
 - add `env.*` backend adapter plumbing: `include/muslisp/env_api.hpp`, `src/env_api.cpp`, `src/env_builtins.cpp`, backend extension files

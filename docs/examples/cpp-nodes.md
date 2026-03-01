@@ -2,6 +2,8 @@
 
 ## Condition Callback Example
 
+`host` below refers to the embedding [host](../terminology.md#host) runtime object.
+
 ```cpp
 host.callbacks().register_condition("target-visible",
     [](bt::tick_context& ctx, std::span<const muslisp::value>) {

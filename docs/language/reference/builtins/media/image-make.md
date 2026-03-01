@@ -4,7 +4,7 @@
 
 ## What It Does
 
-Creates an opaque image observation handle managed by the host runtime.
+Creates an opaque image observation handle managed by the [host](../../../../terminology.md#host) runtime.
 
 ## Arguments And Return
 

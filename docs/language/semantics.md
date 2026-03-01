@@ -159,7 +159,7 @@ Semantics:
 (bt (seq (cond always-true) (act always-success)))
 ```
 
-Compiles one raw BT DSL form at evaluation time. Equivalent to `bt.compile` over quoted DSL.
+Compiles one raw BT language form (DSL: a small purpose-built language for behaviour trees) at evaluation time. Equivalent to `bt.compile` over quoted DSL.
 
 ### `defbt`
 

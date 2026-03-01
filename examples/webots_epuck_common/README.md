@@ -9,3 +9,4 @@ This folder contains the shared C++ controller implementation used by:
 - `examples/webots_epuck_tag/controllers/muesli_epuck/muesli_epuck.cpp`
 
 The per-demo `muesli_epuck.cpp` files are intentionally small wrappers. This keeps behaviour logic in Lisp while avoiding duplicated controller boilerplate.
+The corresponding Lisp entrypoints follow the `.lisp` naming convention.

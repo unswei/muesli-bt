@@ -13,8 +13,8 @@ The world includes a hunter e-puck and an evader e-puck.
 
 - `worlds/epuck_tag.wbt`: pursuit-evasion arena.
 - `controllers/muesli_epuck/muesli_epuck.cpp`: tiny wrapper to the shared Webots controller.
-- `lisp/main.mueslisp`: loop entrypoint and behaviour logic.
-- `lisp/bt_tag.mueslisp`: BT structure.
+- `lisp/main.lisp`: loop entrypoint and behaviour logic.
+- `lisp/bt_tag.lisp`: BT structure.
 - `logs/`: JSONL output.
 - `out/`: plots and DOT renders.
 
@@ -82,7 +82,7 @@ python3 examples/_tools/plot_success_rate.py \
 
 ## BT DOT export
 
-`lisp/main.mueslisp` exports at startup:
+`lisp/main.lisp` exports at startup:
 
 - `examples/webots_epuck_tag/out/tree.dot`
 

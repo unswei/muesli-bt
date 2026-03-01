@@ -4,7 +4,7 @@
 
 ## What It Does
 
-Lists registered host capabilities available to Lisp.
+Lists registered [host](../../../../terminology.md#host) capabilities available to Lisp.
 
 ## Arguments And Return
 

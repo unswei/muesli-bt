@@ -19,6 +19,11 @@ trap 'rm -f "${REQ_NO_PYBULLET}"' EXIT
 grep -viE '^[[:space:]]*pybullet([<>=!~].*)?([[:space:]]*;.*)?$' "${ROOT_DIR}/docs/requirements.txt" > "${REQ_NO_PYBULLET}"
 uv pip install --python "${VENV_DIR}/bin/python" -r "${REQ_NO_PYBULLET}"
 
+if ! command -v dot >/dev/null 2>&1; then
+  echo "warning: Graphviz 'dot' not found. Docs diagram rendering needs Graphviz." >&2
+  echo "         Install with: brew install graphviz  (macOS) or sudo apt-get install graphviz" >&2
+fi
+
 echo "Installing numpy (required by pybullet at import time)"
 uv pip install --python "${VENV_DIR}/bin/python" "numpy>=1.26"
 

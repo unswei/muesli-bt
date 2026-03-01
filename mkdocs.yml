@@ -3,6 +3,8 @@ site_description: Tiny Lisp + behaviour tree runtime in modern C++
 repo_name: muesli-bt
 repo_url: https://github.com/unswei/muesli-bt
 site_url: https://unswei.github.io/muesli-bt/
+not_in_nav: |
+  language/reference/**
 
 theme:
   name: material
@@ -11,6 +13,9 @@ theme:
     - navigation.top
     - content.code.copy
 
+hooks:
+  - docs/hooks.py
+
 plugins:
   - search
   - llmstxt:
@@ -18,11 +23,16 @@ plugins:
       sections:
         muesli-bt:
           - index.md: project overview
+          - terminology.md: terminology and glossary
+          - getting-oriented/*.md: orientation guides
           - getting-started.md: quickstart and setup
+          - integration/*.md: backend integration workflows
+          - planning/*.md: planner API and backend docs
           - bt/*.md: behaviour tree semantics and usage
           - language/**/*.md: language syntax and reference
           - internals/*.md: implementer notes
           - observability/*.md: tracing, logging, profiling
+          - diagrams/*.md: diagram authoring and workflow
           - examples/*.md: runnable patterns
 
 markdown_extensions:
@@ -37,12 +47,24 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Getting Oriented:
+      - What Is muesli-bt: getting-oriented/what-is-muesli-bt.md
+      - How Execution Works: getting-oriented/how-execution-works.md
+      - Scheme vs Common Lisp: getting-oriented/scheme-vs-common-lisp.md
+      - Terminology: terminology.md
   - Getting Started:
       - Getting Started: getting-started.md
       - Lisp Basics: lisp-basics.md
-      - Examples:
-          - Lisp Basics: examples/lisp-basics.md
+  - Examples:
+      - Overview: examples/index.md
+      - Webots:
+          - e-puck Obstacle Avoidance and Wall Following: examples/webots-epuck-obstacle-wall-following.md
+          - e-puck Line Following: examples/webots-epuck-line-following.md
+      - PyBullet:
+          - Racecar: examples/pybullet-racecar.md
+      - More Scripted Examples:
           - Hello BT: examples/hello-bt.md
+          - Lisp Basics: examples/lisp-basics.md
           - A* Search: examples/a-star-search.md
           - A* Tutorial (Step By Step): examples/tutorials/a-star-step-by-step.md
           - Dijkstra (PQ): examples/dijkstra-pq.md
@@ -54,7 +76,7 @@ nav:
           - Planning BT (1D): examples/planner-bt-1d.md
           - Planning BT (PTZ): examples/planner-bt-ptz.md
           - VLA Stub BT: examples/vla-stub-bt.md
-          - Hybrid VLA + MCTS: examples/hybrid-vla-mcts.md
+          - Hybrid VLA + Planner: examples/hybrid-vla-mcts.md
           - C++ Nodes: examples/cpp-nodes.md
   - Language:
       - Syntax: language/syntax.md
@@ -65,21 +87,36 @@ nav:
       - Introduction: bt/intro.md
       - Syntax: bt/syntax.md
       - Semantics: bt/semantics.md
-      - Bounded-Time Planning: bt/bounded-time-planning.md
-      - PlanAction Node: bt/plan-action-node.md
-      - Planner Configuration: bt/planner-configuration.md
+      - Blackboard: bt/blackboard.md
+      - Scheduler: bt/scheduler.md
+      - Bounded-Time Planning (Legacy): bt/bounded-time-planning.md
+      - PlanAction Node (Legacy): bt/plan-action-node.md
+      - Planner Configuration (Legacy): bt/planner-configuration.md
       - VLA Integration: bt/vla-integration.md
       - VLA Nodes: bt/vla-nodes.md
       - VLA Request/Response: bt/vla-request-response.md
-      - Blackboard: bt/blackboard.md
-      - Scheduler: bt/scheduler.md
-      - Integration: bt/robot-integration.md
-      - Observability:
-          - Tracing: observability/tracing.md
-          - Logging: observability/logging.md
-          - Profiling: observability/profiling.md
-          - Planner Logging: observability/planner-logging.md
-          - VLA Logging: observability/vla-logging.md
+      - Legacy Integration Notes: bt/robot-integration.md
+  - Planning:
+      - Overview: planning/overview.md
+      - planner.plan Request/Result: planning/planner-plan.md
+      - MCTS Backend: planning/mcts.md
+      - MPPI Backend: planning/mppi.md
+      - iLQR Backend: planning/ilqr.md
+      - plan-action Node: planning/plan-action-node.md
+      - Planner Logging: observability/planner-logging.md
+  - Integration:
+      - Overview: integration/overview.md
+      - env API (`env.api.v1`): integration/env-api.md
+      - Writing A Backend: integration/writing-a-backend.md
+      - Sensing and Blackboard: integration/sensing-and-blackboard.md
+  - Observability:
+      - Tracing: observability/tracing.md
+      - Logging: observability/logging.md
+      - Profiling: observability/profiling.md
+      - Planner Logging: observability/planner-logging.md
+      - VLA Logging: observability/vla-logging.md
+  - Diagrams:
+      - Diagram Workflow: diagrams/diagrams.md
   - Internals:
       - Architecture: internals/architecture.md
       - GC: internals/gc.md

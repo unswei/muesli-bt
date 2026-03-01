@@ -32,7 +32,7 @@ Options:
 
 ## `plot_planner_root.py`
 
-Generates budget adherence and planner-root action plots, plus common demo metrics.
+Generates budget adherence and planner-root action plots, plus common demo metrics and visualisations.
 
 ```bash
 python3 examples/_tools/plot_planner_root.py \

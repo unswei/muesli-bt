@@ -2,5 +2,6 @@ mkdocs>=1.6,<2.0
 mkdocs-material>=9.5
 mkdocs-llmstxt
 pymdown-extensions>=10.0
+# Graphviz `dot` is required as a system dependency for docs diagram rendering.
 numpy>=1.26
 pybullet>=3.2; python_version < "3.14"

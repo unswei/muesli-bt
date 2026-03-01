@@ -4,7 +4,7 @@
 
 ## What It Does
 
-Compiles one BT DSL form.
+Compiles one BT language form (DSL: a small purpose-built language for behaviour trees).
 
 ## Arguments And Return
 

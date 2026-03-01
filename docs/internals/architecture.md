@@ -13,14 +13,14 @@
 
 ## BT runtime
 
-- BT DSL (domain-specific language) compiler
+- BT language compiler (DSL: a small purpose-built language for behaviour trees)
 - compiled node graph
 - tick semantics
 - instance memory
 - blackboard
 - trace/log/profile hooks
 
-## Host integration
+## [Host](../terminology.md#host) integration
 
 - callback registry
 - scheduler
@@ -37,7 +37,7 @@ Preferred direction:
 
 ## Data Flow
 
-1. user writes BT DSL in Lisp (`bt`/`defbt` or quoted form with `bt.compile`)
+1. user writes BT language in Lisp (`bt`/`defbt` or quoted form with `bt.compile`)
 2. `bt`/`defbt` (or `bt.compile`) create immutable definition
 3. `bt.new-instance` creates mutable instance
 4. host ticks instance repeatedly

@@ -1,6 +1,6 @@
 # Example: Hybrid VLA + Planner
 
-This script demonstrates combining VLA proposal logic with host-side planning through `planner.plan`.
+This script demonstrates combining VLA proposal logic with [host](../terminology.md#host)-side planning through `planner.plan`.
 
 Script path:
 

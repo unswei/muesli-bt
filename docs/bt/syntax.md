@@ -1,6 +1,6 @@
 # Behaviour Tree Syntax
 
-BTs are authored in the BT DSL and compiled into `bt_def` values.
+BTs are authored in the BT language (DSL: a small purpose-built language for behaviour trees) and compiled into `bt_def` values.
 
 Preferred authoring forms:
 
@@ -64,7 +64,7 @@ Preferred authoring forms:
 (plan-action key value key value ...)
 ```
 
-`plan-action` is a built-in planning leaf that runs bounded-time MCTS and writes action output to blackboard.
+`plan-action` is a built-in planning leaf that runs bounded-time planning and writes action output to blackboard.
 `plan-action` is planner-agnostic and dispatches to `planner.plan`.
 
 Common keys:

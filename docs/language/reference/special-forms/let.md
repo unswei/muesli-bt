@@ -31,7 +31,7 @@ Creates a child lexical scope with local bindings.
 
 ## Notes
 
-- Initializers are evaluated in the parent scope.
+- Initialisers are evaluated in the parent scope.
 
 ## See Also
 

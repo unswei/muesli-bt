@@ -15,7 +15,7 @@ Good candidates:
 - task flags (`target-visible`)
 - numeric goals and thresholds
 - action progress markers
-- integration results from host actions
+- integration results from [host](../terminology.md#host) actions
 
 Avoid:
 

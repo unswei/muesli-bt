@@ -4,7 +4,7 @@ This page describes how `bt.tick` and background scheduler work together in the 
 
 ## Overview
 
-- host code owns tick cadence and calls `(bt.tick inst)`
+- [host](../terminology.md#host) code owns tick cadence and calls `(bt.tick inst)`
 - async work can run on the background `thread_pool_scheduler`
 - async outcomes are reconciled on later ticks
 - scheduler activity is observable through stats and trace events

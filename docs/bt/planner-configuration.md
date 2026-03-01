@@ -15,7 +15,7 @@ This page documents the unified planner request schema used by `planner.plan` an
 - `seed`: deterministic seed
 - `safe_action`: canonical action map `{action_schema, u}`
 - `action_schema`: default schema for result action
-- `work_max`: secondary cap (iterations/samples/optimizer iterations)
+- `work_max`: secondary cap (iterations/samples/optimiser iterations)
 - `horizon`: rollout horizon for horizon-based backends
 - `dt_ms`: optional timestep hint
 - `bounds`: list of `[lo hi]` rows (one per action dim)
@@ -65,7 +65,7 @@ Node fallback rule: if planner status is not `:ok`, the node returns `failure`.
   (map.set! req 'schema_version "planner.request.v1")
   (map.set! req 'planner "mcts")
   (map.set! req 'model_service "toy-1d")
-  (map.set! req 'state 0.0)
+  (map.set! req 'state (list 0.0))
   (map.set! req 'budget_ms 10)
   (map.set! req 'work_max 300)
   (define mcts (map.make))
@@ -76,6 +76,8 @@ Node fallback rule: if planner status is not `:ok`, the node returns `failure`.
 
 ## See Also
 
+- [Planning Overview](../planning/overview.md)
+- [planner.plan Request/Result](../planning/planner-plan.md)
 - [PlanAction Node Reference](plan-action-node.md)
 - [Bounded-Time Planning](bounded-time-planning.md)
 - [Planner Logging Schema](../observability/planner-logging.md)

@@ -4,7 +4,7 @@
 
 ## What It Does
 
-Runs a host-managed control loop around `observe -> on_tick -> act -> step` with fallback/error handling.
+Runs a [host](../../../../terminology.md#host)-managed control loop around `observe -> on_tick -> act -> step` with fallback/error handling.
 
 ## Arguments And Return
 
@@ -72,4 +72,3 @@ Runs a host-managed control loop around `observe -> on_tick -> act -> step` with
 - [Reference Index](../../index.md)
 - [env.observe](env-observe.md)
 - [env.act](env-act.md)
-

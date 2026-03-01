@@ -17,7 +17,7 @@ Reasoning:
 - runtime handles (`rng` wrapper values)
 - environments
 
-## What Is Host-Managed
+## What Is [Host](../terminology.md#host)-Managed
 
 - non-Lisp runtime objects such as scheduler threads
 - host interfaces and external robotics systems

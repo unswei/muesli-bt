@@ -2,6 +2,8 @@
 
 This page gets a new developer from clone to runnable REPL, tests, and docs.
 
+If you are new to the architecture, read [What Is muesli-bt](getting-oriented/what-is-muesli-bt.md) first.
+
 ## Toolchain Requirements
 
 - C++20 compiler (`clang++` or `g++`)
@@ -9,6 +11,7 @@ This page gets a new developer from clone to runnable REPL, tests, and docs.
 - Ninja
 - Python 3.11 (single environment for docs + `pybullet`)
 - `uv` (recommended for Python environment management)
+- Graphviz `dot` (required for rendering architecture/BT diagrams in docs)
 
 ## Build And Test
 
@@ -77,6 +80,12 @@ Notes:
 
 `(load "path/to/file.lisp")` is also available inside the REPL for runtime loading.
 
+## Script File Extension Convention
+
+Use `.lisp` for muslisp/muesli-bt scripts.
+
+There is no semantic difference between `.lisp`, `.muslisp`, or older `.mueslisp` naming; file extension is a naming convention only. The project standard is now `.lisp`.
+
 ## Environment Capability Interface (`env.*`)
 
 The runtime now exposes a backend-agnostic control surface:
@@ -117,10 +126,18 @@ Build static docs:
 .venv-py311/bin/python -m mkdocs build
 ```
 
+Diagram rendering is automatic during docs build through a pre-build hook.
+You can also run it directly:
+
+```bash
+python3 scripts/render-doc-diagrams.py
+```
+
 ## Where Examples Live
 
 - runnable Lisp scripts: `examples/repl_scripts/` and `examples/bt/`
 - prose walkthroughs: `docs/examples/`
+- simulator/robot integrations: [Integration chapter](integration/overview.md)
 
 ## Common Issues
 

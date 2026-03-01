@@ -4,7 +4,7 @@
 
 ## What It Does
 
-Host-implemented callable primitive value.
+[Host](../../../terminology.md#host)-implemented callable primitive value.
 
 ## Arguments And Return
 

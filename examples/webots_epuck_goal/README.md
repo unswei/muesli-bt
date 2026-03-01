@@ -11,8 +11,8 @@ The observation includes a lightweight ray-style signal (`lidar_lite`) derived f
 
 - `worlds/epuck_goal_cluttered.wbt`: cluttered arena with a visible goal marker.
 - `controllers/muesli_epuck/muesli_epuck.cpp`: tiny wrapper to the shared Webots controller.
-- `lisp/main.mueslisp`: loop entrypoint and behaviour logic.
-- `lisp/bt_goal_seek.mueslisp`: BT structure.
+- `lisp/main.lisp`: loop entrypoint and behaviour logic.
+- `lisp/bt_goal_seek.lisp`: BT structure.
 - `logs/`: JSONL output.
 - `out/`: plots and DOT renders.
 
@@ -78,7 +78,7 @@ Key outputs for this demo:
 
 ## BT DOT export
 
-`lisp/main.mueslisp` exports at startup:
+`lisp/main.lisp` exports at startup:
 
 - `examples/webots_epuck_goal/out/tree.dot`
 

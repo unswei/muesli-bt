@@ -19,7 +19,7 @@ Coverage includes:
 - bounded-time planner service (`planner.plan`) and `plan-action` node semantics
 - async capability/VLA surface (`cap.*`, `vla.*`, handle metadata, JSON conversion)
 - VLA BT nodes (`vla-request`, `vla-wait`, `vla-cancel`) including cancel flow
-- host wrappers and typed robot interface injection
+- [host](terminology.md#host) wrappers and typed robot interface injection
 
 ## Run Tests
 

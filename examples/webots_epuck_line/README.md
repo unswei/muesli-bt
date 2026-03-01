@@ -11,8 +11,8 @@ This demo uses the canonical `env.*` interface with:
 - `worlds/epuck_line_follow.wbt`: line-follow world.
 - `controllers/muesli_epuck/muesli_epuck.cpp`: tiny wrapper that includes the shared Webots controller implementation.
 - `../webots_epuck_common/muesli_epuck_controller_impl.cpp`: shared controller + `env` backend adapter used by both e-puck demos.
-- `lisp/main.mueslisp`: loop entrypoint, control logic, and planner log shaping.
-- `lisp/bt_line_follow.mueslisp`: BT structure.
+- `lisp/main.lisp`: loop entrypoint, control logic, and planner log shaping.
+- `lisp/bt_line_follow.lisp`: BT structure.
 - `logs/`: JSONL output.
 - `out/`: plots and DOT renders.
 
@@ -75,7 +75,7 @@ python3 examples/_tools/plot_planner_root.py \
 
 ## BT DOT export
 
-`lisp/main.mueslisp` exports at startup:
+`lisp/main.lisp` exports at startup:
 
 - `examples/webots_epuck_line/out/tree.dot`
 

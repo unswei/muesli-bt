@@ -18,3 +18,8 @@ This directory contains runnable muesli-bt examples.
 - `repl_scripts/`: standalone Lisp algorithm and planner scripts.
 - `pybullet_racecar/`: PyBullet racecar showcase.
 - `pybullet_racecar_common/`: shared C++ extension plumbing for the PyBullet racecar demo.
+
+## Script Extension Convention
+
+Example Lisp entrypoints use `.lisp`.
+The older `.muslisp`/`.mueslisp` naming is equivalent semantically, but `.lisp` is the project convention.

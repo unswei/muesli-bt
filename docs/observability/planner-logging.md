@@ -47,6 +47,16 @@ Runtime metadata such as `run_id`, `tick_index`, `node_name`, and `seed` is also
 - `cost_final`
 - `reg_final`
 
+## Reusable Visualisations
+
+The `planner.v1` schema is designed so the same plots work across backends:
+
+- budget adherence: `time_used_ms` vs `budget_ms`
+- confidence trend: `confidence` over ticks
+- root action distribution: `trace.*.top_k` when present
+
+For backends without `top_k` (often iLQR), budget/confidence plots still apply.
+
 ## Example JSON Line
 
 ```json

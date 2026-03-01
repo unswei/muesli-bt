@@ -17,7 +17,7 @@ Notes:
 - Generic environment capability builtins (`env.*`, `sim.*` alias layer) live in `src/env_builtins.cpp`.
 - Backend registration/attachment state for `env.*` lives in `src/env_api.cpp`.
 
-## Add A New BT DSL (domain-specific language) Node/Decorator
+## Add A New BT Language Node/Decorator (DSL)
 
 Checklist:
 
@@ -40,7 +40,7 @@ Checklist:
 4. test read/write/dump behaviour
 5. document type and usage constraints
 
-## Add Host Callbacks
+## Add [Host](../terminology.md#host) Callbacks
 
 Checklist:
 

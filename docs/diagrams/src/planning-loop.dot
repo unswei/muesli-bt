@@ -1,0 +1,14 @@
+digraph PlanningLoop {
+  graph [rankdir=LR, bgcolor="white", pad="0.2", nodesep="0.5", ranksep="0.7"];
+  node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, fillcolor="#F8FAFC", color="#4A5568"];
+  edge [color="#4A5568", penwidth=1.2, arrowsize=0.7, fontname="Helvetica", fontsize=10];
+
+  observe [label="env.observe", fillcolor="#E6FFFA", color="#319795"];
+  tick [label="BT tick", fillcolor="#EBF8FF", color="#3182CE"];
+  plan [label="plan-action\n-> planner.plan", fillcolor="#EBF8FF", color="#3182CE"];
+  bb [label="blackboard action/meta", fillcolor="#FFF5F5", color="#C53030"];
+  act [label="env.act", fillcolor="#FFFAF0", color="#DD6B20"];
+  step [label="env.step", fillcolor="#FAF5FF", color="#805AD5"];
+
+  observe -> tick -> plan -> bb -> act -> step -> observe;
+}

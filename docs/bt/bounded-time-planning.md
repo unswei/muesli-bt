@@ -42,7 +42,7 @@
 
 - `:planner :mcts` for tree-search style lookahead
 - `:planner :mppi` for sampling MPC
-- `:planner :ilqr` for deterministic optimization (requires derivatives policy support)
+- `:planner :ilqr` for deterministic optimisation (requires derivatives policy support)
 
 Use BT control flow to decide when to switch backend or fallback branch.
 
@@ -50,4 +50,6 @@ Use BT control flow to decide when to switch backend or fallback branch.
 
 - [PlanAction Node Reference](plan-action-node.md)
 - [Planner Configuration Reference](planner-configuration.md)
+- [Planning Overview](../planning/overview.md)
+- [planner.plan Request/Result](../planning/planner-plan.md)
 - [Planner Logging Schema](../observability/planner-logging.md)

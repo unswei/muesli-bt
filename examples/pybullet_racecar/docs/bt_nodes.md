@@ -15,7 +15,7 @@
 - `drive-to-goal` (action callback)
 - `apply-action` (action callback)
 
-Behavior:
+Behaviour:
 
 - Goal condition returns success.
 - Otherwise when forward rays are short, avoidance steers to the clearer side.
@@ -29,7 +29,7 @@ Behavior:
 - `plan-action` (planner node, model `racecar-kinematic-v1`)
 - `apply-action` (action callback)
 
-Behavior:
+Behaviour:
 
 - Safety branch preempts planning.
 - Planner branch runs planner-agnostic `plan-action` (internally `planner.plan`); this demo config selects `:planner "mcts"`.

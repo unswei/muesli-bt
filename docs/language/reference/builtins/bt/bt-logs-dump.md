@@ -4,7 +4,7 @@
 
 ## What It Does
 
-Returns runtime-host log sink text.
+Returns runtime-[host](../../../../terminology.md#host) log sink text.
 
 ## Arguments And Return
 

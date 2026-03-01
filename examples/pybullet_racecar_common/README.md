@@ -6,3 +6,4 @@ This folder contains the shared C++ extension entry points used by the PyBullet 
 - `extension.cpp`
 
 The code was moved from top-level `ext/` so example-specific extension code now lives under `examples/`, similar to `webots_epuck_common`.
+This keeps simulator integration close to the corresponding Lisp-first example workflows.

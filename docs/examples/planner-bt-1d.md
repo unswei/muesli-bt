@@ -22,4 +22,4 @@ What to look for:
 See also:
 
 - [Example: Async VLA Stub BT](vla-stub-bt.md)
-- [Example: Hybrid VLA Prior + MCTS](hybrid-vla-mcts.md)
+- [Example: Hybrid VLA + Planner](hybrid-vla-mcts.md)

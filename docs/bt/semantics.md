@@ -117,13 +117,13 @@ Uses per-node retry counter.
 ## `vla-request`
 
 - validates request inputs from configured keys/options
-- submits async job through host VLA service
+- submits async job through [host](../terminology.md#host) VLA service
 - writes `job_id` to blackboard
 - returns `running`
 
 ## `vla-wait`
 
-- polls `job_id` through host VLA service
+- polls `job_id` through [host](../terminology.md#host) VLA service
 - while queued/running/streaming: returns `running`
 - on valid terminal action: writes action to blackboard and returns `success`
 - on timeout/error/cancel/invalid: returns `failure` (and clears `job_id` unless configured otherwise)
@@ -158,7 +158,7 @@ It does not implicitly clear trace/log buffers.
 
 ## Authoring And Persistence Notes
 
-- `(bt ...)` and `(defbt ...)` compile DSL at evaluation time.
+- `(bt ...)` and `(defbt ...)` compile BT language (DSL: a small purpose-built language for behaviour trees) at evaluation time.
 - `bt.compile` is equivalent low-level compilation over quoted DSL data.
 - `bt.to-dsl` returns canonical DSL data for a compiled definition.
 - `bt.save-dsl` / `bt.load-dsl` are the recommended portable persistence path.

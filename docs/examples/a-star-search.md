@@ -16,7 +16,7 @@ Step-by-step tutorial:
 
 ## What It Demonstrates
 
-- graph search in pure Lisp without host callbacks
+- graph search in pure Lisp without [host](../terminology.md#host) callbacks
 - a deliberate non-PQ baseline open-set implementation (vector + best-node scan)
 - mutable container usage:
   - `vec.make`, `vec.push!`, `vec.get`, `vec.set!`, `vec.pop!`

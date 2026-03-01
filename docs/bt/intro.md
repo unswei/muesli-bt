@@ -10,7 +10,7 @@ They are useful in robotics because they provide:
 
 ## Tick-Based Execution
 
-A BT is not run once and forgotten. It is ticked repeatedly by a host loop.
+A BT is not run once and forgotten. It is ticked repeatedly by a [host](../terminology.md#host) loop.
 
 Each tick evaluates from the root and returns one status:
 
@@ -26,7 +26,7 @@ Each tick evaluates from the root and returns one status:
 - decorators: transform child outcomes (`invert`, `repeat`, `retry`)
 - leaves: host callbacks (`cond`, `act`), bounded-time planning (`plan-action`), and async VLA orchestration (`vla-request`, `vla-wait`, `vla-cancel`)
 
-This prepares you for the project BT DSL (domain-specific language) in [BT Syntax](syntax.md).
+This prepares you for the project BT language (DSL: a small purpose-built language for behaviour trees) in [BT Syntax](syntax.md).
 
 Authoring helpers are available:
 

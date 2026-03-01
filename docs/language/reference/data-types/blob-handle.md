@@ -4,7 +4,7 @@
 
 ## What It Does
 
-Opaque handle for host-managed binary payloads.
+Opaque handle for [host](../../../terminology.md#host)-managed binary payloads.
 
 ## Arguments And Return
 

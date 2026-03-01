@@ -78,6 +78,7 @@ Unknown keys are configuration errors.
 
 ## See Also
 
+- [Planning: `plan-action` Node](../planning/plan-action-node.md)
 - [Planner Configuration Reference](planner-configuration.md)
 - [Bounded-Time Planning](bounded-time-planning.md)
 - [Planner Logging Schema](../observability/planner-logging.md)

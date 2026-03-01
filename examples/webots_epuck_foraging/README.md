@@ -13,8 +13,8 @@ The scene uses simple coloured puck solids and a base marker; the backend tracks
 
 - `worlds/epuck_foraging.wbt`: base + pucks + simple obstacles.
 - `controllers/muesli_epuck/muesli_epuck.cpp`: tiny wrapper to the shared Webots controller.
-- `lisp/main.mueslisp`: loop entrypoint and behaviour logic.
-- `lisp/bt_foraging.mueslisp`: BT structure.
+- `lisp/main.lisp`: loop entrypoint and behaviour logic.
+- `lisp/bt_foraging.lisp`: BT structure.
 - `logs/`: JSONL output.
 - `out/`: plots and DOT renders.
 
@@ -82,7 +82,7 @@ python3 examples/_tools/plot_success_rate.py \
 
 ## BT DOT export
 
-`lisp/main.mueslisp` exports at startup:
+`lisp/main.lisp` exports at startup:
 
 - `examples/webots_epuck_foraging/out/tree.dot`
 

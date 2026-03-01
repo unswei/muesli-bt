@@ -30,7 +30,7 @@ Deterministic random stream state handle.
 
 ## Notes
 
-- State is host-managed, handle is GC-traced.
+- State is [host](../../../terminology.md#host)-managed, handle is GC-traced.
 
 ## See Also
 

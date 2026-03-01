@@ -4,7 +4,7 @@
 
 ## What It Does
 
-Compiles a BT DSL form and binds it to a symbol.
+Compiles a BT language form (DSL: a small purpose-built language for behaviour trees) and binds it to a symbol.
 
 ## Arguments And Return
 

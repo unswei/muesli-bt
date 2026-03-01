@@ -1,6 +1,6 @@
 # Connecting BT Nodes To Robot Functionality
 
-BTs coordinate behaviour. Actual robot work usually happens in host-side C++ callbacks.
+BTs coordinate behaviour. Actual robot work usually happens in [host](../terminology.md#host)-side C++ callbacks.
 
 ## Registry API
 
@@ -119,6 +119,9 @@ Recommended pattern:
 
 ## See Also
 
+- [Integration Overview](../integration/overview.md)
+- [Writing A Backend](../integration/writing-a-backend.md)
+- [Sensing And Blackboard](../integration/sensing-and-blackboard.md)
 - [Scheduler](scheduler.md)
 - [Bounded-Time Planning In BTs](bounded-time-planning.md)
 - [VLA Integration In BTs](vla-integration.md)
