@@ -38,7 +38,13 @@ Compiles one BT language form (DSL: a small purpose-built language for behaviour
 ## Notes
 
 - Authoring-friendly compile form.
-- BT DSL includes composite/decorator leaves plus planner and VLA node forms.
+- BT DSL includes:
+  - memoryless composites: `seq`, `sel`
+  - memoryful composites: `mem-seq`, `mem-sel`
+  - yielding/reactive composites: `async-seq`, `reactive-seq`, `reactive-sel`
+  - decorators: `invert`, `repeat`, `retry`
+  - leaves: `cond`, `act`, `plan-action`, `vla-request`, `vla-wait`, `vla-cancel`
+  - utility nodes: `succeed`, `fail`, `running`
 
 ## See Also
 

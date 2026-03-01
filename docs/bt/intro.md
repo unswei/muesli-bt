@@ -36,6 +36,18 @@ Authoring helpers are available:
 - `(bt ...)` compiles one DSL form
 - `(defbt name ...)` defines a compiled tree
 
+## Composite Quick Reference
+
+| Composite | Category | Core intent |
+| --- | --- | --- |
+| `seq` | memoryless | restart from child 0 each tick |
+| `sel` | memoryless | retry higher-priority children each tick |
+| `mem-seq` | memoryful | resume from last running/failing child |
+| `mem-sel` | memoryful | stay on selected running child; skip earlier failed children |
+| `async-seq` | yielding | return `running` between child boundaries |
+| `reactive-seq` | reactive | continuously re-check earlier guards and pre-empt stale running work |
+| `reactive-sel` | reactive | continuously re-check priorities and pre-empt lower running work |
+
 ## See Also
 
 - [BT Syntax](syntax.md)

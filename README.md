@@ -155,10 +155,14 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 
 ### Behaviour tree runtime
 
-- DSL forms: `seq`, `sel`, `invert`, `repeat`, `retry`, `cond`, `act`, `succeed`, `fail`, `running`
+- composites:
+  - memoryless: `seq`, `sel`
+  - memoryful: `mem-seq`, `mem-sel`
+  - yielding/reactive: `async-seq`, `reactive-seq`, `reactive-sel`
+- decorators and leaves: `invert`, `repeat`, `retry`, `cond`, `act`, `succeed`, `fail`, `running`
 - compile/load/save paths (`bt.compile`, `bt.to-dsl`, `bt.save`, `bt.load`, `bt.save-dsl`, `bt.load-dsl`)
 - per-instance blackboard with typed values and write metadata
-- scheduler-backed async actions
+- scheduler-backed async actions and reactive pre-emption tracing (`node_preempt`, `node_halt`)
 
 ### Bounded-time planning
 
@@ -181,8 +185,6 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
   - `env.info`, `env.attach`, `env.configure`
   - `env.reset`, `env.observe`, `env.act`, `env.step`
   - `env.run-loop`, `env.debug-draw`
-- transition aliases:
-  - `sim.*` forwards to `env.*`
 - backend-specific extensions remain under `env.backend.*` style namespaces (for example `env.pybullet.*`)
 
 ### Observability and control

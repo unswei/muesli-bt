@@ -26,7 +26,19 @@ Compiles a BT language form (DSL: a small purpose-built language for behaviour t
 ### Realistic
 
 ```lisp
-(begin (defbt patrol (sel (cond target-visible) (act search-target))) (define i (bt.new-instance patrol)) (bt.tick i))
+(begin
+  (defbt patrol
+    (reactive-sel
+      (reactive-seq
+        (cond target-visible)
+        (async-seq
+          (act approach-target)
+          (act grasp)))
+      (mem-seq
+        (act search-target)
+        (running))))
+  (define i (bt.new-instance patrol))
+  (bt.tick i))
 ```
 
 ## Notes

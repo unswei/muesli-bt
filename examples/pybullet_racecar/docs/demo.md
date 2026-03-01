@@ -5,8 +5,7 @@
 The agent drives a PyBullet racecar from start pose to a goal marker while avoiding static box obstacles.
 
 In BT modes, the control loop is executed by `muesli_bt_bridge` through the canonical `env.run-loop`
-interface (with `pybullet` backend attached). The legacy `env.pybullet.run-loop` path remains available for
-compatibility.
+interface (with `pybullet` backend attached).
 
 Per tick flow is:
 

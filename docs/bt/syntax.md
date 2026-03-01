@@ -26,6 +26,30 @@ Preferred authoring forms:
 
 ## Syntax Summary
 
+## Complete Node Inventory
+
+| Form | Kind | Notes |
+| --- | --- | --- |
+| `seq` | memoryless composite | sequence from child 0 each tick |
+| `sel` | memoryless composite | fallback from child 0 each tick |
+| `mem-seq` | memoryful composite | sequence with child index memory |
+| `mem-sel` | memoryful composite | fallback with child index memory |
+| `async-seq` | yielding composite | yields `running` between successful children |
+| `reactive-seq` | reactive composite | restarts at child 0 every tick, pre-empting prior running subtree if needed |
+| `reactive-sel` | reactive composite | restarts at child 0 every tick with priority re-check and pre-emption |
+| `invert` | decorator | inverts success/failure |
+| `repeat` | decorator | repeats child up to `n` successes |
+| `retry` | decorator | retries child up to `n` failures |
+| `cond` | leaf | condition callback |
+| `act` | leaf | action callback |
+| `plan-action` | leaf | bounded-time planner leaf |
+| `vla-request` | leaf | submit async VLA job |
+| `vla-wait` | leaf | poll async VLA job |
+| `vla-cancel` | leaf | cancel async VLA job |
+| `succeed` | utility | always success |
+| `fail` | utility | always failure |
+| `running` | utility | always running |
+
 ## Composites
 
 ### Memoryless
