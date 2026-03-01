@@ -116,8 +116,6 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`env.run-loop`](builtins/env/env-run-loop.md)
 - [`env.debug-draw`](builtins/env/env-debug-draw.md)
 
-Legacy `sim.*` names remain temporary aliases to `env.*`.
-
 ### Capability introspection
 
 - [`cap.list`](builtins/cap/cap-list.md)

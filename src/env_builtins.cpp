@@ -967,16 +967,6 @@ void install_env_capability_builtins(env_ptr global_env) {
     bind_primitive(global_env, "env.step", builtin_env_step);
     bind_primitive(global_env, "env.run-loop", builtin_env_run_loop);
     bind_primitive(global_env, "env.debug-draw", builtin_env_debug_draw);
-
-    bind_primitive(global_env, "sim.info", builtin_env_info);
-    bind_primitive(global_env, "sim.attach", builtin_env_attach);
-    bind_primitive(global_env, "sim.configure", builtin_env_configure);
-    bind_primitive(global_env, "sim.reset", builtin_env_reset);
-    bind_primitive(global_env, "sim.observe", builtin_env_observe);
-    bind_primitive(global_env, "sim.act", builtin_env_act);
-    bind_primitive(global_env, "sim.step", builtin_env_step);
-    bind_primitive(global_env, "sim.run-loop", builtin_env_run_loop);
-    bind_primitive(global_env, "sim.debug-draw", builtin_env_debug_draw);
 }
 
 void reset_env_capability_runtime_state() {

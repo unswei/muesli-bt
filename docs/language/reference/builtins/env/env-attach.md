@@ -36,10 +36,8 @@ Attaches a registered backend to the fixed `env.*` interface.
 ## Notes
 
 - Only one backend can be attached at a time.
-- `sim.attach` is a temporary alias.
 
 ## See Also
 
 - [Reference Index](../../index.md)
 - [env.info](env-info.md)
-

@@ -42,10 +42,8 @@ Submits the action for the next control tick.
 ## Notes
 
 - Bounds/clamping behaviour is backend/schema dependent.
-- `sim.act` is a temporary alias.
 
 ## See Also
 
 - [Reference Index](../../index.md)
 - [env.step](env-step.md)
-

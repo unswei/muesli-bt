@@ -165,7 +165,6 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `env.step` -> [page](language/reference/builtins/env/env-step.md)
 - [x] `env.run-loop` -> [page](language/reference/builtins/env/env-run-loop.md)
 - [x] `env.debug-draw` -> [page](language/reference/builtins/env/env-debug-draw.md)
-- [x] `sim.*` alias layer noted in env pages -> [page](language/reference/builtins/env/env-info.md)
 
 ### Capability services
 - [x] `cap.list` -> [page](language/reference/builtins/cap/cap-list.md)

@@ -2501,7 +2501,6 @@ void test_env_core_interface_unattached() {
           "env.info api_version mismatch");
     check(!boolean_value(eval_text("(map.get (env.info) 'attached #t)", env)), "env.info should report unattached");
     check(is_nil(eval_text("(map.get (env.info) 'backend ':none)", env)), "env.info backend should be nil when unattached");
-    check(!boolean_value(eval_text("(map.get (sim.info) 'attached #t)", env)), "sim.info alias should forward to env.info");
 
     try {
         (void)eval_text("(env.observe)", env);

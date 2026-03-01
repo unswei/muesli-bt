@@ -32,6 +32,8 @@ One definition can be shared across many instances.
 
 ## Composite Semantics
 
+## Memoryless Composites
+
 ## `seq` (memoryless)
 
 Evaluation order: left to right.
@@ -55,6 +57,8 @@ Rules:
 - all children `failure` -> `failure`
 
 Memoryless means it starts from child 0 on each tick.
+
+## Memoryful Composites
 
 ## `mem-seq` (sequence with memory)
 
@@ -84,6 +88,8 @@ Rules:
 - if all children fail: reset index to 0 and return `failure`
 
 This avoids retrying earlier failed children while a later child is still running.
+
+## Yielding And Reactive Composites
 
 ## `async-seq` (yielding sequence)
 

@@ -28,6 +28,8 @@ Preferred authoring forms:
 
 ## Composites
 
+### Memoryless
+
 ### `seq`
 
 ```lisp
@@ -40,6 +42,8 @@ Preferred authoring forms:
 (sel child1 child2 ...)
 ```
 
+### Memoryful
+
 ### `mem-seq`
 
 ```lisp
@@ -51,6 +55,8 @@ Preferred authoring forms:
 ```lisp
 (mem-sel child1 child2 ...)
 ```
+
+### Yielding / Reactive
 
 ### `async-seq`
 

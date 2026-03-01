@@ -39,10 +39,9 @@ Returns environment capability metadata for the fixed `env.*` interface.
 
 ## Notes
 
-- `sim.info` is a temporary alias to `env.info`.
+- `env.info` is always available, even before backend attachment.
 
 ## See Also
 
 - [Reference Index](../../index.md)
 - [env.attach](env-attach.md)
-

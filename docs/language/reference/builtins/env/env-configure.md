@@ -43,10 +43,8 @@ Applies backend/runtime options before stepping or loop execution.
 ## Notes
 
 - Unsupported keys may be ignored by a backend.
-- `sim.configure` is a temporary alias.
 
 ## See Also
 
 - [Reference Index](../../index.md)
 - [env.run-loop](env-run-loop.md)
-

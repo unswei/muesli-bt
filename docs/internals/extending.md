@@ -14,7 +14,7 @@ Checklist:
 
 Notes:
 
-- Generic environment capability builtins (`env.*`, `sim.*` alias layer) live in `src/env_builtins.cpp`.
+- Generic environment capability builtins (`env.*`) live in `src/env_builtins.cpp`.
 - Backend registration/attachment state for `env.*` lives in `src/env_api.cpp`.
 
 ## Add A New BT Language Node/Decorator (DSL)

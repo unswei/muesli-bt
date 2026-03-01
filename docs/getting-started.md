@@ -94,8 +94,6 @@ The runtime now exposes a backend-agnostic control surface:
 - `env.reset`, `env.observe`, `env.act`, `env.step`
 - `env.run-loop`, `env.debug-draw`
 
-Legacy `sim.*` names are temporary aliases to the same behaviour.
-
 See the built-in reference index for exact signatures and error behaviour:
 
 - [Language Reference Index](language/reference/index.md)

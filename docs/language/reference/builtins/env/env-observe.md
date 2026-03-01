@@ -41,10 +41,8 @@ Returns the current observation from the attached backend.
 ## Notes
 
 - Additional fields (`state_vec`, `done`, `reward`, `info`) are backend/demo-defined.
-- `sim.observe` is a temporary alias.
 
 ## See Also
 
 - [Reference Index](../../index.md)
 - [env.act](env-act.md)
-

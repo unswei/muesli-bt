@@ -36,10 +36,8 @@ Advances the backend by one control tick.
 ## Notes
 
 - `env.step` is the canonical “advance to next control tick” call.
-- `sim.step` is a temporary alias.
 
 ## See Also
 
 - [Reference Index](../../index.md)
 - [env.run-loop](env-run-loop.md)
-

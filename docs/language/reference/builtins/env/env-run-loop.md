@@ -65,7 +65,6 @@ Runs a [host](../../../../terminology.md#host)-managed control loop around `obse
 
 - If `on_tick` overruns, runtime uses last-good or safe action and continues.
 - On runtime error, one safety action + one step is attempted before returning `:error`.
-- `sim.run-loop` is a temporary alias.
 
 ## See Also
 

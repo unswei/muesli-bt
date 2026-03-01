@@ -46,7 +46,6 @@ This page is a summary and link hub for built-ins. Detailed behaviour, errors, a
 ## Environment Capability Interface
 
 - canonical interface: `env.info`, `env.attach`, `env.configure`, `env.reset`, `env.observe`, `env.act`, `env.step`, `env.run-loop`, `env.debug-draw`
-- transition aliases (legacy): `sim.info`, `sim.attach`, `sim.configure`, `sim.reset`, `sim.observe`, `sim.act`, `sim.step`, `sim.run-loop`, `sim.debug-draw`
 
 ## BT Integration
 

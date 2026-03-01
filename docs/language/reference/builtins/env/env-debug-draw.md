@@ -39,10 +39,8 @@ Requests optional backend debug visualisation.
 ## Notes
 
 - Intended for overlays and debug helpers, not core control semantics.
-- `sim.debug-draw` is a temporary alias.
 
 ## See Also
 
 - [Reference Index](../../index.md)
 - [env.info](env-info.md)
-

@@ -100,13 +100,13 @@ nav:
       - BT.CPP Crosswalk: bt/cpp-crosswalk.md
       - Blackboard: bt/blackboard.md
       - Scheduler: bt/scheduler.md
-      - Bounded-Time Planning (Legacy): bt/bounded-time-planning.md
-      - PlanAction Node (Legacy): bt/plan-action-node.md
-      - Planner Configuration (Legacy): bt/planner-configuration.md
+      - PlanAction Node: bt/plan-action-node.md
+      - Planner Configuration: bt/planner-configuration.md
+      - Bounded-Time Planning: bt/bounded-time-planning.md
       - VLA Integration: bt/vla-integration.md
       - VLA Nodes: bt/vla-nodes.md
       - VLA Request/Response: bt/vla-request-response.md
-      - Legacy Integration Notes: bt/robot-integration.md
+      - Host Integration: bt/robot-integration.md
   - Planning:
       - Overview: planning/overview.md
       - planner.plan Request/Result: planning/planner-plan.md

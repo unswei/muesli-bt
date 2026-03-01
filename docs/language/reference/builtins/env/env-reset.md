@@ -37,10 +37,8 @@ Resets the attached backend and returns the first observation map.
 ## Notes
 
 - `episode` increments on reset in the current runtime.
-- `sim.reset` is a temporary alias.
 
 ## See Also
 
 - [Reference Index](../../index.md)
 - [env.observe](env-observe.md)
-

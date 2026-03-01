@@ -31,7 +31,7 @@ Alias of `bt.logs.snapshot`.
 
 ## Notes
 
-- Legacy alias.
+- Alias of `bt.logs.snapshot`.
 
 ## See Also
 

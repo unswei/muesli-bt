@@ -31,7 +31,7 @@ Alias of `bt.logs.dump`.
 
 ## Notes
 
-- Legacy alias.
+- Alias of `bt.logs.dump`.
 
 ## See Also
 
