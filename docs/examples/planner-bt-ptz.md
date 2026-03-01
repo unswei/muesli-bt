@@ -25,3 +25,9 @@ Related:
 
 - [Example: Async VLA Stub BT](vla-stub-bt.md)
 - [VLA Integration In BTs](../bt/vla-integration.md)
+
+## Source
+
+```lisp
+--8<-- "examples/repl_scripts/planner-bt-ptz.lisp"
+```

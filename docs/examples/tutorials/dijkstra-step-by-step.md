@@ -219,3 +219,9 @@ The file finishes by running the search and printing summary plus path details.
 
 - [Dijkstra Example Overview](../dijkstra-pq.md)
 - [PRM Tutorial](prm-step-by-step.md)
+
+## Full Source
+
+```lisp
+--8<-- "examples/repl_scripts/dijkstra-grid-pq.lisp"
+```

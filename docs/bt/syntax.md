@@ -40,6 +40,36 @@ Preferred authoring forms:
 (sel child1 child2 ...)
 ```
 
+### `mem-seq`
+
+```lisp
+(mem-seq child1 child2 ...)
+```
+
+### `mem-sel`
+
+```lisp
+(mem-sel child1 child2 ...)
+```
+
+### `async-seq`
+
+```lisp
+(async-seq child1 child2 ...)
+```
+
+### `reactive-seq`
+
+```lisp
+(reactive-seq child1 child2 ...)
+```
+
+### `reactive-sel`
+
+```lisp
+(reactive-sel child1 child2 ...)
+```
+
 ## Leaves
 
 ### `cond`
@@ -159,6 +189,7 @@ Use DSL save/load when long-term portability is the priority.
 
 ## See Also
 
+- [BT.CPP Crosswalk](cpp-crosswalk.md)
 - [PlanAction Node Reference](plan-action-node.md)
 - [Planner Configuration Reference](planner-configuration.md)
 - [VLA BT Nodes](vla-nodes.md)

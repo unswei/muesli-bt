@@ -26,6 +26,12 @@ Step-by-step tutorial:
 - The A* example remains intentionally non-PQ: [A* Search](a-star-search.md).
 - Dijkstra here is the reference example that uses `pq.*` directly.
 
+## Source
+
+```lisp
+--8<-- "examples/repl_scripts/dijkstra-grid-pq.lisp"
+```
+
 ## Expected Output Shape
 
 The script prints:

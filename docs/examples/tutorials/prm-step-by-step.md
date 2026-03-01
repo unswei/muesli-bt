@@ -321,3 +321,9 @@ This final block seeds the RNG, samples nodes, builds the roadmap, runs shortest
 
 - [PRM Example Overview](../prm-pq.md)
 - [Dijkstra Tutorial](dijkstra-step-by-step.md)
+
+## Full Source
+
+```lisp
+--8<-- "examples/repl_scripts/prm-2d-pq.lisp"
+```

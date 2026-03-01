@@ -18,3 +18,9 @@ What to look for:
 - `flow-action`/`vla-action` is written by `vla-wait` when ready
 - `vla-meta` contains structured poll metadata
 - `vla.logs.dump` returns JSON lines records
+
+## Source
+
+```lisp
+--8<-- "examples/repl_scripts/vla-stub-bt.lisp"
+```

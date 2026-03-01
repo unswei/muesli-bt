@@ -22,7 +22,12 @@ enum class node_kind {
     plan_action,
     vla_request,
     vla_wait,
-    vla_cancel
+    vla_cancel,
+    mem_seq,
+    mem_sel,
+    async_seq,
+    reactive_seq,
+    reactive_sel
 };
 
 enum class arg_kind {

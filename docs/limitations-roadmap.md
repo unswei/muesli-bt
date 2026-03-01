@@ -11,7 +11,7 @@ This page tracks likely next areas of work. It is intentionally short and groupe
 ## Behaviour Tree Runtime
 
 - explicit leaf `halt` lifecycle for long-running actions
-- memoryful composites (`mem-seq`, `mem-sel`)
+- async fallback composite (`async-sel`, BT.CPP-style `AsyncFallback`) in a future version
 - stronger blackboard schema validation and typed contracts for complex leaves
 
 ## Integrations

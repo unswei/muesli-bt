@@ -12,10 +12,16 @@ muesli-bt docs use Graphviz DOT sources for architecture/workflow diagrams.
 Render all diagrams:
 
 ```bash
+./scripts/gen_diagrams.sh
+```
+
+Alternative Python entrypoint:
+
+```bash
 python3 scripts/render-doc-diagrams.py
 ```
 
-The docs build also runs this renderer automatically through an MkDocs pre-build hook.
+The docs build also runs the Python renderer automatically through an MkDocs pre-build hook.
 
 ## Tooling
 

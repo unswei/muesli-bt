@@ -1,15 +1,9 @@
 # Example: Hello BT
 
-```lisp
-(defbt tree
-  (seq
-    (cond always-true)
-    (act running-then-success 1)))
+Path: `examples/bt/hello_bt.lisp`
 
-(define inst (bt.new-instance tree))
-(bt.tick inst) ; running
-(bt.tick inst) ; success
-(bt.trace.snapshot inst)
+```lisp
+--8<-- "examples/bt/hello_bt.lisp"
 ```
 
 What this shows:

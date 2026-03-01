@@ -1319,6 +1319,283 @@ status execute_vla_cancel(const node& n, tick_context& ctx, const std::vector<mu
     return status::success;
 }
 
+status tick_node(node_id id, tick_context& ctx);
+
+std::size_t clamp_child_index(const node& n, std::int64_t raw_index) {
+    if (raw_index < 0) {
+        return 0;
+    }
+    const std::size_t idx = static_cast<std::size_t>(raw_index);
+    if (idx >= n.children.size()) {
+        return 0;
+    }
+    return idx;
+}
+
+std::optional<node_id> prior_running_child(const node_memory& mem, const node& n) {
+    if (!mem.b0) {
+        return std::nullopt;
+    }
+    if (mem.i0 < 0) {
+        return std::nullopt;
+    }
+    const std::size_t idx = static_cast<std::size_t>(mem.i0);
+    if (idx >= n.children.size()) {
+        return std::nullopt;
+    }
+    return n.children[idx];
+}
+
+void clear_reactive_running_child(node_memory& mem) {
+    mem.b0 = false;
+    mem.i0 = 0;
+}
+
+void remember_reactive_running_child(node_memory& mem, std::size_t child_index) {
+    mem.b0 = true;
+    mem.i0 = static_cast<std::int64_t>(child_index);
+}
+
+void emit_node_halt(tick_context& ctx, node_id halted_node, std::string_view reason) {
+    trace_event ev = make_trace_event(trace_event_kind::node_halt);
+    ev.node = halted_node;
+    ev.message = std::string(reason);
+    emit_trace(ctx, std::move(ev));
+}
+
+void emit_node_preempt(tick_context& ctx, node_id from_node, node_id to_node, std::string_view reason) {
+    trace_event ev = make_trace_event(trace_event_kind::node_preempt);
+    ev.node = from_node;
+    ev.message = "to_node=" + std::to_string(to_node) + " reason=" + std::string(reason);
+    emit_trace(ctx, std::move(ev));
+}
+
+void emit_unhaltable_warning_once(tick_context& ctx, node_id id, std::string_view message) {
+    if (!ctx.inst.halt_warning_emitted.insert(id).second) {
+        return;
+    }
+    trace_event ev = make_trace_event(trace_event_kind::warning);
+    ev.node = id;
+    ev.message = std::string(message);
+    emit_trace(ctx, std::move(ev));
+    emit_log(ctx, log_level::warn, "bt", std::string(message));
+}
+
+bool try_cancel_scheduler_leaf(tick_context& ctx, node_memory& mem, std::string_view reason) {
+    if (!ctx.svc.sched || !mem.b0 || mem.i0 <= 0) {
+        return false;
+    }
+
+    const job_id jid = static_cast<job_id>(mem.i0);
+    const job_info info = ctx.svc.sched->get_info(jid);
+    if (info.status != job_status::queued && info.status != job_status::running) {
+        return false;
+    }
+
+    if (!ctx.svc.sched->cancel(jid)) {
+        return false;
+    }
+
+    ctx.scheduler_event(
+        trace_event_kind::scheduler_cancel, jid, job_status::cancelled, "scheduler cancelled by halt_subtree (" + std::string(reason) + ")");
+    mem.b0 = false;
+    mem.i0 = 0;
+    mem.i1 = static_cast<std::int64_t>(job_status::unknown);
+    return true;
+}
+
+void halt_subtree_impl(tick_context& ctx, node_id root, std::string_view reason) {
+    if (!ctx.inst.def) {
+        return;
+    }
+
+    std::vector<node_id> stack;
+    stack.push_back(root);
+    while (!stack.empty()) {
+        const node_id id = stack.back();
+        stack.pop_back();
+        const node& n = get_node(*ctx.inst.def, id);
+
+        emit_node_halt(ctx, id, reason);
+
+        const auto mem_it = ctx.inst.memory.find(id);
+        if (n.kind == node_kind::act && mem_it != ctx.inst.memory.end()) {
+            node_memory& mem = mem_it->second;
+            bool halted = false;
+
+            if (const action_halt_fn* halt_fn = ctx.reg.find_action_halt(n.leaf_name); halt_fn) {
+                try {
+                    (*halt_fn)(ctx, id, mem);
+                    halted = true;
+                } catch (const std::exception& e) {
+                    emit_unhaltable_warning_once(
+                        ctx, id, "halt callback threw for node " + std::to_string(id) + ": " + std::string(e.what()));
+                } catch (...) {
+                    emit_unhaltable_warning_once(ctx, id, "halt callback threw for node " + std::to_string(id));
+                }
+            }
+
+            if (!halted) {
+                halted = try_cancel_scheduler_leaf(ctx, mem, reason);
+            }
+            if (!halted && mem.b0) {
+                emit_unhaltable_warning_once(ctx, id, "halt_subtree: no halt hook/job id for running node " + std::to_string(id));
+            }
+        }
+
+        ctx.inst.memory.erase(id);
+        for (node_id child : n.children) {
+            stack.push_back(child);
+        }
+    }
+}
+
+void halt_child_subtree(tick_context& ctx, node_id from_child, node_id to_child, std::string_view reason) {
+    emit_node_preempt(ctx, from_child, to_child, reason);
+    halt_subtree_impl(ctx, from_child, reason);
+}
+
+void halt_all_children(tick_context& ctx, const node& parent, std::string_view reason) {
+    for (node_id child : parent.children) {
+        halt_subtree_impl(ctx, child, reason);
+    }
+}
+
+status tick_mem_seq(const node& n, tick_context& ctx) {
+    node_memory& mem = node_memory_for(ctx.inst, n.id);
+    std::size_t index = clamp_child_index(n, mem.i0);
+    while (index < n.children.size()) {
+        const status child_st = tick_node(n.children[index], ctx);
+        if (child_st == status::running) {
+            mem.i0 = static_cast<std::int64_t>(index);
+            return status::running;
+        }
+        if (child_st == status::failure) {
+            mem.i0 = static_cast<std::int64_t>(index);
+            return status::failure;
+        }
+        ++index;
+    }
+
+    mem.i0 = 0;
+    halt_all_children(ctx, n, "mem-seq complete");
+    return status::success;
+}
+
+status tick_mem_sel(const node& n, tick_context& ctx) {
+    node_memory& mem = node_memory_for(ctx.inst, n.id);
+    std::size_t index = clamp_child_index(n, mem.i0);
+    while (index < n.children.size()) {
+        const status child_st = tick_node(n.children[index], ctx);
+        if (child_st == status::success) {
+            mem.i0 = 0;
+            mem.b0 = false;
+            halt_all_children(ctx, n, "mem-sel success");
+            return status::success;
+        }
+        if (child_st == status::running) {
+            mem.i0 = static_cast<std::int64_t>(index);
+            mem.b0 = true;
+            return status::running;
+        }
+        ++index;
+    }
+
+    mem.i0 = 0;
+    mem.b0 = false;
+    return status::failure;
+}
+
+status tick_async_seq(const node& n, tick_context& ctx) {
+    node_memory& mem = node_memory_for(ctx.inst, n.id);
+    const std::size_t index = clamp_child_index(n, mem.i0);
+    const status child_st = tick_node(n.children[index], ctx);
+    if (child_st == status::running) {
+        mem.i0 = static_cast<std::int64_t>(index);
+        return status::running;
+    }
+    if (child_st == status::failure) {
+        mem.i0 = 0;
+        return status::failure;
+    }
+
+    if (index + 1 >= n.children.size()) {
+        mem.i0 = 0;
+        halt_all_children(ctx, n, "async-seq complete");
+        return status::success;
+    }
+
+    mem.i0 = static_cast<std::int64_t>(index + 1);
+    return status::running;
+}
+
+status tick_reactive_seq(const node& n, tick_context& ctx) {
+    node_memory& mem = node_memory_for(ctx.inst, n.id);
+    const std::optional<node_id> previous_running = prior_running_child(mem, n);
+
+    for (std::size_t i = 0; i < n.children.size(); ++i) {
+        const node_id child = n.children[i];
+        const status child_st = tick_node(child, ctx);
+
+        if (child_st == status::failure) {
+            if (previous_running.has_value()) {
+                halt_child_subtree(ctx, *previous_running, child, "reactive-seq preempted on failure");
+            }
+            clear_reactive_running_child(mem);
+            return status::failure;
+        }
+
+        if (child_st == status::running) {
+            if (previous_running.has_value() && previous_running != child) {
+                halt_child_subtree(ctx, *previous_running, child, "reactive-seq switched running child");
+            }
+            remember_reactive_running_child(mem, i);
+            return status::running;
+        }
+    }
+
+    if (previous_running.has_value()) {
+        halt_child_subtree(ctx, *previous_running, n.id, "reactive-seq completed");
+    }
+    clear_reactive_running_child(mem);
+    return status::success;
+}
+
+status tick_reactive_sel(const node& n, tick_context& ctx) {
+    node_memory& mem = node_memory_for(ctx.inst, n.id);
+    const std::optional<node_id> previous_running = prior_running_child(mem, n);
+    std::size_t previous_index = n.children.size();
+    if (mem.b0 && mem.i0 >= 0) {
+        previous_index = static_cast<std::size_t>(mem.i0);
+    }
+
+    for (std::size_t i = 0; i < n.children.size(); ++i) {
+        const node_id child = n.children[i];
+        const status child_st = tick_node(child, ctx);
+        if (child_st == status::failure) {
+            continue;
+        }
+
+        if (previous_running.has_value() && previous_index > i && previous_running != child) {
+            halt_child_subtree(ctx, *previous_running, child, "reactive-sel switched to higher priority");
+        }
+
+        if (child_st == status::running) {
+            remember_reactive_running_child(mem, i);
+            return status::running;
+        }
+
+        clear_reactive_running_child(mem);
+        return status::success;
+    }
+
+    if (previous_running.has_value()) {
+        halt_child_subtree(ctx, *previous_running, n.id, "reactive-sel all failed");
+    }
+    clear_reactive_running_child(mem);
+    return status::failure;
+}
+
 status tick_node(node_id id, tick_context& ctx) {
     const node& n = get_node(*ctx.inst.def, id);
     node_scope scope(ctx, n);
@@ -1354,6 +1631,21 @@ status tick_node(node_id id, tick_context& ctx) {
             }
             return finalize(status::failure);
         }
+
+        case node_kind::mem_seq:
+            return finalize(tick_mem_seq(n, ctx));
+
+        case node_kind::mem_sel:
+            return finalize(tick_mem_sel(n, ctx));
+
+        case node_kind::async_seq:
+            return finalize(tick_async_seq(n, ctx));
+
+        case node_kind::reactive_seq:
+            return finalize(tick_reactive_seq(n, ctx));
+
+        case node_kind::reactive_sel:
+            return finalize(tick_reactive_sel(n, ctx));
 
         case node_kind::invert: {
             const status st = tick_node(n.children[0], ctx);
@@ -1613,8 +1905,22 @@ status tick(instance& inst, registry& reg, services& svc) {
     return result;
 }
 
+void halt_subtree(instance& inst, registry& reg, services& svc, node_id root, std::string_view reason) {
+    if (!inst.def) {
+        return;
+    }
+    tick_context ctx{.inst = inst,
+                     .reg = reg,
+                     .svc = svc,
+                     .tick_index = inst.tick_index,
+                     .now = svc.clock ? svc.clock->now() : std::chrono::steady_clock::now(),
+                     .current_node = root};
+    halt_subtree_impl(ctx, root, reason);
+}
+
 void reset(instance& inst) {
     inst.memory.clear();
+    inst.halt_warning_emitted.clear();
     inst.bb.clear();
 }
 

@@ -1,0 +1,35 @@
+digraph bt_composites_crosswalk {
+  rankdir=LR;
+  graph [fontname="Helvetica", fontsize=11, labelloc=t, label="muesli-bt <-> BehaviorTree.CPP composites"];
+  node [shape=box, style="rounded,filled", fillcolor="#f4f8ff", color="#355c7d", fontname="Helvetica", fontsize=10];
+  edge [color="#355c7d", penwidth=1.2, fontname="Helvetica", fontsize=9];
+
+  m_seq [label="seq\n(memoryless)"];
+  c_seq [label="Sequence"];
+
+  m_sel [label="sel\n(memoryless)"];
+  c_fallback [label="Fallback / Selector"];
+
+  m_mem_seq [label="mem-seq"];
+  c_mem_seq [label="SequenceWithMemory"];
+
+  m_mem_sel [label="mem-sel"];
+  c_mem_sel [label="Fallback with memory\n(closest analogue)"];
+
+  m_async_seq [label="async-seq"];
+  c_async_seq [label="AsyncSequence"];
+
+  m_rseq [label="reactive-seq"];
+  c_rseq [label="ReactiveSequence"];
+
+  m_rsel [label="reactive-sel"];
+  c_rsel [label="ReactiveFallback"];
+
+  m_seq -> c_seq;
+  m_sel -> c_fallback;
+  m_mem_seq -> c_mem_seq;
+  m_mem_sel -> c_mem_sel;
+  m_async_seq -> c_async_seq;
+  m_rseq -> c_rseq;
+  m_rsel -> c_rsel;
+}

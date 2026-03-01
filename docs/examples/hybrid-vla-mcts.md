@@ -17,3 +17,9 @@ What to look for:
 - `vla.submit` + `vla.poll` produce structured proposal metadata
 - planner requests use unified `planner.request.v1`
 - backend selection is explicit via `planner` (`mcts`, `mppi`, `ilqr`)
+
+## Source
+
+```lisp
+--8<-- "examples/repl_scripts/hybrid-vla-mcts-1d.lisp"
+```

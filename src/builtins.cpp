@@ -1853,6 +1853,36 @@ value bt_node_to_dsl(const bt::definition& def, bt::node_id id) {
                 form.push_back(bt_node_to_dsl(def, child));
             }
             break;
+        case bt::node_kind::mem_seq:
+            form.push_back(make_symbol("mem-seq"));
+            for (bt::node_id child : n.children) {
+                form.push_back(bt_node_to_dsl(def, child));
+            }
+            break;
+        case bt::node_kind::mem_sel:
+            form.push_back(make_symbol("mem-sel"));
+            for (bt::node_id child : n.children) {
+                form.push_back(bt_node_to_dsl(def, child));
+            }
+            break;
+        case bt::node_kind::async_seq:
+            form.push_back(make_symbol("async-seq"));
+            for (bt::node_id child : n.children) {
+                form.push_back(bt_node_to_dsl(def, child));
+            }
+            break;
+        case bt::node_kind::reactive_seq:
+            form.push_back(make_symbol("reactive-seq"));
+            for (bt::node_id child : n.children) {
+                form.push_back(bt_node_to_dsl(def, child));
+            }
+            break;
+        case bt::node_kind::reactive_sel:
+            form.push_back(make_symbol("reactive-sel"));
+            for (bt::node_id child : n.children) {
+                form.push_back(bt_node_to_dsl(def, child));
+            }
+            break;
         case bt::node_kind::invert:
             form.push_back(make_symbol("invert"));
             if (n.children.size() != 1) {

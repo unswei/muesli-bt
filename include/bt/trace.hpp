@@ -24,6 +24,8 @@ enum class trace_event_kind {
     scheduler_start,
     scheduler_finish,
     scheduler_cancel,
+    node_halt,
+    node_preempt,
     warning,
     error
 };

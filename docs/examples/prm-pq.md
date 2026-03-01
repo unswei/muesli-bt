@@ -26,6 +26,12 @@ Step-by-step tutorial:
 - naive roadmap construction with k-nearest candidate filtering
 - Dijkstra search over roadmap using native priority queue builtins
 
+## Source
+
+```lisp
+--8<-- "examples/repl_scripts/prm-2d-pq.lisp"
+```
+
 ## Expected Output Shape
 
 The script prints:

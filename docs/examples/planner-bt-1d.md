@@ -23,3 +23,9 @@ See also:
 
 - [Example: Async VLA Stub BT](vla-stub-bt.md)
 - [Example: Hybrid VLA + Planner](hybrid-vla-mcts.md)
+
+## Source
+
+```lisp
+--8<-- "examples/repl_scripts/planner-bt-1d.lisp"
+```

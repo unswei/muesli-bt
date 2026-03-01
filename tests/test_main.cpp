@@ -1688,6 +1688,285 @@ void test_bt_compile_checks() {
         throw std::runtime_error("expected bt.compile vla-request key/value validation failure");
     } catch (const lisp_error&) {
     }
+
+    (void)eval_text("(bt.compile '(mem-seq (succeed)))", env);
+    (void)eval_text("(bt.compile '(mem-sel (succeed)))", env);
+    (void)eval_text("(bt.compile '(async-seq (succeed)))", env);
+    (void)eval_text("(bt.compile '(reactive-seq (succeed)))", env);
+    (void)eval_text("(bt.compile '(reactive-sel (succeed)))", env);
+}
+
+void test_bt_new_composite_dsl_roundtrip() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    (void)eval_text(
+        "(define tree "
+        "  (bt.compile "
+        "    '(reactive-sel "
+        "       (reactive-seq (cond always-true) (async-seq (act always-success) (act always-success))) "
+        "       (mem-seq (act always-success) (mem-sel (act always-fail) (succeed))))))",
+        env);
+    value dsl = eval_text("(bt.to-dsl tree)", env);
+    check(is_cons(dsl), "bt.to-dsl should return a list");
+    check(print_value(dsl).find("reactive-sel") != std::string::npos, "dsl should include reactive-sel");
+    check(print_value(dsl).find("mem-seq") != std::string::npos, "dsl should include mem-seq");
+    check(print_value(dsl).find("mem-sel") != std::string::npos, "dsl should include mem-sel");
+    check(print_value(dsl).find("async-seq") != std::string::npos, "dsl should include async-seq");
+    check(print_value(dsl).find("reactive-seq") != std::string::npos, "dsl should include reactive-seq");
+
+    const std::filesystem::path dsl_path = temp_file_path("bt_new_nodes", ".lisp");
+    const std::filesystem::path mbt_path = temp_file_path("bt_new_nodes", ".mbt");
+    const std::string dsl_literal = lisp_string_literal(dsl_path.string());
+    const std::string mbt_literal = lisp_string_literal(mbt_path.string());
+
+    (void)eval_text("(bt.save-dsl tree " + dsl_literal + ")", env);
+    (void)eval_text("(define tree-from-dsl (bt.load-dsl " + dsl_literal + "))", env);
+    const value dsl_from_dsl = eval_text("(bt.to-dsl tree-from-dsl)", env);
+    check(print_value(dsl_from_dsl) == print_value(dsl), "new nodes should roundtrip through bt.save-dsl/bt.load-dsl");
+
+    (void)eval_text("(bt.save tree " + mbt_literal + ")", env);
+    (void)eval_text("(define tree-from-mbt (bt.load " + mbt_literal + "))", env);
+    const value dsl_from_mbt = eval_text("(bt.to-dsl tree-from-mbt)", env);
+    check(print_value(dsl_from_mbt) == print_value(dsl), "new nodes should roundtrip through bt.save/bt.load");
+
+    std::error_code ec;
+    std::filesystem::remove(dsl_path, ec);
+    std::filesystem::remove(mbt_path, ec);
+}
+
+void test_bt_mem_seq_semantics() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    bt::runtime_host& host = bt::default_runtime_host();
+    int setup_calls = 0;
+    int fail_once_calls = 0;
+    int run_then_success_calls = 0;
+
+    host.callbacks().register_action(
+        "test-ms-setup",
+        [&setup_calls](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+            ++setup_calls;
+            return bt::status::success;
+        });
+    host.callbacks().register_action(
+        "test-ms-run-then-success",
+        [&run_then_success_calls](bt::tick_context&, bt::node_id, bt::node_memory& mem, std::span<const muslisp::value>) {
+            ++run_then_success_calls;
+            if (mem.i0 == 0) {
+                mem.i0 = 1;
+                return bt::status::running;
+            }
+            mem.i0 = 0;
+            return bt::status::success;
+        });
+    host.callbacks().register_action(
+        "test-ms-fail-once",
+        [&fail_once_calls](bt::tick_context&, bt::node_id, bt::node_memory& mem, std::span<const muslisp::value>) {
+            ++fail_once_calls;
+            if (mem.i0 == 0) {
+                mem.i0 = 1;
+                return bt::status::failure;
+            }
+            mem.i0 = 0;
+            return bt::status::success;
+        });
+
+    env_ptr env = create_global_env();
+
+    (void)eval_text("(define tree-a (bt.compile '(mem-seq (act always-success) (act always-success) (act always-success))))", env);
+    (void)eval_text("(define inst-a (bt.new-instance tree-a))", env);
+    check(symbol_name(eval_text("(bt.tick inst-a)", env)) == "success", "mem-seq all-success should succeed");
+    check(symbol_name(eval_text("(bt.tick inst-a)", env)) == "success", "mem-seq should reset after success");
+
+    setup_calls = 0;
+    run_then_success_calls = 0;
+    (void)eval_text(
+        "(define tree-b (bt.compile '(mem-seq (act test-ms-setup) (act test-ms-run-then-success) (act always-success))))",
+        env);
+    (void)eval_text("(define inst-b (bt.new-instance tree-b))", env);
+    check(symbol_name(eval_text("(bt.tick inst-b)", env)) == "running", "mem-seq should return running");
+    check(setup_calls == 1, "mem-seq should tick setup exactly once before running");
+    check(symbol_name(eval_text("(bt.tick inst-b)", env)) == "success", "mem-seq should resume and succeed");
+    check(setup_calls == 1, "mem-seq should resume at running child");
+    check(run_then_success_calls == 2, "mem-seq running child should be revisited");
+
+    setup_calls = 0;
+    fail_once_calls = 0;
+    (void)eval_text("(define tree-c (bt.compile '(mem-seq (act test-ms-setup) (act test-ms-fail-once) (act always-success))))", env);
+    (void)eval_text("(define inst-c (bt.new-instance tree-c))", env);
+    check(symbol_name(eval_text("(bt.tick inst-c)", env)) == "failure", "mem-seq should fail when child fails");
+    check(symbol_name(eval_text("(bt.tick inst-c)", env)) == "success", "mem-seq should resume failing child next tick");
+    check(setup_calls == 1, "mem-seq should not rerun prior success child after failure");
+    check(fail_once_calls == 2, "mem-seq should retick failing child");
+}
+
+void test_bt_mem_sel_semantics() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    bt::runtime_host& host = bt::default_runtime_host();
+    int fail_a_calls = 0;
+    int fail_b_calls = 0;
+    int run_then_success_calls = 0;
+
+    host.callbacks().register_action(
+        "test-msel-fail-a",
+        [&fail_a_calls](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+            ++fail_a_calls;
+            return bt::status::failure;
+        });
+    host.callbacks().register_action(
+        "test-msel-fail-b",
+        [&fail_b_calls](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+            ++fail_b_calls;
+            return bt::status::failure;
+        });
+    host.callbacks().register_action(
+        "test-msel-run-then-success",
+        [&run_then_success_calls](bt::tick_context&, bt::node_id, bt::node_memory& mem, std::span<const muslisp::value>) {
+            ++run_then_success_calls;
+            if (mem.i0 == 0) {
+                mem.i0 = 1;
+                return bt::status::running;
+            }
+            mem.i0 = 0;
+            return bt::status::success;
+        });
+
+    env_ptr env = create_global_env();
+
+    (void)eval_text(
+        "(define tree-a (bt.compile '(mem-sel (act test-msel-fail-a) (act test-msel-fail-b) (act test-msel-run-then-success))))",
+        env);
+    (void)eval_text("(define inst-a (bt.new-instance tree-a))", env);
+    check(symbol_name(eval_text("(bt.tick inst-a)", env)) == "running", "mem-sel should run lower-priority child");
+    check(fail_a_calls == 1 && fail_b_calls == 1, "mem-sel should evaluate failed higher priorities once");
+    check(symbol_name(eval_text("(bt.tick inst-a)", env)) == "success", "mem-sel should resume running child");
+    check(fail_a_calls == 1 && fail_b_calls == 1, "mem-sel should not retry earlier failed children while running");
+    check(run_then_success_calls == 2, "mem-sel running child should complete");
+
+    fail_a_calls = 0;
+    fail_b_calls = 0;
+    (void)eval_text("(define tree-b (bt.compile '(mem-sel (act test-msel-fail-a) (act test-msel-fail-b))))", env);
+    (void)eval_text("(define inst-b (bt.new-instance tree-b))", env);
+    check(symbol_name(eval_text("(bt.tick inst-b)", env)) == "failure", "mem-sel all-failure should fail");
+    check(symbol_name(eval_text("(bt.tick inst-b)", env)) == "failure", "mem-sel should reset after all-failure");
+    check(fail_a_calls == 2 && fail_b_calls == 2, "mem-sel reset should restart from child 0");
+}
+
+void test_bt_async_seq_semantics() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    bt::runtime_host& host = bt::default_runtime_host();
+    int first_calls = 0;
+    int second_calls = 0;
+
+    host.callbacks().register_action(
+        "test-async-seq-first",
+        [&first_calls](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+            ++first_calls;
+            return bt::status::success;
+        });
+    host.callbacks().register_action(
+        "test-async-seq-second",
+        [&second_calls](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+            ++second_calls;
+            return bt::status::success;
+        });
+
+    env_ptr env = create_global_env();
+    (void)eval_text("(define tree (bt.compile '(async-seq (act test-async-seq-first) (act test-async-seq-second))))", env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "running", "async-seq should yield running between children");
+    check(first_calls == 1, "async-seq first child should run once");
+    check(second_calls == 0, "async-seq should not tick second child on first tick");
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "success", "async-seq should complete on second tick");
+    check(first_calls == 1, "async-seq should not rerun first child on second tick");
+    check(second_calls == 1, "async-seq should tick second child on resume");
+}
+
+void test_bt_reactive_preemption_and_memoryless_regressions() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    bt::runtime_host& host = bt::default_runtime_host();
+    int seq_setup_calls = 0;
+    int sel_fail_calls = 0;
+
+    host.callbacks().register_action(
+        "test-seq-setup",
+        [&seq_setup_calls](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+            ++seq_setup_calls;
+            return bt::status::success;
+        });
+    host.callbacks().register_action(
+        "test-sel-fail",
+        [&sel_fail_calls](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+            ++sel_fail_calls;
+            return bt::status::failure;
+        });
+    host.callbacks().register_condition("test-gate",
+                                        [](bt::tick_context& ctx, std::span<const muslisp::value>) -> bool {
+                                            const bt::bb_entry* entry = ctx.bb_get("gate");
+                                            if (!entry) {
+                                                return false;
+                                            }
+                                            if (const bool* b = std::get_if<bool>(&entry->value)) {
+                                                return *b;
+                                            }
+                                            return false;
+                                        });
+    host.callbacks().register_condition("test-high-priority",
+                                        [](bt::tick_context& ctx, std::span<const muslisp::value>) -> bool {
+                                            const bt::bb_entry* entry = ctx.bb_get("high");
+                                            if (!entry) {
+                                                return false;
+                                            }
+                                            if (const bool* b = std::get_if<bool>(&entry->value)) {
+                                                return *b;
+                                            }
+                                            return false;
+                                        });
+
+    env_ptr env = create_global_env();
+
+    (void)eval_text("(define seq-tree (bt.compile '(seq (act test-seq-setup) (act running-then-success))))", env);
+    (void)eval_text("(define seq-inst (bt.new-instance seq-tree))", env);
+    check(symbol_name(eval_text("(bt.tick seq-inst)", env)) == "running", "seq tick1 should be running");
+    check(symbol_name(eval_text("(bt.tick seq-inst)", env)) == "success", "seq tick2 should succeed");
+    check(seq_setup_calls == 2, "seq should remain memoryless and restart from child 0");
+
+    (void)eval_text("(define sel-tree (bt.compile '(sel (act test-sel-fail) (act running-then-success))))", env);
+    (void)eval_text("(define sel-inst (bt.new-instance sel-tree))", env);
+    check(symbol_name(eval_text("(bt.tick sel-inst)", env)) == "running", "sel tick1 should be running");
+    check(symbol_name(eval_text("(bt.tick sel-inst)", env)) == "success", "sel tick2 should succeed");
+    check(sel_fail_calls == 2, "sel should remain memoryless and retry first child");
+
+    (void)eval_text("(define rseq-tree (bt.compile '(reactive-seq (cond test-gate) (act async-sleep-ms 200))))", env);
+    (void)eval_text("(define rseq-inst (bt.new-instance rseq-tree))", env);
+    check(symbol_name(eval_text("(bt.tick rseq-inst '((gate #t)))", env)) == "running", "reactive-seq tick1 should run");
+    check(symbol_name(eval_text("(bt.tick rseq-inst '((gate #f)))", env)) == "failure",
+          "reactive-seq tick2 should fail and preempt");
+    value rseq_trace = eval_text("(bt.trace.snapshot rseq-inst)", env);
+    check(string_value(rseq_trace).find("node_preempt") != std::string::npos, "reactive-seq should emit node_preempt");
+    check(string_value(rseq_trace).find("node_halt") != std::string::npos, "reactive-seq should emit node_halt");
+    check(string_value(rseq_trace).find("scheduler_cancel") != std::string::npos,
+          "reactive-seq should cancel scheduler-backed running subtree");
+
+    (void)eval_text("(define rsel-tree (bt.compile '(reactive-sel (cond test-high-priority) (act async-sleep-ms 200))))", env);
+    (void)eval_text("(define rsel-inst (bt.new-instance rsel-tree))", env);
+    check(symbol_name(eval_text("(bt.tick rsel-inst '((high #f)))", env)) == "running",
+          "reactive-sel tick1 should run low-priority child");
+    check(symbol_name(eval_text("(bt.tick rsel-inst '((high #t)))", env)) == "success",
+          "reactive-sel tick2 should switch to high-priority success");
+    value rsel_trace = eval_text("(bt.trace.snapshot rsel-inst)", env);
+    check(string_value(rsel_trace).find("node_preempt") != std::string::npos, "reactive-sel should emit node_preempt");
+    check(string_value(rsel_trace).find("scheduler_cancel") != std::string::npos,
+          "reactive-sel should cancel preempted low-priority subtree");
 }
 
 void test_bt_seq_and_running_semantics() {
@@ -2452,6 +2731,11 @@ int main() {
         {"vla builtins submit/poll/cancel/caps", test_vla_builtins_submit_poll_cancel_and_caps},
         {"vla bt nodes flow and cancel", test_vla_bt_nodes_flow_and_cancel},
         {"bt compile checks", test_bt_compile_checks},
+        {"bt new composite dsl roundtrip", test_bt_new_composite_dsl_roundtrip},
+        {"bt mem-seq semantics", test_bt_mem_seq_semantics},
+        {"bt mem-sel semantics", test_bt_mem_sel_semantics},
+        {"bt async-seq semantics", test_bt_async_seq_semantics},
+        {"bt reactive preemption + memoryless regressions", test_bt_reactive_preemption_and_memoryless_regressions},
         {"bt seq/running semantics", test_bt_seq_and_running_semantics},
         {"bt decorator semantics", test_bt_decorator_semantics},
         {"bt reset clears phase4 state", test_bt_reset_clears_phase4_state},

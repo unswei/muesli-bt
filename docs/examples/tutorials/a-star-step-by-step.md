@@ -247,3 +247,9 @@ The final section chooses start/goal, executes A*, and prints either a full path
 
 - [A* Example Overview](../a-star-search.md)
 - [Dijkstra Tutorial](dijkstra-step-by-step.md)
+
+## Full Source
+
+```lisp
+--8<-- "examples/repl_scripts/a-star-grid.lisp"
+```

@@ -35,6 +35,16 @@ python3 examples/_tools/plot_bt_timeline.py \
 - `examples/webots_epuck_obstacle/lisp/main.lisp`
 - `examples/webots_epuck_obstacle/lisp/bt_obstacle_wallfollow.lisp`
 
+## BT Source (Inline)
+
+```lisp
+--8<-- "examples/webots_epuck_obstacle/lisp/bt_obstacle_wallfollow.lisp"
+```
+
+Full source and walkthrough:
+
+- [Webots e-puck obstacle full source page](webots-epuck-obstacle-wall-following-source.md)
+
 ## Render BT DOT
 
 `main.lisp` exports `out/tree.dot` at startup.

@@ -44,6 +44,10 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.superfences
   - pymdownx.details
+  - pymdownx.snippets:
+      check_paths: true
+      base_path:
+        - .
 
 nav:
   - Home: index.md
@@ -64,6 +68,8 @@ nav:
           - Racecar: examples/pybullet-racecar.md
       - More Scripted Examples:
           - Hello BT: examples/hello-bt.md
+          - Memoryful Sequence Demo: examples/memoryful-sequence-demo.md
+          - Reactive Guard Demo: examples/reactive-guard-demo.md
           - Lisp Basics: examples/lisp-basics.md
           - A* Search: examples/a-star-search.md
           - A* Tutorial (Step By Step): examples/tutorials/a-star-step-by-step.md
@@ -78,6 +84,10 @@ nav:
           - VLA Stub BT: examples/vla-stub-bt.md
           - Hybrid VLA + Planner: examples/hybrid-vla-mcts.md
           - C++ Nodes: examples/cpp-nodes.md
+      - Full Source Walkthroughs:
+          - Webots e-puck Obstacle Source: examples/webots-epuck-obstacle-wall-following-source.md
+          - Webots e-puck Line Source: examples/webots-epuck-line-following-source.md
+          - PyBullet Racecar Source: examples/pybullet-racecar-source.md
   - Language:
       - Syntax: language/syntax.md
       - Semantics: language/semantics.md
@@ -87,6 +97,7 @@ nav:
       - Introduction: bt/intro.md
       - Syntax: bt/syntax.md
       - Semantics: bt/semantics.md
+      - BT.CPP Crosswalk: bt/cpp-crosswalk.md
       - Blackboard: bt/blackboard.md
       - Scheduler: bt/scheduler.md
       - Bounded-Time Planning (Legacy): bt/bounded-time-planning.md

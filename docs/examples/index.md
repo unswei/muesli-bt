@@ -8,6 +8,7 @@ Most examples follow the same pattern:
 2. run through a backend (simulator or robot)
 3. inspect JSONL logs and plots
 4. render BT DOT for structure debugging
+5. inspect source directly from docs pages (inline for short examples, linked full-source pages for longer demos)
 
 ## Webots
 
@@ -23,6 +24,8 @@ Most examples follow the same pattern:
 For pure Lisp algorithms and smaller BT samples, see:
 
 - [examples directory overview](https://github.com/unswei/muesli-bt/blob/main/examples/README.md)
+- [Memoryful Sequence Demo](memoryful-sequence-demo.md)
+- [Reactive Guard Demo](reactive-guard-demo.md)
 - [A* Search](a-star-search.md)
 - [Dijkstra + PQ](dijkstra-pq.md)
 - [PRM + PQ](prm-pq.md)

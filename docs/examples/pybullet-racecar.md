@@ -37,6 +37,16 @@ PYTHONPATH=build/dev/python \
 - `examples/pybullet_racecar/bt/racecar_bt.lisp`
 - runtime entry: `examples/pybullet_racecar/run_demo.py`
 
+## BT Source (Inline)
+
+```lisp
+--8<-- "examples/pybullet_racecar/bt/racecar_bt.lisp"
+```
+
+Full walkthrough:
+
+- [PyBullet racecar full source page](pybullet-racecar-source.md)
+
 ## Render BT DOT
 
 ```bash

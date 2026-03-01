@@ -25,12 +25,27 @@ public:
 
         const std::string form_name = muslisp::symbol_name(items[0]);
 
-        if (form_name == "seq" || form_name == "sel") {
+        if (form_name == "seq" || form_name == "sel" || form_name == "mem-seq" || form_name == "mem-sel" ||
+            form_name == "async-seq" || form_name == "reactive-seq" || form_name == "reactive-sel") {
             if (items.size() < 2) {
                 throw bt_compile_error(form_name + ": expects at least one child");
             }
             node n;
-            n.kind = (form_name == "seq") ? node_kind::seq : node_kind::sel;
+            if (form_name == "seq") {
+                n.kind = node_kind::seq;
+            } else if (form_name == "sel") {
+                n.kind = node_kind::sel;
+            } else if (form_name == "mem-seq") {
+                n.kind = node_kind::mem_seq;
+            } else if (form_name == "mem-sel") {
+                n.kind = node_kind::mem_sel;
+            } else if (form_name == "async-seq") {
+                n.kind = node_kind::async_seq;
+            } else if (form_name == "reactive-seq") {
+                n.kind = node_kind::reactive_seq;
+            } else {
+                n.kind = node_kind::reactive_sel;
+            }
             for (std::size_t i = 1; i < items.size(); ++i) {
                 n.children.push_back(compile_node(items[i]));
             }

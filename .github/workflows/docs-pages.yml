@@ -40,6 +40,12 @@ jobs:
       - name: Setup unified Python environment
         run: bash ./scripts/setup-python-env.sh .venv-py311
 
+      - name: Regenerate diagrams
+        run: ./scripts/gen_diagrams.sh
+
+      - name: Verify generated diagrams are committed
+        run: git diff --exit-code -- docs/diagrams/src docs/diagrams/gen
+
       - name: Build docs
         run: .venv-py311/bin/python -m mkdocs build --strict
 

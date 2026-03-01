@@ -1,19 +1,9 @@
 # Example: Fallback/Recovery BT
 
-```lisp
-(defbt tree
-  (sel
-    (seq
-      (cond target-visible)
-      (act approach-target)
-      (act grasp))
-    (act search-target)))
+Path: `examples/bt/recovery-bt.lisp`
 
-(define inst (bt.new-instance tree))
-(bt.tick inst)
-(bt.tick inst)
-(bt.tick inst)
-(bt.blackboard.dump inst)
+```lisp
+--8<-- "examples/bt/recovery-bt.lisp"
 ```
 
 Interpretation:

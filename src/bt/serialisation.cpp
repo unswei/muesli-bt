@@ -136,7 +136,7 @@ std::string read_string(std::ifstream& in, const std::string& where) {
 }
 
 bool is_valid_node_kind(std::uint8_t raw) {
-    return raw <= static_cast<std::uint8_t>(node_kind::vla_cancel);
+    return raw <= static_cast<std::uint8_t>(node_kind::reactive_sel);
 }
 
 bool is_valid_arg_kind(std::uint8_t raw) {
@@ -173,6 +173,16 @@ const char* node_kind_name(node_kind kind) {
             return "vla-wait";
         case node_kind::vla_cancel:
             return "vla-cancel";
+        case node_kind::mem_seq:
+            return "mem-seq";
+        case node_kind::mem_sel:
+            return "mem-sel";
+        case node_kind::async_seq:
+            return "async-seq";
+        case node_kind::reactive_seq:
+            return "reactive-seq";
+        case node_kind::reactive_sel:
+            return "reactive-sel";
     }
     return "unknown";
 }
@@ -241,8 +251,13 @@ void validate_definition(const definition& def) {
         switch (n.kind) {
             case node_kind::seq:
             case node_kind::sel:
+            case node_kind::mem_seq:
+            case node_kind::mem_sel:
+            case node_kind::async_seq:
+            case node_kind::reactive_seq:
+            case node_kind::reactive_sel:
                 if (n.children.empty()) {
-                    throw std::runtime_error("bt.load: seq/sel nodes require at least one child");
+                    throw std::runtime_error("bt.load: composite nodes require at least one child");
                 }
                 break;
             case node_kind::invert:

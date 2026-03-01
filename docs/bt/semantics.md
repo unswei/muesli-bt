@@ -56,6 +56,72 @@ Rules:
 
 Memoryless means it starts from child 0 on each tick.
 
+## `mem-seq` (sequence with memory)
+
+`mem-seq` resumes from the stored child index instead of restarting from child 0.
+
+Rules:
+
+- start from stored `child_index` (default 0)
+- if current child returns `success`, advance to next child in the same tick
+- if last child succeeds, reset `child_index` to 0 and return `success`
+- if current child returns `running`, keep `child_index` and return `running`
+- if current child returns `failure`, keep `child_index` and return `failure`
+
+This avoids redoing previously successful earlier steps.
+
+## `mem-sel` (fallback with memory)
+
+`mem-sel` resumes from the stored child index while a lower-priority child is running.
+
+Rules:
+
+- start from stored `child_index` (default 0)
+- evaluate children left-to-right from that index
+- on child `success`: reset index to 0 and return `success`
+- on child `running`: store index and return `running`
+- on child `failure`: continue to next child in the same tick
+- if all children fail: reset index to 0 and return `failure`
+
+This avoids retrying earlier failed children while a later child is still running.
+
+## `async-seq` (yielding sequence)
+
+`async-seq` intentionally yields between successful child boundaries.
+
+Rules:
+
+- tick current `child_index` (default 0)
+- child `success` on non-last child: advance index and return `running`
+- child `success` on last child: reset index to 0 and return `success`
+- child `running`: return `running`
+- child `failure`: reset index to 0 and return `failure`
+
+Use this under reactive parents when you want frequent guard re-check points.
+
+## `reactive-seq` (reactive sequence)
+
+`reactive-seq` always re-evaluates from child 0 every tick.
+
+Rules:
+
+- evaluate left-to-right from child 0 every tick
+- on first `failure`: return `failure`
+- on first `running`: return `running`
+- all children `success`: return `success`
+- if a different subtree was running in the prior tick and is no longer selected, the runtime calls `halt_subtree` best-effort
+
+## `reactive-sel` (reactive fallback)
+
+`reactive-sel` also restarts from child 0 every tick, preserving priority ordering.
+
+Rules:
+
+- evaluate children left-to-right every tick
+- first child returning `success` or `running` is returned immediately
+- if all children fail: return `failure`
+- if a lower-priority subtree was running in the prior tick and a higher-priority branch is now selected, pre-empt and halt the old running subtree best-effort
+
 ## Decorator Semantics
 
 ## `invert`
@@ -167,6 +233,9 @@ It does not implicitly clear trace/log buffers.
 ## Common Gotchas
 
 - `seq` and `sel` are memoryless.
+- `mem-seq` and `mem-sel` retain child progress in per-node instance memory.
+- `reactive-seq` and `reactive-sel` require haltable running leaves for clean pre-emption.
+- `async-seq` yields between steps by design; this is expected.
 - `running` is a status, not a thread.
 - long-running leaves should avoid blocking the tick thread.
 
@@ -175,3 +244,4 @@ It does not implicitly clear trace/log buffers.
 - [PlanAction Node Reference](plan-action-node.md)
 - [Planner Configuration Reference](planner-configuration.md)
 - [VLA BT Nodes](vla-nodes.md)
+- [BT.CPP Crosswalk](cpp-crosswalk.md)

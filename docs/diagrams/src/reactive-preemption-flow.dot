@@ -1,0 +1,27 @@
+digraph reactive_preemption_flow {
+  rankdir=TB;
+  graph [fontname="Helvetica", fontsize=11, labelloc=t, label="Reactive Composite Tick + Preemption"];
+  node [shape=box, style="rounded,filled", fillcolor="#fff7ed", color="#9a3412", fontname="Helvetica", fontsize=10];
+  edge [color="#9a3412", penwidth=1.2, fontname="Helvetica", fontsize=9];
+
+  tick [label="Tick N"];
+  eval [label="Evaluate from child 0"];
+  running [label="Current child returns running"];
+  prior [label="Was a different child running\nlast tick?"];
+  preempt [label="Emit node_preempt\ncall halt_subtree(old child)"];
+  halt [label="Emit node_halt\ncancel scheduler job / call halt callback"];
+  ret_running [label="Return running"];
+  fail [label="Earlier child fails"];
+  ret_fail [label="Return failure"];
+
+  tick -> eval;
+  eval -> running;
+  running -> prior;
+  prior -> preempt [label="yes"];
+  preempt -> halt;
+  halt -> ret_running;
+  prior -> ret_running [label="no"];
+  eval -> fail;
+  fail -> preempt;
+  fail -> ret_fail [label="no prior running child"];
+}

@@ -61,6 +61,10 @@ const char* trace_event_kind_name(trace_event_kind kind) noexcept {
             return "scheduler_finish";
         case trace_event_kind::scheduler_cancel:
             return "scheduler_cancel";
+        case trace_event_kind::node_halt:
+            return "node_halt";
+        case trace_event_kind::node_preempt:
+            return "node_preempt";
         case trace_event_kind::warning:
             return "warning";
         case trace_event_kind::error:

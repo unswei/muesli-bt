@@ -36,6 +36,16 @@ python3 examples/_tools/plot_planner_root.py \
 - `examples/webots_epuck_line/lisp/main.lisp`
 - `examples/webots_epuck_line/lisp/bt_line_follow.lisp`
 
+## BT Source (Inline)
+
+```lisp
+--8<-- "examples/webots_epuck_line/lisp/bt_line_follow.lisp"
+```
+
+Full source and walkthrough:
+
+- [Webots e-puck line full source page](webots-epuck-line-following-source.md)
+
 ## Render BT DOT
 
 `main.lisp` exports `out/tree.dot` at startup.

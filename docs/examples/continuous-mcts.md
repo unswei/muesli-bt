@@ -19,3 +19,9 @@ Run it with:
 ```
 
 It prints the selected action from a toy 1D continuous control problem (`x -> x + 0.25*a`, `a in [-1,1]`).
+
+## Source
+
+```lisp
+--8<-- "examples/repl_scripts/mcts-continuous.lisp"
+```

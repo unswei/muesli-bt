@@ -36,6 +36,12 @@ Step-by-step tutorial:
   - `f = g + h`: A* priority score
 - Parent links (`came`) allow goal-to-start backtracking and path reconstruction.
 
+## Source
+
+```lisp
+--8<-- "examples/repl_scripts/a-star-grid.lisp"
+```
+
 ## Expected Output Shape
 
 The script prints:
