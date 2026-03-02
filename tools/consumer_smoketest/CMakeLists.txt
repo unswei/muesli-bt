@@ -7,10 +7,6 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(muesli_bt CONFIG REQUIRED)
 
-if(NOT TARGET muesli_bt::integration_pybullet)
-  message(FATAL_ERROR "muesli_bt::integration_pybullet target is required for this smoketest")
-endif()
-
 if(NOT DEFINED muesli_bt_SHARE_DIR)
   message(FATAL_ERROR "muesli_bt_SHARE_DIR must be defined by muesli_btConfig.cmake")
 endif()
@@ -23,10 +19,16 @@ if(NOT EXISTS "${muesli_bt_SHARE_DIR}/schema/mbt.evt.v1.schema.json")
   message(FATAL_ERROR "missing installed schema: ${muesli_bt_SHARE_DIR}/schema/mbt.evt.v1.schema.json")
 endif()
 
-add_executable(mbt_inspector_smoketest main.cpp)
-target_link_libraries(mbt_inspector_smoketest PRIVATE muesli_bt::runtime muesli_bt::integration_pybullet)
+if(TARGET muesli_bt::integration_pybullet)
+  add_executable(mbt_inspector_smoketest main.cpp)
+  target_link_libraries(mbt_inspector_smoketest PRIVATE muesli_bt::runtime muesli_bt::integration_pybullet)
+endif()
 
 if(TARGET muesli_bt::integration_webots)
   add_executable(mbt_inspector_webots_smoketest webots_main.cpp)
   target_link_libraries(mbt_inspector_webots_smoketest PRIVATE muesli_bt::runtime muesli_bt::integration_webots)
+endif()
+
+if(NOT TARGET muesli_bt::integration_pybullet AND NOT TARGET muesli_bt::integration_webots)
+  message(FATAL_ERROR "At least one integration target is required for this smoketest")
 endif()

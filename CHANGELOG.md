@@ -11,6 +11,10 @@ Earlier development happened during rapid prototyping and was not recorded as a 
   - macOS arm64 (Apple Silicon) binary archive
   - GitHub Release assets with SHA256 checksums
 
+### Changed
+- Updated consumer smoketest CMake to support either optional integration target (`integration_pybullet` or `integration_webots`) instead of hard-requiring PyBullet in all contexts.
+- Updated docs-pages deploy job to run only on push to `main`, `master`, or `legacy` so manual non-default-branch verification runs do not fail at deploy time.
+
 ## [0.1.0] - 2026-03-02
 
 ### Added
