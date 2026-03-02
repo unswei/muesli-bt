@@ -218,6 +218,8 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 - [VLA nodes reference](docs/bt/vla-nodes.md)
 - [VLA request/response schema](docs/bt/vla-request-response.md)
 - [Observability](docs/observability/logging.md)
+- [Changelog](docs/changelog.md)
+- [TODO](docs/todo.md)
 - [Roadmap](docs/limitations-roadmap.md)
 
 Serve docs locally:

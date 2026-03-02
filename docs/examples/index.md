@@ -29,3 +29,6 @@ For pure Lisp algorithms and smaller BT samples, see:
 - [A* Search](a-star-search.md)
 - [Dijkstra + PQ](dijkstra-pq.md)
 - [PRM + PQ](prm-pq.md)
+
+Each scripted example page includes executable source directly from `examples/repl_scripts/*.lisp`
+using MkDocs snippets, so docs stay synced with runnable files.

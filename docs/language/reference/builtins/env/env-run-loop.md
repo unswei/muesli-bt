@@ -6,20 +6,35 @@
 
 Runs a [host](../../../../terminology.md#host)-managed control loop around `observe -> on_tick -> act -> step` with fallback/error handling.
 
+Supports single-episode and multi-episode execution.
+
 ## Arguments And Return
 
 - Arguments:
   - `config-map` with required keys `tick_hz`, `max_ticks`
   - `on-tick-fn` callable receiving one argument: observation map
-- Optional config keys: `episode_max`, `steps_per_tick`, `seed`, `realtime`, `safe_action`, `stop_on_success`, `success_predicate`, `log_path`, `observer`
+- Optional config keys: `episode_max`, `step_max`, `steps_per_tick`, `seed`, `realtime`, `safe_action`, `stop_on_success`, `success_predicate`, `log_path`, `observer`
 - Return map includes:
-  - `status` in `:ok | :stopped | :error`
-  - `episodes`
-  - `ticks`
-  - `reason`
+  - `status` in `:ok | :stopped | :error | :unsupported`
+  - `last_status`
+  - `ok`
+  - `error`
+  - `episodes_completed`
+  - `steps_total`
+  - `last_episode_steps`
+  - compatibility keys: `episodes`, `ticks`
+  - `message`, `reason`
   - `final_obs`
   - `fallback_count`
   - `overrun_count`
+
+## Episode Semantics
+
+- `episode_max` defaults to `1`.
+- `step_max` is the per-episode step cap.
+- If `step_max` is not provided, `max_ticks` is used as the per-episode cap.
+- For reset-capable backends, each episode starts with `env.reset` and its own step counter.
+- If `episode_max > 1` and backend reset is unsupported, `env.run-loop` returns `status :unsupported` with message `episode_max>1 requires env.reset capability`.
 
 ## Errors And Edge Cases
 
@@ -40,17 +55,20 @@ Runs a [host](../../../../terminology.md#host)-managed control loop around `obse
   (map.set! safe 'u (list 0.0 0.0))
   (map.set! cfg 'tick_hz 20)
   (map.set! cfg 'max_ticks 100)
+  (map.set! cfg 'step_max 100)
   (map.set! cfg 'safe_action safe)
   (env.run-loop cfg (lambda (obs) safe)))
 ```
 
-### Realistic
+### Multi-Episode
 
 ```lisp
 (begin
   (define cfg (map.make))
-  (map.set! cfg 'tick_hz 50)
-  (map.set! cfg 'max_ticks 500)
+  (map.set! cfg 'tick_hz 20)
+  (map.set! cfg 'max_ticks 200)
+  (map.set! cfg 'step_max 200)
+  (map.set! cfg 'episode_max 3)
   (map.set! cfg 'realtime #t)
   (env.run-loop
     cfg
@@ -65,6 +83,7 @@ Runs a [host](../../../../terminology.md#host)-managed control loop around `obse
 
 - If `on_tick` overruns, runtime uses last-good or safe action and continues.
 - On runtime error, one safety action + one step is attempted before returning `:error`.
+- `stop_on_success` controls whether success ends the run early or continues until `episode_max`/`step_max`.
 
 ## See Also
 

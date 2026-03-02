@@ -26,6 +26,9 @@ The docs build also runs the Python renderer automatically through an MkDocs pre
 CI verifies that each committed `docs/diagrams/src/*.dot` has a committed matching
 `docs/diagrams/gen/*.svg`.
 
+CI also regenerates diagrams and fails if that introduces a git diff, so committed
+SVG outputs must stay in sync with DOT sources.
+
 ## Tooling
 
 - required tool: Graphviz (`dot`)

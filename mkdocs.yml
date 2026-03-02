@@ -135,4 +135,6 @@ nav:
       - Extending: internals/extending.md
       - Testing And Verification: testing.md
       - Docs Coverage: docs-coverage.md
+  - Changelog: changelog.md
+  - TODO: todo.md
   - Roadmap: limitations-roadmap.md

@@ -45,6 +45,9 @@ A [host](../terminology.md#host) (backend) can implement this surface for Webots
 - deadlines per tick
 - fallback to last safe action when planning/control misses deadlines
 - structured tick records for logs/telemetry
+- multi-episode execution via `episode_max`/`step_max` when backend reset is supported
+
+If `episode_max > 1` and backend reset is unsupported, `env.run-loop` returns `:unsupported`.
 
 ## Formal Reference
 

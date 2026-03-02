@@ -719,6 +719,13 @@ value builtin_env_run_loop(const std::vector<value>& args) {
     if (max_ticks <= 0) {
         throw lisp_error("env.run-loop :max_ticks: expected > 0");
     }
+    std::int64_t step_max = max_ticks;
+    if (const auto step_max_opt = map_lookup_option(config, "step_max")) {
+        step_max = require_int(*step_max_opt, "env.run-loop :step_max");
+        if (step_max <= 0) {
+            throw lisp_error("env.run-loop :step_max: expected > 0");
+        }
+    }
 
     std::int64_t episode_max = 1;
     if (const auto episode_max_value = map_lookup_option(config, "episode_max")) {
@@ -794,34 +801,21 @@ value builtin_env_run_loop(const std::vector<value>& args) {
         throw lisp_error(std::string("env.run-loop: ") + e.what());
     }
 
-    if (backend->supports().reset) {
-        std::optional<std::int64_t> seed{};
-        if (const auto seed_opt = map_lookup_option(config, "seed")) {
-            seed = require_int(*seed_opt, "env.run-loop :seed");
-        } else if (runtime_state().seed.has_value()) {
-            seed = runtime_state().seed;
-        }
-        try {
-            obs = backend->reset(seed);
-        } catch (const std::exception& e) {
-            throw lisp_error(std::string("env.run-loop: reset failed: ") + e.what());
-        }
-        env_runtime_state& state = runtime_state();
-        ++state.episode;
-        state.step = 0;
-        state.time_origin = std::chrono::steady_clock::now();
-        state.next_deadline = std::chrono::steady_clock::time_point{};
-        enrich_observation(obs);
-        final_obs = obs;
+    const bool backend_supports_reset = backend->supports().reset;
+    std::optional<std::int64_t> seed{};
+    if (const auto seed_opt = map_lookup_option(config, "seed")) {
+        seed = require_int(*seed_opt, "env.run-loop :seed");
+    } else if (runtime_state().seed.has_value()) {
+        seed = runtime_state().seed;
     }
 
     const auto tick_period = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
         std::chrono::duration<double>(1.0 / static_cast<double>(tick_hz)));
-    std::int64_t episodes_completed = std::min<std::int64_t>(1, episode_max);
-    std::int64_t ticks = 0;
+    std::int64_t episodes_completed = 0;
+    std::int64_t steps_total = 0;
+    std::int64_t last_episode_steps = 0;
     std::int64_t fallback_count = 0;
     std::int64_t overrun_count = 0;
-    bool have_last_good_action = false;
     value last_good_action = make_nil();
     roots.add(&last_good_action);
 
@@ -832,127 +826,186 @@ value builtin_env_run_loop(const std::vector<value>& args) {
         result_roots.add(&final_obs);
 
         map_set_symbol(out, "status", make_symbol(status_symbol));
+        map_set_symbol(out, "last_status", make_symbol(status_symbol));
+        map_set_symbol(out, "ok", make_boolean(status_symbol != ":error" && status_symbol != ":unsupported"));
+        map_set_symbol(out, "error", make_boolean(status_symbol == ":error" || status_symbol == ":unsupported"));
         map_set_symbol(out, "episodes", make_integer(episodes_completed));
-        map_set_symbol(out, "ticks", make_integer(ticks));
+        map_set_symbol(out, "episodes_completed", make_integer(episodes_completed));
+        map_set_symbol(out, "ticks", make_integer(steps_total));
+        map_set_symbol(out, "steps_total", make_integer(steps_total));
+        map_set_symbol(out, "last_episode_steps", make_integer(last_episode_steps));
         map_set_symbol(out, "reason", make_string(reason));
+        map_set_symbol(out, "message", make_string(reason));
         map_set_symbol(out, "final_obs", final_obs);
         map_set_symbol(out, "fallback_count", make_integer(fallback_count));
         map_set_symbol(out, "overrun_count", make_integer(overrun_count));
         return out;
     };
 
-    for (std::int64_t k = 0; k < max_ticks; ++k) {
-        bool used_fallback = false;
-        bool overrun = false;
-        std::optional<std::string> tick_schema = schema_version;
-        const auto tick_started = std::chrono::steady_clock::now();
-
-        try {
-            obs = backend->observe();
-            enrich_observation(obs);
-            final_obs = obs;
-
-            on_tick_result = invoke_callable_unary(on_tick_fn, obs, "env.run-loop on_tick");
-            if (is_map(on_tick_result)) {
-                if (const auto on_tick_schema = map_lookup_option(on_tick_result, "schema_version")) {
-                    if (!is_string(*on_tick_schema)) {
-                        throw lisp_error("env.run-loop on_tick: schema_version must be string");
-                    }
-                    tick_schema = string_value(*on_tick_schema);
-                }
-            }
-
-            const auto action_candidate = extract_action_from_on_tick(on_tick_result);
-
-            // Use a per-tick deadline so long external pauses (e.g. paused simulator UI)
-            // do not permanently force fallback actions after resume.
-            const auto tick_deadline = tick_started + tick_period;
-            if (std::chrono::steady_clock::now() > tick_deadline) {
-                overrun = true;
-                ++overrun_count;
-            }
-
-            if (!overrun && action_candidate.has_value()) {
-                chosen_action = *action_candidate;
-                last_good_action = chosen_action;
-                have_last_good_action = true;
-            } else if (have_last_good_action) {
-                chosen_action = last_good_action;
-                used_fallback = true;
-                ++fallback_count;
-            } else if (has_safe_action) {
-                chosen_action = safe_action;
-                used_fallback = true;
-                ++fallback_count;
-            } else {
-                throw lisp_error("env.run-loop: no action returned and safe_action is not configured");
-            }
-
-            backend->act(chosen_action);
-            const bool can_continue = perform_step_and_pacing(*backend, tick_hz, realtime);
-            ++ticks;
-            const auto tick_finished = std::chrono::steady_clock::now();
-            const double tick_time_ms =
-                std::chrono::duration<double, std::milli>(tick_finished - tick_started).count();
-            const double tick_budget_ms = 1000.0 / static_cast<double>(tick_hz);
-
-            tick_record = build_tick_record(
-                ticks, obs, chosen_action, on_tick_result, tick_schema, tick_budget_ms, tick_time_ms, used_fallback, overrun, {});
-            emit_record(observer_fn, has_observer, log_path, tick_record);
-
-            if (!can_continue) {
-                return make_result(":stopped", "backend step returned false");
-            }
-
-            bool success = false;
-            if (has_success_predicate) {
-                success = is_truthy(invoke_callable_unary(success_predicate, obs, "env.run-loop success_predicate"));
-            } else {
-                success = obs_done(obs) || on_tick_result_indicates_success(on_tick_result);
-            }
-
-            if (stop_on_success && success) {
-                return make_result(":ok", "success predicate satisfied");
-            }
-        } catch (const std::exception& e) {
-            std::string error_reason = e.what();
-            safety_action = make_nil();
-            if (have_last_good_action) {
-                safety_action = last_good_action;
-            } else if (has_safe_action) {
-                safety_action = safe_action;
-            }
-
-            if (!is_nil(safety_action)) {
-                try {
-                    backend->act(safety_action);
-                    (void)perform_step_and_pacing(*backend, tick_hz, realtime);
-                } catch (const std::exception&) {
-                    // best effort
-                }
-            }
-
-            try {
-                final_obs = backend->observe();
-                enrich_observation(final_obs);
-            } catch (const std::exception&) {
-                final_obs = make_map();
-                enrich_observation(final_obs);
-            }
-
-            ++ticks;
-            const auto tick_finished = std::chrono::steady_clock::now();
-            const double tick_time_ms =
-                std::chrono::duration<double, std::milli>(tick_finished - tick_started).count();
-            const double tick_budget_ms = 1000.0 / static_cast<double>(tick_hz);
-            tick_record = build_tick_record(
-                ticks, final_obs, safety_action, on_tick_result, tick_schema, tick_budget_ms, tick_time_ms, true, overrun, error_reason);
-            emit_record(observer_fn, has_observer, log_path, tick_record);
-            return make_result(":error", error_reason);
-        }
+    if (episode_max > 1 && !backend_supports_reset) {
+        return make_result(":unsupported", "episode_max>1 requires env.reset capability");
     }
 
-    return make_result(":stopped", "max ticks reached");
+    for (std::int64_t episode_index = 0; episode_index < episode_max; ++episode_index) {
+        std::int64_t episode_steps = 0;
+        bool have_last_good_action = false;
+        last_good_action = make_nil();
+
+        if (backend_supports_reset) {
+            try {
+                obs = backend->reset(seed);
+            } catch (const std::exception& e) {
+                throw lisp_error(std::string("env.run-loop: reset failed: ") + e.what());
+            }
+            env_runtime_state& state = runtime_state();
+            ++state.episode;
+            state.step = 0;
+            state.time_origin = std::chrono::steady_clock::now();
+            state.next_deadline = std::chrono::steady_clock::time_point{};
+            enrich_observation(obs);
+            final_obs = obs;
+        }
+
+        for (std::int64_t k = 0; k < step_max; ++k) {
+            bool used_fallback = false;
+            bool overrun = false;
+            std::optional<std::string> tick_schema = schema_version;
+            const auto tick_started = std::chrono::steady_clock::now();
+
+            try {
+                obs = backend->observe();
+                enrich_observation(obs);
+                final_obs = obs;
+
+                on_tick_result = invoke_callable_unary(on_tick_fn, obs, "env.run-loop on_tick");
+                if (is_map(on_tick_result)) {
+                    if (const auto on_tick_schema = map_lookup_option(on_tick_result, "schema_version")) {
+                        if (!is_string(*on_tick_schema)) {
+                            throw lisp_error("env.run-loop on_tick: schema_version must be string");
+                        }
+                        tick_schema = string_value(*on_tick_schema);
+                    }
+                }
+
+                const auto action_candidate = extract_action_from_on_tick(on_tick_result);
+
+                // Use a per-tick deadline so long external pauses (e.g. paused simulator UI)
+                // do not permanently force fallback actions after resume.
+                const auto tick_deadline = tick_started + tick_period;
+                if (std::chrono::steady_clock::now() > tick_deadline) {
+                    overrun = true;
+                    ++overrun_count;
+                }
+
+                if (!overrun && action_candidate.has_value()) {
+                    chosen_action = *action_candidate;
+                    last_good_action = chosen_action;
+                    have_last_good_action = true;
+                } else if (have_last_good_action) {
+                    chosen_action = last_good_action;
+                    used_fallback = true;
+                    ++fallback_count;
+                } else if (has_safe_action) {
+                    chosen_action = safe_action;
+                    used_fallback = true;
+                    ++fallback_count;
+                } else {
+                    throw lisp_error("env.run-loop: no action returned and safe_action is not configured");
+                }
+
+                backend->act(chosen_action);
+                const bool can_continue = perform_step_and_pacing(*backend, tick_hz, realtime);
+                ++steps_total;
+                ++episode_steps;
+                const auto tick_finished = std::chrono::steady_clock::now();
+                const double tick_time_ms =
+                    std::chrono::duration<double, std::milli>(tick_finished - tick_started).count();
+                const double tick_budget_ms = 1000.0 / static_cast<double>(tick_hz);
+
+                tick_record = build_tick_record(steps_total,
+                                                obs,
+                                                chosen_action,
+                                                on_tick_result,
+                                                tick_schema,
+                                                tick_budget_ms,
+                                                tick_time_ms,
+                                                used_fallback,
+                                                overrun,
+                                                {});
+                emit_record(observer_fn, has_observer, log_path, tick_record);
+
+                if (!can_continue) {
+                    episodes_completed = episode_index + 1;
+                    last_episode_steps = episode_steps;
+                    return make_result(":stopped", "backend step returned false");
+                }
+
+                bool success = false;
+                if (has_success_predicate) {
+                    success = is_truthy(invoke_callable_unary(success_predicate, obs, "env.run-loop success_predicate"));
+                } else {
+                    success = obs_done(obs) || on_tick_result_indicates_success(on_tick_result);
+                }
+
+                if (stop_on_success && success) {
+                    episodes_completed = episode_index + 1;
+                    last_episode_steps = episode_steps;
+                    return make_result(":ok", "success predicate satisfied");
+                }
+            } catch (const std::exception& e) {
+                std::string error_reason = e.what();
+                safety_action = make_nil();
+                if (have_last_good_action) {
+                    safety_action = last_good_action;
+                } else if (has_safe_action) {
+                    safety_action = safe_action;
+                }
+
+                if (!is_nil(safety_action)) {
+                    try {
+                        backend->act(safety_action);
+                        (void)perform_step_and_pacing(*backend, tick_hz, realtime);
+                    } catch (const std::exception&) {
+                        // best effort
+                    }
+                }
+
+                try {
+                    final_obs = backend->observe();
+                    enrich_observation(final_obs);
+                } catch (const std::exception&) {
+                    final_obs = make_map();
+                    enrich_observation(final_obs);
+                }
+
+                ++steps_total;
+                ++episode_steps;
+                const auto tick_finished = std::chrono::steady_clock::now();
+                const double tick_time_ms =
+                    std::chrono::duration<double, std::milli>(tick_finished - tick_started).count();
+                const double tick_budget_ms = 1000.0 / static_cast<double>(tick_hz);
+                tick_record = build_tick_record(steps_total,
+                                                final_obs,
+                                                safety_action,
+                                                on_tick_result,
+                                                tick_schema,
+                                                tick_budget_ms,
+                                                tick_time_ms,
+                                                true,
+                                                overrun,
+                                                error_reason);
+                emit_record(observer_fn, has_observer, log_path, tick_record);
+                episodes_completed = episode_index + 1;
+                last_episode_steps = episode_steps;
+                return make_result(":error", error_reason);
+            }
+        }
+
+        ++episodes_completed;
+        last_episode_steps = episode_steps;
+    }
+
+    return make_result(":stopped", "episode_max reached");
 }
 
 }  // namespace

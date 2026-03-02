@@ -18,6 +18,7 @@
 #include "bt/runtime_host.hpp"
 #include "bt/trace.hpp"
 #include "muslisp/env.hpp"
+#include "muslisp/env_api.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/eval.hpp"
 #include "muslisp/gc.hpp"
@@ -2336,6 +2337,105 @@ public:
     std::vector<bt::racecar_tick_record> tick_records{};
 };
 
+muslisp::map_key test_symbol_key(const std::string& name) {
+    muslisp::map_key key;
+    key.type = muslisp::map_key_type::symbol;
+    key.text_data = name;
+    return key;
+}
+
+void test_map_set_symbol(muslisp::value map_obj, const std::string& key, muslisp::value v) {
+    map_obj->map_data[test_symbol_key(key)] = v;
+}
+
+class test_loop_backend final : public muslisp::env_backend {
+public:
+    explicit test_loop_backend(bool supports_reset, std::int64_t done_after_steps)
+        : supports_reset_(supports_reset), done_after_steps_(done_after_steps) {}
+
+    [[nodiscard]] muslisp::env_backend_supports supports() const override {
+        muslisp::env_backend_supports out;
+        out.reset = supports_reset_;
+        out.debug_draw = false;
+        out.headless = true;
+        out.realtime_pacing = false;
+        out.deterministic_seed = true;
+        return out;
+    }
+
+    void configure(muslisp::value opts) override {
+        if (!muslisp::is_map(opts)) {
+            throw std::runtime_error("configure: expected map");
+        }
+        ++configure_calls;
+    }
+
+    [[nodiscard]] muslisp::value reset(std::optional<std::int64_t> seed) override {
+        if (!supports_reset_) {
+            throw std::runtime_error("reset unsupported");
+        }
+        ++reset_calls;
+        if (seed.has_value()) {
+            last_seed = *seed;
+        }
+        steps_in_episode = 0;
+        return observe();
+    }
+
+    [[nodiscard]] muslisp::value observe() override {
+        ++observe_calls;
+        muslisp::value obs = muslisp::make_map();
+        muslisp::gc_root_scope roots(muslisp::default_gc());
+        roots.add(&obs);
+
+        test_map_set_symbol(obs, "obs_schema", muslisp::make_string("test.loop.obs.v1"));
+        test_map_set_symbol(obs, "t_ms", muslisp::make_integer(global_steps * 10));
+        test_map_set_symbol(obs, "done", muslisp::make_boolean(steps_in_episode >= done_after_steps_));
+        return obs;
+    }
+
+    void act(muslisp::value action) override {
+        if (!muslisp::is_map(action)) {
+            throw std::runtime_error("act: expected action map");
+        }
+        ++act_calls;
+    }
+
+    [[nodiscard]] bool step() override {
+        ++step_calls;
+        ++steps_in_episode;
+        ++global_steps;
+        return true;
+    }
+
+    bool supports_reset_ = false;
+    std::int64_t done_after_steps_ = 0;
+    std::int64_t configure_calls = 0;
+    std::int64_t reset_calls = 0;
+    std::int64_t observe_calls = 0;
+    std::int64_t act_calls = 0;
+    std::int64_t step_calls = 0;
+    std::int64_t steps_in_episode = 0;
+    std::int64_t global_steps = 0;
+    std::int64_t last_seed = 0;
+};
+
+void register_test_loop_backend(muslisp::registrar* r, void* user) {
+    (void)r;
+    auto* backend_ptr = static_cast<std::shared_ptr<muslisp::env_backend>*>(user);
+    if (!backend_ptr || !(*backend_ptr)) {
+        throw muslisp::lisp_error("test backend registration requires non-null backend");
+    }
+    muslisp::env_api_register_backend("loop-test", *backend_ptr);
+}
+
+muslisp::env_ptr create_env_with_test_loop_backend(const std::shared_ptr<muslisp::env_backend>& backend) {
+    muslisp::runtime_config config;
+    config.extension_register_hook = register_test_loop_backend;
+    config.extension_register_user = const_cast<std::shared_ptr<muslisp::env_backend>*>(&backend);
+    return muslisp::create_global_env(config);
+}
+
 void test_racecar_loop_contract() {
     using namespace muslisp;
 
@@ -2486,6 +2586,96 @@ void test_racecar_planner_model_and_sim_get_state_builtin() {
     check(action_vec && action_vec->size() >= 2, "racecar plan-action should output [steering throttle]");
 
     bt::clear_racecar_demo_state();
+}
+
+void test_env_run_loop_multi_episode_reset_true() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    auto backend = std::make_shared<test_loop_backend>(true, 1000);
+    env_ptr env = create_env_with_test_loop_backend(backend);
+
+    (void)eval_text("(env.attach \"loop-test\")", env);
+    (void)eval_text(
+        "(define on-tick-loop "
+        "  (lambda (obs) "
+        "    (begin "
+        "      (define a (map.make)) "
+        "      (map.set! a 'action_schema \"test.loop.action.v1\") "
+        "      (map.set! a 'u (list 0.0)) "
+        "      a)))",
+        env);
+
+    (void)eval_text(
+        "(define loop-multi-result "
+        "  (env.run-loop "
+        "    (begin "
+        "      (define cfg (map.make)) "
+        "      (map.set! cfg 'tick_hz 1000) "
+        "      (map.set! cfg 'max_ticks 99) "
+        "      (map.set! cfg 'step_max 2) "
+        "      (map.set! cfg 'episode_max 3) "
+        "      (map.set! cfg 'stop_on_success #f) "
+        "      cfg) "
+        "    on-tick-loop))",
+        env);
+
+    check(symbol_name(eval_text("(map.get loop-multi-result 'status ':none)", env)) == ":stopped",
+          "multi-episode run-loop should stop on episode_max");
+    check(integer_value(eval_text("(map.get loop-multi-result 'episodes_completed -1)", env)) == 3,
+          "multi-episode run-loop episodes_completed mismatch");
+    check(integer_value(eval_text("(map.get loop-multi-result 'steps_total -1)", env)) == 6,
+          "multi-episode run-loop steps_total mismatch");
+    check(integer_value(eval_text("(map.get loop-multi-result 'last_episode_steps -1)", env)) == 2,
+          "multi-episode run-loop last_episode_steps mismatch");
+    check(integer_value(eval_text("(map.get loop-multi-result 'episodes -1)", env)) == 3,
+          "multi-episode compatibility key episodes mismatch");
+    check(integer_value(eval_text("(map.get loop-multi-result 'ticks -1)", env)) == 6,
+          "multi-episode compatibility key ticks mismatch");
+    check(backend->reset_calls == 3, "multi-episode run-loop should reset at episode start");
+    check(backend->step_calls == 6, "multi-episode run-loop step count mismatch");
+}
+
+void test_env_run_loop_multi_episode_reset_false() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    auto backend = std::make_shared<test_loop_backend>(false, 1000);
+    env_ptr env = create_env_with_test_loop_backend(backend);
+
+    (void)eval_text("(env.attach \"loop-test\")", env);
+    (void)eval_text(
+        "(define on-tick-loop-unsupported "
+        "  (lambda (obs) "
+        "    (begin "
+        "      (define a (map.make)) "
+        "      (map.set! a 'action_schema \"test.loop.action.v1\") "
+        "      (map.set! a 'u (list 0.0)) "
+        "      a)))",
+        env);
+
+    (void)eval_text(
+        "(define loop-unsupported-result "
+        "  (env.run-loop "
+        "    (begin "
+        "      (define cfg (map.make)) "
+        "      (map.set! cfg 'tick_hz 1000) "
+        "      (map.set! cfg 'max_ticks 10) "
+        "      (map.set! cfg 'step_max 2) "
+        "      (map.set! cfg 'episode_max 2) "
+        "      cfg) "
+        "    on-tick-loop-unsupported))",
+        env);
+
+    check(symbol_name(eval_text("(map.get loop-unsupported-result 'status ':none)", env)) == ":unsupported",
+          "run-loop should return :unsupported when episode_max > 1 without reset support");
+    check(integer_value(eval_text("(map.get loop-unsupported-result 'episodes_completed -1)", env)) == 0,
+          "unsupported run-loop should not complete episodes");
+    check(integer_value(eval_text("(map.get loop-unsupported-result 'steps_total -1)", env)) == 0,
+          "unsupported run-loop should not step");
+    const std::string message = string_value(eval_text("(map.get loop-unsupported-result 'message \"\")", env));
+    check(message.find("requires env.reset capability") != std::string::npos,
+          "unsupported run-loop message should mention reset requirement");
 }
 
 void test_env_core_interface_unattached() {
@@ -2743,6 +2933,8 @@ int main() {
         {"bt scheduler-backed action", test_bt_scheduler_backed_action},
         {"bt tick with blackboard input", test_bt_tick_with_blackboard_input},
         {"env core interface unattached", test_env_core_interface_unattached},
+        {"env run-loop multi-episode reset=true", test_env_run_loop_multi_episode_reset_true},
+        {"env run-loop multi-episode reset=false", test_env_run_loop_multi_episode_reset_false},
         {"env generic pybullet backend contract", test_env_generic_pybullet_backend_contract},
         {"env run-loop log record shape", test_env_run_loop_log_record_shape},
         {"pybullet symbols absent in core env", test_pybullet_extension_symbols_absent_in_core_env},

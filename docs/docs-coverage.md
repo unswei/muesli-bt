@@ -63,6 +63,8 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] Code map internals -> [page](internals/code-map.md)
 - [x] Embedding/extending internals -> [page](internals/extending.md)
 - [x] Testing and verification -> [page](testing.md)
+- [x] Changelog -> [page](changelog.md)
+- [x] TODO -> [page](todo.md)
 - [x] Roadmap -> [page](limitations-roadmap.md)
 
 ## Special Forms

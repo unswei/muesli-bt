@@ -4,6 +4,21 @@ This guide shows the minimum work needed to connect a new simulator or robot.
 
 A backend is your [host](../terminology.md#host) integration layer for `env.*`.
 
+## Current State
+
+- Implemented: `env.api.v1` core capability built-ins (`env.info`, `env.attach`, `env.configure`, `env.reset`, `env.observe`, `env.act`, `env.step`, `env.run-loop`, `env.debug-draw`)
+- Implemented: `pybullet` backend adapter (racecar demo path)
+- Implemented: `webots` backend adapter (e-puck demo path, `reset=false`)
+- Planned: dedicated ROS2 backend module (not yet in-tree)
+
+Validation references:
+
+- env core contract tests: `tests/test_main.cpp` (`test_env_core_interface_unattached`)
+- env generic backend contract tests: `tests/test_main.cpp` (`test_env_generic_pybullet_backend_contract`)
+- multi-episode run-loop tests: `tests/test_main.cpp` (`test_env_run_loop_multi_episode_reset_true`, `test_env_run_loop_multi_episode_reset_false`)
+- pybullet backend extension: `examples/pybullet_racecar_common/extension.cpp`
+- webots backend extension: `examples/webots_epuck_common/muesli_epuck_controller_impl.cpp`
+
 ## Minimal Responsibilities
 
 1. expose `env.info` with backend name + schema ids
@@ -72,13 +87,22 @@ Use it when:
 
 ## Backend Checklist
 
-- [ ] `env.info` advertises schemas and capabilities
-- [ ] `env.observe` returns stable schema
-- [ ] `env.act` validates + clamps + reports errors
-- [ ] `env.step` advances exactly one control increment
-- [ ] fallback action is defined and tested
-- [ ] log records include tick index, action, and budget stats
-- [ ] one reproducible example script exists
+Implemented:
+- [x] `env.info` advertises backend capabilities
+- [x] `env.observe` returns stable schema maps with episode/step metadata
+- [x] `env.act` validates payloads and clamps bounds in demo backends
+- [x] `env.step` advances exactly one control increment
+- [x] fallback/last-good action handling in `env.run-loop`
+- [x] tick log records include action and budget timings
+- [x] reproducible demo scripts exist (PyBullet racecar, Webots e-puck variants)
+
+Planned:
+- [ ] dedicated ROS2 backend target and packaging
+- [ ] additional production backends beyond demo-focused adapters
+
+Known limitations:
+- [ ] backend-specific extension APIs still exist for legacy/demo compatibility (`env.pybullet.*`)
+- [ ] Webots backend currently reports `reset=false`
 
 ## Minimal Template
 
