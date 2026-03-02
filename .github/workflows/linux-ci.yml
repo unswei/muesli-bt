@@ -214,3 +214,71 @@ jobs:
 
       - name: Test
         run: ctest --preset dev
+
+  macos-webots-consumer-smoketest:
+    name: macos-webots-consumer-smoketest
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          brew update
+          brew install ninja
+          brew install --cask webots
+
+      - name: Discover Webots home
+        run: |
+          set -euo pipefail
+          if [ -d /Applications/Webots.app/Contents/lib/controller ]; then
+            echo "WEBOTS_HOME=/Applications/Webots.app" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          app_path="$(ls -d /Applications/Webots*.app 2>/dev/null | head -n 1 || true)"
+          if [ -z "$app_path" ] || [ ! -d "$app_path/Contents/lib/controller" ]; then
+            echo "Webots installation not found under /Applications"
+            exit 1
+          fi
+          echo "WEBOTS_HOME=${app_path}" >> "$GITHUB_ENV"
+
+      - name: Configure runtime install build (Webots enabled)
+        run: |
+          cmake -S . -B build/macos-webots-install -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/build/macos-webots-install-root" \
+            -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
+            -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=ON \
+            -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+            -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+
+      - name: Build and install runtime package
+        run: |
+          cmake --build build/macos-webots-install --parallel
+          cmake --install build/macos-webots-install
+
+      - name: Verify installed Webots integration artefacts
+        run: |
+          test -f build/macos-webots-install-root/lib/cmake/muesli_bt/muesli_btConfig.cmake
+          test -f build/macos-webots-install-root/lib/cmake/muesli_bt/muesli_btTargets.cmake
+          grep -q "muesli_bt::integration_webots" build/macos-webots-install-root/lib/cmake/muesli_bt/muesli_btTargets.cmake
+          test -f build/macos-webots-install-root/include/webots/extension.hpp
+
+      - name: Configure and build consumer smoketest
+        run: |
+          cmake -S tools/consumer_smoketest -B build/macos-webots-consumer -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${GITHUB_WORKSPACE}/build/macos-webots-install-root"
+          cmake --build build/macos-webots-consumer --parallel
+
+      - name: Verify runtime rpath shape and process start
+        run: |
+          set -euo pipefail
+          test -x ./build/macos-webots-consumer/mbt_inspector_webots_smoketest
+          otool -l ./build/macos-webots-consumer/mbt_inspector_webots_smoketest > build/macos-webots-consumer/otool.txt
+          if grep -A2 "LC_RPATH" build/macos-webots-consumer/otool.txt | grep -q "Contents/lib/controller$"; then
+            echo "invalid LC_RPATH points at Contents/lib/controller instead of Webots root"
+            exit 1
+          fi
+          WEBOTS_HOME="${WEBOTS_HOME}" ./build/macos-webots-consumer/mbt_inspector_webots_smoketest

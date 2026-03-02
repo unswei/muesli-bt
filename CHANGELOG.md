@@ -42,6 +42,8 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - CI install consumer-smoketest now builds/install package with integration enabled and validates installed integration artefacts.
 - Integration docs now define a stable C++ attach API path and explicit compatibility policy for inspector-facing API/schema changes.
 - CMake now detects missing Webots SDK and omits `integration_webots` cleanly (core/runtime still build and install).
+- Webots integration export now injects macOS runtime rpath to Webots root (not `Contents/lib/controller`) so downstream dyld lookup resolves `@rpath/Contents/lib/controller/*.dylib` correctly.
+- CI now includes a macOS Webots consumer smoketest that installs Webots, links `muesli_bt::integration_webots`, and runs the consumer binary to catch runtime linker regressions.
 
 ### Fixed
 - Eliminated docs/runtime drift where `episode_max` was documented but previously not executed as a true episode loop.

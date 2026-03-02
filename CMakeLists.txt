@@ -76,6 +76,7 @@ if(MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
 endif()
 
 set(MUESLI_BT_HAVE_WEBOTS OFF)
+set(MUESLI_BT_WEBOTS_RPATH_ROOT "")
 if(MUESLI_BT_BUILD_INTEGRATION_WEBOTS OR MUESLI_BT_BUILD_WEBOTS_EXAMPLES)
     find_path(WEBOTS_CPP_INCLUDE_DIR webots/Robot.hpp
         HINTS ENV WEBOTS_HOME "${WEBOTS_HOME}"
@@ -89,6 +90,26 @@ if(MUESLI_BT_BUILD_INTEGRATION_WEBOTS OR MUESLI_BT_BUILD_WEBOTS_EXAMPLES)
 
     if(WEBOTS_CPP_INCLUDE_DIR AND WEBOTS_CONTROLLER_LIBRARY AND WEBOTS_CPP_CONTROLLER_LIBRARY)
         set(MUESLI_BT_HAVE_WEBOTS ON)
+        if(APPLE)
+            if(WEBOTS_CPP_CONTROLLER_LIBRARY MATCHES "^(.+)/Contents/lib/controller/[^/]+$")
+                set(MUESLI_BT_WEBOTS_RPATH_ROOT "${CMAKE_MATCH_1}")
+            elseif(WEBOTS_CPP_INCLUDE_DIR MATCHES "^(.+)/Contents/include/controller/cpp$")
+                set(MUESLI_BT_WEBOTS_RPATH_ROOT "${CMAKE_MATCH_1}")
+            elseif(DEFINED ENV{WEBOTS_HOME} AND NOT "$ENV{WEBOTS_HOME}" STREQUAL "")
+                set(MUESLI_BT_WEBOTS_RPATH_ROOT "$ENV{WEBOTS_HOME}")
+            endif()
+
+            if(MUESLI_BT_WEBOTS_RPATH_ROOT STREQUAL "")
+                get_filename_component(_webots_controller_dir "${WEBOTS_CPP_CONTROLLER_LIBRARY}" DIRECTORY)
+                get_filename_component(_webots_lib_dir "${_webots_controller_dir}" DIRECTORY)
+                get_filename_component(_webots_contents_dir "${_webots_lib_dir}" DIRECTORY)
+                get_filename_component(MUESLI_BT_WEBOTS_RPATH_ROOT "${_webots_contents_dir}" DIRECTORY)
+            endif()
+
+            if(MUESLI_BT_WEBOTS_RPATH_ROOT MATCHES "/Contents$")
+                get_filename_component(MUESLI_BT_WEBOTS_RPATH_ROOT "${MUESLI_BT_WEBOTS_RPATH_ROOT}" DIRECTORY)
+            endif()
+        endif()
     endif()
 endif()
 
@@ -119,6 +140,15 @@ if(MUESLI_BT_BUILD_INTEGRATION_WEBOTS AND MUESLI_BT_HAVE_WEBOTS)
     )
     set_target_properties(muesli_bt_integration_webots PROPERTIES EXPORT_NAME integration_webots)
     target_compile_features(muesli_bt_integration_webots PUBLIC cxx_std_20)
+    if(APPLE)
+        if(MUESLI_BT_WEBOTS_RPATH_ROOT STREQUAL "")
+            message(FATAL_ERROR "Unable to derive Webots runtime rpath root for macOS integration export")
+        endif()
+        target_link_options(muesli_bt_integration_webots
+            INTERFACE
+                "LINKER:-rpath,${MUESLI_BT_WEBOTS_RPATH_ROOT}"
+        )
+    endif()
 endif()
 
 add_executable(muslisp src/main.cpp)
