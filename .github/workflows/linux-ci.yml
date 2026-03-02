@@ -162,6 +162,9 @@ jobs:
           test -f build/install-root/share/muesli_bt/contracts/muesli-studio-integration.md
           test -f build/install-root/share/muesli_bt/schema/mbt.evt.v1.schema.json
           grep -q "set(muesli_bt_SHARE_DIR " build/install-root/lib/cmake/muesli_bt/muesli_btConfig.cmake
+          if grep -q "muesli_bt::integration_webots" build/install-root/lib/cmake/muesli_bt/muesli_btTargets.cmake; then
+            test -f build/install-root/include/webots/extension.hpp
+          fi
 
       - name: Configure and build consumer smoketest
         run: |
@@ -171,7 +174,11 @@ jobs:
           cmake --build build/consumer-smoketest --parallel
 
       - name: Run consumer smoketest
-        run: ./build/consumer-smoketest/mbt_inspector_smoketest
+        run: |
+          ./build/consumer-smoketest/mbt_inspector_smoketest
+          if [ -x ./build/consumer-smoketest/mbt_inspector_webots_smoketest ]; then
+            ./build/consumer-smoketest/mbt_inspector_webots_smoketest
+          fi
 
   build-and-test:
     name: linux-${{ matrix.compiler }}

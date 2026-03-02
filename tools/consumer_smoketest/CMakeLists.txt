@@ -25,3 +25,8 @@ endif()
 
 add_executable(mbt_inspector_smoketest main.cpp)
 target_link_libraries(mbt_inspector_smoketest PRIVATE muesli_bt::runtime muesli_bt::integration_pybullet)
+
+if(TARGET muesli_bt::integration_webots)
+  add_executable(mbt_inspector_webots_smoketest webots_main.cpp)
+  target_link_libraries(mbt_inspector_webots_smoketest PRIVATE muesli_bt::runtime muesli_bt::integration_webots)
+endif()

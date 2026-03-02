@@ -19,6 +19,7 @@ This backlog is maintained forward from March 2, 2026.
   - [x] deterministic host test mode API available (fixed seed + stable event ordering)
   - [x] export integration target (`muesli_bt::integration_pybullet`) with installable headers
   - [x] downstream consumer smoke proves runtime+integration attach and tick path via installed/public headers
+  - [x] optional Webots integration target export (`muesli_bt::integration_webots`) with installable headers and attach API
   - [ ] add extended fixture coverage for asynchronous cancellation edge cases
   - [ ] add dedicated Studio compatibility matrix against release tags and `main`
 

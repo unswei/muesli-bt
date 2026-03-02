@@ -12,6 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(MUESLI_BT_BUILD_PYTHON_BRIDGE "Build the Python bridge module (muesli_bt_bridge)" OFF)
 option(MUESLI_BT_BUILD_WEBOTS_EXAMPLES "Build the Webots e-puck example controllers" OFF)
 option(MUESLI_BT_BUILD_INTEGRATION_PYBULLET "Build the PyBullet integration library" ON)
+option(MUESLI_BT_BUILD_INTEGRATION_WEBOTS "Build the Webots integration library" ON)
 
 add_library(muesli_bt_core
     src/bt/blackboard.cpp
@@ -74,13 +75,8 @@ if(MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
     target_compile_features(muesli_bt_integration_pybullet PUBLIC cxx_std_20)
 endif()
 
-add_executable(muslisp src/main.cpp)
-target_link_libraries(muslisp PRIVATE muesli_bt_core)
-
-set(MUESLI_BT_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/muesli_bt")
-set(MUESLI_BT_INSTALL_SHAREDIR "${CMAKE_INSTALL_DATADIR}/muesli_bt")
-
-if(MUESLI_BT_BUILD_WEBOTS_EXAMPLES)
+set(MUESLI_BT_HAVE_WEBOTS OFF)
+if(MUESLI_BT_BUILD_INTEGRATION_WEBOTS OR MUESLI_BT_BUILD_WEBOTS_EXAMPLES)
     find_path(WEBOTS_CPP_INCLUDE_DIR webots/Robot.hpp
         HINTS ENV WEBOTS_HOME "${WEBOTS_HOME}"
         PATH_SUFFIXES include/controller/cpp Contents/include/controller/cpp)
@@ -91,7 +87,48 @@ if(MUESLI_BT_BUILD_WEBOTS_EXAMPLES)
         HINTS ENV WEBOTS_HOME "${WEBOTS_HOME}"
         PATH_SUFFIXES lib/controller Contents/lib/controller)
 
-    if(NOT WEBOTS_CPP_INCLUDE_DIR OR NOT WEBOTS_CONTROLLER_LIBRARY OR NOT WEBOTS_CPP_CONTROLLER_LIBRARY)
+    if(WEBOTS_CPP_INCLUDE_DIR AND WEBOTS_CONTROLLER_LIBRARY AND WEBOTS_CPP_CONTROLLER_LIBRARY)
+        set(MUESLI_BT_HAVE_WEBOTS ON)
+    endif()
+endif()
+
+if(MUESLI_BT_BUILD_INTEGRATION_WEBOTS AND NOT MUESLI_BT_HAVE_WEBOTS)
+    message(WARNING
+        "MUESLI_BT_BUILD_INTEGRATION_WEBOTS=ON but Webots SDK was not found. "
+        "The integration_webots target will be omitted. Set WEBOTS_HOME to enable it."
+    )
+endif()
+
+if(MUESLI_BT_BUILD_INTEGRATION_WEBOTS AND MUESLI_BT_HAVE_WEBOTS)
+    add_library(muesli_bt_integration_webots
+        integrations/webots/extension.cpp
+    )
+
+    target_link_libraries(muesli_bt_integration_webots
+        PUBLIC
+            muesli_bt_core
+            ${WEBOTS_CPP_CONTROLLER_LIBRARY}
+            ${WEBOTS_CONTROLLER_LIBRARY}
+    )
+    target_include_directories(muesli_bt_integration_webots
+        PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/integrations>
+            $<BUILD_INTERFACE:${WEBOTS_CPP_INCLUDE_DIR}>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    )
+    set_target_properties(muesli_bt_integration_webots PROPERTIES EXPORT_NAME integration_webots)
+    target_compile_features(muesli_bt_integration_webots PUBLIC cxx_std_20)
+endif()
+
+add_executable(muslisp src/main.cpp)
+target_link_libraries(muslisp PRIVATE muesli_bt_core)
+
+set(MUESLI_BT_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/muesli_bt")
+set(MUESLI_BT_INSTALL_SHAREDIR "${CMAKE_INSTALL_DATADIR}/muesli_bt")
+
+if(MUESLI_BT_BUILD_WEBOTS_EXAMPLES)
+    if(NOT MUESLI_BT_HAVE_WEBOTS)
         message(FATAL_ERROR
             "MUESLI_BT_BUILD_WEBOTS_EXAMPLES=ON requires Webots controller headers and library. "
             "Set WEBOTS_HOME to your Webots installation path."
@@ -223,11 +260,27 @@ if(MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
     )
 endif()
 
+if(TARGET muesli_bt_integration_webots)
+    install(TARGETS muesli_bt_integration_webots
+        EXPORT muesli_btTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()
+
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 if(MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
     install(DIRECTORY integrations/pybullet/
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/pybullet
+        FILES_MATCHING PATTERN "*.hpp"
+    )
+endif()
+
+if(TARGET muesli_bt_integration_webots)
+    install(DIRECTORY integrations/webots/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/webots
         FILES_MATCHING PATTERN "*.hpp"
     )
 endif()

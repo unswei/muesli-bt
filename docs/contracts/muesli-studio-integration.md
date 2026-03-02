@@ -30,6 +30,9 @@ Required:
 - `muesli_btConfig.cmake` is installed
 - `muesli_btConfig.cmake` defines `muesli_bt_SHARE_DIR` to `${prefix}/share/muesli_bt`
 - public headers are installed under a stable include root
+- optional integration targets are exported when enabled and available:
+  - `muesli_bt::integration_pybullet`
+  - `muesli_bt::integration_webots`
 - installed share assets include:
   - `${prefix}/share/muesli_bt/contracts/muesli-studio-integration.md`
   - `${prefix}/share/muesli_bt/schema/mbt.evt.v1.schema.json`
@@ -48,6 +51,7 @@ Required capabilities include:
   - `muslisp::runtime_config::register_extension(...)`
   - `muslisp::create_global_env(runtime_config)`
   - integration adapter attach entry points (for example `bt::set_racecar_sim_adapter(...)` for PyBullet)
+  - Webots attach entry points (`muslisp::integrations::webots::make_extension(...)` and `bt::integrations::webots::install_callbacks(...)`)
 
 ### requirement 3: event callback contract
 
@@ -171,6 +175,23 @@ add_executable(mbt_inspector ...)
 target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_pybullet)
 ```
 
+Optional Webots integration target (when built and installed with `MUESLI_BT_BUILD_INTEGRATION_WEBOTS=ON` and Webots SDK is available):
+
+```cmake
+find_package(muesli_bt CONFIG REQUIRED)
+
+add_executable(mbt_inspector ...)
+target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_webots)
+```
+
+Optional-target probe pattern for downstream consumers:
+
+```cmake
+if(TARGET muesli_bt::integration_webots)
+  target_link_libraries(mbt_inspector PRIVATE muesli_bt::integration_webots)
+endif()
+```
+
 ### c++ integration attach flow
 
 ```cpp
@@ -180,6 +201,17 @@ muslisp::env_ptr env = muslisp::create_global_env(std::move(cfg));
 
 bt::set_racecar_sim_adapter(adapter);
 muslisp::eval_source("(env.attach \"pybullet\")", env);
+```
+
+Webots attach flow:
+
+```cpp
+muslisp::runtime_config cfg;
+cfg.register_extension(muslisp::integrations::webots::make_extension(robot_ptr));
+muslisp::env_ptr env = muslisp::create_global_env(std::move(cfg));
+
+bt::integrations::webots::install_callbacks(bt::default_runtime_host());
+muslisp::eval_source("(env.attach \"webots\")", env);
 ```
 
 ### event envelope

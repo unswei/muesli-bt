@@ -17,13 +17,13 @@ Validation references:
 - env generic backend contract tests: `tests/test_main.cpp` (`test_env_generic_pybullet_backend_contract`)
 - multi-episode run-loop tests: `tests/test_main.cpp` (`test_env_run_loop_multi_episode_reset_true`, `test_env_run_loop_multi_episode_reset_false`)
 - pybullet backend extension: `integrations/pybullet/extension.cpp`
-- webots backend extension: `examples/webots_epuck_common/muesli_epuck_controller_impl.cpp`
+- webots backend extension: `integrations/webots/extension.cpp`
 
 ## Stable C++ Attach API
 
 The supported attach path for integrations is:
 
-1. Link `muesli_bt::runtime` and integration target (for example `muesli_bt::integration_pybullet`).
+1. Link `muesli_bt::runtime` and integration target (for example `muesli_bt::integration_pybullet` or `muesli_bt::integration_webots`).
 2. Register integration extension through `muslisp::runtime_config::register_extension(...)`.
 3. Create environment through `muslisp::create_global_env(std::move(config))`.
 4. Attach backend in Lisp via `(env.attach "backend-name")`.
@@ -35,7 +35,7 @@ Public headers for this flow:
 - `muslisp/extensions.hpp`
 - `bt/runtime_host.hpp`
 - `bt/event_log.hpp`
-- integration headers (for PyBullet: `pybullet/extension.hpp`, `pybullet/racecar_demo.hpp`)
+- integration headers (for PyBullet: `pybullet/extension.hpp`, `pybullet/racecar_demo.hpp`; for Webots: `webots/extension.hpp`)
 
 Event callback interface for inspectors:
 

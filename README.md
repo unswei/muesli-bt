@@ -98,6 +98,23 @@ add_executable(mbt_inspector ...)
 target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_pybullet)
 ```
 
+If installed with `-DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=ON` and Webots SDK is available, the package exports `muesli_bt::integration_webots`:
+
+```cmake
+find_package(muesli_bt CONFIG REQUIRED)
+
+add_executable(mbt_inspector ...)
+target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_webots)
+```
+
+Downstream consumers can probe optional integration targets safely:
+
+```cmake
+if(TARGET muesli_bt::integration_webots)
+  target_link_libraries(mbt_inspector PRIVATE muesli_bt::integration_webots)
+endif()
+```
+
 muesli-studio pins to tagged muesli-bt releases; a scheduled CI job may test against `main`.
 
 ## Unified Python Environment (Docs + PyBullet)
