@@ -1,91 +1,77 @@
-muesli-bt install and consumption guide
-======================================
+muesli-bt install and consumption
+=================================
 
-This file documents the supported source install flow and downstream package
-consumption path for `muesli-bt`.
+For the authoritative guide, use:
+- `docs/getting-started-consume.md`
+- `docs/getting-started.md`
 
-1) build + install from source
-------------------------------
+This file is a short summary for source installs and package consumers.
+
+1) build and install runtime
+----------------------------
 
 Required tools:
 - CMake 3.20+
 - Ninja
 - C++20 compiler (`clang++` or `g++`)
 
-Runtime-only install (core package boundary):
+```bash
+cmake -S . -B build/install-core -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX="$PWD/build/install-root" \
+  -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
+  -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+  -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+  -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+cmake --build build/install-core --parallel
+cmake --install build/install-core
+```
 
-  cmake -S . -B build/install-core -G Ninja \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX="$PWD/build/install-root" \
-    -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
-    -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
-    -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
-    -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
-  cmake --build build/install-core --parallel
-  cmake --install build/install-core
+2) optional integration targets
+-------------------------------
 
-Installed package files include:
-- `${prefix}/lib/cmake/muesli_bt/muesli_btConfig.cmake`
-- `${prefix}/lib/cmake/muesli_bt/muesli_btTargets.cmake`
-- `${prefix}/include/**` public headers
-- `${prefix}/share/muesli_bt/contracts/muesli-studio-integration.md`
-- `${prefix}/share/muesli_bt/schema/mbt.evt.v1.schema.json`
+Enable PyBullet integration export:
+- `-DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON`
 
-2) optional integrations
-------------------------
+Enable Webots integration export:
+- `-DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=ON`
 
-PyBullet integration target export:
-
-  -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON
-
-Webots integration target export (requires Webots SDK available, for example
-`WEBOTS_HOME=/Applications/Webots.app` on macOS):
-
-  -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=ON
-
-If Webots SDK is not found, core runtime still builds and installs, and
+If the Webots SDK is not available, the runtime still builds/installs and
 `muesli_bt::integration_webots` is omitted.
 
 3) consume with find_package
 ----------------------------
 
-Point CMake to the install prefix:
+Point CMake at the install prefix:
+- `-DCMAKE_PREFIX_PATH="$PWD/build/install-root"`
 
-  -DCMAKE_PREFIX_PATH="$PWD/build/install-root"
+Minimal consumer `CMakeLists.txt`:
 
-Minimal consumer CMake:
+```cmake
+find_package(muesli_bt CONFIG REQUIRED)
 
-  find_package(muesli_bt CONFIG REQUIRED)
+add_executable(app main.cpp)
+target_link_libraries(app PRIVATE muesli_bt::runtime)
+```
 
-  add_executable(app main.cpp)
-  target_link_libraries(app PRIVATE muesli_bt::runtime)
+Optional integrations (when exported):
 
-Optional integration targets, when exported:
+```cmake
+if(TARGET muesli_bt::integration_pybullet)
+  target_link_libraries(app PRIVATE muesli_bt::integration_pybullet)
+endif()
 
-  if(TARGET muesli_bt::integration_pybullet)
-    target_link_libraries(app PRIVATE muesli_bt::integration_pybullet)
-  endif()
+if(TARGET muesli_bt::integration_webots)
+  target_link_libraries(app PRIVATE muesli_bt::integration_webots)
+endif()
+```
 
-  if(TARGET muesli_bt::integration_webots)
-    target_link_libraries(app PRIVATE muesli_bt::integration_webots)
-  endif()
+4) Studio contract and schema
+-----------------------------
 
-4) studio contract assets
--------------------------
+`muesli_btConfig.cmake` exports:
+- `muesli_bt_SHARE_DIR`
 
-`muesli_btConfig.cmake` defines:
-
-  muesli_bt_SHARE_DIR
-
-This points to `${prefix}/share/muesli_bt`, containing the installed Studio
-contract and canonical event schema.
-
-Authoritative contract page:
-- `docs/contracts/muesli-studio-integration.md`
-
-5) docs and contributor workflows
----------------------------------
-
-For developer setup, test, docs, and formatting workflows, use:
-- `docs/getting-started.md`
-- `CONTRIBUTING.md`
+The value points to `${prefix}/share/muesli_bt`, which contains:
+- contract: `contracts/muesli-studio-integration.md`
+- schema: `schema/mbt.evt.v1.schema.json`

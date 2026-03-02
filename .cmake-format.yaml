@@ -7,7 +7,7 @@ dangle_parens: true
 max_pargs_hwrap: 3
 max_lines_hwrap: 2
 command_case: lower
-keyword_case: lower
+keyword_case: upper
 always_wrap: []
 enable_sort: true
 autosort: true

@@ -1,25 +1,15 @@
 # contributing
 
-## what this is
-
-This page defines the minimum local workflow for building, testing, and
-documenting `muesli-bt` changes before opening a pull request.
-
-## when to use it
-
-Use this guide whenever you modify runtime code, integrations, docs, fixtures,
-or CI configuration.
+Keep changes small, testable, and documented in the same pull request.
 
 ## build
-
-Preset flow:
 
 ```bash
 cmake --preset dev
 cmake --build --preset dev --parallel
 ```
 
-Runtime boundary check (core only, integrations disabled):
+Core/runtime boundary check (no integrations):
 
 ```bash
 cmake --preset core-only
@@ -30,15 +20,10 @@ cmake --build --preset core-only --parallel
 
 ```bash
 ctest --preset dev
-```
-
-Core-only boundary test run:
-
-```bash
 ctest --preset core-only
 ```
 
-Schema + fixture validation:
+Validate canonical event fixtures:
 
 ```bash
 python tools/validate_event_log.py \
@@ -48,29 +33,14 @@ python tools/validate_event_log.py \
 
 ## docs
 
-Create/update the unified Python environment:
-
 ```bash
 ./scripts/setup-python-env.sh
-```
-
-Build docs in strict mode:
-
-```bash
 .venv-py311/bin/python -m mkdocs build --strict
 ```
 
-Serve docs locally:
+## formatting
 
-```bash
-.venv-py311/bin/python -m mkdocs serve
-```
-
-## formatting tools
-
-### clang-format
-
-Check or format C/C++ sources:
+Format C/C++:
 
 ```bash
 find include src integrations tests tools -type f \
@@ -78,26 +48,30 @@ find include src integrations tests tools -type f \
   -print0 | xargs -0 clang-format -i
 ```
 
-### cmake-format
-
-Format CMake files:
+Format CMake:
 
 ```bash
-cmake-format -i CMakeLists.txt cmake/muesli_btConfig.cmake.in tools/consumer_smoketest/CMakeLists.txt
+uvx --with pyyaml --from cmakelang cmake-format -i \
+  CMakeLists.txt \
+  cmake/muesli_btConfig.cmake.in \
+  tools/consumer_smoketest/CMakeLists.txt
 ```
 
-### line ending normalisation
-
-Use the repo normaliser to keep text files GitHub-readable:
+Normalise tracked text files:
 
 ```bash
 python3 scripts/normalise_text_files.py --check
 python3 scripts/normalise_text_files.py --apply
 ```
 
+## boundaries
+
+- keep `muesli_bt::runtime` embeddable and free of demo/example source dependencies
+- keep integrations optional (`muesli_bt::integration_pybullet`, `muesli_bt::integration_webots`)
+- keep demo-specific wiring out of core runtime registration paths
+
 ## pull request checklist
 
-- tests added/updated and passing
+- tests added or updated and passing
 - docs updated in the same change (no drift)
-- event schema and fixtures updated together when contract-relevant behaviour changes
-- runtime/integration boundaries preserved (`muesli_bt::runtime` remains embeddable)
+- event schema and fixtures updated together when runtime behaviour changes

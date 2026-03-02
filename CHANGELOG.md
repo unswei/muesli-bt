@@ -5,15 +5,7 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 
 ## [Unreleased]
 
-### Added
-- Added release workflow (`.github/workflows/release.yml`) that builds and publishes:
-  - Ubuntu x86_64 binary archive
-  - macOS arm64 (Apple Silicon) binary archive
-  - GitHub Release assets with SHA256 checksums
-
-### Changed
-- Updated consumer smoketest CMake to support either optional integration target (`integration_pybullet` or `integration_webots`) instead of hard-requiring PyBullet in all contexts.
-- Updated docs-pages deploy job to run only on push to `main`, `master`, or `legacy` so manual non-default-branch verification runs do not fail at deploy time.
+- No unreleased changes yet.
 
 ## [0.1.0] - 2026-03-02
 
@@ -41,6 +33,10 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - Added flagship demo visual assets under `docs/assets/demos/`.
 - Added deterministic fixture coverage for scheduler cancellation, VLA cancellation, deadline fallback, and reset-less unsupported loop semantics.
 - Added CI jobs for Linux docs strict mode, Linux core sanitizers (ASan/UBSan), and macOS core build/test.
+- Added release workflow (`.github/workflows/release.yml`) that builds and publishes:
+  - Ubuntu x86_64 binary archive
+  - macOS arm64 (Apple Silicon) binary archive
+  - GitHub Release assets with SHA256 checksums
 
 ### Changed
 - `env.run-loop` now supports real multi-episode execution when backend reset is available.
@@ -56,12 +52,14 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - CI install smoketest now verifies installed share assets and `muesli_bt_SHARE_DIR` export.
 - CMake package export now publishes integration target `muesli_bt::integration_pybullet` when built with `MUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON`.
 - CMake package export now publishes integration target `muesli_bt::integration_webots` when built with `MUESLI_BT_BUILD_INTEGRATION_WEBOTS=ON` and Webots SDK is available.
-- Consumer smoketest now requires `muesli_bt::runtime` + `muesli_bt::integration_pybullet`.
+- Consumer smoketest now supports `muesli_bt::runtime` plus whichever optional integration target is exported (`muesli_bt::integration_pybullet` or `muesli_bt::integration_webots`).
 - CI install consumer-smoketest now builds/install package with integration enabled and validates installed integration artefacts.
 - Integration docs now define a stable C++ attach API path and explicit compatibility policy for inspector-facing API/schema changes.
 - CMake now detects missing Webots SDK and omits `integration_webots` cleanly (core/runtime still build and install).
 - Webots integration export now injects macOS runtime rpath to Webots root (not `Contents/lib/controller`) so downstream dyld lookup resolves `@rpath/Contents/lib/controller/*.dylib` correctly.
 - CI now includes a macOS Webots consumer smoketest that installs Webots, links `muesli_bt::integration_webots`, and runs the consumer binary to catch runtime linker regressions.
+- Linux CI now runs on `release/*` branch pushes so release branch gates stay visible.
+- Docs Pages deploy now runs only on push to `main`, `master`, or `legacy` so manual non-default-branch verification runs do not fail at deploy time.
 - Updated `INSTALL.txt` to document the supported `cmake --install` and `find_package(muesli_bt CONFIG REQUIRED)` flow.
 - Updated docs home page with Studio/tool-builder callouts and flagship demo thumbnails.
 - Updated flagship demo pages with run recipes and behaviour-check guidance.
