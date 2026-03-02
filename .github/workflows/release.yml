@@ -144,7 +144,7 @@ jobs:
         run: |
           set -euo pipefail
           file build/install-macos/bin/muslisp | grep -q "arm64"
-          file build/install-macos/lib/libmuesli_bt_core.a | grep -q "arm64"
+          file build/release-macos/CMakeFiles/muesli_bt_core.dir/src/value.cpp.o | grep -q "arm64"
 
       - name: Package
         run: |
