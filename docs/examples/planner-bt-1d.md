@@ -17,7 +17,7 @@ What to look for:
 - `state` moves toward the goal
 - `action` is updated each tick
 - `plan-meta` contains compact planner diagnostics
-- `planner.logs.dump` returns JSON lines records
+- `events.dump` includes `planner_v1` records
 
 See also:
 

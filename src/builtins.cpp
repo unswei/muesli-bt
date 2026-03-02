@@ -184,6 +184,18 @@ void write_text_file(const std::string& path, const std::string& text, const std
     }
 }
 
+value events_dump_list(std::size_t max_count = 0) {
+    const auto lines = bt::default_runtime_host().events().snapshot(max_count);
+    std::vector<value> out;
+    out.reserve(lines.size());
+    gc_root_scope roots(default_gc());
+    for (const auto& line : lines) {
+        out.push_back(make_string(line));
+        roots.add(&out.back());
+    }
+    return list_from_vector(out);
+}
+
 struct numeric {
     bool is_int = false;
     std::int64_t int_value = 0;
@@ -2125,18 +2137,6 @@ value builtin_bt_stats(const std::vector<value>& args) {
     return make_string(bt::default_runtime_host().dump_instance_stats(inst_handle));
 }
 
-value builtin_bt_trace_dump(const std::vector<value>& args) {
-    require_arity("bt.trace.dump", args, 1);
-    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.trace.dump");
-    return make_string(bt::default_runtime_host().dump_instance_trace(inst_handle));
-}
-
-value builtin_bt_trace_snapshot(const std::vector<value>& args) {
-    require_arity("bt.trace.snapshot", args, 1);
-    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.trace.snapshot");
-    return make_string(bt::default_runtime_host().dump_instance_trace(inst_handle));
-}
-
 value builtin_bt_blackboard_dump(const std::vector<value>& args) {
     require_arity("bt.blackboard.dump", args, 1);
     const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.blackboard.dump");
@@ -2162,14 +2162,58 @@ value builtin_bt_blackboard_get(const std::vector<value>& args) {
     return bb_value_to_lisp_value(entry->value);
 }
 
-value builtin_bt_logs_dump(const std::vector<value>& args) {
-    require_arity("bt.logs.dump", args, 0);
-    return make_string(bt::default_runtime_host().dump_logs());
+value builtin_events_enable(const std::vector<value>& args) {
+    require_arity("events.enable", args, 1);
+    if (!is_boolean(args[0])) {
+        throw lisp_error("events.enable: expected boolean");
+    }
+    bt::default_runtime_host().events().set_enabled(boolean_value(args[0]));
+    return make_nil();
 }
 
-value builtin_bt_logs_snapshot(const std::vector<value>& args) {
-    require_arity("bt.logs.snapshot", args, 0);
-    return make_string(bt::default_runtime_host().dump_logs());
+value builtin_events_set_path(const std::vector<value>& args) {
+    require_arity("events.set-path", args, 1);
+    if (!is_string(args[0])) {
+        throw lisp_error("events.set-path: expected string path");
+    }
+    auto& events = bt::default_runtime_host().events();
+    events.set_path(string_value(args[0]));
+    events.set_file_enabled(true);
+    return make_nil();
+}
+
+value builtin_events_set_ring_size(const std::vector<value>& args) {
+    require_arity("events.set-ring-size", args, 1);
+    const std::int64_t raw = require_non_negative_int(args[0], "events.set-ring-size");
+    bt::default_runtime_host().events().set_ring_capacity(static_cast<std::size_t>(raw));
+    return make_nil();
+}
+
+value builtin_events_dump(const std::vector<value>& args) {
+    if (args.size() > 1) {
+        throw lisp_error("events.dump: expected 0 or 1 arguments");
+    }
+    std::size_t max_count = 0;
+    if (!args.empty()) {
+        const std::int64_t raw = require_non_negative_int(args[0], "events.dump");
+        max_count = static_cast<std::size_t>(raw);
+    }
+    return events_dump_list(max_count);
+}
+
+value builtin_events_snapshot_bb(const std::vector<value>& args) {
+    if (args.size() > 1) {
+        throw lisp_error("events.snapshot-bb: expected 0 or 1 arguments");
+    }
+    bool full = false;
+    if (!args.empty()) {
+        if (!is_boolean(args[0])) {
+            throw lisp_error("events.snapshot-bb: expected boolean when argument is provided");
+        }
+        full = boolean_value(args[0]);
+    }
+    bt::default_runtime_host().events().request_snapshot_bb(full);
+    return make_nil();
 }
 
 value builtin_bt_scheduler_stats(const std::vector<value>& args) {
@@ -2189,51 +2233,6 @@ value builtin_bt_set_tick_budget_ms(const std::vector<value>& args) {
         throw lisp_error("bt.set-tick-budget-ms: unknown instance");
     }
     bt::set_tick_budget_ms(*inst, integer_value(args[1]));
-    return make_nil();
-}
-
-value builtin_bt_set_trace_enabled(const std::vector<value>& args) {
-    require_arity("bt.set-trace-enabled", args, 2);
-    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.set-trace-enabled");
-    if (!is_boolean(args[1])) {
-        throw lisp_error("bt.set-trace-enabled: expected boolean");
-    }
-    bt::instance* inst = bt::default_runtime_host().find_instance(inst_handle);
-    if (!inst) {
-        throw lisp_error("bt.set-trace-enabled: unknown instance");
-    }
-    inst->trace_enabled = boolean_value(args[1]);
-    return make_nil();
-}
-
-value builtin_bt_set_read_trace_enabled(const std::vector<value>& args) {
-    require_arity("bt.set-read-trace-enabled", args, 2);
-    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.set-read-trace-enabled");
-    if (!is_boolean(args[1])) {
-        throw lisp_error("bt.set-read-trace-enabled: expected boolean");
-    }
-    bt::instance* inst = bt::default_runtime_host().find_instance(inst_handle);
-    if (!inst) {
-        throw lisp_error("bt.set-read-trace-enabled: unknown instance");
-    }
-    inst->read_trace_enabled = boolean_value(args[1]);
-    return make_nil();
-}
-
-value builtin_bt_clear_trace(const std::vector<value>& args) {
-    require_arity("bt.clear-trace", args, 1);
-    const std::int64_t inst_handle = require_bt_instance_handle(args[0], "bt.clear-trace");
-    bt::instance* inst = bt::default_runtime_host().find_instance(inst_handle);
-    if (!inst) {
-        throw lisp_error("bt.clear-trace: unknown instance");
-    }
-    inst->trace.clear();
-    return make_nil();
-}
-
-value builtin_bt_clear_logs(const std::vector<value>& args) {
-    require_arity("bt.clear-logs", args, 0);
-    bt::default_runtime_host().clear_logs();
     return make_nil();
 }
 
@@ -2423,42 +2422,6 @@ value builtin_vla_cancel(const std::vector<value>& args) {
     const bool cancelled =
         bt::default_runtime_host().vla_ref().cancel(static_cast<bt::vla_service::vla_job_id>(raw_id));
     return make_boolean(cancelled);
-}
-
-value builtin_vla_logs_dump(const std::vector<value>& args) {
-    if (args.size() > 1) {
-        throw lisp_error("vla.logs.dump: expected 0 or 1 arguments");
-    }
-    std::size_t max_count = 200;
-    if (!args.empty()) {
-        const std::int64_t raw = require_non_negative_int(args[0], "vla.logs.dump");
-        max_count = static_cast<std::size_t>(raw);
-    }
-    return make_string(bt::default_runtime_host().dump_vla_records(max_count));
-}
-
-value builtin_vla_set_log_path(const std::vector<value>& args) {
-    require_arity("vla.set-log-path", args, 1);
-    if (!is_string(args[0])) {
-        throw lisp_error("vla.set-log-path: expected string path");
-    }
-    bt::default_runtime_host().vla_ref().set_log_path(string_value(args[0]));
-    return make_nil();
-}
-
-value builtin_vla_set_log_enabled(const std::vector<value>& args) {
-    require_arity("vla.set-log-enabled", args, 1);
-    if (!is_boolean(args[0])) {
-        throw lisp_error("vla.set-log-enabled: expected boolean");
-    }
-    bt::default_runtime_host().vla_ref().set_log_enabled(boolean_value(args[0]));
-    return make_nil();
-}
-
-value builtin_vla_clear_logs(const std::vector<value>& args) {
-    require_arity("vla.clear-logs", args, 0);
-    bt::default_runtime_host().vla_ref().clear_records();
-    return make_nil();
 }
 
 std::uint64_t planner_seed_from_value(value seed_v, const std::string& where) {
@@ -2826,39 +2789,6 @@ value builtin_planner_plan(const std::vector<value>& args) {
     return out;
 }
 
-value builtin_planner_logs_dump(const std::vector<value>& args) {
-    if (args.size() > 1) {
-        throw lisp_error("planner.logs.dump: expected 0 or 1 arguments");
-    }
-    std::size_t max_count = 200;
-    if (!args.empty()) {
-        const std::int64_t raw = require_int_arg(args[0], "planner.logs.dump");
-        if (raw < 0) {
-            throw lisp_error("planner.logs.dump: expected non-negative max_count");
-        }
-        max_count = static_cast<std::size_t>(raw);
-    }
-    return make_string(bt::default_runtime_host().dump_planner_records(max_count));
-}
-
-value builtin_planner_set_log_path(const std::vector<value>& args) {
-    require_arity("planner.set-log-path", args, 1);
-    if (!is_string(args[0])) {
-        throw lisp_error("planner.set-log-path: expected string path");
-    }
-    bt::default_runtime_host().planner_ref().set_jsonl_path(string_value(args[0]));
-    return make_nil();
-}
-
-value builtin_planner_set_log_enabled(const std::vector<value>& args) {
-    require_arity("planner.set-log-enabled", args, 1);
-    if (!is_boolean(args[0])) {
-        throw lisp_error("planner.set-log-enabled: expected boolean");
-    }
-    bt::default_runtime_host().planner_ref().set_jsonl_enabled(boolean_value(args[0]));
-    return make_nil();
-}
-
 value builtin_planner_set_base_seed(const std::vector<value>& args) {
     require_arity("planner.set-base-seed", args, 1);
     const std::int64_t raw = require_int_arg(args[0], "planner.set-base-seed");
@@ -2931,16 +2861,14 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "vla.submit", builtin_vla_submit);
     bind_primitive(global_env, "vla.poll", builtin_vla_poll);
     bind_primitive(global_env, "vla.cancel", builtin_vla_cancel);
-    bind_primitive(global_env, "vla.logs.dump", builtin_vla_logs_dump);
-    bind_primitive(global_env, "vla.set-log-path", builtin_vla_set_log_path);
-    bind_primitive(global_env, "vla.set-log-enabled", builtin_vla_set_log_enabled);
-    bind_primitive(global_env, "vla.clear-logs", builtin_vla_clear_logs);
     bind_primitive(global_env, "planner.plan", builtin_planner_plan);
-    bind_primitive(global_env, "planner.logs.dump", builtin_planner_logs_dump);
-    bind_primitive(global_env, "planner.set-log-path", builtin_planner_set_log_path);
-    bind_primitive(global_env, "planner.set-log-enabled", builtin_planner_set_log_enabled);
     bind_primitive(global_env, "planner.set-base-seed", builtin_planner_set_base_seed);
     bind_primitive(global_env, "planner.get-base-seed", builtin_planner_get_base_seed);
+    bind_primitive(global_env, "events.enable", builtin_events_enable);
+    bind_primitive(global_env, "events.set-path", builtin_events_set_path);
+    bind_primitive(global_env, "events.set-ring-size", builtin_events_set_ring_size);
+    bind_primitive(global_env, "events.dump", builtin_events_dump);
+    bind_primitive(global_env, "events.snapshot-bb", builtin_events_snapshot_bb);
     install_env_capability_builtins(global_env);
 
     bind_primitive(global_env, "vec.make", builtin_vec_make);
@@ -2987,21 +2915,11 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "bt.status->symbol", builtin_bt_status_to_symbol);
 
     bind_primitive(global_env, "bt.stats", builtin_bt_stats);
-    bind_primitive(global_env, "bt.trace.dump", builtin_bt_trace_dump);
-    bind_primitive(global_env, "bt.trace.snapshot", builtin_bt_trace_snapshot);
     bind_primitive(global_env, "bt.blackboard.dump", builtin_bt_blackboard_dump);
     bind_primitive(global_env, "bt.blackboard.get", builtin_bt_blackboard_get);
-    bind_primitive(global_env, "bt.logs.dump", builtin_bt_logs_dump);
-    bind_primitive(global_env, "bt.logs.snapshot", builtin_bt_logs_snapshot);
-    bind_primitive(global_env, "bt.log.dump", builtin_bt_logs_dump);
-    bind_primitive(global_env, "bt.log.snapshot", builtin_bt_logs_snapshot);
     bind_primitive(global_env, "bt.scheduler.stats", builtin_bt_scheduler_stats);
 
     bind_primitive(global_env, "bt.set-tick-budget-ms", builtin_bt_set_tick_budget_ms);
-    bind_primitive(global_env, "bt.set-trace-enabled", builtin_bt_set_trace_enabled);
-    bind_primitive(global_env, "bt.set-read-trace-enabled", builtin_bt_set_read_trace_enabled);
-    bind_primitive(global_env, "bt.clear-trace", builtin_bt_clear_trace);
-    bind_primitive(global_env, "bt.clear-logs", builtin_bt_clear_logs);
 }
 
 }  // namespace muslisp

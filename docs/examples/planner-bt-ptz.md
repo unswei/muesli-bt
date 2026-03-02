@@ -19,7 +19,7 @@ Run:
 Outputs:
 
 - blackboard snapshot with `ptz-state`, `ptz-action`, `ptz-meta`
-- planner JSON records via `planner.logs.dump`
+- planner records via canonical `planner_v1` events
 
 Related:
 

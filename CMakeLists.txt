@@ -12,6 +12,7 @@ option(MUESLI_BT_BUILD_WEBOTS_EXAMPLES "Build the Webots e-puck example controll
 add_library(muesli_bt_core
     src/bt/blackboard.cpp
     src/bt/compiler.cpp
+    src/bt/event_log.cpp
     src/bt/instance.cpp
     src/bt/logging.cpp
     src/bt/planner.cpp

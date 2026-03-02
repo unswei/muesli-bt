@@ -98,11 +98,16 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 ### Planning services
 
 - [`planner.get-base-seed`](builtins/planner/planner-get-base-seed.md)
-- [`planner.logs.dump`](builtins/planner/planner-logs-dump.md)
 - [`planner.plan`](builtins/planner/planner-plan.md)
 - [`planner.set-base-seed`](builtins/planner/planner-set-base-seed.md)
-- [`planner.set-log-enabled`](builtins/planner/planner-set-log-enabled.md)
-- [`planner.set-log-path`](builtins/planner/planner-set-log-path.md)
+
+### Event stream
+
+- [`events.enable`](builtins/events/events-enable.md)
+- [`events.set-path`](builtins/events/events-set-path.md)
+- [`events.set-ring-size`](builtins/events/events-set-ring-size.md)
+- [`events.dump`](builtins/events/events-dump.md)
+- [`events.snapshot-bb`](builtins/events/events-snapshot-bb.md)
 
 ### Environment capability interface
 
@@ -133,10 +138,6 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`vla.submit`](builtins/vla/vla-submit.md)
 - [`vla.poll`](builtins/vla/vla-poll.md)
 - [`vla.cancel`](builtins/vla/vla-cancel.md)
-- [`vla.logs.dump`](builtins/vla/vla-logs-dump.md)
-- [`vla.set-log-path`](builtins/vla/vla-set-log-path.md)
-- [`vla.set-log-enabled`](builtins/vla/vla-set-log-enabled.md)
-- [`vla.clear-logs`](builtins/vla/vla-clear-logs.md)
 
 ### Mutable vectors
 
@@ -182,27 +183,17 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 ### BT integration primitives
 
 - [`bt.blackboard.dump`](builtins/bt/bt-blackboard-dump.md)
-- [`bt.clear-logs`](builtins/bt/bt-clear-logs.md)
-- [`bt.clear-trace`](builtins/bt/bt-clear-trace.md)
 - [`bt.compile`](builtins/bt/bt-compile.md)
 - [`bt.export-dot`](builtins/bt/bt-export-dot.md)
 - [`bt.load`](builtins/bt/bt-load.md)
 - [`bt.load-dsl`](builtins/bt/bt-load-dsl.md)
-- [`bt.log.dump`](builtins/bt/bt-log-dump.md)
-- [`bt.log.snapshot`](builtins/bt/bt-log-snapshot.md)
-- [`bt.logs.dump`](builtins/bt/bt-logs-dump.md)
-- [`bt.logs.snapshot`](builtins/bt/bt-logs-snapshot.md)
 - [`bt.new-instance`](builtins/bt/bt-new-instance.md)
 - [`bt.reset`](builtins/bt/bt-reset.md)
 - [`bt.save`](builtins/bt/bt-save.md)
 - [`bt.save-dsl`](builtins/bt/bt-save-dsl.md)
 - [`bt.scheduler.stats`](builtins/bt/bt-scheduler-stats.md)
-- [`bt.set-read-trace-enabled`](builtins/bt/bt-set-read-trace-enabled.md)
 - [`bt.set-tick-budget-ms`](builtins/bt/bt-set-tick-budget-ms.md)
-- [`bt.set-trace-enabled`](builtins/bt/bt-set-trace-enabled.md)
 - [`bt.stats`](builtins/bt/bt-stats.md)
 - [`bt.status->symbol`](builtins/bt/bt-status-to-symbol.md)
 - [`bt.tick`](builtins/bt/bt-tick.md)
 - [`bt.to-dsl`](builtins/bt/bt-to-dsl.md)
-- [`bt.trace.dump`](builtins/bt/bt-trace-dump.md)
-- [`bt.trace.snapshot`](builtins/bt/bt-trace-snapshot.md)

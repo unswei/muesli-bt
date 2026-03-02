@@ -15,7 +15,7 @@ Coverage includes:
 - BT compile checks
 - BT runtime status propagation
 - decorators and reset behaviour
-- blackboard, trace, logs, scheduler stats
+- blackboard, canonical events, scheduler stats
 - bounded-time planner service (`planner.plan`) and `plan-action` node semantics
 - async capability/VLA surface (`cap.*`, `vla.*`, handle metadata, JSON conversion)
 - VLA BT nodes (`vla-request`, `vla-wait`, `vla-cancel`) including cancel flow
@@ -48,5 +48,5 @@ Recommended integration checks before merging:
 
 1. compile and tick a small BT from Lisp
 2. run at least one action that returns `running` before `success`
-3. inspect `bt.trace.snapshot` and `bt.blackboard.dump`
+3. inspect `events.dump` and `bt.blackboard.dump`
 4. run both clang and gcc builds (local or CI matrix)

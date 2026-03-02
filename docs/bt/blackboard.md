@@ -63,13 +63,13 @@ Each key stores:
 Inspectable means you can:
 
 - view current key/value state (`bt.blackboard.dump`)
-- inspect write history through trace events (`bb_write`)
+- inspect write history through canonical events (`bb_write`)
 - identify writer node id/name from metadata and trace
 
-Optional read tracing (`bb_read`) can be enabled with:
+To emit a snapshot event, request one before the next tick:
 
 ```lisp
-(bt.set-read-trace-enabled inst #t)
+(events.snapshot-bb)
 ```
 
 ## Practical Key Conventions

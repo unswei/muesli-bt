@@ -14,7 +14,7 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - `env.run-loop` now supports `step_max` as a per-episode step cap (`max_ticks` remains a compatibility key).
 - `env.run-loop` result map now includes `episodes_completed`, `steps_total`, `last_episode_steps`, `last_status`, `ok`, and `error`.
 - Integration/backend docs were updated to reflect actual backend implementation status and capabilities.
-- `.instructions` env adapter spec now documents name-based `env.attach`.
+- Environment adapter specification now documents name-based `env.attach`.
 
 ### Fixed
 - Eliminated docs/runtime drift where `episode_max` was documented but previously not executed as a true episode loop.

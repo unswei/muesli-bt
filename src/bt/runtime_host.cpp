@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <thread>
@@ -126,11 +127,35 @@ std::int64_t status_to_memory(job_status st) {
 runtime_host::runtime_host()
     : scheduler_(0),
       logs_(4096),
+      events_(8192),
       vla_(&scheduler_),
       owned_clock_(std::make_unique<system_clock_service>()),
       owned_robot_(std::make_unique<demo_robot_service>()) {
     clock_ = owned_clock_.get();
     robot_ = owned_robot_.get();
+    events_.set_host_info("muesli-bt", "dev", "native");
+    events_.set_run_id("run-" + std::to_string(
+                                std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    std::chrono::system_clock::now().time_since_epoch())
+                                    .count()));
+    planner_.set_record_listener([this](const planner_record& rec, const std::string& json) {
+        std::optional<std::uint64_t> tick{};
+        if (rec.tick_index > 0) {
+            tick = rec.tick_index;
+        }
+        std::string data = std::string("{\"record\":") + json + '}';
+        (void)events_.emit("planner_v1", tick, data);
+    });
+    vla_.set_record_listener([this](const vla_record& rec, const std::string& json) {
+        std::optional<std::uint64_t> tick{};
+        if (rec.tick_index > 0) {
+            tick = rec.tick_index;
+        }
+        std::ostringstream data;
+        data << "{\"job_id\":\"" << rec.request_hash << "\",\"node_id\":0,\"status\":\"" << rec.status
+             << "\",\"digest\":\"" << event_log::hash64_hex(json) << "\",\"record\":" << json << '}';
+        (void)events_.emit("vla_result", tick, data.str());
+    });
 }
 
 std::int64_t runtime_host::store_definition(definition def) {
@@ -149,6 +174,7 @@ std::int64_t runtime_host::create_instance(std::int64_t definition_handle) {
     auto inst = std::make_unique<instance>(def);
     inst->instance_handle = handle;
     set_tick_budget_ms(*inst, 20);
+    events_.emit_bt_def(*def);
     instances_[handle] = std::move(inst);
     return handle;
 }
@@ -183,6 +209,7 @@ status runtime_host::tick_instance(std::int64_t handle) {
     svc.sched = &scheduler_;
     svc.obs.trace = &inst->trace;
     svc.obs.logger = &logs_;
+    svc.obs.events = &events_;
     svc.clock = clock_;
     svc.robot = robot_;
     svc.planner = &planner_;
@@ -239,6 +266,14 @@ const memory_log_sink& runtime_host::logs() const noexcept {
     return logs_;
 }
 
+event_log& runtime_host::events() noexcept {
+    return events_;
+}
+
+const event_log& runtime_host::events() const noexcept {
+    return events_;
+}
+
 void runtime_host::set_clock_interface(clock_interface* clock) noexcept {
     clock_ = clock ? clock : owned_clock_.get();
 }
@@ -265,6 +300,7 @@ const robot_interface* runtime_host::robot_interface_ptr() const noexcept {
 
 void runtime_host::clear_logs() {
     logs_.clear();
+    events_.clear_ring();
 }
 
 void runtime_host::clear_all() {
@@ -272,6 +308,7 @@ void runtime_host::clear_all() {
     instances_.clear();
     registry_.clear();
     logs_.clear();
+    events_.clear_ring();
     planner_.clear_records();
     vla_.clear_records();
 }
@@ -316,11 +353,9 @@ std::string runtime_host::dump_scheduler_stats() const {
 
 std::string runtime_host::dump_logs() const {
     std::ostringstream out;
-    for (const log_record& rec : logs_.snapshot()) {
-        out << rec.sequence << " level=" << log_level_name(rec.level) << " ts_ns="
-            << std::chrono::duration_cast<std::chrono::nanoseconds>(rec.ts.time_since_epoch()).count()
-            << " tick=" << rec.tick_index << " node=" << rec.node << " category=" << rec.category
-            << " msg=" << rec.message << '\n';
+    const auto events = events_.snapshot();
+    for (const auto& line : events) {
+        out << line << '\n';
     }
     return out.str();
 }

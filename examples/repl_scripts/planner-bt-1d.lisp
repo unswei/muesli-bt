@@ -1,5 +1,4 @@
 (planner.set-base-seed 4242)
-(planner.set-log-enabled #t)
 
 (defbt one-d-control
   (sel
@@ -39,4 +38,4 @@
 
 ;; Inspect current planner output and state.
 (bt.blackboard.dump inst)
-(planner.logs.dump 12)
+(events.dump 24)

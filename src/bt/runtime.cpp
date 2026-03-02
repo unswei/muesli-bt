@@ -42,6 +42,33 @@ trace_buffer* resolve_trace_buffer(tick_context& ctx) {
     return &ctx.inst.trace;
 }
 
+event_log* resolve_event_log(tick_context& ctx) {
+    return ctx.svc.obs.events;
+}
+
+std::string status_json(status st) {
+    return std::string("\"") + status_name(st) + "\"";
+}
+
+void emit_event_error(tick_context& ctx,
+                      std::string_view severity,
+                      std::string_view component,
+                      std::string message,
+                      std::optional<node_id> node = std::nullopt) {
+    event_log* events = resolve_event_log(ctx);
+    if (!events) {
+        return;
+    }
+    std::ostringstream data;
+    data << "{\"severity\":\"" << event_log::json_escape(severity) << "\",\"component\":\""
+         << event_log::json_escape(component) << "\",";
+    if (node.has_value()) {
+        data << "\"node_id\":" << *node << ',';
+    }
+    data << "\"message\":\"" << event_log::json_escape(message) << "\"}";
+    (void)events->emit("error", ctx.tick_index, data.str());
+}
+
 void emit_trace(tick_context& ctx, trace_event ev) {
     if (!ctx.inst.trace_enabled) {
         return;
@@ -69,6 +96,20 @@ void emit_log(tick_context& ctx, log_level level, std::string category, std::str
     rec.category = std::move(category);
     rec.message = std::move(message);
     ctx.svc.obs.logger->write(rec);
+
+    event_log* events = resolve_event_log(ctx);
+    if (!events) {
+        return;
+    }
+    const char* severity = "info";
+    if (level == log_level::debug) {
+        severity = "debug";
+    } else if (level == log_level::warn) {
+        severity = "warn";
+    } else if (level == log_level::error) {
+        severity = "error";
+    }
+    emit_event_error(ctx, severity, category, rec.message, ctx.current_node);
 }
 
 node_profile_stats& node_stats_for(instance& inst, const node& n) {
@@ -187,6 +228,55 @@ bb_value action_to_blackboard(const planner_action& action) {
         return bb_value{action.u[0]};
     }
     return bb_value{action.u};
+}
+
+std::string bb_value_json(const bb_value& value) {
+    return std::visit(
+        [](const auto& v) -> std::string {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, std::monostate>) {
+                return "null";
+            } else if constexpr (std::is_same_v<T, bool>) {
+                return v ? "true" : "false";
+            } else if constexpr (std::is_same_v<T, std::int64_t>) {
+                return std::to_string(v);
+            } else if constexpr (std::is_same_v<T, double>) {
+                std::ostringstream out;
+                out << v;
+                return out.str();
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                return "\"" + event_log::json_escape(v) + "\"";
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                std::ostringstream out;
+                out << '[';
+                for (std::size_t i = 0; i < v.size(); ++i) {
+                    if (i != 0) {
+                        out << ',';
+                    }
+                    out << v[i];
+                }
+                out << ']';
+                return out.str();
+            } else if constexpr (std::is_same_v<T, image_handle_ref>) {
+                return "{\"image_handle\":" + std::to_string(v.id) + "}";
+            } else if constexpr (std::is_same_v<T, blob_handle_ref>) {
+                return "{\"blob_handle\":" + std::to_string(v.id) + "}";
+            } else {
+                return "null";
+            }
+        },
+        value);
+}
+
+std::string bb_preview_json(const bb_value& value) {
+    constexpr std::size_t kMaxPreviewBytes = 4096;
+    const std::string preview = bb_value_json(value);
+    if (preview.size() <= kMaxPreviewBytes) {
+        return preview;
+    }
+    std::ostringstream out;
+    out << "{\"_truncated\":true,\"_type\":\"" << bb_value_type_name(value) << "\",\"_bytes\":" << preview.size() << '}';
+    return out.str();
 }
 
 std::string plan_meta_to_json(const planner_result& result, const planner_request& request) {
@@ -650,6 +740,14 @@ public:
         ev.node_status = status_;
         ev.duration = elapsed;
         emit_trace(ctx_, std::move(ev));
+
+        event_log* events = resolve_event_log(ctx_);
+        if (events) {
+            std::ostringstream data;
+            data << "{\"root_status\":" << status_json(status_) << ",\"tick_ms\":"
+                 << (static_cast<double>(elapsed.count()) / 1'000'000.0) << '}';
+            (void)events->emit("tick_end", ctx_.tick_index, data.str());
+        }
     }
 
 private:
@@ -693,6 +791,14 @@ public:
         ev.node_status = status_;
         ev.duration = elapsed;
         emit_trace(ctx_, std::move(ev));
+
+        event_log* events = resolve_event_log(ctx_);
+        if (events) {
+            std::ostringstream data;
+            data << "{\"node_id\":" << node_.id << ",\"status\":" << status_json(status_)
+                 << ",\"dur_ms\":" << (static_cast<double>(elapsed.count()) / 1'000'000.0) << '}';
+            (void)events->emit("node_status", ctx_.tick_index, data.str());
+        }
 
         ctx_.current_node = prev_node_;
     }
@@ -1212,6 +1318,12 @@ status execute_vla_request(const node& n, tick_context& ctx, const std::vector<m
     const vla_service::vla_job_id id = ctx.svc.vla->submit(request);
     ctx.bb_put(opts.job_key, bb_value{static_cast<std::int64_t>(id)}, opts.node_name);
 
+    if (event_log* events = resolve_event_log(ctx); events) {
+        std::ostringstream data;
+        data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"status\":\"submitted\"}";
+        (void)events->emit("vla_submit", ctx.tick_index, data.str());
+    }
+
     std::ostringstream msg;
     msg << "submitted job=" << id << " capability=" << request.capability << " model=" << request.model.name
         << " deadline_ms=" << request.deadline_ms;
@@ -1240,6 +1352,13 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
 
     const auto id = static_cast<vla_service::vla_job_id>(*id_raw);
     const vla_poll poll = ctx.svc.vla->poll(id);
+
+    if (event_log* events = resolve_event_log(ctx); events) {
+        std::ostringstream data;
+        data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"status\":\""
+             << vla_job_status_name(poll.status) << "\"}";
+        (void)events->emit("vla_poll", ctx.tick_index, data.str());
+    }
 
     if (!opts.meta_key.empty()) {
         ctx.bb_put(opts.meta_key, bb_value{vla_poll_meta_json(poll)}, opts.node_name);
@@ -1274,6 +1393,12 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
             clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
         }
         emit_log(ctx, log_level::info, "vla", "vla-wait: committed final action");
+        if (event_log* events = resolve_event_log(ctx); events) {
+            std::ostringstream data;
+            data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"status\":\"ok\",\"digest\":\""
+                 << event_log::hash64_hex(vla_action_to_json(poll.final->action)) << "\"}";
+            (void)events->emit("vla_result", ctx.tick_index, data.str());
+        }
         return status::success;
     }
 
@@ -1316,6 +1441,11 @@ status execute_vla_cancel(const node& n, tick_context& ctx, const std::vector<mu
     (void)ctx.svc.vla->cancel(id);
     clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
     emit_log(ctx, log_level::info, "vla", "vla-cancel: cancelled job=" + std::to_string(id));
+    if (event_log* events = resolve_event_log(ctx); events) {
+        std::ostringstream data;
+        data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"status\":\"cancelled\"}";
+        (void)events->emit("vla_cancel", ctx.tick_index, data.str());
+    }
     return status::success;
 }
 
@@ -1844,6 +1974,7 @@ status tick_node(node_id id, tick_context& ctx) {
 
 void tick_context::bb_put(std::string key, bb_value value, std::string writer_name) {
     const auto ts = tick_now(*this);
+    const bool delete_semantics = std::holds_alternative<std::monostate>(value);
     inst.bb.put(key, value, tick_index, ts, current_node, std::move(writer_name));
 
     trace_event ev = make_trace_event(trace_event_kind::bb_write);
@@ -1851,6 +1982,32 @@ void tick_context::bb_put(std::string key, bb_value value, std::string writer_na
     ev.key = key;
     ev.value_repr = bb_value_repr(value);
     emit_trace(*this, std::move(ev));
+
+    event_log* events = resolve_event_log(*this);
+    if (!events) {
+        return;
+    }
+    if (delete_semantics) {
+        std::ostringstream data;
+        data << "{\"key\":\"" << event_log::json_escape(key) << "\"";
+        if (current_node != 0) {
+            data << ",\"source_node\":" << current_node;
+        }
+        data << '}';
+        (void)events->emit("bb_delete", tick_index, data.str());
+        return;
+    }
+
+    const std::string raw_json = bb_value_json(value);
+    std::ostringstream data;
+    data << "{\"key\":\"" << event_log::json_escape(key) << "\","
+         << "\"value_digest\":\"" << event_log::hash64_hex(raw_json) << "\","
+         << "\"preview\":" << bb_preview_json(value);
+    if (current_node != 0) {
+        data << ",\"source_node\":" << current_node;
+    }
+    data << '}';
+    (void)events->emit("bb_write", tick_index, data.str());
 }
 
 const bb_entry* tick_context::bb_get(std::string_view key) {
@@ -1879,6 +2036,43 @@ void tick_context::scheduler_event(trace_event_kind kind, job_id job, job_status
         return;
     }
     emit_log(*this, log_level::debug, "scheduler", std::move(log_message));
+
+    event_log* events = resolve_event_log(*this);
+    if (!events) {
+        return;
+    }
+    std::string type;
+    if (kind == trace_event_kind::scheduler_submit) {
+        type = "sched_submit";
+    } else if (kind == trace_event_kind::scheduler_start) {
+        type = "sched_start";
+    } else if (kind == trace_event_kind::scheduler_finish) {
+        type = "sched_finish";
+    } else if (kind == trace_event_kind::scheduler_cancel) {
+        type = "sched_cancel";
+    }
+    if (type.empty()) {
+        return;
+    }
+
+    std::ostringstream data;
+    data << "{\"job_id\":\"" << job << "\"";
+    if (kind == trace_event_kind::scheduler_submit || kind == trace_event_kind::scheduler_start) {
+        data << ",\"kind\":\"scheduler\"";
+        if (current_node != 0) {
+            data << ",\"node_id\":" << current_node;
+        }
+    } else {
+        if (st == job_status::done) {
+            data << ",\"outcome\":\"ok\"";
+        } else if (st == job_status::failed) {
+            data << ",\"outcome\":\"failed\"";
+        } else if (st == job_status::cancelled) {
+            data << ",\"outcome\":\"cancelled\"";
+        }
+    }
+    data << '}';
+    (void)events->emit(type, tick_index, data.str());
 }
 
 status tick(instance& inst, registry& reg, services& svc) {
@@ -1894,6 +2088,37 @@ status tick(instance& inst, registry& reg, services& svc) {
                      .tick_index = inst.tick_index,
                      .now = tick_start,
                      .current_node = inst.def->root};
+
+    if (svc.obs.events) {
+        svc.obs.events->ensure_run_started();
+        std::ostringstream data;
+        const auto budget_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(inst.tree_stats.configured_tick_budget).count();
+        if (budget_ms > 0) {
+            data << "{\"tick_budget_ms\":" << budget_ms << '}';
+        } else {
+            data << "{}";
+        }
+        (void)svc.obs.events->emit("tick_begin", inst.tick_index, data.str());
+
+        bool full_snapshot = false;
+        if (svc.obs.events->consume_snapshot_bb_request(&full_snapshot)) {
+            constexpr std::size_t kSnapshotLimit = 256;
+            const auto entries = inst.bb.snapshot();
+            std::ostringstream snap;
+            snap << "{\"entries\":[";
+            const std::size_t max_entries = full_snapshot ? entries.size() : std::min(entries.size(), kSnapshotLimit);
+            for (std::size_t i = 0; i < max_entries; ++i) {
+                if (i != 0) {
+                    snap << ',';
+                }
+                snap << "[\"" << event_log::json_escape(entries[i].first) << "\"," << bb_value_json(entries[i].second.value)
+                     << "]";
+            }
+            snap << "]}";
+            (void)svc.obs.events->emit("bb_snapshot", inst.tick_index, snap.str());
+        }
+    }
 
     trace_event ev = make_trace_event(trace_event_kind::tick_begin);
     ev.node = inst.def->root;

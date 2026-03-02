@@ -26,8 +26,8 @@
       (begin
         (print "blackboard")
         (print (bt.blackboard.dump inst))
-        (print "vla logs")
-        (print (vla.logs.dump 20)))
+        (print "events")
+        (print (events.dump 20)))
       (begin
         (print (bt.tick inst))
         (tick-loop (- n 1)))))

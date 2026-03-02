@@ -7,6 +7,7 @@
 #include <unordered_map>
 
 #include "bt/compiler.hpp"
+#include "bt/event_log.hpp"
 #include "bt/planner.hpp"
 #include "bt/runtime.hpp"
 #include "bt/vla.hpp"
@@ -41,6 +42,8 @@ public:
 
     memory_log_sink& logs() noexcept;
     const memory_log_sink& logs() const noexcept;
+    event_log& events() noexcept;
+    const event_log& events() const noexcept;
 
     void set_clock_interface(clock_interface* clock) noexcept;
     clock_interface* clock_interface_ptr() noexcept;
@@ -71,6 +74,7 @@ private:
     registry registry_;
     thread_pool_scheduler scheduler_;
     memory_log_sink logs_;
+    event_log events_;
     planner_service planner_;
     vla_service vla_;
 

@@ -2,6 +2,7 @@
 .webots
 .webots/
 images/
+AGENTS.md
 
 # cmake out-of-source builds
 /build/

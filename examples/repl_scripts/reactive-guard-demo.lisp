@@ -12,4 +12,4 @@
 
   (print (list 'tick-1 (bt.tick inst)))
   (print (list 'tick-2-stop (bt.tick inst '((stop #t)))))
-  (print (bt.trace.snapshot inst)))
+  (print (events.dump 40)))

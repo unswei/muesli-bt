@@ -1,5 +1,4 @@
 (planner.set-base-seed 777)
-(planner.set-log-enabled #t)
 
 (defbt ptz-track-loop
   (sel
@@ -39,4 +38,4 @@
 (bt.tick inst)
 
 (bt.blackboard.dump inst)
-(planner.logs.dump 16)
+(events.dump 32)

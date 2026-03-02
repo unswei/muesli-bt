@@ -197,6 +197,8 @@ public:
 
 class vla_service {
 public:
+    using record_listener = std::function<void(const vla_record&, const std::string&)>;
+
     explicit vla_service(scheduler* sched);
 
     using vla_job_id = std::uint64_t;
@@ -228,6 +230,7 @@ public:
     [[nodiscard]] std::string dump_recent_records(std::size_t max_count = 200) const;
     [[nodiscard]] std::vector<vla_record> recent_records(std::size_t max_count = 200) const;
     void clear_records();
+    void set_record_listener(record_listener listener);
 
     void set_log_path(std::string path);
     [[nodiscard]] const std::string& log_path() const noexcept;
@@ -300,8 +303,9 @@ private:
 
     std::vector<vla_record> records_;
     std::size_t record_capacity_ = 4096;
-    bool log_enabled_ = true;
-    std::string log_path_ = "logs/vla-records.jsonl";
+    bool log_enabled_ = false;
+    std::string log_path_ = "logs/run.jsonl";
+    record_listener record_listener_;
 };
 
 [[nodiscard]] const char* vla_status_name(vla_status status) noexcept;

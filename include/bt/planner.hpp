@@ -3,6 +3,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -281,6 +282,8 @@ struct planner_record {
 
 class planner_service {
 public:
+    using record_listener = std::function<void(const planner_record&, const std::string&)>;
+
     planner_service();
 
     void register_model(std::string name, std::shared_ptr<planner_model> model);
@@ -303,6 +306,7 @@ public:
     [[nodiscard]] std::vector<planner_record> recent_records(std::size_t max_count) const;
     [[nodiscard]] std::string dump_recent_records(std::size_t max_count) const;
     void clear_records();
+    void set_record_listener(record_listener listener);
 
 private:
     void append_record(planner_record record);
@@ -316,11 +320,12 @@ private:
     std::vector<planner_record> records_;
     std::size_t record_capacity_ = 4096;
 
-    bool jsonl_enabled_ = true;
-    std::string jsonl_path_ = "logs/planner-records.jsonl";
+    bool jsonl_enabled_ = false;
+    std::string jsonl_path_ = "logs/run.jsonl";
 
     mutable std::mutex mutex_;
     mutable std::mutex file_mutex_;
+    record_listener record_listener_;
 };
 
 [[nodiscard]] const char* planner_status_name(planner_status status) noexcept;

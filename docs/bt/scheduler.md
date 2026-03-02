@@ -7,7 +7,7 @@ This page describes how `bt.tick` and background scheduler work together in the 
 - [host](../terminology.md#host) code owns tick cadence and calls `(bt.tick inst)`
 - async work can run on the background `thread_pool_scheduler`
 - async outcomes are reconciled on later ticks
-- scheduler activity is observable through stats and trace events
+- scheduler activity is observable through stats and canonical event stream
 
 ## Available Behaviour
 
@@ -26,11 +26,11 @@ This page describes how `bt.tick` and background scheduler work together in the 
 | `(act async-sleep-ms <ms>)` | Demo async action pattern | Returns `running` until job completes |
 | `(vla.submit req)` + `(vla.poll id)` | Capability-backed async policy calls | Non-blocking, scheduler-owned lifecycle |
 | `(bt.tick inst)` | Advance async leaves | Polling/reconciliation happens on tick |
-| `(bt.trace.snapshot inst)` | See scheduler events | Includes submit/start/finish/cancel events |
+| `(events.dump [n])` | See scheduler events | Includes `sched_submit/start/finish/cancel` events |
 
-## Scheduler Trace Events
+## Scheduler Event Types
 
-When tracing is enabled, scheduler activity appears as:
+In canonical event stream, scheduler activity appears as:
 
 - `scheduler_submit`
 - `scheduler_start`
@@ -82,7 +82,7 @@ Concurrent `bt.tick` on the same instance is not part of the supported model; tr
 - keep tick-thread leaf work short
 - offload blocking I/O or long compute to scheduler jobs
 - merge async outcomes in deterministic tick logic
-- use trace plus scheduler stats when diagnosing latency
+- use canonical events plus scheduler stats when diagnosing latency
 
 ## See Also
 

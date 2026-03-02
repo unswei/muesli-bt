@@ -24,5 +24,5 @@
   (print (list 'mem-t2 (bt.tick mem-inst)))
   (print (list 'mem-t3 (bt.tick mem-inst)))
 
-  (print (list 'seq-trace (bt.trace.snapshot seq-inst)))
-  (print (list 'mem-trace (bt.trace.snapshot mem-inst))))
+  (print (list 'seq-events (events.dump 40)))
+  (print (list 'mem-events (events.dump 40))))

@@ -9,6 +9,7 @@
 
 #include "bt/ast.hpp"
 #include "bt/blackboard.hpp"
+#include "bt/event_log.hpp"
 #include "bt/logging.hpp"
 #include "bt/profile.hpp"
 #include "bt/scheduler.hpp"
@@ -31,6 +32,7 @@ struct node_memory {
 struct observability {
     trace_buffer* trace = nullptr;
     log_sink* logger = nullptr;
+    event_log* events = nullptr;
 };
 
 class clock_interface {

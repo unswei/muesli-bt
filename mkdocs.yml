@@ -121,6 +121,7 @@ nav:
       - Writing A Backend: integration/writing-a-backend.md
       - Sensing and Blackboard: integration/sensing-and-blackboard.md
   - Observability:
+      - Canonical Event Log: observability/event-log.md
       - Tracing: observability/tracing.md
       - Logging: observability/logging.md
       - Profiling: observability/profiling.md

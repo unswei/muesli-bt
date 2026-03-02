@@ -29,19 +29,13 @@ host.callbacks().register_action("approach-target",
 ctx.bb_put("target-visible", bt::bb_value{true}, "search-target");
 ```
 
-## Trace + Profiling Workflow
+## Events + Profiling Workflow
 
-1. enable trace
-
-```lisp
-(bt.set-trace-enabled inst #t)
-```
-
-2. tick and inspect
+1. tick and inspect
 
 ```lisp
 (bt.tick inst)
-(bt.trace.snapshot inst)
+(events.dump 50)
 (bt.stats inst)
 ```
 

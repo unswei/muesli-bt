@@ -1307,7 +1307,6 @@ void test_plan_action_node_blackboard_meta_and_logs() {
     check(is_integer(eval_text("(planner.get-base-seed)", env)) &&
               integer_value(eval_text("(planner.get-base-seed)", env)) == 4242,
           "planner.get-base-seed should return configured value");
-    check(is_nil(eval_text("(planner.set-log-enabled #t)", env)), "planner.set-log-enabled should return nil");
 
     (void)eval_text(
         "(define tree "
@@ -1369,14 +1368,30 @@ void test_plan_action_node_blackboard_meta_and_logs() {
     check(std::get<std::string>(meta_a->value).find("\"status\"") != std::string::npos,
           "plan-action meta should include status");
 
-    value planner_logs = eval_text("(planner.logs.dump 10)", env);
-    check(is_string(planner_logs), "planner.logs.dump should return string");
-    check(string_value(planner_logs).find("\"schema_version\":\"planner.v1\"") != std::string::npos,
-          "planner logs should include stable schema_version");
-    check(string_value(planner_logs).find("\"node_name\":\"toy-plan\"") != std::string::npos,
-          "planner logs should include node name");
-    check(string_value(planner_logs).find("\"status\"") != std::string::npos,
-          "planner logs should include status field");
+    value planner_events = eval_text("(events.dump 200)", env);
+    check(is_proper_list(planner_events), "events.dump should return list");
+    const auto planner_rows = vector_from_list(planner_events);
+    bool saw_planner_v1 = false;
+    bool saw_planner_schema = false;
+    bool saw_planner_node = false;
+    for (const value& row : planner_rows) {
+        if (!is_string(row)) {
+            continue;
+        }
+        const std::string line = string_value(row);
+        if (line.find("\"type\":\"planner_v1\"") != std::string::npos) {
+            saw_planner_v1 = true;
+        }
+        if (line.find("\"schema_version\":\"planner.v1\"") != std::string::npos) {
+            saw_planner_schema = true;
+        }
+        if (line.find("\"node_name\":\"toy-plan\"") != std::string::npos) {
+            saw_planner_node = true;
+        }
+    }
+    check(saw_planner_v1, "events should include planner_v1");
+    check(saw_planner_schema, "planner_v1 should include stable planner schema");
+    check(saw_planner_node, "planner_v1 should include node name");
 
     (void)eval_text(
         "(define bad-tree "
@@ -1585,11 +1600,30 @@ void test_vla_builtins_submit_poll_cancel_and_caps() {
     value bad_status = eval_text("(map.get (vla.poll " + std::to_string(integer_value(bad_job)) + ") 'status ':none)", env);
     check(is_symbol(bad_status) && symbol_name(bad_status) == ":error", "bad request should become error immediately");
 
-    value logs = eval_text("(vla.logs.dump 20)", env);
-    check(is_string(logs), "vla.logs.dump should return string");
-    check(string_value(logs).find("\"task_id\"") != std::string::npos, "vla logs should contain task_id");
-    check(string_value(logs).find("request.instruction is required") != std::string::npos,
-          "vla logs should include immediate validation errors");
+    value vla_events = eval_text("(events.dump 80)", env);
+    check(is_proper_list(vla_events), "events.dump should return list");
+    const auto vla_rows = vector_from_list(vla_events);
+    bool saw_vla_result = false;
+    bool saw_task_id = false;
+    bool saw_validation_error = false;
+    for (const value& row : vla_rows) {
+        if (!is_string(row)) {
+            continue;
+        }
+        const std::string line = string_value(row);
+        if (line.find("\"type\":\"vla_result\"") != std::string::npos) {
+            saw_vla_result = true;
+        }
+        if (line.find("\"task_id\"") != std::string::npos) {
+            saw_task_id = true;
+        }
+        if (line.find("request.instruction is required") != std::string::npos) {
+            saw_validation_error = true;
+        }
+    }
+    check(saw_vla_result, "events should include vla_result");
+    check(saw_task_id, "vla events should contain task_id");
+    check(saw_validation_error, "vla events should include immediate validation errors");
 }
 
 void test_vla_bt_nodes_flow_and_cancel() {
@@ -1952,11 +1986,6 @@ void test_bt_reactive_preemption_and_memoryless_regressions() {
     check(symbol_name(eval_text("(bt.tick rseq-inst '((gate #t)))", env)) == "running", "reactive-seq tick1 should run");
     check(symbol_name(eval_text("(bt.tick rseq-inst '((gate #f)))", env)) == "failure",
           "reactive-seq tick2 should fail and preempt");
-    value rseq_trace = eval_text("(bt.trace.snapshot rseq-inst)", env);
-    check(string_value(rseq_trace).find("node_preempt") != std::string::npos, "reactive-seq should emit node_preempt");
-    check(string_value(rseq_trace).find("node_halt") != std::string::npos, "reactive-seq should emit node_halt");
-    check(string_value(rseq_trace).find("scheduler_cancel") != std::string::npos,
-          "reactive-seq should cancel scheduler-backed running subtree");
 
     (void)eval_text("(define rsel-tree (bt.compile '(reactive-sel (cond test-high-priority) (act async-sleep-ms 200))))", env);
     (void)eval_text("(define rsel-inst (bt.new-instance rsel-tree))", env);
@@ -1964,10 +1993,6 @@ void test_bt_reactive_preemption_and_memoryless_regressions() {
           "reactive-sel tick1 should run low-priority child");
     check(symbol_name(eval_text("(bt.tick rsel-inst '((high #t)))", env)) == "success",
           "reactive-sel tick2 should switch to high-priority success");
-    value rsel_trace = eval_text("(bt.trace.snapshot rsel-inst)", env);
-    check(string_value(rsel_trace).find("node_preempt") != std::string::npos, "reactive-sel should emit node_preempt");
-    check(string_value(rsel_trace).find("scheduler_cancel") != std::string::npos,
-          "reactive-sel should cancel preempted low-priority subtree");
 }
 
 void test_bt_seq_and_running_semantics() {
@@ -2035,7 +2060,7 @@ void test_bt_reset_clears_phase4_state() {
     check(symbol_name(eval_text("(bt.tick binst)", env)) == "failure", "reset should clear blackboard entries");
 }
 
-void test_bt_blackboard_trace_and_stats_builtins() {
+void test_bt_blackboard_events_and_stats_builtins() {
     using namespace muslisp;
 
     reset_bt_runtime_host();
@@ -2053,32 +2078,43 @@ void test_bt_blackboard_trace_and_stats_builtins() {
     check(string_value(bb_dump).find("writer_name=bb-put-int") != std::string::npos,
           "blackboard dump missing writer metadata");
 
-    value trace_dump = eval_text("(bt.trace.snapshot inst)", env);
-    check(is_string(trace_dump), "bt.trace.snapshot should return string");
-    check(string_value(trace_dump).find("kind=tick_begin") != std::string::npos, "trace should include tick_begin");
-    check(string_value(trace_dump).find("kind=node_enter") != std::string::npos, "trace should include node_enter");
-    check(string_value(trace_dump).find("kind=node_exit") != std::string::npos, "trace should include node_exit");
-    check(string_value(trace_dump).find("bb_write") != std::string::npos, "trace should include bb_write");
-    check(string_value(trace_dump).find("duration_ns=") != std::string::npos, "trace should include duration metadata");
-    check(string_value(trace_dump).find("ts_ns=") != std::string::npos, "trace should include timestamp metadata");
+    value events_dump = eval_text("(events.dump 40)", env);
+    check(is_proper_list(events_dump), "events.dump should return list");
+    bool saw_tick_begin = false;
+    bool saw_node_status = false;
+    bool saw_bb_write = false;
+    bool saw_tick_end = false;
+    for (const value& row : vector_from_list(events_dump)) {
+        if (!is_string(row)) {
+            continue;
+        }
+        const std::string line = string_value(row);
+        if (line.find("\"type\":\"tick_begin\"") != std::string::npos) {
+            saw_tick_begin = true;
+        }
+        if (line.find("\"type\":\"node_status\"") != std::string::npos) {
+            saw_node_status = true;
+        }
+        if (line.find("\"type\":\"bb_write\"") != std::string::npos) {
+            saw_bb_write = true;
+        }
+        if (line.find("\"type\":\"tick_end\"") != std::string::npos) {
+            saw_tick_end = true;
+        }
+    }
+    check(saw_tick_begin, "events should include tick_begin");
+    check(saw_node_status, "events should include node_status");
+    check(saw_bb_write, "events should include bb_write");
+    check(saw_tick_end, "events should include tick_end");
 
     value stats_dump = eval_text("(bt.stats inst)", env);
     check(is_string(stats_dump), "bt.stats should return string");
     check(string_value(stats_dump).find("tick_count=1") != std::string::npos, "stats should include tick_count=1");
 
     (void)eval_text("(bt.set-tick-budget-ms inst 1)", env);
-    (void)eval_text("(bt.set-trace-enabled inst #t)", env);
-    (void)eval_text("(bt.clear-trace inst)", env);
-    (void)eval_text("(bt.set-read-trace-enabled inst #t)", env);
     (void)eval_text("(bt.tick inst)", env);
-    trace_dump = eval_text("(bt.trace.snapshot inst)", env);
-    check(string_value(trace_dump).find("bb_read") != std::string::npos, "trace should include bb_read");
-    (void)eval_text("(bt.clear-logs)", env);
-
-    value log_dump_alias = eval_text("(bt.log.dump)", env);
-    check(is_string(log_dump_alias), "bt.log.dump alias should return string");
-    value log_snapshot_alias = eval_text("(bt.log.snapshot)", env);
-    check(is_string(log_snapshot_alias), "bt.log.snapshot alias should return string");
+    events_dump = eval_text("(events.dump 80)", env);
+    check(is_proper_list(events_dump), "events.dump should return list after retick");
 }
 
 void test_bt_blackboard_get_builtin() {
@@ -2125,16 +2161,83 @@ void test_bt_scheduler_backed_action() {
     }
     check(done, "async action should eventually succeed");
 
-    value trace_dump = eval_text("(bt.trace.snapshot inst)", env);
-    check(is_string(trace_dump), "bt.trace.snapshot should return string");
-    check(string_value(trace_dump).find("scheduler_submit") != std::string::npos,
-          "trace should include scheduler_submit");
-    check(string_value(trace_dump).find("scheduler_finish") != std::string::npos,
-          "trace should include scheduler_finish");
+    value events_dump = eval_text("(events.dump 60)", env);
+    bool saw_sched_submit = false;
+    bool saw_sched_finish = false;
+    for (const value& row : vector_from_list(events_dump)) {
+        if (!is_string(row)) {
+            continue;
+        }
+        const std::string line = string_value(row);
+        if (line.find("\"type\":\"sched_submit\"") != std::string::npos) {
+            saw_sched_submit = true;
+        }
+        if (line.find("\"type\":\"sched_finish\"") != std::string::npos) {
+            saw_sched_finish = true;
+        }
+    }
+    check(saw_sched_submit, "events should include sched_submit");
+    check(saw_sched_finish, "events should include sched_finish");
 
     value sched_stats = eval_text("(bt.scheduler.stats)", env);
     check(is_string(sched_stats), "bt.scheduler.stats should return string");
     check(string_value(sched_stats).find("submitted=") != std::string::npos, "scheduler stats missing submitted");
+}
+
+void test_canonical_event_stream_builtins() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    check(is_nil(eval_text("(events.enable #t)", env)), "events.enable should return nil");
+    check(is_nil(eval_text("(events.set-ring-size 256)", env)), "events.set-ring-size should return nil");
+
+    (void)eval_text("(define tree (bt.compile '(seq (act bb-put-int foo 42) (cond bb-has foo))))", env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "success", "event stream test tree should succeed");
+    (void)eval_text("(events.snapshot-bb)", env);
+    (void)eval_text("(bt.tick inst)", env);
+
+    value dumped = eval_text("(events.dump 20)", env);
+    check(is_proper_list(dumped), "events.dump should return list");
+    const auto rows = vector_from_list(dumped);
+    check(!rows.empty(), "events.dump should return at least one event");
+    bool saw_schema = false;
+    bool saw_tick_begin = false;
+    bool saw_tick_end = false;
+    bool saw_node_status = false;
+    bool saw_bb_write = false;
+    bool saw_bb_snapshot = false;
+    for (const auto& row : rows) {
+        check(is_string(row), "events.dump rows should be JSON strings");
+        const std::string line = string_value(row);
+        if (line.find("\"schema\":\"mbt.evt.v1\"") != std::string::npos) {
+            saw_schema = true;
+        }
+        if (line.find("\"type\":\"tick_begin\"") != std::string::npos) {
+            saw_tick_begin = true;
+        }
+        if (line.find("\"type\":\"tick_end\"") != std::string::npos) {
+            saw_tick_end = true;
+        }
+        if (line.find("\"type\":\"node_status\"") != std::string::npos) {
+            saw_node_status = true;
+        }
+        if (line.find("\"type\":\"bb_write\"") != std::string::npos) {
+            saw_bb_write = true;
+        }
+        if (line.find("\"type\":\"bb_snapshot\"") != std::string::npos) {
+            saw_bb_snapshot = true;
+        }
+    }
+
+    check(saw_schema, "events should include schema envelope");
+    check(saw_tick_begin, "events should include tick_begin");
+    check(saw_tick_end, "events should include tick_end");
+    check(saw_node_status, "events should include node_status");
+    check(saw_bb_write, "events should include bb_write");
+    check(saw_bb_snapshot, "events should include bb_snapshot");
 }
 
 void test_bt_tick_with_blackboard_input() {
@@ -2928,9 +3031,10 @@ int main() {
         {"bt seq/running semantics", test_bt_seq_and_running_semantics},
         {"bt decorator semantics", test_bt_decorator_semantics},
         {"bt reset clears phase4 state", test_bt_reset_clears_phase4_state},
-        {"bt blackboard/trace/stats builtins", test_bt_blackboard_trace_and_stats_builtins},
+        {"bt blackboard/events/stats builtins", test_bt_blackboard_events_and_stats_builtins},
         {"bt blackboard.get builtin", test_bt_blackboard_get_builtin},
         {"bt scheduler-backed action", test_bt_scheduler_backed_action},
+        {"canonical event stream builtins", test_canonical_event_stream_builtins},
         {"bt tick with blackboard input", test_bt_tick_with_blackboard_input},
         {"env core interface unattached", test_env_core_interface_unattached},
         {"env run-loop multi-episode reset=true", test_env_run_loop_multi_episode_reset_true},

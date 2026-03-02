@@ -151,11 +151,15 @@ Audit language/runtime surfaces against code before updating this checklist:
 
 ### Planning services
 - [x] `planner.get-base-seed` -> [page](language/reference/builtins/planner/planner-get-base-seed.md)
-- [x] `planner.logs.dump` -> [page](language/reference/builtins/planner/planner-logs-dump.md)
 - [x] `planner.plan` -> [page](language/reference/builtins/planner/planner-plan.md)
 - [x] `planner.set-base-seed` -> [page](language/reference/builtins/planner/planner-set-base-seed.md)
-- [x] `planner.set-log-enabled` -> [page](language/reference/builtins/planner/planner-set-log-enabled.md)
-- [x] `planner.set-log-path` -> [page](language/reference/builtins/planner/planner-set-log-path.md)
+
+### Event stream
+- [x] `events.enable` -> [page](language/reference/builtins/events/events-enable.md)
+- [x] `events.set-path` -> [page](language/reference/builtins/events/events-set-path.md)
+- [x] `events.set-ring-size` -> [page](language/reference/builtins/events/events-set-ring-size.md)
+- [x] `events.dump` -> [page](language/reference/builtins/events/events-dump.md)
+- [x] `events.snapshot-bb` -> [page](language/reference/builtins/events/events-snapshot-bb.md)
 
 ### Environment capability interface
 - [x] `env.info` -> [page](language/reference/builtins/env/env-info.md)
@@ -182,10 +186,6 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `vla.submit` -> [page](language/reference/builtins/vla/vla-submit.md)
 - [x] `vla.poll` -> [page](language/reference/builtins/vla/vla-poll.md)
 - [x] `vla.cancel` -> [page](language/reference/builtins/vla/vla-cancel.md)
-- [x] `vla.logs.dump` -> [page](language/reference/builtins/vla/vla-logs-dump.md)
-- [x] `vla.set-log-path` -> [page](language/reference/builtins/vla/vla-set-log-path.md)
-- [x] `vla.set-log-enabled` -> [page](language/reference/builtins/vla/vla-set-log-enabled.md)
-- [x] `vla.clear-logs` -> [page](language/reference/builtins/vla/vla-clear-logs.md)
 
 ### Mutable vectors
 - [x] `vec.clear!` -> [page](language/reference/builtins/vec/vec-clear-bang.md)
@@ -225,27 +225,17 @@ Audit language/runtime surfaces against code before updating this checklist:
 
 ### BT integration primitives
 - [x] `bt.blackboard.dump` -> [page](language/reference/builtins/bt/bt-blackboard-dump.md)
-- [x] `bt.clear-logs` -> [page](language/reference/builtins/bt/bt-clear-logs.md)
-- [x] `bt.clear-trace` -> [page](language/reference/builtins/bt/bt-clear-trace.md)
 - [x] `bt.compile` -> [page](language/reference/builtins/bt/bt-compile.md)
 - [x] `bt.export-dot` -> [page](language/reference/builtins/bt/bt-export-dot.md)
 - [x] `bt.load` -> [page](language/reference/builtins/bt/bt-load.md)
 - [x] `bt.load-dsl` -> [page](language/reference/builtins/bt/bt-load-dsl.md)
-- [x] `bt.log.dump` -> [page](language/reference/builtins/bt/bt-log-dump.md)
-- [x] `bt.log.snapshot` -> [page](language/reference/builtins/bt/bt-log-snapshot.md)
-- [x] `bt.logs.dump` -> [page](language/reference/builtins/bt/bt-logs-dump.md)
-- [x] `bt.logs.snapshot` -> [page](language/reference/builtins/bt/bt-logs-snapshot.md)
 - [x] `bt.new-instance` -> [page](language/reference/builtins/bt/bt-new-instance.md)
 - [x] `bt.reset` -> [page](language/reference/builtins/bt/bt-reset.md)
 - [x] `bt.save` -> [page](language/reference/builtins/bt/bt-save.md)
 - [x] `bt.save-dsl` -> [page](language/reference/builtins/bt/bt-save-dsl.md)
 - [x] `bt.scheduler.stats` -> [page](language/reference/builtins/bt/bt-scheduler-stats.md)
-- [x] `bt.set-read-trace-enabled` -> [page](language/reference/builtins/bt/bt-set-read-trace-enabled.md)
 - [x] `bt.set-tick-budget-ms` -> [page](language/reference/builtins/bt/bt-set-tick-budget-ms.md)
-- [x] `bt.set-trace-enabled` -> [page](language/reference/builtins/bt/bt-set-trace-enabled.md)
 - [x] `bt.stats` -> [page](language/reference/builtins/bt/bt-stats.md)
 - [x] `bt.status->symbol` -> [page](language/reference/builtins/bt/bt-status-to-symbol.md)
 - [x] `bt.tick` -> [page](language/reference/builtins/bt/bt-tick.md)
 - [x] `bt.to-dsl` -> [page](language/reference/builtins/bt/bt-to-dsl.md)
-- [x] `bt.trace.dump` -> [page](language/reference/builtins/bt/bt-trace-dump.md)
-- [x] `bt.trace.snapshot` -> [page](language/reference/builtins/bt/bt-trace-snapshot.md)

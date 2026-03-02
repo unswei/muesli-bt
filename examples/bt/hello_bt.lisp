@@ -6,4 +6,4 @@
 (define inst (bt.new-instance hello-tree))
 (bt.tick inst)
 (bt.tick inst)
-(bt.trace.snapshot inst)
+(events.dump 20)

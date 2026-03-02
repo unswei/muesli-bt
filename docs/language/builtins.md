@@ -35,12 +35,10 @@ This page is a summary and link hub for built-ins. Detailed behaviour, errors, a
 ## Planning Services
 
 - planning call: `planner.plan`
-- planner records: `planner.logs.dump`
-- planner sink config: `planner.set-log-path`, `planner.set-log-enabled`
+- canonical event stream: `events.enable`, `events.set-path`, `events.set-ring-size`, `events.dump`, `events.snapshot-bb`
 - planner seed controls: `planner.set-base-seed`, `planner.get-base-seed`
 - capabilities: `cap.list`, `cap.describe`
 - async VLA jobs: `vla.submit`, `vla.poll`, `vla.cancel`
-- VLA logging config: `vla.logs.dump`, `vla.set-log-path`, `vla.set-log-enabled`, `vla.clear-logs`
 - observation handles: `image.make`, `image.info`, `blob.make`, `blob.info`
 
 ## Environment Capability Interface
@@ -52,7 +50,7 @@ This page is a summary and link hub for built-ins. Detailed behaviour, errors, a
 - authoring/compile: `bt.compile`
 - runtime: `bt.new-instance`, `bt.tick`, `bt.reset`, `bt.status->symbol`
 - persistence: `bt.to-dsl`, `bt.save-dsl`, `bt.load-dsl`, `bt.save`, `bt.load`
-- observability/config: `bt.stats`, `bt.trace.dump`, `bt.trace.snapshot`, `bt.blackboard.dump`, `bt.logs.dump`, `bt.logs.snapshot`, `bt.log.dump`, `bt.log.snapshot`, `bt.scheduler.stats`, `bt.set-tick-budget-ms`, `bt.set-trace-enabled`, `bt.set-read-trace-enabled`, `bt.clear-trace`, `bt.clear-logs`
+- observability/config: `bt.stats`, `bt.blackboard.dump`, `bt.scheduler.stats`, `bt.set-tick-budget-ms`, plus canonical `events.*`
 
 Special-form authoring sugar lives in the language reference:
 

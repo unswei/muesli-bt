@@ -2009,9 +2009,15 @@ void planner_service::clear_records() {
     records_.clear();
 }
 
+void planner_service::set_record_listener(record_listener listener) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    record_listener_ = std::move(listener);
+}
+
 void planner_service::append_record(planner_record record) {
     std::string json_line;
     bool write_jsonl = false;
+    record_listener listener;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (record_capacity_ > 0 && records_.size() == record_capacity_) {
@@ -2019,11 +2025,13 @@ void planner_service::append_record(planner_record record) {
         }
         records_.push_back(record);
         write_jsonl = jsonl_enabled_;
-        if (write_jsonl) {
-            json_line = record_to_json(record);
-        }
+        json_line = record_to_json(record);
+        listener = record_listener_;
     }
 
+    if (listener) {
+        listener(record, json_line);
+    }
     if (write_jsonl) {
         append_jsonl_line(json_line);
     }

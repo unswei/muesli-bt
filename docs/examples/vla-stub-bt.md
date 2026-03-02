@@ -17,7 +17,7 @@ What to look for:
 - BT keeps returning `running` while VLA job is in flight
 - `flow-action`/`vla-action` is written by `vla-wait` when ready
 - `vla-meta` contains structured poll metadata
-- `vla.logs.dump` returns JSON lines records
+- `events.dump` returns canonical event records
 
 ## Source
 

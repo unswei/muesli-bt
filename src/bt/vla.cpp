@@ -901,6 +901,11 @@ void vla_service::clear_records() {
     records_.clear();
 }
 
+void vla_service::set_record_listener(record_listener listener) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    record_listener_ = std::move(listener);
+}
+
 void vla_service::set_log_path(std::string path) {
     if (path.empty()) {
         throw std::invalid_argument("set_log_path: path must not be empty");
@@ -979,6 +984,7 @@ std::uint64_t vla_service::hash_request(const vla_request& request) {
 void vla_service::append_record(const vla_record& record) {
     std::string json_line;
     bool write_json = false;
+    record_listener listener;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         if (record_capacity_ > 0 && records_.size() == record_capacity_) {
@@ -986,11 +992,13 @@ void vla_service::append_record(const vla_record& record) {
         }
         records_.push_back(record);
         write_json = log_enabled_;
-        if (write_json) {
-            json_line = record_to_json(record);
-        }
+        json_line = record_to_json(record);
+        listener = record_listener_;
     }
 
+    if (listener) {
+        listener(record, json_line);
+    }
     if (write_json) {
         append_jsonl_line(json_line);
     }
