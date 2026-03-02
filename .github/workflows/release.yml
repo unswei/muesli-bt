@@ -1,0 +1,218 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to publish (for example: v0.1.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-ubuntu:
+    name: build-ubuntu-x86_64
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: meta
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-].*)?$ ]]; then
+            echo "invalid tag format: $tag"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/release-ubuntu -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/build/install-ubuntu" \
+            -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON \
+            -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+            -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+            -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+
+      - name: Build
+        run: cmake --build build/release-ubuntu --parallel
+
+      - name: Test
+        run: ctest --test-dir build/release-ubuntu --output-on-failure
+
+      - name: Install
+        run: cmake --install build/release-ubuntu
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          tag="${{ steps.meta.outputs.tag }}"
+          archive="muesli-bt-${tag}-ubuntu-x86_64.tar.gz"
+          tar -C build/install-ubuntu -czf "$archive" .
+          sha256sum "$archive" > "${archive}.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-ubuntu-x86_64
+          path: |
+            muesli-bt-${{ steps.meta.outputs.tag }}-ubuntu-x86_64.tar.gz
+            muesli-bt-${{ steps.meta.outputs.tag }}-ubuntu-x86_64.tar.gz.sha256
+          if-no-files-found: error
+
+  build-macos-arm64:
+    name: build-macos-arm64
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: meta
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-].*)?$ ]]; then
+            echo "invalid tag format: $tag"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Verify Apple Silicon runner
+        run: |
+          set -euo pipefail
+          arch="$(uname -m)"
+          if [ "$arch" != "arm64" ]; then
+            echo "expected arm64 runner, got: $arch"
+            exit 1
+          fi
+
+      - name: Install build dependencies
+        run: |
+          brew update
+          brew install ninja
+
+      - name: Configure
+        run: |
+          cmake -S . -B build/release-macos -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/build/install-macos" \
+            -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON \
+            -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+            -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+            -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+
+      - name: Build
+        run: cmake --build build/release-macos --parallel
+
+      - name: Test
+        run: ctest --test-dir build/release-macos --output-on-failure
+
+      - name: Install
+        run: cmake --install build/release-macos
+
+      - name: Verify arm64 artifacts
+        run: |
+          set -euo pipefail
+          file build/install-macos/bin/muslisp | grep -q "arm64"
+          file build/install-macos/lib/libmuesli_bt_core.a | grep -q "arm64"
+
+      - name: Package
+        run: |
+          set -euo pipefail
+          tag="${{ steps.meta.outputs.tag }}"
+          archive="muesli-bt-${tag}-macos-arm64.tar.gz"
+          tar -C build/install-macos -czf "$archive" .
+          shasum -a 256 "$archive" > "${archive}.sha256"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-macos-arm64
+          path: |
+            muesli-bt-${{ steps.meta.outputs.tag }}-macos-arm64.tar.gz
+            muesli-bt-${{ steps.meta.outputs.tag }}-macos-arm64.tar.gz.sha256
+          if-no-files-found: error
+
+  publish:
+    name: publish-github-release
+    runs-on: ubuntu-latest
+    needs:
+      - build-ubuntu
+      - build-macos-arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release tag
+        id: meta
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          git fetch --tags --force
+          git rev-parse "refs/tags/${tag}" >/dev/null
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create combined checksums
+        run: |
+          set -euo pipefail
+          cat dist/*.sha256 > dist/SHA256SUMS.txt
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          generate_release_notes: true
+          append_body: true
+          body: |
+            Binary artefacts are attached for:
+            - Ubuntu x86_64
+            - macOS arm64 (Apple Silicon only)
+
+            GitHub auto-attaches source code archives (`.zip` and `.tar.gz`) for this tag.
+          files: |
+            dist/*.tar.gz
+            dist/*.sha256
+            dist/SHA256SUMS.txt

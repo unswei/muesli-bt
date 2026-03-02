@@ -5,7 +5,11 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 
 ## [Unreleased]
 
-No unreleased entries.
+### Added
+- Added release workflow (`.github/workflows/release.yml`) that builds and publishes:
+  - Ubuntu x86_64 binary archive
+  - macOS arm64 (Apple Silicon) binary archive
+  - GitHub Release assets with SHA256 checksums
 
 ## [0.1.0] - 2026-03-02
 
