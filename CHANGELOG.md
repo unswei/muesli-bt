@@ -19,6 +19,8 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - Added event line listener API in `bt::event_log::set_line_listener(...)` for pre-serialised stream transport.
 - Added runtime deterministic test mode helper in `bt::runtime_host::enable_deterministic_test_mode(...)`.
 - Added unit tests covering deterministic event mode and canonical serialisation parity.
+- Added installed/public PyBullet integration headers (`pybullet/extension.hpp`, `pybullet/racecar_demo.hpp`).
+- Added downstream smoketest flow that links runtime + integration target and exercises adapter attach + host tick path.
 
 ### Changed
 - `env.run-loop` now supports real multi-episode execution when backend reset is available.
@@ -32,6 +34,10 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - CMake install now publishes inspector share assets under `${prefix}/share/muesli_bt` (contract + schema).
 - `muesli_btConfig.cmake` now exports `muesli_bt_SHARE_DIR` for tooling to resolve installed shared assets.
 - CI install smoketest now verifies installed share assets and `muesli_bt_SHARE_DIR` export.
+- CMake package export now publishes integration target `muesli_bt::integration_pybullet` when built with `MUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON`.
+- Consumer smoketest now requires `muesli_bt::runtime` + `muesli_bt::integration_pybullet`.
+- CI install consumer-smoketest now builds/install package with integration enabled and validates installed integration artefacts.
+- Integration docs now define a stable C++ attach API path and explicit compatibility policy for inspector-facing API/schema changes.
 
 ### Fixed
 - Eliminated docs/runtime drift where `episode_max` was documented but previously not executed as a true episode loop.

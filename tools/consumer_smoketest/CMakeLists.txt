@@ -7,6 +7,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(muesli_bt CONFIG REQUIRED)
 
+if(NOT TARGET muesli_bt::integration_pybullet)
+  message(FATAL_ERROR "muesli_bt::integration_pybullet target is required for this smoketest")
+endif()
+
 if(NOT DEFINED muesli_bt_SHARE_DIR)
   message(FATAL_ERROR "muesli_bt_SHARE_DIR must be defined by muesli_btConfig.cmake")
 endif()
@@ -20,4 +24,4 @@ if(NOT EXISTS "${muesli_bt_SHARE_DIR}/schema/mbt.evt.v1.schema.json")
 endif()
 
 add_executable(mbt_inspector_smoketest main.cpp)
-target_link_libraries(mbt_inspector_smoketest PRIVATE muesli_bt::runtime)
+target_link_libraries(mbt_inspector_smoketest PRIVATE muesli_bt::runtime muesli_bt::integration_pybullet)

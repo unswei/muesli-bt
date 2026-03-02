@@ -17,6 +17,8 @@ This backlog is maintained forward from March 2, 2026.
   - [x] install exports include `muesli_bt_SHARE_DIR` and shared contract/schema assets
   - [x] canonical event-line serialisation API available for inspector transport parity
   - [x] deterministic host test mode API available (fixed seed + stable event ordering)
+  - [x] export integration target (`muesli_bt::integration_pybullet`) with installable headers
+  - [x] downstream consumer smoke proves runtime+integration attach and tick path via installed/public headers
   - [ ] add extended fixture coverage for asynchronous cancellation edge cases
   - [ ] add dedicated Studio compatibility matrix against release tags and `main`
 

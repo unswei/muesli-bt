@@ -68,7 +68,9 @@ if(MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
         PUBLIC
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/integrations>
+            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     )
+    set_target_properties(muesli_bt_integration_pybullet PROPERTIES EXPORT_NAME integration_pybullet)
     target_compile_features(muesli_bt_integration_pybullet PUBLIC cxx_std_20)
 endif()
 
@@ -212,7 +214,23 @@ install(TARGETS muesli_bt_core
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+if(MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
+    install(TARGETS muesli_bt_integration_pybullet
+        EXPORT muesli_btTargets
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()
+
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+if(MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
+    install(DIRECTORY integrations/pybullet/
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/pybullet
+        FILES_MATCHING PATTERN "*.hpp"
+    )
+endif()
 
 install(FILES
     docs/contracts/muesli-studio-integration.md

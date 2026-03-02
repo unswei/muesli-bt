@@ -44,6 +44,10 @@ Required capabilities include:
 - ticking/resetting instances through host/runtime entry points
 - reading event stream lines in-order
 - reading blackboard snapshots/entries needed for inspection
+- stable C++ integration attach flow through public headers only:
+  - `muslisp::runtime_config::register_extension(...)`
+  - `muslisp::create_global_env(runtime_config)`
+  - integration adapter attach entry points (for example `bt::set_racecar_sim_adapter(...)` for PyBullet)
 
 ### requirement 3: event callback contract
 
@@ -136,6 +140,17 @@ Required:
 - serialised envelope layout matches `mbt.evt.v1` exactly
 - one canonical serialisation path is used for file output and callback output
 
+### requirement 12: compatibility policy
+
+Runtime API and schema-affecting changes must follow explicit compatibility rules.
+
+Required:
+
+- `muesli-studio` consumes tagged `muesli-bt` releases; optional scheduled CI may test `main`
+- breaking inspector-facing C++ API changes require explicit changelog entries
+- event schema-affecting changes require schema/version update plus fixture and validator updates in the same change
+- contract changes must be acknowledged by changelog update (enforced in CI)
+
 ## api / syntax
 
 ### package consumption
@@ -145,6 +160,26 @@ find_package(muesli_bt CONFIG REQUIRED)
 
 add_executable(mbt_inspector ...)
 target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime)
+```
+
+Optional PyBullet integration target (when built and installed with `MUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON`):
+
+```cmake
+find_package(muesli_bt CONFIG REQUIRED)
+
+add_executable(mbt_inspector ...)
+target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_pybullet)
+```
+
+### c++ integration attach flow
+
+```cpp
+muslisp::runtime_config cfg;
+cfg.register_extension(muslisp::integrations::pybullet::make_extension());
+muslisp::env_ptr env = muslisp::create_global_env(std::move(cfg));
+
+bt::set_racecar_sim_adapter(adapter);
+muslisp::eval_source("(env.attach \"pybullet\")", env);
 ```
 
 ### event envelope

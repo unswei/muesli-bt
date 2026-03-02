@@ -19,6 +19,29 @@ Validation references:
 - pybullet backend extension: `integrations/pybullet/extension.cpp`
 - webots backend extension: `examples/webots_epuck_common/muesli_epuck_controller_impl.cpp`
 
+## Stable C++ Attach API
+
+The supported attach path for integrations is:
+
+1. Link `muesli_bt::runtime` and integration target (for example `muesli_bt::integration_pybullet`).
+2. Register integration extension through `muslisp::runtime_config::register_extension(...)`.
+3. Create environment through `muslisp::create_global_env(std::move(config))`.
+4. Attach backend in Lisp via `(env.attach "backend-name")`.
+5. Attach simulator/hardware adapter through integration public API where required (for example `bt::set_racecar_sim_adapter(...)`).
+
+Public headers for this flow:
+
+- `muslisp/eval.hpp`
+- `muslisp/extensions.hpp`
+- `bt/runtime_host.hpp`
+- `bt/event_log.hpp`
+- integration headers (for PyBullet: `pybullet/extension.hpp`, `pybullet/racecar_demo.hpp`)
+
+Event callback interface for inspectors:
+
+- `bt::event_log::set_line_listener(...)`: consume canonical pre-serialised `mbt.evt.v1` JSONL lines.
+- `bt::event_log::serialise_event_line(...)`: canonical envelope serialiser for parity checks.
+
 ## Minimal Responsibilities
 
 1. expose `env.info` with backend name + schema ids
