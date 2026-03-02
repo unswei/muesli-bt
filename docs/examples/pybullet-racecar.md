@@ -1,24 +1,40 @@
 # PyBullet: Racecar
 
+![PyBullet racecar scene](../assets/demos/pybullet-racecar/hero.png)
+
+_Scene preview of the racecar environment used by the demo._
+
+![PyBullet runtime snapshot](../assets/demos/pybullet-racecar/runtime.png)
+
+_Runtime action trace snapshot from a planner-mode run._
+
 ## What It Demonstrates
 
 - backend-managed observe/tick/act/step loop in PyBullet
 - BT safety branch + planner branch (`plan-action` -> `planner.plan`)
 - structured tick logs (`racecar_demo.v1`) with planner diagnostics
 
-## How To Run
+## Run It
 
-Detailed setup/build steps:
+```bash
+make demo-setup
+make demo-run MODE=bt_planner
+```
 
-- [example README (PyBullet racecar)](https://github.com/unswei/muesli-bt/blob/main/examples/pybullet_racecar/README.md)
-
-Minimal planner-mode run:
+Direct command:
 
 ```bash
 PYTHONPATH=build/dev/python \
   .venv-py311/bin/python examples/pybullet_racecar/run_demo.py \
   --mode bt_planner --budget-ms 20 --work-max 1200
 ```
+
+## What To Look For
+
+- budgets: planner `time_used_ms` should stay near or below configured `budget_ms`
+- behaviour switching: safety branch pre-empts when collisions are predicted
+- fallback: safe action path should be used when planner output is unavailable
+- event logging: inspect `racecar_demo.v1` records plus canonical `mbt.evt.v1` events
 
 ## Logs And Plots
 

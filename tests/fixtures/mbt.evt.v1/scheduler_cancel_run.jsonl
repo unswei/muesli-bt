@@ -1,0 +1,4 @@
+{"schema":"mbt.evt.v1","type":"run_start","run_id":"fixture-scheduler-cancel","unix_ms":1735689600250,"seq":1,"data":{"git_sha":"fixture","host":{"name":"muesli-bt","version":"0.1.0","platform":"linux"},"tick_hz":50.0,"tree_hash":"fnv1a64:cccccccccccccccd","capabilities":{"reset":true}}}
+{"schema":"mbt.evt.v1","type":"sched_submit","run_id":"fixture-scheduler-cancel","unix_ms":1735689600251,"seq":2,"tick":8,"data":{"job_id":202,"node_id":17,"queue_depth":1}}
+{"schema":"mbt.evt.v1","type":"sched_cancel","run_id":"fixture-scheduler-cancel","unix_ms":1735689600252,"seq":3,"tick":8,"data":{"job_id":202,"node_id":17,"status":"cancelled"}}
+{"schema":"mbt.evt.v1","type":"tick_end","run_id":"fixture-scheduler-cancel","unix_ms":1735689600253,"seq":4,"tick":8,"data":{"status":"failure","budget":{"tick_budget_ms":20.0,"tick_time_ms":1.4}}}

@@ -80,6 +80,32 @@ jobs:
           bash ./scripts/setup-python-env.sh .venv-py311
           .venv-py311/bin/python -c "import pybullet, mkdocs; print('python env ok')"
 
+  docs-strict:
+    name: docs-strict
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Graphviz
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y graphviz
+
+      - name: Build docs in strict mode
+        run: |
+          bash ./scripts/setup-python-env.sh .venv-py311
+          .venv-py311/bin/python -m mkdocs build --strict
+
   schema-validation:
     name: schema-validation
     runs-on: ubuntu-latest
@@ -214,6 +240,76 @@ jobs:
 
       - name: Test
         run: ctest --preset dev
+
+  core-sanitizers:
+    name: core-sanitizer-${{ matrix.sanitizer }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sanitizer: asan
+            cxx_flags: "-fsanitize=address -fno-omit-frame-pointer"
+          - sanitizer: ubsan
+            cxx_flags: "-fsanitize=undefined -fno-omit-frame-pointer"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build clang
+
+      - name: Configure core-only with sanitizer
+        run: |
+          cmake -S . -B build/sanitizer-${{ matrix.sanitizer }} -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_CXX_FLAGS="${{ matrix.cxx_flags }}" \
+            -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
+            -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+            -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+            -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+
+      - name: Build
+        run: cmake --build build/sanitizer-${{ matrix.sanitizer }} --parallel
+
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:strict_init_order=1
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: ctest --test-dir build/sanitizer-${{ matrix.sanitizer }} --output-on-failure
+
+  macos-core:
+    name: macos-core
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          brew update
+          brew install ninja
+
+      - name: Configure core-only build
+        run: |
+          cmake -S . -B build/macos-core -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
+            -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+            -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+            -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+
+      - name: Build
+        run: cmake --build build/macos-core --parallel
+
+      - name: Test
+        run: ctest --test-dir build/macos-core --output-on-failure
 
   macos-webots-consumer-smoketest:
     name: macos-webots-consumer-smoketest

@@ -20,6 +20,20 @@ Coverage includes:
 - async capability/VLA surface (`cap.*`, `vla.*`, handle metadata, JSON conversion)
 - VLA BT nodes (`vla-request`, `vla-wait`, `vla-cancel`) including cancel flow
 - [host](terminology.md#host) wrappers and typed robot interface injection
+- `env.run-loop` multi-episode semantics for reset-capable and reset-less backends
+
+## canonical event fixture suite
+
+Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:
+
+- `minimal_run.jsonl`
+- `planner_run.jsonl`
+- `scheduler_run.jsonl`
+- `scheduler_cancel_run.jsonl` (async cancellation edge case)
+- `vla_run.jsonl`
+- `vla_cancel_run.jsonl` (async cancellation edge case)
+- `deadline_fallback_run.jsonl` (deadline exceeded with safe fallback)
+- `resetless_unsupported_run.jsonl` (multi-episode request on reset-less backend)
 
 ## Run Tests
 

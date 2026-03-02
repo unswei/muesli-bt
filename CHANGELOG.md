@@ -5,6 +5,10 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 
 ## [Unreleased]
 
+No unreleased entries.
+
+## [0.1.0] - 2026-03-02
+
 ### Added
 - Added root `TODO.md` as a forward-maintained backlog file.
 - Added multi-episode `env.run-loop` tests for reset-capable and reset-less backends.
@@ -23,6 +27,12 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - Added downstream smoketest flow that links runtime + integration target and exercises adapter attach + host tick path.
 - Added Webots integration library sources under `integrations/webots/` with installable public attach API (`webots/extension.hpp`).
 - Added optional Webots consumer smoketest compile target that validates public attach API and link contract when exported.
+- Added contributor workflow guide at `CONTRIBUTING.md` (build, test, docs, format, boundary checks).
+- Added `core-only` CMake preset for deterministic runtime boundary verification.
+- Added package-consumption docs page at `docs/getting-started-consume.md`.
+- Added flagship demo visual assets under `docs/assets/demos/`.
+- Added deterministic fixture coverage for scheduler cancellation, VLA cancellation, deadline fallback, and reset-less unsupported loop semantics.
+- Added CI jobs for Linux docs strict mode, Linux core sanitizers (ASan/UBSan), and macOS core build/test.
 
 ### Changed
 - `env.run-loop` now supports real multi-episode execution when backend reset is available.
@@ -44,6 +54,11 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - CMake now detects missing Webots SDK and omits `integration_webots` cleanly (core/runtime still build and install).
 - Webots integration export now injects macOS runtime rpath to Webots root (not `Contents/lib/controller`) so downstream dyld lookup resolves `@rpath/Contents/lib/controller/*.dylib` correctly.
 - CI now includes a macOS Webots consumer smoketest that installs Webots, links `muesli_bt::integration_webots`, and runs the consumer binary to catch runtime linker regressions.
+- Updated `INSTALL.txt` to document the supported `cmake --install` and `find_package(muesli_bt CONFIG REQUIRED)` flow.
+- Updated docs home page with Studio/tool-builder callouts and flagship demo thumbnails.
+- Updated flagship demo pages with run recipes and behaviour-check guidance.
+- Expanded contracts index with a compatibility matrix.
+- Expanded testing docs to list the canonical fixture suite and high-risk behaviour fixtures.
 
 ### Fixed
 - Eliminated docs/runtime drift where `episode_max` was documented but previously not executed as a true episode loop.

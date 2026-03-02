@@ -23,6 +23,14 @@ cmake --build --preset dev -j
 ctest --preset dev
 ```
 
+Core-only boundary check (no optional integrations):
+
+```bash
+cmake --preset core-only
+cmake --build --preset core-only -j
+ctest --preset core-only
+```
+
 Without presets:
 
 ```bash
@@ -30,6 +38,15 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
 cmake --build build -j
 ctest --test-dir build --output-on-failure
 ```
+
+## Consume As A Package
+
+If you are embedding `muesli-bt` into another CMake project, use:
+
+- [consume as an installed package](getting-started-consume.md)
+
+That page covers `cmake --install`, exported targets, optional integrations, and
+the Studio contract assets shipped in `${prefix}/share/muesli_bt`.
 
 ## Run The REPL
 

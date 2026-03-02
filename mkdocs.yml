@@ -26,6 +26,7 @@ plugins:
           - terminology.md: terminology and glossary
           - getting-oriented/*.md: orientation guides
           - getting-started.md: quickstart and setup
+          - getting-started-consume.md: package installation and consumer setup
           - integration/*.md: backend integration workflows
           - contracts/*.md: integration contracts and compatibility guarantees
           - planning/*.md: planner API and backend docs
@@ -59,6 +60,7 @@ nav:
       - Terminology: terminology.md
   - Getting Started:
       - Getting Started: getting-started.md
+      - Consume As A Package: getting-started-consume.md
       - Lisp Basics: lisp-basics.md
   - Examples:
       - Overview: examples/index.md

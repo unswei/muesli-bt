@@ -1,23 +1,41 @@
 # Webots: e-puck Obstacle Avoidance + Wall Following
 
+![Webots e-puck obstacle scene](../assets/demos/webots-epuck-obstacle/hero.png)
+
+_Scene preview from the obstacle arena world and initial e-puck pose._
+
+![Webots obstacle runtime snapshot](../assets/demos/webots-epuck-obstacle/runtime.png)
+
+_Runtime budget snapshot from a recorded obstacle run._
+
 ## What It Demonstrates
 
 - BT branch switching between roam, wall-follow, and collision-avoid modes
 - backend observation mapping from e-puck proximity sensors
 - bounded tick budget logging in a simulator loop
 
-## How To Run
+## Run It
 
-Detailed setup/build steps:
+Build controller target:
 
-- [example README (Webots e-puck obstacle)](https://github.com/unswei/muesli-bt/blob/main/examples/webots_epuck_obstacle/README.md)
+```bash
+cmake --preset dev -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=ON
+cmake --build --preset dev --parallel --target muesli_webots_epuck_obstacle
+```
 
-Direct run (after building the Webots controller target):
+Run world:
 
 ```bash
 "$WEBOTS_HOME/webots" --batch --mode=fast --stdout --stderr \
   examples/webots_epuck_obstacle/worlds/epuck_obstacle_arena.wbt
 ```
+
+## What To Look For
+
+- budgets: watch `budget.tick_time_ms` against `budget.tick_budget_ms`
+- behaviour switching: BT should move across roam, wall-follow, and avoid branches
+- fallback: safety branch should win when front proximity rises
+- event logging: confirm active path and action outputs in JSONL records
 
 ## Logs And Plots
 
@@ -25,7 +43,7 @@ Direct run (after building the Webots controller target):
 - plot timeline:
 
 ```bash
-python3 examples/_tools/plot_bt_timeline.py \
+.venv-py311/bin/python examples/_tools/plot_bt_timeline.py \
   examples/webots_epuck_obstacle/logs/obstacle.jsonl \
   --out examples/webots_epuck_obstacle/out/bt_timeline.png
 ```

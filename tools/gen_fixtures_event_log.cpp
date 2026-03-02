@@ -56,6 +56,15 @@ std::vector<std::string> scheduler_run_lines()
       R"EVT({"schema":"mbt.evt.v1","type":"sched_finish","run_id":"fixture-scheduler","unix_ms":1735689600203,"seq":4,"tick":4,"data":{"job_id":101,"node_id":12,"status":"ok","run_time_ns":1200000}})EVT"};
 }
 
+std::vector<std::string> scheduler_cancel_run_lines()
+{
+  return {
+      R"EVT({"schema":"mbt.evt.v1","type":"run_start","run_id":"fixture-scheduler-cancel","unix_ms":1735689600250,"seq":1,"data":{"git_sha":"fixture","host":{"name":"muesli-bt","version":"0.1.0","platform":"linux"},"tick_hz":50.0,"tree_hash":"fnv1a64:cccccccccccccccd","capabilities":{"reset":true}}})EVT",
+      R"EVT({"schema":"mbt.evt.v1","type":"sched_submit","run_id":"fixture-scheduler-cancel","unix_ms":1735689600251,"seq":2,"tick":8,"data":{"job_id":202,"node_id":17,"queue_depth":1}})EVT",
+      R"EVT({"schema":"mbt.evt.v1","type":"sched_cancel","run_id":"fixture-scheduler-cancel","unix_ms":1735689600252,"seq":3,"tick":8,"data":{"job_id":202,"node_id":17,"status":"cancelled"}})EVT",
+      R"EVT({"schema":"mbt.evt.v1","type":"tick_end","run_id":"fixture-scheduler-cancel","unix_ms":1735689600253,"seq":4,"tick":8,"data":{"status":"failure","budget":{"tick_budget_ms":20.0,"tick_time_ms":1.4}}})EVT"};
+}
+
 std::vector<std::string> vla_run_lines()
 {
   return {
@@ -63,6 +72,30 @@ std::vector<std::string> vla_run_lines()
       R"EVT({"schema":"mbt.evt.v1","type":"vla_submit","run_id":"fixture-vla","unix_ms":1735689600301,"seq":2,"tick":2,"data":{"job_id":"job-1","node_id":7,"capability":"vision"}})EVT",
       R"EVT({"schema":"mbt.evt.v1","type":"vla_poll","run_id":"fixture-vla","unix_ms":1735689600302,"seq":3,"tick":3,"data":{"job_id":"job-1","node_id":7,"status":"running"}})EVT",
       R"EVT({"schema":"mbt.evt.v1","type":"vla_result","run_id":"fixture-vla","unix_ms":1735689600303,"seq":4,"tick":4,"data":{"job_id":"job-1","node_id":7,"status":"done","digest":"fnv1a64:eeeeeeeeeeeeeeee","record":{"schema_version":"vla.result.v1","action":{"action_schema":"action.u.v1","u":[0.0]}}}})EVT"};
+}
+
+std::vector<std::string> vla_cancel_run_lines()
+{
+  return {
+      R"EVT({"schema":"mbt.evt.v1","type":"run_start","run_id":"fixture-vla-cancel","unix_ms":1735689600350,"seq":1,"data":{"git_sha":"fixture","host":{"name":"muesli-bt","version":"0.1.0","platform":"linux"},"tick_hz":20.0,"tree_hash":"fnv1a64:ddddddddddddddde","capabilities":{"reset":true}}})EVT",
+      R"EVT({"schema":"mbt.evt.v1","type":"vla_submit","run_id":"fixture-vla-cancel","unix_ms":1735689600351,"seq":2,"tick":2,"data":{"job_id":"job-2","node_id":9,"capability":"vision"}})EVT",
+      R"EVT({"schema":"mbt.evt.v1","type":"vla_cancel","run_id":"fixture-vla-cancel","unix_ms":1735689600352,"seq":3,"tick":3,"data":{"job_id":"job-2","node_id":9,"accepted":true}})EVT",
+      R"EVT({"schema":"mbt.evt.v1","type":"vla_poll","run_id":"fixture-vla-cancel","unix_ms":1735689600353,"seq":4,"tick":4,"data":{"job_id":"job-2","node_id":9,"status":"cancelled"}})EVT"};
+}
+
+std::vector<std::string> deadline_fallback_run_lines()
+{
+  return {
+      R"EVT({"schema":"mbt.evt.v1","type":"run_start","run_id":"fixture-deadline-fallback","unix_ms":1735689600400,"seq":1,"data":{"git_sha":"fixture","host":{"name":"muesli-bt","version":"0.1.0","platform":"linux"},"tick_hz":20.0,"tree_hash":"fnv1a64:eeeeeeeeeeeeeeef","capabilities":{"reset":true}}})EVT",
+      R"EVT({"schema":"mbt.evt.v1","type":"tick_begin","run_id":"fixture-deadline-fallback","unix_ms":1735689600401,"seq":2,"tick":11,"data":{"root":1}})EVT",
+      R"EVT({"schema":"mbt.evt.v1","type":"tick_end","run_id":"fixture-deadline-fallback","unix_ms":1735689600402,"seq":3,"tick":11,"data":{"status":"running","used_fallback":true,"reason":"deadline_exceeded","budget":{"tick_budget_ms":20.0,"tick_time_ms":24.7}}})EVT"};
+}
+
+std::vector<std::string> resetless_unsupported_run_lines()
+{
+  return {
+      R"EVT({"schema":"mbt.evt.v1","type":"run_start","run_id":"fixture-resetless-unsupported","unix_ms":1735689600450,"seq":1,"data":{"git_sha":"fixture","host":{"name":"muesli-bt","version":"0.1.0","platform":"linux"},"tick_hz":20.0,"tree_hash":"fnv1a64:ffffffffffffffff","capabilities":{"reset":false}}})EVT",
+      R"EVT({"schema":"mbt.evt.v1","type":"error","run_id":"fixture-resetless-unsupported","unix_ms":1735689600451,"seq":2,"tick":1,"data":{"status":"unsupported","message":"episode_max>1 requires env.reset capability"}})EVT"};
 }
 
 } // namespace
@@ -80,7 +113,11 @@ int main(int argc, char** argv)
     write_lines(out_dir / "minimal_run.jsonl", minimal_run_lines());
     write_lines(out_dir / "planner_run.jsonl", planner_run_lines());
     write_lines(out_dir / "scheduler_run.jsonl", scheduler_run_lines());
+    write_lines(out_dir / "scheduler_cancel_run.jsonl", scheduler_cancel_run_lines());
     write_lines(out_dir / "vla_run.jsonl", vla_run_lines());
+    write_lines(out_dir / "vla_cancel_run.jsonl", vla_cancel_run_lines());
+    write_lines(out_dir / "deadline_fallback_run.jsonl", deadline_fallback_run_lines());
+    write_lines(out_dir / "resetless_unsupported_run.jsonl", resetless_unsupported_run_lines());
 
     std::cout << "wrote fixtures to " << out_dir << '\n';
     return 0;

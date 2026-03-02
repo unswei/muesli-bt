@@ -1,0 +1,2 @@
+{"schema":"mbt.evt.v1","type":"run_start","run_id":"fixture-resetless-unsupported","unix_ms":1735689600450,"seq":1,"data":{"git_sha":"fixture","host":{"name":"muesli-bt","version":"0.1.0","platform":"linux"},"tick_hz":20.0,"tree_hash":"fnv1a64:ffffffffffffffff","capabilities":{"reset":false}}}
+{"schema":"mbt.evt.v1","type":"error","run_id":"fixture-resetless-unsupported","unix_ms":1735689600451,"seq":2,"tick":1,"data":{"status":"unsupported","message":"episode_max>1 requires env.reset capability"}}
