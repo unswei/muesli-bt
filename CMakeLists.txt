@@ -305,6 +305,13 @@ endif ()
 
 add_test(NAME muslisp_tests COMMAND muslisp_tests)
 
+add_executable(muesli_bt_conformance_tests tests/conformance/mock_backend.cpp
+                                           tests/conformance/test_conformance_main.cpp)
+target_link_libraries(muesli_bt_conformance_tests PRIVATE muesli_bt_core)
+target_include_directories(muesli_bt_conformance_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
+add_test(NAME muesli_bt_conformance_tests COMMAND muesli_bt_conformance_tests)
+
 install(
   TARGETS muesli_bt_core
   EXPORT muesli_btTargets
@@ -353,11 +360,16 @@ if (TARGET muesli_bt_integration_webots)
   )
 endif ()
 
-install(FILES docs/contracts/muesli-studio-integration.md
-        DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/contracts
+install(
+  FILES docs/contracts/muesli-studio-integration.md docs/contracts/runtime-contract-v1.md
+        docs/contracts/compatibility.md docs/contracts/conformance.md
+  DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/contracts
 )
 
 install(FILES schema/mbt.evt.v1.schema.json DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/schema)
+install(FILES schemas/event_log/v1/mbt.evt.v1.schema.json
+        DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/schemas/event_log/v1
+)
 
 install(
   EXPORT muesli_btTargets

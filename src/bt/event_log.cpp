@@ -8,6 +8,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include "muesli_bt/contract/version.hpp"
+
 namespace bt {
 namespace {
 
@@ -147,6 +149,8 @@ void event_log::ensure_run_started(std::string_view tree_hash, std::string_view 
     data << "{\"git_sha\":\"" << json_escape(git_sha_) << "\","
          << "\"host\":{\"name\":\"" << json_escape(host_name_) << "\",\"version\":\"" << json_escape(host_version_)
          << "\",\"platform\":\"" << json_escape(host_platform_) << "\"},"
+         << "\"contract_version\":\"" << runtime_contract_version() << "\","
+         << "\"contract_id\":\"" << runtime_contract_id() << "\","
          << "\"tick_hz\":" << tick_hz_ << ","
          << "\"tree_hash\":\"" << json_escape(std::string(tree_hash)) << "\","
          << "\"capabilities\":" << capabilities_json << '}';
@@ -267,6 +271,14 @@ bool event_log::deterministic_time_enabled() const noexcept {
     return deterministic_time_enabled_;
 }
 
+std::string_view event_log::runtime_contract_version() noexcept {
+    return muesli_bt::contract::kRuntimeContractVersion;
+}
+
+std::string_view event_log::runtime_contract_id() noexcept {
+    return muesli_bt::contract::kRuntimeContractId;
+}
+
 std::string event_log::serialise_event_line(std::string_view type,
                                             std::string_view run_id,
                                             std::int64_t unix_ms,
@@ -275,6 +287,7 @@ std::string event_log::serialise_event_line(std::string_view type,
                                             std::string_view data_json) {
     std::ostringstream out;
     out << "{\"schema\":\"mbt.evt.v1\","
+        << "\"contract_version\":\"" << json_escape(runtime_contract_version()) << "\","
         << "\"type\":\"" << json_escape(type) << "\","
         << "\"run_id\":\"" << json_escape(run_id) << "\","
         << "\"unix_ms\":" << unix_ms << ','

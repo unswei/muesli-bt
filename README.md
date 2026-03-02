@@ -78,7 +78,7 @@ Open a REPL:
 
 ## muesli-studio integration
 
-`muesli-studio` is the inspector and tooling consumer for `muesli-bt` runtime data; this contract exists so integration behaviour stays stable and auditable across releases. The canonical contract lives at [docs/contracts/muesli-studio-integration.md](docs/contracts/muesli-studio-integration.md), with the authoritative event schema at [schema/mbt.evt.v1.schema.json](schema/mbt.evt.v1.schema.json) and deterministic fixtures at [tests/fixtures/mbt.evt.v1/](tests/fixtures/mbt.evt.v1/).
+`muesli-studio` is the inspector and tooling consumer for `muesli-bt` runtime data; this contract exists so integration behaviour stays stable and auditable across releases. The canonical runtime contract lives at [docs/contracts/runtime-contract-v1.md](docs/contracts/runtime-contract-v1.md), the Studio integration profile is [docs/contracts/muesli-studio-integration.md](docs/contracts/muesli-studio-integration.md), the authoritative event schema is [schemas/event_log/v1/mbt.evt.v1.schema.json](schemas/event_log/v1/mbt.evt.v1.schema.json), and deterministic fixtures are published under [tests/fixtures/mbt.evt.v1/](tests/fixtures/mbt.evt.v1/) and [fixtures/](fixtures/).
 
 ```cmake
 find_package(muesli_bt CONFIG REQUIRED)

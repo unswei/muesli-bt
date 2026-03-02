@@ -125,6 +125,9 @@ nav:
       - Sensing and Blackboard: integration/sensing-and-blackboard.md
   - Contracts:
       - Index: contracts/README.md
+      - Runtime Contract v1: contracts/runtime-contract-v1.md
+      - Compatibility Policy: contracts/compatibility.md
+      - Conformance Levels: contracts/conformance.md
       - muesli-studio Integration: contracts/muesli-studio-integration.md
   - Observability:
       - Canonical Event Log: observability/event-log.md

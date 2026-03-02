@@ -26,9 +26,11 @@ ctest --preset core-only
 Validate canonical event fixtures:
 
 ```bash
-python tools/validate_event_log.py \
-  --schema schema/mbt.evt.v1.schema.json \
-  tests/fixtures/mbt.evt.v1/*.jsonl
+python3 tools/validate_log.py \
+  --schema schemas/event_log/v1/mbt.evt.v1.schema.json \
+  tests/fixtures/mbt.evt.v1/*.jsonl \
+  fixtures/*/events.jsonl
+python3 tools/fixtures/verify_fixture.py
 ```
 
 ## docs
@@ -75,3 +77,8 @@ python3 scripts/normalise_text_files.py --apply
 - tests added or updated and passing
 - docs updated in the same change (no drift)
 - event schema and fixtures updated together when runtime behaviour changes
+- changelog updated when contract or schema files change
+- release notes for the next tag include explicit contract compatibility notes:
+  - previous contract/schema versions
+  - new contract/schema versions
+  - additive vs breaking impact

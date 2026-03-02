@@ -68,6 +68,7 @@ struct instance {
     const definition* def = nullptr;
     std::int64_t instance_handle = 0;
     std::unordered_map<node_id, node_memory> memory;
+    std::unordered_map<node_id, std::uint64_t> active_vla_jobs;
     std::unordered_set<node_id> halt_warning_emitted;
     blackboard bb;
     std::uint64_t tick_index = 0;

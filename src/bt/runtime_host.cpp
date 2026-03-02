@@ -9,6 +9,7 @@
 #include <thread>
 #include <utility>
 
+#include "muesli_bt/contract/events.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/printer.hpp"
 
@@ -155,6 +156,13 @@ runtime_host::runtime_host()
         data << "{\"job_id\":\"" << rec.request_hash << "\",\"node_id\":0,\"status\":\"" << rec.status
              << "\",\"digest\":\"" << event_log::hash64_hex(json) << "\",\"record\":" << json << '}';
         (void)events_.emit("vla_result", tick, data.str());
+
+        if (rec.completion_dropped) {
+            std::ostringstream drop_data;
+            drop_data << "{\"job_id\":\"" << rec.request_hash
+                      << "\",\"node_id\":0,\"reason\":\"completion_after_cancel\"}";
+            (void)events_.emit(muesli_bt::contract::kEventAsyncCompletionDropped, tick, drop_data.str());
+        }
     });
 }
 

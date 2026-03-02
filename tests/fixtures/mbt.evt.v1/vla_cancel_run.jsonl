@@ -1,4 +1,4 @@
-{"schema":"mbt.evt.v1","type":"run_start","run_id":"fixture-vla-cancel","unix_ms":1735689600350,"seq":1,"data":{"git_sha":"fixture","host":{"name":"muesli-bt","version":"0.1.0","platform":"linux"},"tick_hz":20.0,"tree_hash":"fnv1a64:ddddddddddddddde","capabilities":{"reset":true}}}
-{"schema":"mbt.evt.v1","type":"vla_submit","run_id":"fixture-vla-cancel","unix_ms":1735689600351,"seq":2,"tick":2,"data":{"job_id":"job-2","node_id":9,"capability":"vision"}}
-{"schema":"mbt.evt.v1","type":"vla_cancel","run_id":"fixture-vla-cancel","unix_ms":1735689600352,"seq":3,"tick":3,"data":{"job_id":"job-2","node_id":9,"accepted":true}}
-{"schema":"mbt.evt.v1","type":"vla_poll","run_id":"fixture-vla-cancel","unix_ms":1735689600353,"seq":4,"tick":4,"data":{"job_id":"job-2","node_id":9,"status":"cancelled"}}
+{"schema":"mbt.evt.v1","contract_version":"1.0.0","type":"run_start","run_id":"fixture-vla-cancel","unix_ms":1735689600350,"seq":1,"data":{"git_sha":"fixture","host":{"name":"muesli-bt","version":"0.1.0","platform":"linux"},"contract_version":"1.0.0","contract_id":"runtime-contract-v1.0.0","tick_hz":20.0,"tree_hash":"fnv1a64:ddddddddddddddde","capabilities":{"reset":true}}}
+{"schema":"mbt.evt.v1","contract_version":"1.0.0","type":"vla_submit","run_id":"fixture-vla-cancel","unix_ms":1735689600351,"seq":2,"tick":2,"data":{"job_id":"job-2","node_id":9,"capability":"vision"}}
+{"schema":"mbt.evt.v1","contract_version":"1.0.0","type":"vla_cancel","run_id":"fixture-vla-cancel","unix_ms":1735689600352,"seq":3,"tick":3,"data":{"job_id":"job-2","node_id":9,"accepted":true}}
+{"schema":"mbt.evt.v1","contract_version":"1.0.0","type":"vla_poll","run_id":"fixture-vla-cancel","unix_ms":1735689600353,"seq":4,"tick":4,"data":{"job_id":"job-2","node_id":9,"status":"cancelled"}}

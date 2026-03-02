@@ -1,6 +1,8 @@
 # schema
 
-This directory stores authoritative, versioned schemas for public `muesli-bt` interfaces.
+This directory stores compatibility copies of schemas for public `muesli-bt` interfaces.
+
+Canonical runtime-contract schema files live under `schemas/`.
 
 ## versioning rules
 
@@ -14,8 +16,8 @@ This directory stores authoritative, versioned schemas for public `muesli-bt` in
 Use the in-repo validator:
 
 ```bash
-python3 tools/validate_event_log.py \
-  --schema schema/mbt.evt.v1.schema.json \
+python3 tools/validate_log.py \
+  --schema schemas/event_log/v1/mbt.evt.v1.schema.json \
   tests/fixtures/mbt.evt.v1/*.jsonl
 ```
 

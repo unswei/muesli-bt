@@ -622,6 +622,7 @@ vla_service::vla_job_id vla_service::submit(const vla_request& request) {
             std::lock_guard<std::mutex> lock(mutex_);
             const double latency = elapsed_ms(state->submitted_at, finish);
             if (state->cancel_requested.load() && response.status == vla_status::ok) {
+                state->completion_dropped = true;
                 response.status = vla_status::cancelled;
                 response.explanation = "cancelled";
             }
@@ -677,6 +678,7 @@ vla_service::vla_job_id vla_service::submit(const vla_request& request) {
             rec.cache_hit = state->cache_hit;
             rec.replay_hit = state->replay_hit;
             rec.superseded = state->superseded;
+            rec.completion_dropped = state->completion_dropped;
         }
 
         append_record(rec);
@@ -744,7 +746,7 @@ bool vla_service::cancel(vla_job_id id) {
         }
         state = it->second;
         if (is_terminal(state->status)) {
-            return false;
+            return true;
         }
 
         state->cancel_requested.store(true);
@@ -1023,6 +1025,7 @@ std::string vla_service::record_to_json(const vla_record& record) const {
         << "\"cache_hit\":" << (record.cache_hit ? "true" : "false") << ','
         << "\"replay_hit\":" << (record.replay_hit ? "true" : "false") << ','
         << "\"superseded\":" << (record.superseded ? "true" : "false") << ','
+        << "\"completion_dropped\":" << (record.completion_dropped ? "true" : "false") << ','
         << "\"response\":" << record.response_json << '}';
     return out.str();
 }

@@ -1,0 +1,12 @@
+{
+  "contract_id": "runtime-contract-v1.0.0",
+  "contract_version": "1.0.0",
+  "cwd": "/Users/z3550628/Code/2026/muesli-bt",
+  "fixture_name": "budget-warning-case",
+  "generated_at_utc": "2026-03-02T23:19:28.099842+00:00",
+  "generator": "tools/fixtures/update_fixture.py",
+  "git_sha": "6e5fc47cff6722e97ae0a80b30a1a0c2e38d479a",
+  "platform": "macOS-15.7.4-arm64-arm-64bit-Mach-O",
+  "schema": "mbt.evt.v1",
+  "schema_path": "schemas/event_log/v1/mbt.evt.v1.schema.json"
+}

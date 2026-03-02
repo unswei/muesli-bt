@@ -2,9 +2,10 @@
 
 ## Test Layout
 
-The project currently uses a single C++ test binary:
+Core test binaries:
 
-- `tests/test_main.cpp`
+- `tests/test_main.cpp` (`muslisp_tests`)
+- `tests/conformance/test_conformance_main.cpp` (`muesli_bt_conformance_tests`, L0)
 
 Coverage includes:
 
@@ -21,6 +22,7 @@ Coverage includes:
 - VLA BT nodes (`vla-request`, `vla-wait`, `vla-cancel`) including cancel flow
 - [host](terminology.md#host) wrappers and typed robot interface injection
 - `env.run-loop` multi-episode semantics for reset-capable and reset-less backends
+- runtime-contract L0 conformance checks (tick ordering, budget/deadline hooks, async lifecycle, determinism)
 
 ## canonical event fixture suite
 
@@ -35,6 +37,12 @@ Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated i
 - `deadline_fallback_run.jsonl` (deadline exceeded with safe fallback)
 - `resetless_unsupported_run.jsonl` (multi-episode request on reset-less backend)
 
+Runtime-contract fixture bundles for reproducibility are stored under `fixtures/`:
+
+- `fixtures/budget-warning-case/`
+- `fixtures/deadline-cancel-case/`
+- `fixtures/determinism-replay-case/`
+
 ## Run Tests
 
 ```bash
@@ -45,6 +53,14 @@ or:
 
 ```bash
 ./build/dev/muslisp_tests
+./build/dev/muesli_bt_conformance_tests
+```
+
+Validate and verify fixtures:
+
+```bash
+python3 tools/validate_log.py --schema schemas/event_log/v1/mbt.evt.v1.schema.json tests/fixtures/mbt.evt.v1/*.jsonl
+python3 tools/fixtures/verify_fixture.py
 ```
 
 ## Deterministic BT Tests

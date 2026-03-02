@@ -9,6 +9,7 @@
 #include "bt/blackboard.hpp"
 #include "bt/planner.hpp"
 #include "bt/vla.hpp"
+#include "muesli_bt/contract/events.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
@@ -44,6 +45,85 @@ trace_buffer* resolve_trace_buffer(tick_context& ctx) {
 
 event_log* resolve_event_log(tick_context& ctx) {
     return ctx.svc.obs.events;
+}
+
+void emit_log(tick_context& ctx, log_level level, std::string category, std::string message);
+
+std::optional<double> tick_budget_ms(const tick_context& ctx) {
+    const auto configured = ctx.inst.tree_stats.configured_tick_budget;
+    if (configured.count() <= 0) {
+        return std::nullopt;
+    }
+    const auto as_ms = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(configured);
+    return as_ms.count();
+}
+
+std::optional<double> tick_remaining_ms(tick_context& ctx) {
+    const std::optional<double> budget = tick_budget_ms(ctx);
+    if (!budget.has_value()) {
+        return std::nullopt;
+    }
+    const auto now = tick_now(ctx);
+    const auto elapsed = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(now - ctx.tick_started_at).count();
+    return *budget - elapsed;
+}
+
+void emit_budget_warning_event(tick_context& ctx,
+                               std::string_view decision_point,
+                               std::optional<node_id> node,
+                               double remaining_ms,
+                               double threshold_ms,
+                               std::string_view reason) {
+    event_log* events = resolve_event_log(ctx);
+    if (!events) {
+        return;
+    }
+    std::ostringstream data;
+    data << "{\"decision_point\":\"" << event_log::json_escape(decision_point) << "\","
+         << "\"remaining_ms\":" << remaining_ms << ','
+         << "\"threshold_ms\":" << threshold_ms << ','
+         << "\"reason\":\"" << event_log::json_escape(reason) << "\"";
+    if (node.has_value()) {
+        data << ",\"node_id\":" << *node;
+    }
+    data << '}';
+    (void)events->emit(muesli_bt::contract::kEventBudgetWarning, ctx.tick_index, data.str());
+}
+
+void emit_deadline_exceeded_event(tick_context& ctx,
+                                  std::optional<node_id> node,
+                                  std::string_view source,
+                                  double tick_budget_ms_value,
+                                  double tick_elapsed_ms_value) {
+    event_log* events = resolve_event_log(ctx);
+    if (!events) {
+        return;
+    }
+    std::ostringstream data;
+    data << "{\"source\":\"" << event_log::json_escape(source) << "\","
+         << "\"tick_budget_ms\":" << tick_budget_ms_value << ','
+         << "\"tick_elapsed_ms\":" << tick_elapsed_ms_value;
+    if (node.has_value()) {
+        data << ",\"node_id\":" << *node;
+    }
+    data << '}';
+    (void)events->emit(muesli_bt::contract::kEventDeadlineExceeded, ctx.tick_index, data.str());
+}
+
+bool budget_allows_decision_point(tick_context& ctx, node_id node, std::string_view decision_point, double threshold_ms = 0.25) {
+    const std::optional<double> remaining = tick_remaining_ms(ctx);
+    if (!remaining.has_value()) {
+        return true;
+    }
+    if (*remaining >= threshold_ms) {
+        return true;
+    }
+    emit_budget_warning_event(ctx, decision_point, node, *remaining, threshold_ms, "insufficient_budget");
+    emit_log(ctx,
+             log_level::warn,
+             "bt",
+             std::string("budget blocked decision point: ") + std::string(decision_point) + " node=" + std::to_string(node));
+    return false;
 }
 
 std::string status_json(status st) {
@@ -721,6 +801,10 @@ public:
     ~tick_scope() {
         const auto end = tick_now(ctx_);
         const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(end - started_at_);
+        const double elapsed_ms = static_cast<double>(elapsed.count()) / 1'000'000.0;
+        const auto configured_budget = ctx_.inst.tree_stats.configured_tick_budget;
+        const double budget_ms =
+            std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(configured_budget).count();
 
         ctx_.inst.tree_stats.tick_duration.observe(elapsed, ctx_.inst.tree_stats.configured_tick_budget);
         ++ctx_.inst.tree_stats.tick_count;
@@ -734,6 +818,40 @@ public:
             warning.message = "tick budget overrun";
             emit_trace(ctx_, std::move(warning));
             emit_log(ctx_, log_level::warn, "bt", "tick budget overrun");
+
+            emit_budget_warning_event(ctx_,
+                                      "tick_end",
+                                      std::nullopt,
+                                      budget_ms - elapsed_ms,
+                                      0.0,
+                                      "tick_budget_overrun");
+            emit_deadline_exceeded_event(ctx_, std::nullopt, "tick_end", budget_ms, elapsed_ms);
+
+            if (ctx_.svc.vla && !ctx_.inst.active_vla_jobs.empty()) {
+                std::vector<node_id> to_erase;
+                to_erase.reserve(ctx_.inst.active_vla_jobs.size());
+                event_log* events = resolve_event_log(ctx_);
+                for (const auto& [node, job] : ctx_.inst.active_vla_jobs) {
+                    if (events) {
+                        std::ostringstream data;
+                        data << "{\"job_id\":\"" << job << "\",\"node_id\":" << node
+                             << ",\"reason\":\"tick_deadline_exceeded\"}";
+                        (void)events->emit(muesli_bt::contract::kEventAsyncCancelRequested, ctx_.tick_index, data.str());
+                    }
+
+                    const bool accepted = ctx_.svc.vla->cancel(job);
+                    if (events) {
+                        std::ostringstream data;
+                        data << "{\"job_id\":\"" << job << "\",\"node_id\":" << node << ",\"accepted\":"
+                             << (accepted ? "true" : "false") << ",\"reason\":\"tick_deadline_exceeded\"}";
+                        (void)events->emit(muesli_bt::contract::kEventAsyncCancelAcknowledged, ctx_.tick_index, data.str());
+                    }
+                    to_erase.push_back(node);
+                }
+                for (node_id node : to_erase) {
+                    ctx_.inst.active_vla_jobs.erase(node);
+                }
+            }
         }
 
         trace_event ev = make_trace_event(trace_event_kind::tick_end);
@@ -744,8 +862,11 @@ public:
         event_log* events = resolve_event_log(ctx_);
         if (events) {
             std::ostringstream data;
-            data << "{\"root_status\":" << status_json(status_) << ",\"tick_ms\":"
-                 << (static_cast<double>(elapsed.count()) / 1'000'000.0) << '}';
+            data << "{\"root_status\":" << status_json(status_) << ",\"tick_ms\":" << elapsed_ms;
+            if (configured_budget.count() > 0) {
+                data << ",\"tick_budget_ms\":" << budget_ms;
+            }
+            data << '}';
             (void)events->emit("tick_end", ctx_.tick_index, data.str());
         }
     }
@@ -764,6 +885,13 @@ public:
         trace_event ev = make_trace_event(trace_event_kind::node_enter);
         ev.node = node_.id;
         emit_trace(ctx_, std::move(ev));
+
+        event_log* events = resolve_event_log(ctx_);
+        if (events) {
+            std::ostringstream data;
+            data << "{\"node_id\":" << node_.id << '}';
+            (void)events->emit(muesli_bt::contract::kEventNodeEnter, ctx_.tick_index, data.str());
+        }
     }
 
     void set_status(status st) { status_ = st; }
@@ -797,6 +925,7 @@ public:
             std::ostringstream data;
             data << "{\"node_id\":" << node_.id << ",\"status\":" << status_json(status_)
                  << ",\"dur_ms\":" << (static_cast<double>(elapsed.count()) / 1'000'000.0) << '}';
+            (void)events->emit(muesli_bt::contract::kEventNodeExit, ctx_.tick_index, data.str());
             (void)events->emit("node_status", ctx_.tick_index, data.str());
         }
 
@@ -1091,16 +1220,52 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
         request.seed = ctx.svc.planner->derive_seed(request.node_name, ctx.tick_index);
     }
 
+    if (!budget_allows_decision_point(ctx, n.id, muesli_bt::contract::kEventPlannerCallStart)) {
+        return status::failure;
+    }
+
+    event_log* events = resolve_event_log(ctx);
+    const auto planner_call_started = tick_now(ctx);
+    if (events) {
+        std::ostringstream data;
+        data << "{\"node_id\":" << n.id << ",\"planner\":\"" << planner_backend_name(request.planner)
+             << "\",\"budget_ms\":" << request.budget_ms << "}";
+        (void)events->emit(muesli_bt::contract::kEventPlannerCallStart, ctx.tick_index, data.str());
+    }
+
     planner_result result;
     try {
         result = ctx.svc.planner->plan(request);
     } catch (const std::exception& e) {
+        if (events) {
+            const auto planner_call_finished = tick_now(ctx);
+            const double elapsed_ms =
+                std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(planner_call_finished - planner_call_started)
+                    .count();
+            std::ostringstream data;
+            data << "{\"node_id\":" << n.id << ",\"planner\":\"" << planner_backend_name(request.planner)
+                 << "\",\"status\":\"error\",\"time_used_ms\":" << elapsed_ms << ",\"message\":\""
+                 << event_log::json_escape(e.what()) << "\"}";
+            (void)events->emit(muesli_bt::contract::kEventPlannerCallEnd, ctx.tick_index, data.str());
+        }
         trace_event ev = make_trace_event(trace_event_kind::error);
         ev.node = n.id;
         ev.message = std::string("plan-action: planner threw: ") + e.what();
         emit_trace(ctx, std::move(ev));
         emit_log(ctx, log_level::error, "planner", std::string("plan-action: planner threw: ") + e.what());
         return status::failure;
+    }
+
+    if (events) {
+        const auto planner_call_finished = tick_now(ctx);
+        const double elapsed_ms =
+            std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(planner_call_finished - planner_call_started)
+                .count();
+        std::ostringstream data;
+        data << "{\"node_id\":" << n.id << ",\"planner\":\"" << planner_backend_name(result.planner)
+             << "\",\"status\":\"" << planner_status_name(result.status) << "\",\"time_used_ms\":" << elapsed_ms
+             << ",\"work_done\":" << result.stats.work_done << "}";
+        (void)events->emit(muesli_bt::contract::kEventPlannerCallEnd, ctx.tick_index, data.str());
     }
 
     if (result.action.u.empty()) {
@@ -1315,7 +1480,12 @@ status execute_vla_request(const node& n, tick_context& ctx, const std::vector<m
         request.seed = vla_service::hash64(request.run_id + "::" + request.node_name + "::" + std::to_string(ctx.tick_index));
     }
 
+    if (!budget_allows_decision_point(ctx, n.id, "vla_submit")) {
+        return status::failure;
+    }
+
     const vla_service::vla_job_id id = ctx.svc.vla->submit(request);
+    ctx.inst.active_vla_jobs[n.id] = id;
     ctx.bb_put(opts.job_key, bb_value{static_cast<std::int64_t>(id)}, opts.node_name);
 
     if (event_log* events = resolve_event_log(ctx); events) {
@@ -1341,13 +1511,19 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
 
     const bb_entry* job_entry = ctx.bb_get(opts.job_key);
     if (!job_entry) {
+        ctx.inst.active_vla_jobs.erase(n.id);
         emit_log(ctx, log_level::error, "vla", "vla-wait: missing job key: " + opts.job_key);
         return status::failure;
     }
     const auto* id_raw = std::get_if<std::int64_t>(&job_entry->value);
     if (!id_raw || *id_raw <= 0) {
+        ctx.inst.active_vla_jobs.erase(n.id);
         emit_log(ctx, log_level::error, "vla", "vla-wait: job key does not hold a valid job id");
         return status::failure;
+    }
+
+    if (!budget_allows_decision_point(ctx, n.id, "vla_poll")) {
+        return status::running;
     }
 
     const auto id = static_cast<vla_service::vla_job_id>(*id_raw);
@@ -1370,10 +1546,22 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
         clamp_confidence(poll.partial->confidence) >= opts.early_confidence && action_is_finite(*poll.partial->action_candidate)) {
         ctx.bb_put(opts.action_key, action_to_blackboard(*poll.partial->action_candidate), opts.node_name);
         if (opts.cancel_on_early_commit) {
-            (void)ctx.svc.vla->cancel(id);
+            if (event_log* events = resolve_event_log(ctx); events) {
+                std::ostringstream data;
+                data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"reason\":\"early_commit\"}";
+                (void)events->emit(muesli_bt::contract::kEventAsyncCancelRequested, ctx.tick_index, data.str());
+                const bool accepted = ctx.svc.vla->cancel(id);
+                std::ostringstream ack_data;
+                ack_data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"accepted\":"
+                         << (accepted ? "true" : "false") << "}";
+                (void)events->emit(muesli_bt::contract::kEventAsyncCancelAcknowledged, ctx.tick_index, ack_data.str());
+            } else {
+                (void)ctx.svc.vla->cancel(id);
+            }
         }
         if (opts.clear_job) {
             clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+            ctx.inst.active_vla_jobs.erase(n.id);
         }
         emit_log(ctx,
                  log_level::info,
@@ -1391,6 +1579,7 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
         ctx.bb_put(opts.action_key, action_to_blackboard(poll.final->action), opts.node_name);
         if (opts.clear_job) {
             clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+            ctx.inst.active_vla_jobs.erase(n.id);
         }
         emit_log(ctx, log_level::info, "vla", "vla-wait: committed final action");
         if (event_log* events = resolve_event_log(ctx); events) {
@@ -1402,8 +1591,18 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
         return status::success;
     }
 
+    if ((poll.status == vla_job_status::cancelled || poll.status == vla_job_status::timeout) && poll.final.has_value() &&
+        poll.final->status == vla_status::cancelled) {
+        if (event_log* events = resolve_event_log(ctx); events) {
+            std::ostringstream data;
+            data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"reason\":\"completion_after_cancel\"}";
+            (void)events->emit(muesli_bt::contract::kEventAsyncCompletionDropped, ctx.tick_index, data.str());
+        }
+    }
+
     if (opts.clear_job) {
         clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+        ctx.inst.active_vla_jobs.erase(n.id);
     }
 
     std::string failure_reason = "vla-wait: job failed";
@@ -1429,21 +1628,35 @@ status execute_vla_cancel(const node& n, tick_context& ctx, const std::vector<mu
     const vla_cancel_options opts = parse_vla_cancel_options(n, args);
     const bb_entry* job_entry = ctx.bb_get(opts.job_key);
     if (!job_entry) {
+        ctx.inst.active_vla_jobs.erase(n.id);
         return status::success;
     }
     const auto* id_raw = std::get_if<std::int64_t>(&job_entry->value);
     if (!id_raw || *id_raw <= 0) {
         clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+        ctx.inst.active_vla_jobs.erase(n.id);
         return status::success;
     }
 
     const auto id = static_cast<vla_service::vla_job_id>(*id_raw);
-    (void)ctx.svc.vla->cancel(id);
+    if (event_log* events = resolve_event_log(ctx); events) {
+        std::ostringstream req_data;
+        req_data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"reason\":\"explicit_cancel\"}";
+        (void)events->emit(muesli_bt::contract::kEventAsyncCancelRequested, ctx.tick_index, req_data.str());
+    }
+    const bool accepted = ctx.svc.vla->cancel(id);
     clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+    ctx.inst.active_vla_jobs.erase(n.id);
     emit_log(ctx, log_level::info, "vla", "vla-cancel: cancelled job=" + std::to_string(id));
     if (event_log* events = resolve_event_log(ctx); events) {
+        std::ostringstream ack_data;
+        ack_data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"accepted\":"
+                 << (accepted ? "true" : "false") << "}";
+        (void)events->emit(muesli_bt::contract::kEventAsyncCancelAcknowledged, ctx.tick_index, ack_data.str());
+
         std::ostringstream data;
-        data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"status\":\"cancelled\"}";
+        data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"status\":\"cancelled\",\"accepted\":"
+             << (accepted ? "true" : "false") << "}";
         (void)events->emit("vla_cancel", ctx.tick_index, data.str());
     }
     return status::success;
@@ -2082,11 +2295,17 @@ status tick(instance& inst, registry& reg, services& svc) {
 
     ++inst.tick_index;
     const auto tick_start = svc.clock ? svc.clock->now() : std::chrono::steady_clock::now();
+    auto tick_deadline = std::chrono::steady_clock::time_point::max();
+    if (inst.tree_stats.configured_tick_budget.count() > 0) {
+        tick_deadline = tick_start + inst.tree_stats.configured_tick_budget;
+    }
     tick_context ctx{.inst = inst,
                      .reg = reg,
                      .svc = svc,
                      .tick_index = inst.tick_index,
                      .now = tick_start,
+                     .tick_started_at = tick_start,
+                     .tick_deadline = tick_deadline,
                      .current_node = inst.def->root};
 
     if (svc.obs.events) {
@@ -2145,6 +2364,7 @@ void halt_subtree(instance& inst, registry& reg, services& svc, node_id root, st
 
 void reset(instance& inst) {
     inst.memory.clear();
+    inst.active_vla_jobs.clear();
     inst.halt_warning_emitted.clear();
     inst.bb.clear();
 }

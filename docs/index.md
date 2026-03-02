@@ -16,7 +16,7 @@ It keeps behaviour logic scriptable while the [host](terminology.md#host) (backe
 If you are building tooling around runtime data, start with:
 
 - [muesli-studio integration contract](contracts/muesli-studio-integration.md)
-- [canonical event schema (`mbt.evt.v1`)](https://github.com/unswei/muesli-bt/blob/main/schema/mbt.evt.v1.schema.json)
+- [canonical event schema (`mbt.evt.v1`)](https://github.com/unswei/muesli-bt/blob/main/schemas/event_log/v1/mbt.evt.v1.schema.json)
 - [deterministic fixtures](https://github.com/unswei/muesli-bt/tree/main/tests/fixtures/mbt.evt.v1)
 - [deterministic mode contract requirement](contracts/muesli-studio-integration.md#requirement-9-deterministic-mode-for-fixtures)
 

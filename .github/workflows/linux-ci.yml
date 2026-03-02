@@ -7,6 +7,8 @@ on:
       - master
       - release/*
   pull_request:
+  schedule:
+    - cron: "0 3 * * *"
   workflow_dispatch:
 
 permissions:
@@ -31,9 +33,9 @@ jobs:
           head_sha="${{ github.event.pull_request.head.sha }}"
           changed_files="$(git diff --name-only "$base_sha" "$head_sha")"
 
-          if echo "$changed_files" | grep -q '^docs/contracts/muesli-studio-integration.md$'; then
+          if echo "$changed_files" | grep -Eq '^docs/contracts/(muesli-studio-integration|runtime-contract-v1|compatibility|conformance)\.md$|^schemas/event_log/v1/mbt\.evt\.v1\.schema\.json$|^schema/mbt\.evt\.v1\.schema\.json$'; then
             if ! echo "$changed_files" | grep -q '^CHANGELOG.md$'; then
-              echo "docs/contracts/muesli-studio-integration.md changed without CHANGELOG.md update."
+              echo "contract or schema changed without CHANGELOG.md update."
               echo "Update CHANGELOG.md in the same PR when changing the integration contract."
               exit 1
             fi
@@ -125,9 +127,10 @@ jobs:
 
       - name: Validate event schema and fixtures
         run: |
-          python tools/validate_event_log.py \
-            --schema schema/mbt.evt.v1.schema.json \
-            tests/fixtures/mbt.evt.v1/*.jsonl
+          python tools/validate_log.py \
+            --schema schemas/event_log/v1/mbt.evt.v1.schema.json \
+            tests/fixtures/mbt.evt.v1/*.jsonl \
+            fixtures/*/events.jsonl
 
   fixture-drift:
     name: fixture-drift
@@ -142,14 +145,104 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install fixture verification dependency
+        run: python -m pip install jsonschema
+
       - name: Regenerate deterministic event fixtures
         run: |
           mkdir -p build/tools
           c++ -std=c++20 -O2 tools/gen_fixtures_event_log.cpp -o build/tools/gen_fixtures_event_log
           ./build/tools/gen_fixtures_event_log
+          python3 tools/fixtures/update_fixture.py
+          python3 tools/fixtures/verify_fixture.py
 
       - name: Check fixture drift
-        run: git diff --exit-code tests/fixtures/mbt.evt.v1
+        run: git diff --exit-code tests/fixtures/mbt.evt.v1 fixtures
+
+  conformance-l0:
+    name: conformance-l0
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++
+
+      - name: Configure core-only conformance
+        run: |
+          cmake -S . -B build/conformance-l0 -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
+            -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+            -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+            -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+
+      - name: Build conformance tests
+        run: cmake --build build/conformance-l0 --target muesli_bt_conformance_tests --parallel
+
+      - name: Run L0 conformance tests
+        run: ctest --test-dir build/conformance-l0 -R muesli_bt_conformance_tests --output-on-failure
+
+  conformance-l1-sim:
+    name: conformance-l1-sim
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++
+
+      - name: Configure simulator conformance build
+        run: |
+          cmake -S . -B build/conformance-l1 -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON \
+            -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+            -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+            -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+
+      - name: Build
+        run: cmake --build build/conformance-l1 --parallel
+
+      - name: Run simulator-backed checks
+        run: ctest --test-dir build/conformance-l1 --output-on-failure --repeat until-pass:2
+
+  conformance-l2-ros2:
+    name: conformance-l2-ros2
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install verification dependency
+        run: python -m pip install jsonschema
+
+      - name: Run fixture-level ROS2 surrogate checks
+        run: |
+          python3 tools/fixtures/verify_fixture.py
+          echo "L2 placeholder: ROS 2 rosbag conformance harness to be wired into this job."
 
   api-consumer-smoketest:
     name: api-consumer-smoketest
@@ -187,7 +280,11 @@ jobs:
           test -f build/install-root/include/pybullet/racecar_demo.hpp
           test -f build/install-root/lib/libmuesli_bt_integration_pybullet.a
           test -f build/install-root/share/muesli_bt/contracts/muesli-studio-integration.md
+          test -f build/install-root/share/muesli_bt/contracts/runtime-contract-v1.md
+          test -f build/install-root/share/muesli_bt/contracts/compatibility.md
+          test -f build/install-root/share/muesli_bt/contracts/conformance.md
           test -f build/install-root/share/muesli_bt/schema/mbt.evt.v1.schema.json
+          test -f build/install-root/share/muesli_bt/schemas/event_log/v1/mbt.evt.v1.schema.json
           grep -q "set(muesli_bt_SHARE_DIR " build/install-root/lib/cmake/muesli_bt/muesli_btConfig.cmake
           if grep -q "muesli_bt::integration_webots" build/install-root/lib/cmake/muesli_bt/muesli_btTargets.cmake; then
             test -f build/install-root/include/webots/extension.hpp

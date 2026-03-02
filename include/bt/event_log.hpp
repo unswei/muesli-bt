@@ -55,6 +55,8 @@ public:
     void set_deterministic_time(std::int64_t start_unix_ms, std::int64_t step_ms = 1) noexcept;
     void clear_deterministic_time() noexcept;
     [[nodiscard]] bool deterministic_time_enabled() const noexcept;
+    [[nodiscard]] static std::string_view runtime_contract_version() noexcept;
+    [[nodiscard]] static std::string_view runtime_contract_id() noexcept;
 
     [[nodiscard]] static std::string serialise_event_line(std::string_view type,
                                                           std::string_view run_id,

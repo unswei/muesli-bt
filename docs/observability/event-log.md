@@ -5,6 +5,7 @@
 ```json
 {
   "schema": "mbt.evt.v1",
+  "contract_version": "1.0.0",
   "type": "tick_begin",
   "run_id": "run-1735689600000",
   "unix_ms": 1735689600123,
@@ -17,6 +18,7 @@
 ## Envelope fields
 
 - `schema`: always `"mbt.evt.v1"`
+- `contract_version`: runtime contract version (`"1.0.0"` in runtime-contract v1)
 - `type`: event type
 - `run_id`: run identifier
 - `unix_ms`: UTC milliseconds
@@ -30,13 +32,19 @@
 - `bt_def`
 - `tick_begin`
 - `tick_end`
+- `node_enter`
+- `node_exit`
 - `node_status`
+- `budget_warning`
+- `deadline_exceeded`
 - `bb_write`
 - `bb_delete`
 - `bb_snapshot`
 - `sched_submit`, `sched_start`, `sched_finish`, `sched_cancel`
+- `planner_call_start`, `planner_call_end`
 - `planner_v1`
 - `vla_submit`, `vla_poll`, `vla_cancel`, `vla_result`
+- `async_cancel_requested`, `async_cancel_acknowledged`, `async_completion_dropped`
 - `error`
 
 ## Lisp controls

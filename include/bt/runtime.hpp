@@ -22,6 +22,8 @@ struct tick_context {
     services& svc;
     std::uint64_t tick_index = 0;
     std::chrono::steady_clock::time_point now{};
+    std::chrono::steady_clock::time_point tick_started_at{};
+    std::chrono::steady_clock::time_point tick_deadline{};
     node_id current_node = 0;
 
     void bb_put(std::string key, bb_value value, std::string writer_name = "");

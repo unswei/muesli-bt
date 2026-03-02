@@ -184,6 +184,7 @@ struct vla_record {
     bool cache_hit = false;
     bool replay_hit = false;
     bool superseded = false;
+    bool completion_dropped = false;
 };
 
 class vla_backend {
@@ -263,6 +264,7 @@ private:
         bool cache_hit = false;
         bool replay_hit = false;
         bool superseded = false;
+        bool completion_dropped = false;
         job_id scheduler_job_id = 0;
         std::chrono::steady_clock::time_point submitted_at{};
         std::chrono::steady_clock::time_point started_at{};

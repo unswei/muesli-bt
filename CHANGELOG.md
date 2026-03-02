@@ -5,7 +5,36 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 
 ## [Unreleased]
 
-- No unreleased changes yet.
+### Added
+- Added runtime contract v1 specification at `docs/contracts/runtime-contract-v1.md`.
+- Added compatibility policy and release-note/changelog compatibility rules at `docs/contracts/compatibility.md`.
+- Added conformance levels and execution guidance at `docs/contracts/conformance.md`.
+- Added public runtime-contract headers under `include/muesli_bt/contract/`.
+- Added L0 conformance test suite under `tests/conformance/` with deterministic mock backend.
+- Added runtime-contract fixture bundle tooling:
+  - `tools/fixtures/update_fixture.py`
+  - `tools/fixtures/verify_fixture.py`
+- Added published fixture bundles for:
+  - budget warning case
+  - deadline exceeded + cancellation case
+  - determinism replay case
+
+### Changed
+- Canonical event envelopes now include `contract_version`.
+- `run_start` payload now includes runtime contract metadata (`contract_version`, `contract_id`).
+- Event schema now tracks runtime-contract v1 events:
+  - `node_enter`, `node_exit`
+  - `budget_warning`, `deadline_exceeded`
+  - `planner_call_start`, `planner_call_end`
+  - `async_cancel_requested`, `async_cancel_acknowledged`, `async_completion_dropped`
+- Runtime now emits budget/deadline decision-point events and planner start/end anchors.
+- Runtime now tracks active async jobs per node and requests cancellation on tick deadline overrun.
+- VLA cancel is idempotent at API level (`vla_service::cancel`).
+- Canonical schema path is now published at `schemas/event_log/v1/mbt.evt.v1.schema.json` with validator `tools/validate_log.py`.
+- Linux CI now includes:
+  - explicit `conformance-l0` job on push/PR
+  - nightly/on-demand `conformance-l1-sim` and `conformance-l2-ros2` lanes
+  - fixture-bundle drift and verification checks
 
 ## [0.1.0] - 2026-03-02
 
