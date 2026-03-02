@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+      - release/*
   pull_request:
   workflow_dispatch:
 
@@ -321,23 +322,53 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          brew update
-          brew install ninja
-          brew install --cask webots
+          set -euo pipefail
+          if ! brew list ninja >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install ninja
+          fi
+
+          # The Webots cask occasionally flakes on transient network issues.
+          if [ -d /Applications/Webots.app/Contents/lib/controller ]; then
+            echo "Webots already present at /Applications/Webots.app"
+            exit 0
+          fi
+
+          attempts=0
+          until [ "$attempts" -ge 3 ]; do
+            attempts=$((attempts + 1))
+            if HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask webots; then
+              break
+            fi
+
+            echo "webots cask install attempt ${attempts} failed"
+            if [ "$attempts" -ge 3 ]; then
+              echo "webots cask install failed after ${attempts} attempts"
+              brew info --cask webots || true
+              exit 1
+            fi
+
+            sleep 20
+          done
 
       - name: Discover Webots home
         run: |
           set -euo pipefail
-          if [ -d /Applications/Webots.app/Contents/lib/controller ]; then
-            echo "WEBOTS_HOME=/Applications/Webots.app" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          app_path="$(ls -d /Applications/Webots*.app 2>/dev/null | head -n 1 || true)"
-          if [ -z "$app_path" ] || [ ! -d "$app_path/Contents/lib/controller" ]; then
-            echo "Webots installation not found under /Applications"
-            exit 1
-          fi
-          echo "WEBOTS_HOME=${app_path}" >> "$GITHUB_ENV"
+          for _ in $(seq 1 12); do
+            if [ -d /Applications/Webots.app/Contents/lib/controller ]; then
+              echo "WEBOTS_HOME=/Applications/Webots.app" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            app_path="$(ls -d /Applications/Webots*.app 2>/dev/null | head -n 1 || true)"
+            if [ -n "$app_path" ] && [ -d "$app_path/Contents/lib/controller" ]; then
+              echo "WEBOTS_HOME=${app_path}" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            sleep 5
+          done
+
+          echo "Webots installation not found under /Applications"
+          ls -la /Applications || true
+          exit 1
 
       - name: Configure runtime install build (Webots enabled)
         run: |
