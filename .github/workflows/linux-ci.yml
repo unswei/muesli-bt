@@ -156,6 +156,9 @@ jobs:
           test -f build/install-root/lib/cmake/muesli_bt/muesli_btConfig.cmake
           test -f build/install-root/lib/cmake/muesli_bt/muesli_btTargets.cmake
           test -f build/install-root/include/muslisp/eval.hpp
+          test -f build/install-root/share/muesli_bt/contracts/muesli-studio-integration.md
+          test -f build/install-root/share/muesli_bt/schema/mbt.evt.v1.schema.json
+          grep -q "set(muesli_bt_SHARE_DIR " build/install-root/lib/cmake/muesli_bt/muesli_btConfig.cmake
 
       - name: Configure and build consumer smoketest
         run: |

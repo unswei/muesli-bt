@@ -298,6 +298,28 @@ const robot_interface* runtime_host::robot_interface_ptr() const noexcept {
     return robot_;
 }
 
+void runtime_host::enable_deterministic_test_mode(std::uint64_t planner_seed,
+                                                  std::string run_id,
+                                                  std::int64_t unix_ms_start,
+                                                  std::int64_t unix_ms_step) {
+    if (run_id.empty()) {
+        run_id = "deterministic-run";
+    }
+    deterministic_test_mode_enabled_ = true;
+    planner_.set_base_seed(planner_seed);
+    events_.set_run_id(std::move(run_id));
+    events_.set_deterministic_time(unix_ms_start, unix_ms_step);
+}
+
+void runtime_host::disable_deterministic_test_mode() noexcept {
+    deterministic_test_mode_enabled_ = false;
+    events_.clear_deterministic_time();
+}
+
+bool runtime_host::deterministic_test_mode_enabled() const noexcept {
+    return deterministic_test_mode_enabled_;
+}
+
 void runtime_host::clear_logs() {
     logs_.clear();
     events_.clear_ring();

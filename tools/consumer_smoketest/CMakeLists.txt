@@ -7,5 +7,17 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(muesli_bt CONFIG REQUIRED)
 
+if(NOT DEFINED muesli_bt_SHARE_DIR)
+  message(FATAL_ERROR "muesli_bt_SHARE_DIR must be defined by muesli_btConfig.cmake")
+endif()
+
+if(NOT EXISTS "${muesli_bt_SHARE_DIR}/contracts/muesli-studio-integration.md")
+  message(FATAL_ERROR "missing installed contract: ${muesli_bt_SHARE_DIR}/contracts/muesli-studio-integration.md")
+endif()
+
+if(NOT EXISTS "${muesli_bt_SHARE_DIR}/schema/mbt.evt.v1.schema.json")
+  message(FATAL_ERROR "missing installed schema: ${muesli_bt_SHARE_DIR}/schema/mbt.evt.v1.schema.json")
+endif()
+
 add_executable(mbt_inspector_smoketest main.cpp)
 target_link_libraries(mbt_inspector_smoketest PRIVATE muesli_bt::runtime)

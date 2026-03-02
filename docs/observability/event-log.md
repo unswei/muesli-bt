@@ -47,6 +47,13 @@
 - `(events.dump [n])` -> list of JSON strings
 - `(events.snapshot-bb [#t])` -> request snapshot at next tick boundary
 
+## c++ integration hooks
+
+- `bt::event_log::set_line_listener(...)`: consume canonical pre-serialised JSON lines for streaming transports.
+- `bt::event_log::serialise_event_line(...)`: canonical serialiser for `mbt.evt.v1` envelopes.
+- `bt::event_log::set_deterministic_time(...)`: fixed timestamp progression for deterministic fixture/test runs.
+- `bt::runtime_host::enable_deterministic_test_mode(...)`: one-call deterministic mode (fixed planner seed + deterministic event timestamps).
+
 ## Notes
 
 - Blackboard `bb_write.preview` is size-limited (4KB JSON).

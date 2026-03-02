@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -14,6 +15,8 @@ namespace bt {
 
 class event_log {
 public:
+    using line_listener = std::function<void(const std::string&)>;
+
     explicit event_log(std::size_t ring_capacity = 4096);
 
     void set_enabled(bool enabled) noexcept;
@@ -45,6 +48,21 @@ public:
 
     std::uint64_t emit(std::string_view type, std::optional<std::uint64_t> tick, std::string_view data_json);
 
+    void set_line_listener(line_listener listener);
+    void clear_line_listener() noexcept;
+    [[nodiscard]] bool has_line_listener() const noexcept;
+
+    void set_deterministic_time(std::int64_t start_unix_ms, std::int64_t step_ms = 1) noexcept;
+    void clear_deterministic_time() noexcept;
+    [[nodiscard]] bool deterministic_time_enabled() const noexcept;
+
+    [[nodiscard]] static std::string serialise_event_line(std::string_view type,
+                                                          std::string_view run_id,
+                                                          std::int64_t unix_ms,
+                                                          std::uint64_t seq,
+                                                          std::optional<std::uint64_t> tick,
+                                                          std::string_view data_json);
+
     [[nodiscard]] std::vector<std::string> snapshot(std::size_t max_count = 0) const;
     void clear_ring();
 
@@ -55,10 +73,6 @@ public:
     [[nodiscard]] static std::string hash64_hex(std::string_view text);
 
 private:
-    [[nodiscard]] std::string make_envelope(std::string_view type,
-                                            std::optional<std::uint64_t> tick,
-                                            std::string_view data_json,
-                                            std::uint64_t seq) const;
     void append_ring_line(const std::string& line);
     void append_file_line(const std::string& line, bool flush_now);
     [[nodiscard]] static std::string node_kind_name(node_kind kind);
@@ -83,6 +97,12 @@ private:
     std::string host_name_ = "muesli-bt";
     std::string host_version_ = "dev";
     std::string host_platform_ = "unknown";
+
+    line_listener line_listener_{};
+
+    bool deterministic_time_enabled_ = false;
+    std::int64_t deterministic_unix_ms_ = 0;
+    std::int64_t deterministic_step_ms_ = 1;
 
     bool snapshot_bb_requested_ = false;
     bool snapshot_bb_full_ = false;

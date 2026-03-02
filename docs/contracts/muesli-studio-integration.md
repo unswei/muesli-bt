@@ -28,7 +28,11 @@ Required:
 - `find_package(muesli_bt CONFIG REQUIRED)` works against installed artefacts
 - imported target `muesli_bt::runtime` is exported and linkable
 - `muesli_btConfig.cmake` is installed
+- `muesli_btConfig.cmake` defines `muesli_bt_SHARE_DIR` to `${prefix}/share/muesli_bt`
 - public headers are installed under a stable include root
+- installed share assets include:
+  - `${prefix}/share/muesli_bt/contracts/muesli-studio-integration.md`
+  - `${prefix}/share/muesli_bt/schema/mbt.evt.v1.schema.json`
 
 ### requirement 2: inspector-facing host api
 
@@ -110,6 +114,7 @@ Required:
 - checked-in fixtures under `tests/fixtures/mbt.evt.v1/`
 - deterministic generator in-repo
 - CI drift check fails if regenerated fixtures differ from checked-in fixtures
+- host/runtime deterministic mode support with fixed seed and stable event ordering
 
 ### requirement 10: failure semantics
 
@@ -120,6 +125,16 @@ Required:
 - unknown schema versions fail validation in CI tooling
 - malformed JSONL lines fail validation in CI tooling
 - contract file updates require explicit changelog acknowledgement in CI
+
+### requirement 11: canonical serialisation for inspector transport
+
+`muesli-bt` must provide canonical event serialisation so Studio can preserve exact parity between websocket and JSONL transport without duplicating JSON formatting logic.
+
+Required:
+
+- canonical pre-serialised JSON event lines are available from runtime event APIs
+- serialised envelope layout matches `mbt.evt.v1` exactly
+- one canonical serialisation path is used for file output and callback output
 
 ## api / syntax
 

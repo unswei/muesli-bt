@@ -76,6 +76,7 @@ add_executable(muslisp src/main.cpp)
 target_link_libraries(muslisp PRIVATE muesli_bt_core)
 
 set(MUESLI_BT_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/muesli_bt")
+set(MUESLI_BT_INSTALL_SHAREDIR "${CMAKE_INSTALL_DATADIR}/muesli_bt")
 
 if(MUESLI_BT_BUILD_WEBOTS_EXAMPLES)
     find_path(WEBOTS_CPP_INCLUDE_DIR webots/Robot.hpp
@@ -213,6 +214,16 @@ install(TARGETS muesli_bt_core
 
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
+install(FILES
+    docs/contracts/muesli-studio-integration.md
+    DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/contracts
+)
+
+install(FILES
+    schema/mbt.evt.v1.schema.json
+    DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/schema
+)
+
 install(EXPORT muesli_btTargets
     NAMESPACE muesli_bt::
     FILE muesli_btTargets.cmake
@@ -223,6 +234,7 @@ configure_package_config_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/cmake/muesli_btConfig.cmake.in
     ${CMAKE_CURRENT_BINARY_DIR}/muesli_btConfig.cmake
     INSTALL_DESTINATION ${MUESLI_BT_INSTALL_CMAKEDIR}
+    PATH_VARS MUESLI_BT_INSTALL_SHAREDIR
 )
 
 write_basic_package_version_file(

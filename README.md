@@ -87,6 +87,8 @@ add_executable(mbt_inspector ...)
 target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime)
 ```
 
+muesli_btConfig.cmake also defines `muesli_bt_SHARE_DIR`, which points to the installed contract and schema assets under `${prefix}/share/muesli_bt`.
+
 muesli-studio pins to tagged muesli-bt releases; a scheduled CI job may test against `main`.
 
 ## Unified Python Environment (Docs + PyBullet)

@@ -2297,6 +2297,51 @@ void test_phase5_ring_buffer_bounds() {
     check(log_records.back().sequence == 3, "log ring should keep newest record");
 }
 
+void test_event_log_deterministic_mode_and_canonical_serialisation() {
+    bt::event_log events(16);
+    events.set_run_id("fixture-run");
+    events.set_deterministic_time(1735689600000, 3);
+
+    std::vector<std::string> callback_lines;
+    events.set_line_listener([&callback_lines](const std::string& line) { callback_lines.push_back(line); });
+
+    const std::uint64_t seq1 = events.emit("tick_begin", 1, "{\"root\":1}");
+    const std::uint64_t seq2 = events.emit("tick_end", 1, "{\"status\":\"success\"}");
+    check(seq1 == 1, "event log should start sequence at 1 after set_run_id");
+    check(seq2 == 2, "event log should increment sequence for each event");
+    check(callback_lines.size() == 2, "line listener should receive canonical line for each event");
+
+    const std::string expected_first = bt::event_log::serialise_event_line(
+        "tick_begin", "fixture-run", 1735689600000, 1, 1, "{\"root\":1}");
+    const std::string expected_second = bt::event_log::serialise_event_line(
+        "tick_end", "fixture-run", 1735689600003, 2, 1, "{\"status\":\"success\"}");
+    check(callback_lines[0] == expected_first, "line listener should receive canonical serialised tick_begin line");
+    check(callback_lines[1] == expected_second, "line listener should receive canonical serialised tick_end line");
+
+    const auto ring = events.snapshot();
+    check(ring.size() == 2, "event ring should contain emitted events");
+    check(ring == callback_lines, "event ring and callback lines should match canonical serialisation");
+}
+
+void test_runtime_host_deterministic_test_mode() {
+    bt::runtime_host host;
+    host.enable_deterministic_test_mode(4242, "deterministic-host", 1735689601000, 7);
+    check(host.deterministic_test_mode_enabled(), "runtime host should report deterministic mode enabled");
+    check(host.planner_ref().base_seed() == 4242, "deterministic mode should set fixed planner base seed");
+
+    (void)host.events().emit("tick_begin", 1, "{\"root\":1}");
+    const auto events = host.events().snapshot();
+    check(events.size() == 1, "deterministic mode smoke should emit one event");
+    check(events.front().find("\"run_id\":\"deterministic-host\"") != std::string::npos,
+          "deterministic mode should pin event run_id");
+    check(events.front().find("\"unix_ms\":1735689601000") != std::string::npos,
+          "deterministic mode should pin event timestamp progression");
+    check(events.front().find("\"seq\":1") != std::string::npos, "deterministic mode should preserve stable sequence ordering");
+
+    host.disable_deterministic_test_mode();
+    check(!host.deterministic_test_mode_enabled(), "runtime host should report deterministic mode disabled");
+}
+
 void test_phase6_sample_wrappers_tree() {
     using namespace muslisp;
 
@@ -3053,6 +3098,8 @@ int main() {
         {"env core interface unattached", test_env_core_interface_unattached},
         {"env run-loop multi-episode reset=true", test_env_run_loop_multi_episode_reset_true},
         {"env run-loop multi-episode reset=false", test_env_run_loop_multi_episode_reset_false},
+        {"event log deterministic mode + canonical serialisation", test_event_log_deterministic_mode_and_canonical_serialisation},
+        {"runtime host deterministic test mode", test_runtime_host_deterministic_test_mode},
         {"pybullet backend absent in core env", test_pybullet_backend_absent_in_core_env},
 #if MUESLI_BT_WITH_PYBULLET_INTEGRATION
         {"env generic pybullet backend contract", test_env_generic_pybullet_backend_contract},

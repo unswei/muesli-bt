@@ -15,6 +15,10 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - Added event log validator tool at `tools/validate_event_log.py`.
 - Added deterministic fixture generator at `tools/gen_fixtures_event_log.cpp`.
 - Added install consumer smoketest project at `tools/consumer_smoketest/`.
+- Added canonical event-line serialisation API in `bt::event_log::serialise_event_line(...)`.
+- Added event line listener API in `bt::event_log::set_line_listener(...)` for pre-serialised stream transport.
+- Added runtime deterministic test mode helper in `bt::runtime_host::enable_deterministic_test_mode(...)`.
+- Added unit tests covering deterministic event mode and canonical serialisation parity.
 
 ### Changed
 - `env.run-loop` now supports real multi-episode execution when backend reset is available.
@@ -25,6 +29,9 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - Root README now includes a dedicated `muesli-studio integration` section with contract/schema/fixture links and package consumer snippet.
 - Linux CI now enforces schema validation, fixture drift checks, installed-package consumer smoketest, and contract-change changelog acknowledgement.
 - CMake install/export now publishes `muesli_btConfig.cmake` and `muesli_bt::runtime` for external consumers.
+- CMake install now publishes inspector share assets under `${prefix}/share/muesli_bt` (contract + schema).
+- `muesli_btConfig.cmake` now exports `muesli_bt_SHARE_DIR` for tooling to resolve installed shared assets.
+- CI install smoketest now verifies installed share assets and `muesli_bt_SHARE_DIR` export.
 
 ### Fixed
 - Eliminated docs/runtime drift where `episode_max` was documented but previously not executed as a true episode loop.

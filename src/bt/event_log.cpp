@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace bt {
 namespace {
@@ -196,28 +197,93 @@ void event_log::emit_bt_def(const definition& def) {
 }
 
 std::uint64_t event_log::emit(std::string_view type, std::optional<std::uint64_t> tick, std::string_view data_json) {
-    bool enabled = true;
     bool file_enabled = false;
     bool flush_on_tick_end = true;
     std::uint64_t seq = 0;
+    std::string run_id;
+    std::int64_t unix_ms = 0;
+    line_listener listener{};
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        enabled = enabled_;
+        seq = ++seq_;
+        if (!enabled_) {
+            return seq;
+        }
         file_enabled = file_enabled_;
         flush_on_tick_end = flush_on_tick_end_;
-        seq = ++seq_;
-    }
-    if (!enabled) {
-        return seq;
+        run_id = run_id_;
+        if (deterministic_time_enabled_) {
+            unix_ms = deterministic_unix_ms_;
+            deterministic_unix_ms_ += deterministic_step_ms_;
+        } else {
+            unix_ms = unix_ms_now();
+        }
+        listener = line_listener_;
     }
 
-    const std::string line = make_envelope(type, tick, data_json, seq);
+    const std::string line = serialise_event_line(type, run_id, unix_ms, seq, tick, data_json);
     append_ring_line(line);
     if (file_enabled) {
         const bool flush_now = !flush_on_tick_end || type == "tick_end";
         append_file_line(line, flush_now);
     }
+    if (listener) {
+        listener(line);
+    }
     return seq;
+}
+
+void event_log::set_line_listener(line_listener listener) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    line_listener_ = std::move(listener);
+}
+
+void event_log::clear_line_listener() noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    line_listener_ = {};
+}
+
+bool event_log::has_line_listener() const noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return static_cast<bool>(line_listener_);
+}
+
+void event_log::set_deterministic_time(std::int64_t start_unix_ms, std::int64_t step_ms) noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    deterministic_time_enabled_ = true;
+    deterministic_unix_ms_ = start_unix_ms;
+    deterministic_step_ms_ = step_ms;
+}
+
+void event_log::clear_deterministic_time() noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    deterministic_time_enabled_ = false;
+    deterministic_unix_ms_ = 0;
+    deterministic_step_ms_ = 1;
+}
+
+bool event_log::deterministic_time_enabled() const noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return deterministic_time_enabled_;
+}
+
+std::string event_log::serialise_event_line(std::string_view type,
+                                            std::string_view run_id,
+                                            std::int64_t unix_ms,
+                                            std::uint64_t seq,
+                                            std::optional<std::uint64_t> tick,
+                                            std::string_view data_json) {
+    std::ostringstream out;
+    out << "{\"schema\":\"mbt.evt.v1\","
+        << "\"type\":\"" << json_escape(type) << "\","
+        << "\"run_id\":\"" << json_escape(run_id) << "\","
+        << "\"unix_ms\":" << unix_ms << ','
+        << "\"seq\":" << seq;
+    if (tick.has_value()) {
+        out << ",\"tick\":" << *tick;
+    }
+    out << ",\"data\":" << data_json << '}';
+    return out.str();
 }
 
 std::vector<std::string> event_log::snapshot(std::size_t max_count) const {
@@ -286,23 +352,6 @@ std::string event_log::hash64_hex(std::string_view text) {
     const std::uint64_t h = fnv1a_64(text);
     std::ostringstream out;
     out << "fnv1a64:" << std::hex << std::setw(16) << std::setfill('0') << h;
-    return out.str();
-}
-
-std::string event_log::make_envelope(std::string_view type,
-                                     std::optional<std::uint64_t> tick,
-                                     std::string_view data_json,
-                                     std::uint64_t seq) const {
-    std::ostringstream out;
-    out << "{\"schema\":\"mbt.evt.v1\","
-        << "\"type\":\"" << json_escape(type) << "\","
-        << "\"run_id\":\"" << json_escape(run_id_) << "\","
-        << "\"unix_ms\":" << unix_ms_now() << ','
-        << "\"seq\":" << seq;
-    if (tick.has_value()) {
-        out << ",\"tick\":" << *tick;
-    }
-    out << ",\"data\":" << data_json << '}';
     return out.str();
 }
 

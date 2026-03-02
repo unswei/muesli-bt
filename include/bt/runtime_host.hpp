@@ -53,6 +53,13 @@ public:
     robot_interface* robot_interface_ptr() noexcept;
     const robot_interface* robot_interface_ptr() const noexcept;
 
+    void enable_deterministic_test_mode(std::uint64_t planner_seed = 0x4d6f6f736c694254ull,
+                                        std::string run_id = "deterministic-run",
+                                        std::int64_t unix_ms_start = 1735689600000,
+                                        std::int64_t unix_ms_step = 1);
+    void disable_deterministic_test_mode() noexcept;
+    [[nodiscard]] bool deterministic_test_mode_enabled() const noexcept;
+
     void clear_logs();
     void clear_all();
 
@@ -82,6 +89,8 @@ private:
     std::unique_ptr<robot_interface> owned_robot_;
     clock_interface* clock_ = nullptr;
     robot_interface* robot_ = nullptr;
+
+    bool deterministic_test_mode_enabled_ = false;
 };
 
 runtime_host& default_runtime_host();
