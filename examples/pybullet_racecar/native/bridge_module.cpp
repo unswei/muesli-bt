@@ -5,12 +5,13 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "racecar_demo.hpp"
+#include "pybullet/racecar_demo.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/status.hpp"
 #include "muslisp/error.hpp"
@@ -18,7 +19,7 @@
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
 #include "muslisp/value.hpp"
-#include "pybullet_racecar_common/extension.hpp"
+#include "pybullet/extension.hpp"
 
 namespace py = pybind11;
 
@@ -349,8 +350,8 @@ class runtime_bridge {
 public:
     runtime_bridge() {
         muslisp::runtime_config config;
-        config.extension_register_hook = muslisp::ext::pybullet_racecar::register_extension;
-        env_ = muslisp::create_global_env(config);
+        config.register_extension(muslisp::integrations::pybullet::make_extension());
+        env_ = muslisp::create_global_env(std::move(config));
     }
     ~runtime_bridge() {
         bt::clear_racecar_demo_state();

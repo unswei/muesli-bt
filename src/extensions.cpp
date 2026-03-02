@@ -40,4 +40,15 @@ void registrar::ensure_registerable_name(const std::string& full_name, const cha
     }
 }
 
+void runtime_config::register_extension(std::unique_ptr<extension> ext) {
+    if (!ext) {
+        throw lisp_error("runtime_config.register_extension: extension must not be null");
+    }
+    extensions_.push_back(std::move(ext));
+}
+
+const std::vector<std::unique_ptr<extension>>& runtime_config::extensions() const noexcept {
+    return extensions_;
+}
+
 }  // namespace muslisp

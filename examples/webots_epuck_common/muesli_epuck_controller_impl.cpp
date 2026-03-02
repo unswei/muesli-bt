@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include <webots/DistanceSensor.hpp>
@@ -1106,14 +1107,26 @@ struct extension_context {
     std::shared_ptr<webots_env_backend> backend;
 };
 
-void register_extension(muslisp::registrar* r, void* user) {
-    (void)r;
-    auto* context = static_cast<extension_context*>(user);
-    if (!context || !context->backend) {
-        throw muslisp::lisp_error("webots extension context is invalid");
+class webots_extension final : public muslisp::extension {
+public:
+    explicit webots_extension(std::shared_ptr<webots_env_backend> backend) : backend_(std::move(backend)) {
+        if (!backend_) {
+            throw muslisp::lisp_error("webots extension context is invalid");
+        }
     }
-    muslisp::env_api_register_backend("webots", context->backend);
-}
+
+    [[nodiscard]] std::string name() const override {
+        return "integration.webots";
+    }
+
+    void register_lisp(muslisp::registrar& reg) const override {
+        (void)reg;
+        muslisp::env_api_register_backend("webots", backend_);
+    }
+
+private:
+    std::shared_ptr<webots_env_backend> backend_;
+};
 
 std::filesystem::path resolve_example_root(const char* argv0) {
     std::filesystem::path exe_path = argv0 ? std::filesystem::path(argv0) : std::filesystem::path("muesli_epuck");
@@ -1152,10 +1165,9 @@ int main(int argc, char** argv) {
         context.backend = std::make_shared<webots_env_backend>(&devices);
 
         muslisp::runtime_config config;
-        config.extension_register_hook = register_extension;
-        config.extension_register_user = &context;
+        config.register_extension(std::make_unique<webots_extension>(context.backend));
 
-        muslisp::env_ptr env = muslisp::create_global_env(config);
+        muslisp::env_ptr env = muslisp::create_global_env(std::move(config));
 
         const std::filesystem::path example_root = resolve_example_root(argc > 0 ? argv[0] : nullptr);
         const std::filesystem::path lisp_entry = example_root / "lisp" / "main.lisp";

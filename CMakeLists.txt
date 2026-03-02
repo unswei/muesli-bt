@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(MUESLI_BT_BUILD_PYTHON_BRIDGE "Build the Python bridge module (muesli_bt_bridge)" OFF)
 option(MUESLI_BT_BUILD_WEBOTS_EXAMPLES "Build the Webots e-puck example controllers" OFF)
+option(MUESLI_BT_BUILD_INTEGRATION_PYBULLET "Build the PyBullet integration library" ON)
 
 add_library(muesli_bt_core
     src/bt/blackboard.cpp
@@ -50,19 +51,20 @@ else()
     target_compile_options(muesli_bt_core PRIVATE -Wall -Wextra -Wpedantic)
 endif()
 
-add_library(muesli_bt_ext_pybullet_racecar
-    examples/pybullet_racecar/native/racecar_demo.cpp
-    examples/pybullet_racecar_common/extension.cpp
-)
+if(MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
+    add_library(muesli_bt_integration_pybullet
+        integrations/pybullet/extension.cpp
+        integrations/pybullet/racecar_demo.cpp
+    )
 
-target_link_libraries(muesli_bt_ext_pybullet_racecar PUBLIC muesli_bt_core)
-target_include_directories(muesli_bt_ext_pybullet_racecar
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/examples
-        ${CMAKE_CURRENT_SOURCE_DIR}/examples/pybullet_racecar/native
-)
-target_compile_features(muesli_bt_ext_pybullet_racecar PUBLIC cxx_std_20)
+    target_link_libraries(muesli_bt_integration_pybullet PUBLIC muesli_bt_core)
+    target_include_directories(muesli_bt_integration_pybullet
+        PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}/include
+            ${CMAKE_CURRENT_SOURCE_DIR}/integrations
+    )
+    target_compile_features(muesli_bt_integration_pybullet PUBLIC cxx_std_20)
+endif()
 
 add_executable(muslisp src/main.cpp)
 target_link_libraries(muslisp PRIVATE muesli_bt_core)
@@ -134,6 +136,10 @@ if(MUESLI_BT_BUILD_WEBOTS_EXAMPLES)
 endif()
 
 if(MUESLI_BT_BUILD_PYTHON_BRIDGE)
+    if(NOT MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
+        message(FATAL_ERROR "MUESLI_BT_BUILD_PYTHON_BRIDGE=ON requires MUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON")
+    endif()
+
     if(NOT Python3_EXECUTABLE)
         set(MUESLI_BT_LOCAL_PYTHON "${CMAKE_CURRENT_SOURCE_DIR}/.venv-py311/bin/python")
         if(EXISTS "${MUESLI_BT_LOCAL_PYTHON}")
@@ -172,14 +178,20 @@ if(MUESLI_BT_BUILD_PYTHON_BRIDGE)
     endif()
 
     pybind11_add_module(muesli_bt_bridge examples/pybullet_racecar/native/bridge_module.cpp)
-    target_link_libraries(muesli_bt_bridge PRIVATE muesli_bt_ext_pybullet_racecar)
-    target_include_directories(muesli_bt_bridge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(muesli_bt_bridge PRIVATE muesli_bt_integration_pybullet)
+    target_include_directories(muesli_bt_bridge PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/integrations)
     set_target_properties(muesli_bt_bridge PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/python")
 endif()
 
 enable_testing()
 
 add_executable(muslisp_tests tests/test_main.cpp)
-target_link_libraries(muslisp_tests PRIVATE muesli_bt_ext_pybullet_racecar)
+if(MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
+    target_link_libraries(muslisp_tests PRIVATE muesli_bt_integration_pybullet)
+    target_compile_definitions(muslisp_tests PRIVATE MUESLI_BT_WITH_PYBULLET_INTEGRATION=1)
+else()
+    target_link_libraries(muslisp_tests PRIVATE muesli_bt_core)
+    target_compile_definitions(muslisp_tests PRIVATE MUESLI_BT_WITH_PYBULLET_INTEGRATION=0)
+endif()
 
 add_test(NAME muslisp_tests COMMAND muslisp_tests)

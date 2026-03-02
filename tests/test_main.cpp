@@ -9,14 +9,17 @@
 #include <string>
 #include <thread>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "bt/instance.hpp"
 #include "bt/logging.hpp"
-#include "pybullet_racecar_common/extension.hpp"
-#include "racecar_demo.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/trace.hpp"
+#if MUESLI_BT_WITH_PYBULLET_INTEGRATION
+#include "pybullet/extension.hpp"
+#include "pybullet/racecar_demo.hpp"
+#endif
 #include "muslisp/env.hpp"
 #include "muslisp/env_api.hpp"
 #include "muslisp/error.hpp"
@@ -57,9 +60,13 @@ void reset_bt_runtime_host() {
 }
 
 muslisp::env_ptr create_env_with_pybullet_extension() {
+#if MUESLI_BT_WITH_PYBULLET_INTEGRATION
     muslisp::runtime_config config;
-    config.extension_register_hook = muslisp::ext::pybullet_racecar::register_extension;
-    return muslisp::create_global_env(config);
+    config.register_extension(muslisp::integrations::pybullet::make_extension());
+    return muslisp::create_global_env(std::move(config));
+#else
+    throw std::runtime_error("pybullet integration tests are disabled");
+#endif
 }
 
 std::filesystem::path temp_file_path(const std::string& stem, const std::string& extension = ".lisp") {
@@ -2387,6 +2394,7 @@ void test_phase6_custom_robot_interface() {
     host.set_robot_interface(nullptr);
 }
 
+#if MUESLI_BT_WITH_PYBULLET_INTEGRATION
 class mock_racecar_adapter final : public bt::racecar_sim_adapter {
 public:
     bt::racecar_state get_state() override {
@@ -2439,6 +2447,7 @@ public:
     std::array<double, 2> last_action{0.0, 0.0};
     std::vector<bt::racecar_tick_record> tick_records{};
 };
+#endif
 
 muslisp::map_key test_symbol_key(const std::string& name) {
     muslisp::map_key key;
@@ -2523,22 +2532,34 @@ public:
     std::int64_t last_seed = 0;
 };
 
-void register_test_loop_backend(muslisp::registrar* r, void* user) {
-    (void)r;
-    auto* backend_ptr = static_cast<std::shared_ptr<muslisp::env_backend>*>(user);
-    if (!backend_ptr || !(*backend_ptr)) {
-        throw muslisp::lisp_error("test backend registration requires non-null backend");
+class test_loop_extension final : public muslisp::extension {
+public:
+    explicit test_loop_extension(std::shared_ptr<muslisp::env_backend> backend) : backend_(std::move(backend)) {
+        if (!backend_) {
+            throw muslisp::lisp_error("test backend registration requires non-null backend");
+        }
     }
-    muslisp::env_api_register_backend("loop-test", *backend_ptr);
-}
+
+    [[nodiscard]] std::string name() const override {
+        return "tests.loop-backend";
+    }
+
+    void register_lisp(muslisp::registrar& reg) const override {
+        (void)reg;
+        muslisp::env_api_register_backend("loop-test", backend_);
+    }
+
+private:
+    std::shared_ptr<muslisp::env_backend> backend_;
+};
 
 muslisp::env_ptr create_env_with_test_loop_backend(const std::shared_ptr<muslisp::env_backend>& backend) {
     muslisp::runtime_config config;
-    config.extension_register_hook = register_test_loop_backend;
-    config.extension_register_user = const_cast<std::shared_ptr<muslisp::env_backend>*>(&backend);
-    return muslisp::create_global_env(config);
+    config.register_extension(std::make_unique<test_loop_extension>(backend));
+    return muslisp::create_global_env(std::move(config));
 }
 
+#if MUESLI_BT_WITH_PYBULLET_INTEGRATION
 void test_racecar_loop_contract() {
     using namespace muslisp;
 
@@ -2626,48 +2647,33 @@ void test_racecar_loop_error_safe_action() {
     bt::clear_racecar_demo_state();
 }
 
-void test_racecar_planner_model_and_sim_get_state_builtin() {
+void test_racecar_planner_model_and_env_api_contract() {
     using namespace muslisp;
 
     reset_bt_runtime_host();
     bt::runtime_host& host = bt::default_runtime_host();
-    bt::install_racecar_demo_callbacks(host);
-    check(host.planner_ref().has_model("racecar-kinematic-v1"), "planner should register racecar-kinematic-v1 model");
-
     env_ptr env = create_env_with_pybullet_extension();
+    check(host.planner_ref().has_model("racecar-kinematic-v1"), "planner should register racecar-kinematic-v1 model");
 
     auto adapter = std::make_shared<mock_racecar_adapter>();
     bt::set_racecar_sim_adapter(adapter);
 
+    (void)eval_text("(env.attach \"pybullet\")", env);
     value state_meta = eval_text(
         "(begin "
-        "  (define s (env.pybullet.get-state)) "
-        "  (list (map.get s 'state_schema \"none\") "
-        "        (map.get s 'x -1.0) "
-        "        (map.get s 'collision_count -1)))",
+        "  (define s (env.reset nil)) "
+        "  (define info (map.get s 'info (map.make))) "
+        "  (list (map.get info 'state_schema \"none\") "
+        "        (map.get info 'x -1.0) "
+        "        (map.get info 'collision_count -1)))",
         env);
     const auto state_fields = vector_from_list(state_meta);
-    check(state_fields.size() == 3, "env.pybullet.get-state metadata shape mismatch");
+    check(state_fields.size() == 3, "env.reset info metadata shape mismatch");
     check(is_string(state_fields[0]) && string_value(state_fields[0]) == "racecar_state.v1",
-          "env.pybullet.get-state should expose state_schema");
-    check(is_float(state_fields[1]), "env.pybullet.get-state should expose x as float");
+          "env.reset info should expose state_schema");
+    check(is_float(state_fields[1]), "env.reset info should expose x as float");
     check(is_integer(state_fields[2]) && integer_value(state_fields[2]) == 0,
-          "env.pybullet.get-state should expose collision_count as int");
-
-    (void)eval_text(
-        "(define loop-tree "
-        "  (bt.compile '(seq (act constant-drive action 0.0 0.2) (act apply-action action) (running))))",
-        env);
-    (void)eval_text("(define loop-inst (bt.new-instance loop-tree))", env);
-    (void)eval_text(
-        "(define loop-result "
-        "(env.pybullet.run-loop loop-inst \"tick_hz\" 1000 \"max_ticks\" 3 \"state_key\" 'state \"action_key\" 'action "
-        "\"steps_per_tick\" 1 \"mode\" \"test\"))",
-        env);
-    check(is_symbol(eval_text("(map.get loop-result 'status ':none)", env)), "env.pybullet.run-loop status should be symbol");
-    check(symbol_name(eval_text("(map.get loop-result 'status ':none)", env)) == ":stopped",
-          "env.pybullet.run-loop should stop on max ticks");
-    check(integer_value(eval_text("(map.get loop-result 'ticks -1)", env)) == 3, "env.pybullet.run-loop tick count mismatch");
+          "env.reset info should expose collision_count as int");
 
     (void)eval_text(
         "(define tree "
@@ -2690,6 +2696,7 @@ void test_racecar_planner_model_and_sim_get_state_builtin() {
 
     bt::clear_racecar_demo_state();
 }
+#endif
 
 void test_env_run_loop_multi_episode_reset_true() {
     using namespace muslisp;
@@ -2803,6 +2810,7 @@ void test_env_core_interface_unattached() {
     }
 }
 
+#if MUESLI_BT_WITH_PYBULLET_INTEGRATION
 void test_env_generic_pybullet_backend_contract() {
     using namespace muslisp;
 
@@ -2965,27 +2973,33 @@ void test_env_run_loop_log_record_shape() {
 
     bt::clear_racecar_demo_state();
 }
+#endif
 
-void test_pybullet_extension_symbols_absent_in_core_env() {
+void test_pybullet_backend_absent_in_core_env() {
     using namespace muslisp;
 
     reset_bt_runtime_host();
     env_ptr env = create_global_env();
     try {
-        (void)eval_text("env.pybullet.get-state", env);
-        throw std::runtime_error("expected env.pybullet.get-state to be unbound in core-only env");
-    } catch (const name_error&) {
+        (void)eval_text("(env.attach \"pybullet\")", env);
+        throw std::runtime_error("expected env.attach to reject unknown pybullet backend without extension");
+    } catch (const lisp_error& e) {
+        const std::string msg = e.what();
+        check(msg.find("unknown backend") != std::string::npos, "missing unknown backend error for pybullet attach");
     }
 }
 
-void test_pybullet_extension_symbols_present_with_hook() {
+#if MUESLI_BT_WITH_PYBULLET_INTEGRATION
+void test_pybullet_backend_present_with_extension() {
     using namespace muslisp;
 
     reset_bt_runtime_host();
     env_ptr env = create_env_with_pybullet_extension();
-    const value sym = eval_text("env.pybullet.get-state", env);
-    check(is_primitive(sym), "env.pybullet.get-state should resolve to a primitive with extension hook");
+    (void)eval_text("(env.attach \"pybullet\")", env);
+    check(string_value(eval_text("(map.get (env.info) 'backend \"\")", env)) == "pybullet",
+          "env.info backend should be pybullet when extension is installed");
 }
+#endif
 
 }  // namespace
 
@@ -3039,13 +3053,15 @@ int main() {
         {"env core interface unattached", test_env_core_interface_unattached},
         {"env run-loop multi-episode reset=true", test_env_run_loop_multi_episode_reset_true},
         {"env run-loop multi-episode reset=false", test_env_run_loop_multi_episode_reset_false},
+        {"pybullet backend absent in core env", test_pybullet_backend_absent_in_core_env},
+#if MUESLI_BT_WITH_PYBULLET_INTEGRATION
         {"env generic pybullet backend contract", test_env_generic_pybullet_backend_contract},
         {"env run-loop log record shape", test_env_run_loop_log_record_shape},
-        {"pybullet symbols absent in core env", test_pybullet_extension_symbols_absent_in_core_env},
-        {"pybullet symbols present with hook", test_pybullet_extension_symbols_present_with_hook},
+        {"pybullet backend present with extension", test_pybullet_backend_present_with_extension},
         {"racecar run-loop contract", test_racecar_loop_contract},
         {"racecar run-loop error safe-action", test_racecar_loop_error_safe_action},
-        {"racecar planner model + env.pybullet.get-state", test_racecar_planner_model_and_sim_get_state_builtin},
+        {"racecar planner model + env.api contract", test_racecar_planner_model_and_env_api_contract},
+#endif
         {"phase5 ring buffer bounds", test_phase5_ring_buffer_bounds},
         {"phase6 sample wrappers tree", test_phase6_sample_wrappers_tree},
         {"phase6 custom robot interface", test_phase6_custom_robot_interface},

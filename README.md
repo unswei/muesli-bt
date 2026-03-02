@@ -185,7 +185,7 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
   - `env.info`, `env.attach`, `env.configure`
   - `env.reset`, `env.observe`, `env.act`, `env.step`
   - `env.run-loop`, `env.debug-draw`
-- backend-specific extensions remain under `env.backend.*` style namespaces (for example `env.pybullet.*`)
+- backends are registered through explicit integration extensions (no legacy backend-specific Lisp namespaces)
 
 ### Observability and control
 
@@ -238,11 +238,12 @@ ctest --test-dir build/dev --output-on-failure
 
 ## Repository Layout
 
-- `src/`, `include/`: runtime, evaluator, BT engine, planner, VLA integration
+- `src/`, `include/`: core runtime, evaluator, BT engine, planner, VLA integration
+- `integrations/`: optional backend integrations (for example `integrations/pybullet/`)
 - `examples/bt/`: compact BT scripts
 - `examples/repl_scripts/`: end-to-end experiments and demos
 - `examples/pybullet_racecar/`: racecar demo package
-  - `native/`: demo-only C++ + pybind bridge code for `env.run-loop` / `env.pybullet.*`
+  - `native/`: demo bridge entrypoint that uses canonical `env.api.v1` via the PyBullet integration
 - `tests/`: unit/integration coverage
 - `docs/`: user and internals documentation
 

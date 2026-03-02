@@ -16,7 +16,7 @@ Validation references:
 - env core contract tests: `tests/test_main.cpp` (`test_env_core_interface_unattached`)
 - env generic backend contract tests: `tests/test_main.cpp` (`test_env_generic_pybullet_backend_contract`)
 - multi-episode run-loop tests: `tests/test_main.cpp` (`test_env_run_loop_multi_episode_reset_true`, `test_env_run_loop_multi_episode_reset_false`)
-- pybullet backend extension: `examples/pybullet_racecar_common/extension.cpp`
+- pybullet backend extension: `integrations/pybullet/extension.cpp`
 - webots backend extension: `examples/webots_epuck_common/muesli_epuck_controller_impl.cpp`
 
 ## Minimal Responsibilities
@@ -101,7 +101,6 @@ Planned:
 - [ ] additional production backends beyond demo-focused adapters
 
 Known limitations:
-- [ ] backend-specific extension APIs still exist for legacy/demo compatibility (`env.pybullet.*`)
 - [ ] Webots backend currently reports `reset=false`
 
 ## Minimal Template

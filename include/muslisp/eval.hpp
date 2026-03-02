@@ -14,6 +14,6 @@ value eval_sequence(const std::vector<value>& exprs, env_ptr scope);
 value invoke_callable(value fn_value, const std::vector<value>& args);
 value eval_source(std::string_view source, env_ptr scope);
 env_ptr create_global_env();
-env_ptr create_global_env(const runtime_config& config);
+env_ptr create_global_env(runtime_config config);
 
 }  // namespace muslisp

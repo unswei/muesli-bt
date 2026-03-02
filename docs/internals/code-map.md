@@ -43,7 +43,8 @@ Use this page to find where to implement specific changes.
 ### Demo integration (PyBullet racecar)
 
 - `examples/pybullet_racecar/run_demo.py` (demo entrypoint)
-- `examples/pybullet_racecar/native/racecar_demo.cpp` (demo builtins/callbacks/run-loop)
+- `integrations/pybullet/racecar_demo.cpp` (racecar adapter/callbacks/run-loop helpers)
+- `integrations/pybullet/extension.cpp` (PyBullet backend extension for `env.api.v1`)
 - `examples/pybullet_racecar/native/bridge_module.cpp` (Python bridge module)
 
 ## Where Do I Change X?

@@ -151,7 +151,8 @@ If Graphviz is unavailable, the script still generates a `.dot` file.
 ## Files
 
 - `run_demo.py`: demo entrypoint, PyBullet sim adapter, manual controls
-- `native/`: demo-native C++/pybind pieces (`env.run-loop` backend adapter, `env.pybullet.*` compatibility builtins, racecar model, Python bridge module)
+- `native/`: demo-native C++/pybind bridge entrypoint that drives canonical `env.api.v1`
+- `../../integrations/pybullet/`: optional C++ integration target and racecar adapter/model helpers
 - `bt/racecar_bt.lisp`: canonical BT DSL for diagram export
 - `scripts/plot_logs.py`: log-to-plot utility
 - `scripts/render_bt_dot.py`: DOT/SVG export helper

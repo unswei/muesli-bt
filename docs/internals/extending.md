@@ -2,7 +2,7 @@
 
 This page describes safe extension patterns for contributors.
 
-## Add A New Lisp Built-in
+## Add A New Core Lisp Built-in
 
 Checklist:
 
@@ -16,6 +16,17 @@ Notes:
 
 - Generic environment capability builtins (`env.*`) live in `src/env_builtins.cpp`.
 - Backend registration/attachment state for `env.*` lives in `src/env_api.cpp`.
+
+## Add A New Integration Extension
+
+Checklist:
+
+1. add an extension class that implements `muslisp::extension`
+2. register backend and optional builtins in `register_lisp(...)`
+3. register BT callbacks/models in `register_bt(...)` where needed
+4. expose a factory like `make_extension()` from the integration module
+5. register it from host setup via `runtime_config.register_extension(...)`
+6. add conformance/integration tests and docs under `docs/integration/`
 
 ## Add A New BT Language Node/Decorator (DSL)
 

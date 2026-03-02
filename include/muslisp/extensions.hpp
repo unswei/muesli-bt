@@ -1,9 +1,15 @@
 #pragma once
 
+#include <memory>
 #include <string>
+#include <vector>
 
 #include "muslisp/env.hpp"
 #include "muslisp/value.hpp"
+
+namespace bt {
+class runtime_host;
+}
 
 namespace muslisp {
 
@@ -23,11 +29,24 @@ private:
     env_ptr global_env_;
 };
 
-using extension_register_hook_fn = void (*)(registrar* r, void* user);
+class extension {
+public:
+    virtual ~extension() = default;
 
-struct runtime_config {
-    extension_register_hook_fn extension_register_hook = nullptr;
-    void* extension_register_user = nullptr;
+    [[nodiscard]] virtual std::string name() const = 0;
+    virtual void register_lisp(registrar& reg) const = 0;
+    virtual void register_bt(bt::runtime_host& host) const {
+        (void)host;
+    }
+};
+
+class runtime_config {
+public:
+    void register_extension(std::unique_ptr<extension> ext);
+    [[nodiscard]] const std::vector<std::unique_ptr<extension>>& extensions() const noexcept;
+
+private:
+    std::vector<std::unique_ptr<extension>> extensions_;
 };
 
 }  // namespace muslisp
