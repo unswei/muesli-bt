@@ -8,6 +8,13 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 ### Added
 - Added root `TODO.md` as a forward-maintained backlog file.
 - Added multi-episode `env.run-loop` tests for reset-capable and reset-less backends.
+- Added canonical Studio integration contract at `docs/contracts/muesli-studio-integration.md`.
+- Added contracts index at `docs/contracts/README.md`.
+- Added authoritative event schema at `schema/mbt.evt.v1.schema.json` and schema guidance at `schema/README.md`.
+- Added deterministic event fixtures under `tests/fixtures/mbt.evt.v1/`.
+- Added event log validator tool at `tools/validate_event_log.py`.
+- Added deterministic fixture generator at `tools/gen_fixtures_event_log.cpp`.
+- Added install consumer smoketest project at `tools/consumer_smoketest/`.
 
 ### Changed
 - `env.run-loop` now supports real multi-episode execution when backend reset is available.
@@ -15,6 +22,9 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - `env.run-loop` result map now includes `episodes_completed`, `steps_total`, `last_episode_steps`, `last_status`, `ok`, and `error`.
 - Integration/backend docs were updated to reflect actual backend implementation status and capabilities.
 - Environment adapter specification now documents name-based `env.attach`.
+- Root README now includes a dedicated `muesli-studio integration` section with contract/schema/fixture links and package consumer snippet.
+- Linux CI now enforces schema validation, fixture drift checks, installed-package consumer smoketest, and contract-change changelog acknowledgement.
+- CMake install/export now publishes `muesli_btConfig.cmake` and `muesli_bt::runtime` for external consumers.
 
 ### Fixed
 - Eliminated docs/runtime drift where `episode_max` was documented but previously not executed as a true episode loop.

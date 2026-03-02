@@ -76,6 +76,19 @@ Open a REPL:
 ./build/dev/muslisp
 ```
 
+## muesli-studio integration
+
+`muesli-studio` is the inspector and tooling consumer for `muesli-bt` runtime data; this contract exists so integration behaviour stays stable and auditable across releases. The canonical contract lives at [docs/contracts/muesli-studio-integration.md](docs/contracts/muesli-studio-integration.md), with the authoritative event schema at [schema/mbt.evt.v1.schema.json](schema/mbt.evt.v1.schema.json) and deterministic fixtures at [tests/fixtures/mbt.evt.v1/](tests/fixtures/mbt.evt.v1/).
+
+```cmake
+find_package(muesli_bt CONFIG REQUIRED)
+
+add_executable(mbt_inspector ...)
+target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime)
+```
+
+muesli-studio pins to tagged muesli-bt releases; a scheduled CI job may test against `main`.
+
 ## Unified Python Environment (Docs + PyBullet)
 
 Use one Python version for docs tooling and `pybullet`: Python `3.11`.

@@ -12,6 +12,32 @@ permissions:
   contents: read
 
 jobs:
+  contract-change-guard:
+    name: contract-change-guard
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require changelog update when contract changes
+        run: |
+          set -euo pipefail
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          changed_files="$(git diff --name-only "$base_sha" "$head_sha")"
+
+          if echo "$changed_files" | grep -q '^docs/contracts/muesli-studio-integration.md$'; then
+            if ! echo "$changed_files" | grep -q '^CHANGELOG.md$'; then
+              echo "docs/contracts/muesli-studio-integration.md changed without CHANGELOG.md update."
+              echo "Update CHANGELOG.md in the same PR when changing the integration contract."
+              exit 1
+            fi
+          fi
+
   diagram-drift:
     name: diagram-drift
     runs-on: ubuntu-latest
@@ -53,6 +79,90 @@ jobs:
         run: |
           bash ./scripts/setup-python-env.sh .venv-py311
           .venv-py311/bin/python -c "import pybullet, mkdocs; print('python env ok')"
+
+  schema-validation:
+    name: schema-validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install schema validation dependency
+        run: python -m pip install jsonschema
+
+      - name: Validate event schema and fixtures
+        run: |
+          python tools/validate_event_log.py \
+            --schema schema/mbt.evt.v1.schema.json \
+            tests/fixtures/mbt.evt.v1/*.jsonl
+
+  fixture-drift:
+    name: fixture-drift
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install compiler toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: Regenerate deterministic event fixtures
+        run: |
+          mkdir -p build/tools
+          c++ -std=c++20 -O2 tools/gen_fixtures_event_log.cpp -o build/tools/gen_fixtures_event_log
+          ./build/tools/gen_fixtures_event_log
+
+      - name: Check fixture drift
+        run: git diff --exit-code tests/fixtures/mbt.evt.v1
+
+  api-consumer-smoketest:
+    name: api-consumer-smoketest
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++
+
+      - name: Configure runtime install build
+        run: |
+          cmake -S . -B build/install-smoke -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/build/install-root" \
+            -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
+            -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+            -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+
+      - name: Build and install runtime package
+        run: |
+          cmake --build build/install-smoke --parallel
+          cmake --install build/install-smoke
+
+      - name: Verify installed package artefacts
+        run: |
+          test -f build/install-root/lib/cmake/muesli_bt/muesli_btConfig.cmake
+          test -f build/install-root/lib/cmake/muesli_bt/muesli_btTargets.cmake
+          test -f build/install-root/include/muslisp/eval.hpp
+
+      - name: Configure and build consumer smoketest
+        run: |
+          cmake -S tools/consumer_smoketest -B build/consumer-smoketest -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${GITHUB_WORKSPACE}/build/install-root"
+          cmake --build build/consumer-smoketest --parallel
 
   build-and-test:
     name: linux-${{ matrix.compiler }}

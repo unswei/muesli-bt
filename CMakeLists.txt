@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.20)
 
 project(muesli_bt VERSION 0.1.0 LANGUAGES CXX)
 
+include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -40,8 +43,11 @@ add_library(muesli_bt_core
 
 target_include_directories(muesli_bt_core
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
+
+set_target_properties(muesli_bt_core PROPERTIES EXPORT_NAME runtime)
 
 target_compile_features(muesli_bt_core PUBLIC cxx_std_20)
 
@@ -60,14 +66,16 @@ if(MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
     target_link_libraries(muesli_bt_integration_pybullet PUBLIC muesli_bt_core)
     target_include_directories(muesli_bt_integration_pybullet
         PUBLIC
-            ${CMAKE_CURRENT_SOURCE_DIR}/include
-            ${CMAKE_CURRENT_SOURCE_DIR}/integrations
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/integrations>
     )
     target_compile_features(muesli_bt_integration_pybullet PUBLIC cxx_std_20)
 endif()
 
 add_executable(muslisp src/main.cpp)
 target_link_libraries(muslisp PRIVATE muesli_bt_core)
+
+set(MUESLI_BT_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/muesli_bt")
 
 if(MUESLI_BT_BUILD_WEBOTS_EXAMPLES)
     find_path(WEBOTS_CPP_INCLUDE_DIR webots/Robot.hpp
@@ -195,3 +203,36 @@ else()
 endif()
 
 add_test(NAME muslisp_tests COMMAND muslisp_tests)
+
+install(TARGETS muesli_bt_core
+    EXPORT muesli_btTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+install(EXPORT muesli_btTargets
+    NAMESPACE muesli_bt::
+    FILE muesli_btTargets.cmake
+    DESTINATION ${MUESLI_BT_INSTALL_CMAKEDIR}
+)
+
+configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/muesli_btConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/muesli_btConfig.cmake
+    INSTALL_DESTINATION ${MUESLI_BT_INSTALL_CMAKEDIR}
+)
+
+write_basic_package_version_file(
+    ${CMAKE_CURRENT_BINARY_DIR}/muesli_btConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/muesli_btConfig.cmake
+    ${CMAKE_CURRENT_BINARY_DIR}/muesli_btConfigVersion.cmake
+    DESTINATION ${MUESLI_BT_INSTALL_CMAKEDIR}
+)

@@ -27,6 +27,7 @@ plugins:
           - getting-oriented/*.md: orientation guides
           - getting-started.md: quickstart and setup
           - integration/*.md: backend integration workflows
+          - contracts/*.md: integration contracts and compatibility guarantees
           - planning/*.md: planner API and backend docs
           - bt/*.md: behaviour tree semantics and usage
           - language/**/*.md: language syntax and reference
@@ -120,6 +121,9 @@ nav:
       - env API (`env.api.v1`): integration/env-api.md
       - Writing A Backend: integration/writing-a-backend.md
       - Sensing and Blackboard: integration/sensing-and-blackboard.md
+  - Contracts:
+      - Index: contracts/README.md
+      - muesli-studio Integration: contracts/muesli-studio-integration.md
   - Observability:
       - Canonical Event Log: observability/event-log.md
       - Tracing: observability/tracing.md

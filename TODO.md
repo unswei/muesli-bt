@@ -7,6 +7,15 @@ This backlog is maintained forward from March 2, 2026.
 - Finalize ROS2 backend scope and create initial `integrations/ros2` skeleton.
 - Add documentation examples for `env.run-loop` observer callback patterns and multi-episode analytics.
 - Audit environment backend docs for strict key naming consistency (`obs_schema`, `action_schema`, `state_schema`).
+- Studio integration readiness:
+  - [x] canonical contract published under `docs/contracts/`
+  - [x] canonical event schema published under `schema/`
+  - [x] deterministic fixture set committed under `tests/fixtures/mbt.evt.v1/`
+  - [x] CI schema validation and fixture drift gates enabled
+  - [x] CI install + consumer smoketest gate enabled
+  - [x] CI contract-change requires changelog acknowledgement
+  - [ ] add extended fixture coverage for asynchronous cancellation edge cases
+  - [ ] add dedicated Studio compatibility matrix against release tags and `main`
 
 ## Next
 
