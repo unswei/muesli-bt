@@ -8,6 +8,8 @@ It keeps behaviour logic scriptable while the [host](terminology.md#host) (backe
 
 - [Getting oriented](getting-oriented/what-is-muesli-bt.md)
 - [Getting started](getting-started.md)
+- [runtime contract v1](contracts/runtime-contract-v1.md)
+- [conformance levels (L0/L1/L2)](contracts/conformance.md)
 - [Examples overview](examples/index.md)
 - [Terminology](terminology.md)
 
@@ -20,7 +22,16 @@ If you are building tooling around runtime data, start with:
 - [deterministic fixtures](https://github.com/unswei/muesli-bt/tree/main/tests/fixtures/mbt.evt.v1)
 - [deterministic mode contract requirement](contracts/muesli-studio-integration.md#requirement-9-deterministic-mode-for-fixtures)
 
-## flagship demos
+## conformance quick run
+
+```bash
+cmake --preset dev
+cmake --build --preset dev -j
+ctest --preset dev -R muesli_bt_conformance_tests --output-on-failure
+python3 tools/validate_log.py --schema schemas/event_log/v1/mbt.evt.v1.schema.json tests/fixtures/mbt.evt.v1/*.jsonl
+```
+
+## demos
 
 | PyBullet racecar | Webots e-puck line | Webots e-puck obstacle |
 | --- | --- | --- |

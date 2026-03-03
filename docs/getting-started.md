@@ -31,6 +31,16 @@ cmake --build --preset core-only -j
 ctest --preset core-only
 ```
 
+Install verification (canonical event stream + schema validation):
+
+```bash
+make demo-setup
+make verify-install
+```
+
+`make verify-install` writes `logs/verify-install.mbt.evt.v1.jsonl` and validates it
+against `schemas/event_log/v1/mbt.evt.v1.schema.json`.
+
 Without presets:
 
 ```bash

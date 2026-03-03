@@ -2,6 +2,19 @@
 
 This runtime exposes VLA access through [host](../terminology.md#host) capabilities and async jobs.
 
+Current repository scope: **stub integration + contract hooks**.
+
+Implemented now:
+
+- async submit/poll/cancel interface and BT node semantics
+- cancellation and timeout behaviour in runtime lifecycle
+- canonical `mbt.evt.v1` logging for VLA events
+
+Host-defined / placeholder in this repo:
+
+- production model/provider transport and credentials
+- remote inference integration details beyond stub/replay adapters
+
 Key principles:
 
 - mueslisp does not perform raw HTTP/model credential handling

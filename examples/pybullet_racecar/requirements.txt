@@ -2,3 +2,4 @@ pybullet==3.2.7
 matplotlib==3.10.8
 pynput==1.8.1
 pybind11==2.13.6
+jsonschema==4.25.1

@@ -3,6 +3,7 @@
 [![Linux CI](https://github.com/unswei/muesli-bt/actions/workflows/linux-ci.yml/badge.svg)](https://github.com/unswei/muesli-bt/actions/workflows/linux-ci.yml)
 [![Docs Pages](https://github.com/unswei/muesli-bt/actions/workflows/docs-pages.yml/badge.svg)](https://github.com/unswei/muesli-bt/actions/workflows/docs-pages.yml)
 [![Docs](https://img.shields.io/badge/docs-online-brightgreen)](https://unswei.github.io/muesli-bt/)
+[![Conformance](https://img.shields.io/badge/conformance-L0%20core%20in%20CI-blue)](docs/contracts/conformance.md)
 
 A compact Lisp runtime with an integrated Behaviour Tree engine, bounded-time planning, and async vision-language-action orchestration.
 
@@ -18,7 +19,42 @@ When control loops need to stay responsive, three things matter:
 
 muesli-bt keeps those concerns in one place with explicit runtime semantics and built-in observability.
 
-## Quick Start
+## Runtime Contract In One Minute
+
+Guarantees:
+
+1. Tick semantics are explicit and auditable (`tick_begin`/`tick_end`, ordered node events, stable tick index progression).
+2. Budget and deadline handling is enforced at decision points with observable overrun/cancellation events.
+3. Runtime observability uses one canonical external event stream: `mbt.evt.v1` JSONL with `contract_version`.
+
+Host obligations:
+
+1. The host owns time integration, sensor/actuator I/O, and safety fallback policy.
+2. The host owns timeout policy and provides planner/VLA capability backends.
+
+Authoritative contract artefacts:
+
+- [runtime contract v1](docs/contracts/runtime-contract-v1.md)
+- [muesli-studio integration contract](docs/contracts/muesli-studio-integration.md)
+- [canonical event schema (`mbt.evt.v1`)](schemas/event_log/v1/mbt.evt.v1.schema.json)
+- [deterministic fixtures](tests/fixtures/mbt.evt.v1/) and [fixture bundles](fixtures/)
+
+## Conformance Levels
+
+Conformance is layered so reviewers can separate core runtime semantics from heavier integration checks:
+
+- `L0`: core-only runtime contract checks (fast, deterministic, PR-safe)
+- `L1`: simulator integration conformance (PyBullet/Webots)
+- `L2`: ROS 2 conformance (rosbag-driven)
+
+Runbook and checklist: [conformance levels](docs/contracts/conformance.md).
+
+## From Zero To Verified Demo
+
+OS notes:
+
+- macOS: `brew install cmake ninja python@3.11`
+- Ubuntu/Debian: `sudo apt update && sudo apt install -y cmake ninja-build g++ python3.11 python3.11-venv`
 
 Build:
 
@@ -27,52 +63,28 @@ cmake --preset dev
 cmake --build --preset dev -j
 ```
 
-Run a basic BT script:
-
-```bash
-./build/dev/muslisp examples/bt/hello_bt.lisp
-```
-
-Run bounded-time planner demo:
-
-```bash
-./build/dev/muslisp examples/repl_scripts/planner-bt-1d.lisp
-```
-
-Run pure Lisp A* grid-search demo:
-
-```bash
-./build/dev/muslisp examples/repl_scripts/a-star-grid.lisp
-```
-
-Run pure Lisp Dijkstra grid-search demo (using native `pq.*`):
-
-```bash
-./build/dev/muslisp examples/repl_scripts/dijkstra-grid-pq.lisp
-```
-
-Run pure Lisp PRM demo (deterministic seed + `pq.*` shortest path):
-
-```bash
-./build/dev/muslisp examples/repl_scripts/prm-2d-pq.lisp
-```
-
-Run async VLA demo with fallback behaviour:
-
-```bash
-./build/dev/muslisp examples/repl_scripts/vla-stub-bt.lisp
-```
-
-Run the visual PyBullet racecar showcase:
+Run the visual PyBullet racecar demo:
 
 ```bash
 make demo-setup
 make demo-run MODE=bt_planner
 ```
 
-Open a REPL:
+Verify install (single command; writes + validates canonical event log):
 
 ```bash
+make verify-install
+```
+
+Additional runnable commands:
+
+```bash
+./build/dev/muslisp examples/bt/hello_bt.lisp
+./build/dev/muslisp examples/repl_scripts/planner-bt-1d.lisp
+./build/dev/muslisp examples/repl_scripts/a-star-grid.lisp
+./build/dev/muslisp examples/repl_scripts/dijkstra-grid-pq.lisp
+./build/dev/muslisp examples/repl_scripts/prm-2d-pq.lisp
+./build/dev/muslisp examples/repl_scripts/vla-stub-bt.lisp
 ./build/dev/muslisp
 ```
 
@@ -145,6 +157,21 @@ Then use that same environment for docs:
 
 - `make demo-setup`: installs pinned demo deps and builds `muesli_bt_bridge`.
 - `make demo-run MODE=bt_planner`: runs the racecar demo through the bridge/runtime path.
+- `make verify-install`: runs a deterministic BT smoke run, writes `logs/verify-install.mbt.evt.v1.jsonl`, and validates it against `mbt.evt.v1`.
+
+## VLA Integration Status
+
+VLA support in this repository is currently **stub integration + contract hooks**.
+
+What is real today:
+
+- async interface surface (`vla.submit`, `vla.poll`, `vla.cancel`)
+- cancellation lifecycle behaviour in BT nodes (`vla-request`, `vla-wait`, `vla-cancel`)
+- canonical runtime logging for VLA lifecycle events (`mbt.evt.v1`)
+
+What is placeholder today:
+
+- production model transport/auth/provider integration (implemented by host backends, not by `muslisp` itself)
 
 ## A Small Hybrid Example
 
