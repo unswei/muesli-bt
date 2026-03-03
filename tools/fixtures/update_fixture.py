@@ -373,6 +373,11 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Optional fixture name filter. May be passed multiple times.",
     )
+    parser.add_argument(
+        "--refresh-provenance",
+        action="store_true",
+        help="Refresh manifest provenance fields (git_sha and generated_from_commit_time_utc) from current HEAD.",
+    )
     return parser.parse_args()
 
 
@@ -404,6 +409,23 @@ def main() -> int:
         expected["events_sha256"] = digest
         write_json(fixture_dir / "expected_metrics.json", expected)
 
+        manifest_path = fixture_dir / "manifest.json"
+        existing_manifest: dict[str, object] = {}
+        if manifest_path.exists():
+            try:
+                loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    existing_manifest = loaded
+            except Exception:
+                existing_manifest = {}
+
+        if args.refresh_provenance:
+            manifest_git_sha = sha
+            manifest_commit_time = commit_time
+        else:
+            manifest_git_sha = str(existing_manifest.get("git_sha", sha))
+            manifest_commit_time = str(existing_manifest.get("generated_from_commit_time_utc", commit_time))
+
         manifest = {
             "fixture_name": name,
             "schema": SCHEMA_NAME,
@@ -411,11 +433,11 @@ def main() -> int:
             "contract_version": CONTRACT_VERSION,
             "contract_id": CONTRACT_ID,
             "generator": "tools/fixtures/update_fixture.py",
-            "generated_from_commit_time_utc": commit_time,
-            "git_sha": sha,
+            "generated_from_commit_time_utc": manifest_commit_time,
+            "git_sha": manifest_git_sha,
             "provenance_model": "deterministic-from-git",
         }
-        write_json(fixture_dir / "manifest.json", manifest)
+        write_json(manifest_path, manifest)
 
         print(f"updated {fixture_dir}")
 
