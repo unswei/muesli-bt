@@ -28,6 +28,11 @@ bool is_terminal(vla_job_status status) {
            status == vla_job_status::cancelled;
 }
 
+bool is_scheduler_terminal(job_status status) {
+    return status == job_status::done || status == job_status::failed || status == job_status::cancelled ||
+           status == job_status::unknown;
+}
+
 vla_job_status to_job_status(vla_status status) {
     switch (status) {
         case vla_status::ok:
@@ -396,6 +401,41 @@ vla_service::vla_service(scheduler* sched) : sched_(sched) {
             }
             return it->second;
         }));
+}
+
+vla_service::~vla_service() {
+    std::vector<job_id> scheduler_jobs;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        record_listener_ = {};
+        log_enabled_ = false;
+
+        scheduler_jobs.reserve(jobs_.size());
+        for (auto& [_, state] : jobs_) {
+            state->cancel_requested.store(true);
+            if (!is_terminal(state->status) && state->scheduler_job_id != 0) {
+                scheduler_jobs.push_back(state->scheduler_job_id);
+            }
+        }
+    }
+
+    if (!sched_) {
+        return;
+    }
+
+    for (const job_id id : scheduler_jobs) {
+        (void)sched_->cancel(id);
+    }
+
+    for (const job_id id : scheduler_jobs) {
+        while (true) {
+            const job_info info = sched_->get_info(id);
+            if (is_scheduler_terminal(info.status)) {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+    }
 }
 
 vla_service::vla_job_id vla_service::submit(const vla_request& request) {

@@ -6,9 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import pathlib
-import platform
 import subprocess
 from datetime import datetime, timezone
 
@@ -48,6 +46,20 @@ def git_sha() -> str:
         return (
             subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, stderr=subprocess.DEVNULL).strip()
         )
+    except Exception:
+        return "unknown"
+
+
+def git_commit_time_utc_iso8601() -> str:
+    try:
+        epoch = int(
+            subprocess.check_output(
+                ["git", "show", "-s", "--format=%ct", "HEAD"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        )
+        return datetime.fromtimestamp(epoch, timezone.utc).isoformat().replace("+00:00", "Z")
     except Exception:
         return "unknown"
 
@@ -374,9 +386,8 @@ def main() -> int:
             raise SystemExit(f"unknown fixture(s): {', '.join(sorted(unknown))}")
 
     FIXTURE_ROOT.mkdir(parents=True, exist_ok=True)
-    now = datetime.now(timezone.utc).isoformat()
     sha = git_sha()
-    host_platform = platform.platform()
+    commit_time = git_commit_time_utc_iso8601()
 
     for name, definition in definitions.items():
         if selected and name not in selected:
@@ -400,10 +411,9 @@ def main() -> int:
             "contract_version": CONTRACT_VERSION,
             "contract_id": CONTRACT_ID,
             "generator": "tools/fixtures/update_fixture.py",
-            "generated_at_utc": now,
+            "generated_from_commit_time_utc": commit_time,
             "git_sha": sha,
-            "platform": host_platform,
-            "cwd": os.getcwd(),
+            "provenance_model": "deterministic-from-git",
         }
         write_json(fixture_dir / "manifest.json", manifest)
 

@@ -201,6 +201,7 @@ public:
     using record_listener = std::function<void(const vla_record&, const std::string&)>;
 
     explicit vla_service(scheduler* sched);
+    ~vla_service();
 
     using vla_job_id = std::uint64_t;
 

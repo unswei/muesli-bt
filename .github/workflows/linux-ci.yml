@@ -43,6 +43,7 @@ jobs:
 
   diagram-drift:
     name: diagram-drift
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
 
     steps:
@@ -59,6 +60,7 @@ jobs:
 
   python-env:
     name: python-env
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
 
     steps:
@@ -85,6 +87,7 @@ jobs:
 
   docs-strict:
     name: docs-strict
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
 
     steps:
@@ -111,6 +114,7 @@ jobs:
 
   schema-validation:
     name: schema-validation
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
 
     steps:
@@ -134,6 +138,7 @@ jobs:
 
   fixture-drift:
     name: fixture-drift
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
 
     steps:
@@ -167,7 +172,7 @@ jobs:
   conformance-l0:
     name: conformance-l0
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    if: github.event_name != 'schedule'
 
     steps:
       - name: Checkout
@@ -246,6 +251,7 @@ jobs:
 
   api-consumer-smoketest:
     name: api-consumer-smoketest
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
 
     steps:
@@ -306,6 +312,7 @@ jobs:
 
   build-and-test:
     name: linux-${{ matrix.compiler }}
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -341,6 +348,7 @@ jobs:
 
   core-sanitizers:
     name: core-sanitizer-${{ matrix.sanitizer }}
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -383,6 +391,7 @@ jobs:
 
   macos-core:
     name: macos-core
+    if: github.event_name != 'schedule'
     runs-on: macos-latest
 
     steps:
@@ -411,6 +420,7 @@ jobs:
 
   macos-webots-consumer-smoketest:
     name: macos-webots-consumer-smoketest
+    if: github.event_name != 'schedule'
     runs-on: macos-latest
 
     steps:
