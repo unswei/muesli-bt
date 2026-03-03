@@ -2,9 +2,9 @@
   "contract_id": "runtime-contract-v1.0.0",
   "contract_version": "1.0.0",
   "fixture_name": "budget-warning-case",
-  "generated_from_commit_time_utc": "2026-03-02T23:31:35Z",
+  "generated_from_commit_time_utc": "2026-03-03T00:34:36Z",
   "generator": "tools/fixtures/update_fixture.py",
-  "git_sha": "3cac28f9e26ae46f6e975a75332abea50660abb6",
+  "git_sha": "2ecc18d5c64286f911b0d575dab9cca05a8f7a0d",
   "provenance_model": "deterministic-from-git",
   "schema": "mbt.evt.v1",
   "schema_path": "schemas/event_log/v1/mbt.evt.v1.schema.json"
