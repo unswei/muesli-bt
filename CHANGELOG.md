@@ -18,6 +18,9 @@ Earlier development happened during rapid prototyping and was not recorded as a 
   - budget warning case
   - deadline exceeded + cancellation case
   - determinism replay case
+- Added docs snippet freshness checker at `scripts/check_docs_snippet_freshness.py`.
+- Added CI docs snippet freshness gate in `.github/workflows/linux-ci.yml`.
+- Added ROS2-on `env.*` backend contract regression coverage (`test_env_generic_ros2_backend_contract`) and CI lane (`ros2-skeleton-contract`).
 
 ### Changed
 - Canonical event envelopes now include `contract_version`.
@@ -35,6 +38,8 @@ Earlier development happened during rapid prototyping and was not recorded as a 
   - explicit `conformance-l0` job on push/PR
   - nightly/on-demand `conformance-l1-sim` and `conformance-l2-ros2` lanes
   - fixture-bundle drift and verification checks
+- Webots callback attach flow no longer requires explicit callback installation for new consumers; `bt::integrations::webots::install_callbacks(...)` remains as a compatibility shim.
+- Core demo callback registration now includes `bb-truthy` and `select-action`.
 
 ## [0.1.0] - 2026-03-02
 
