@@ -5,6 +5,10 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 
 ## [Unreleased]
 
+No entries yet.
+
+## [0.2.0] - 2026-03-04
+
 ### Added
 - Added runtime contract v1 specification at `docs/contracts/runtime-contract-v1.md`.
 - Added compatibility policy and release-note/changelog compatibility rules at `docs/contracts/compatibility.md`.
