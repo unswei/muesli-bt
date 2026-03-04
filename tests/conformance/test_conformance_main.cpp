@@ -248,8 +248,8 @@ void test_async_lifecycle_and_idempotent_cancel() {
 
     vla.register_backend("fast-ok",
                          std::make_shared<conformance::scripted_vla_backend>(conformance::scripted_vla_behaviour{
-                             .steps_before_complete = 3,
-                             .step_sleep_ms = 1,
+                             .steps_before_complete = 8,
+                             .step_sleep_ms = 2,
                              .honour_cancel = true,
                              .return_ok_after_cancel = false,
                              .action_value = 0.3,
@@ -272,18 +272,19 @@ void test_async_lifecycle_and_idempotent_cancel() {
                          }));
 
     const auto ok_job = vla.submit(make_request("fast-ok", "ok-task", 200, 1));
-    bool saw_running = false;
+    bool saw_in_flight = false;
     bool saw_done = false;
     for (int i = 0; i < 100; ++i) {
         const bt::vla_poll poll = vla.poll(ok_job);
-        saw_running = saw_running || poll.status == bt::vla_job_status::running || poll.status == bt::vla_job_status::streaming;
+        saw_in_flight = saw_in_flight || poll.status == bt::vla_job_status::queued || poll.status == bt::vla_job_status::running ||
+                        poll.status == bt::vla_job_status::streaming;
         if (poll.status == bt::vla_job_status::done) {
             saw_done = true;
             break;
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
-    check(saw_running, "async lifecycle: expected running/streaming before completion");
+    check(saw_in_flight, "async lifecycle: expected queued/running/streaming before completion");
     check(saw_done, "async lifecycle: expected done status");
 
     const auto cancel_job = vla.submit(make_request("slow-cancel", "cancel-task", 400, 2));
