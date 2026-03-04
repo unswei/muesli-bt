@@ -19,11 +19,10 @@ Use this page when:
 - `L0` core-only conformance:
   - deterministic mock backend
   - no simulator dependency
-  - scheduled or on-demand CI lane
+  - runs on PR/push CI
 - `L1` simulator conformance:
   - PyBullet/Webots integration checks
-  - default push/PR CI gate
-  - also available on on-demand dispatch
+  - additional push/PR CI gate for simulator-backed integration checks
 - `L2` ROS 2 conformance:
   - rosbag-driven conformance checks
   - nightly or on-demand

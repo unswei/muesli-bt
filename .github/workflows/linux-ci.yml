@@ -184,7 +184,7 @@ jobs:
   conformance-l0:
     name: conformance-l0
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name != 'schedule'
 
     steps:
       - name: Checkout

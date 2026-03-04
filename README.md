@@ -43,8 +43,8 @@ Authoritative contract artefacts:
 
 Conformance is layered so reviewers can separate core runtime semantics from heavier integration checks:
 
-- `L1`: simulator integration conformance (PyBullet/Webots, default CI gate)
-- `L0`: core-only runtime contract checks (fast, deterministic, scheduled/on-demand lane)
+- `L0`: core-only runtime contract checks (fast, deterministic, PR-safe)
+- `L1`: simulator integration conformance (PyBullet/Webots, push/PR CI gate)
 - `L2`: ROS 2 conformance (rosbag-driven)
 - Generic `env.*` contract coverage in `muslisp_tests` includes both PyBullet and ROS2 skeleton backends.
 
