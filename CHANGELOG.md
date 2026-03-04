@@ -42,6 +42,8 @@ No entries yet.
   - explicit `conformance-l0` job on push/PR
   - nightly/on-demand `conformance-l1-sim` and `conformance-l2-ros2` lanes
   - fixture-bundle drift and verification checks
+- Linux CI conformance gating now defaults to `conformance-l1-sim` on push/PR/workflow-dispatch; `conformance-l0` moved to schedule/on-demand.
+- README and conformance docs now reflect `L1` as the default visible CI conformance lane.
 - Webots callback attach flow no longer requires explicit callback installation for new consumers; `bt::integrations::webots::install_callbacks(...)` remains as a compatibility shim.
 - Core demo callback registration now includes `bb-truthy` and `select-action`.
 

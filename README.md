@@ -3,7 +3,7 @@
 [![Linux CI](https://github.com/unswei/muesli-bt/actions/workflows/linux-ci.yml/badge.svg)](https://github.com/unswei/muesli-bt/actions/workflows/linux-ci.yml)
 [![Docs Pages](https://github.com/unswei/muesli-bt/actions/workflows/docs-pages.yml/badge.svg)](https://github.com/unswei/muesli-bt/actions/workflows/docs-pages.yml)
 [![Docs](https://img.shields.io/badge/docs-online-brightgreen)](https://unswei.github.io/muesli-bt/)
-[![Conformance](https://img.shields.io/badge/conformance-L0%20core%20in%20CI-blue)](docs/contracts/conformance.md)
+[![Conformance](https://img.shields.io/badge/conformance-L1%20sim%20in%20CI-blue)](docs/contracts/conformance.md)
 
 A compact Lisp runtime with an integrated Behaviour Tree engine, bounded-time planning, and async vision-language-action orchestration.
 
@@ -43,8 +43,8 @@ Authoritative contract artefacts:
 
 Conformance is layered so reviewers can separate core runtime semantics from heavier integration checks:
 
-- `L0`: core-only runtime contract checks (fast, deterministic, PR-safe)
-- `L1`: simulator integration conformance (PyBullet/Webots)
+- `L1`: simulator integration conformance (PyBullet/Webots, default CI gate)
+- `L0`: core-only runtime contract checks (fast, deterministic, scheduled/on-demand lane)
 - `L2`: ROS 2 conformance (rosbag-driven)
 - Generic `env.*` contract coverage in `muslisp_tests` includes both PyBullet and ROS2 skeleton backends.
 

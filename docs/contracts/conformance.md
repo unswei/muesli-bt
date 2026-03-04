@@ -19,11 +19,11 @@ Use this page when:
 - `L0` core-only conformance:
   - deterministic mock backend
   - no simulator dependency
-  - runs on all PRs
+  - scheduled or on-demand CI lane
 - `L1` simulator conformance:
   - PyBullet/Webots integration checks
-  - heavier runtime and environment checks
-  - nightly or on-demand
+  - default push/PR CI gate
+  - also available on on-demand dispatch
 - `L2` ROS 2 conformance:
   - rosbag-driven conformance checks
   - nightly or on-demand
@@ -76,7 +76,7 @@ Published L0 fixture bundles:
 ## gotchas
 
 - L0 should stay fast and hermetic; do not add simulator dependencies.
-- L1/L2 failures should signal integration risk but not block core authoring speed by default.
+- L2 failures should signal integration risk and stay non-blocking by default.
 - Deterministic fixtures are provenance-controlled; edit through update tooling only.
 
 ## see also
