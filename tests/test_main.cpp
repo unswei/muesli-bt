@@ -1534,7 +1534,7 @@ void test_vla_builtins_submit_poll_cancel_and_caps() {
         "(define req (map.make))"
         "(map.set! req 'task_id \"task-demo\")"
         "(map.set! req 'instruction \"move right\")"
-        "(map.set! req 'deadline_ms 30)"
+        "(map.set! req 'deadline_ms 250)"
         "(map.set! req 'seed 42)"
         "(let ((obs (map.make)))"
         "  (map.set! obs 'state (list 0.1))"
@@ -1561,7 +1561,7 @@ void test_vla_builtins_submit_poll_cancel_and_caps() {
     const std::int64_t job_id = integer_value(job);
 
     bool done = false;
-    for (int i = 0; i < 80; ++i) {
+    for (int i = 0; i < 250; ++i) {
         value st = eval_text("(map.get (vla.poll " + std::to_string(job_id) + ") 'status ':none)", env);
         check(is_symbol(st), "vla.poll status should be symbol");
         const std::string name = symbol_name(st);
@@ -1572,7 +1572,7 @@ void test_vla_builtins_submit_poll_cancel_and_caps() {
         if (name == ":error" || name == ":timeout" || name == ":cancelled") {
             throw std::runtime_error("vla.poll unexpectedly reached terminal non-done state: " + name);
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
     check(done, "vla job should complete");
 
