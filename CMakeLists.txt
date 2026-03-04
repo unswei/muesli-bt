@@ -17,6 +17,7 @@ option(MUESLI_BT_BUILD_PYTHON_BRIDGE "Build the Python bridge module (muesli_bt_
 option(MUESLI_BT_BUILD_WEBOTS_EXAMPLES "Build the Webots e-puck example controllers" OFF)
 option(MUESLI_BT_BUILD_INTEGRATION_PYBULLET "Build the PyBullet integration library" ON)
 option(MUESLI_BT_BUILD_INTEGRATION_WEBOTS "Build the Webots integration library" ON)
+option(MUESLI_BT_BUILD_INTEGRATION_ROS2 "Build the ROS2 integration skeleton library" OFF)
 
 add_library(
   muesli_bt_core
@@ -166,6 +167,20 @@ if (MUESLI_BT_BUILD_INTEGRATION_WEBOTS AND MUESLI_BT_HAVE_WEBOTS)
   endif ()
 endif ()
 
+if (MUESLI_BT_BUILD_INTEGRATION_ROS2)
+  add_library(muesli_bt_integration_ros2 integrations/ros2/extension.cpp)
+
+  target_link_libraries(muesli_bt_integration_ros2 PUBLIC muesli_bt_core)
+  target_include_directories(
+    muesli_bt_integration_ros2
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/integrations>
+           $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+  )
+  set_target_properties(muesli_bt_integration_ros2 PROPERTIES EXPORT_NAME integration_ros2)
+  target_compile_features(muesli_bt_integration_ros2 PUBLIC cxx_std_20)
+endif ()
+
 add_executable(muslisp src/main.cpp)
 target_link_libraries(muslisp PRIVATE muesli_bt_core)
 
@@ -303,6 +318,13 @@ else ()
   target_compile_definitions(muslisp_tests PRIVATE MUESLI_BT_WITH_PYBULLET_INTEGRATION=0)
 endif ()
 
+if (TARGET muesli_bt_integration_ros2)
+  target_link_libraries(muslisp_tests PRIVATE muesli_bt_integration_ros2)
+  target_compile_definitions(muslisp_tests PRIVATE MUESLI_BT_WITH_ROS2_INTEGRATION=1)
+else ()
+  target_compile_definitions(muslisp_tests PRIVATE MUESLI_BT_WITH_ROS2_INTEGRATION=0)
+endif ()
+
 add_test(NAME muslisp_tests COMMAND muslisp_tests)
 
 add_executable(muesli_bt_conformance_tests tests/conformance/mock_backend.cpp
@@ -340,6 +362,16 @@ if (TARGET muesli_bt_integration_webots)
   )
 endif ()
 
+if (TARGET muesli_bt_integration_ros2)
+  install(
+    TARGETS muesli_bt_integration_ros2
+    EXPORT muesli_btTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
+endif ()
+
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 if (MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
@@ -355,6 +387,15 @@ if (TARGET muesli_bt_integration_webots)
   install(
     DIRECTORY integrations/webots/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/webots
+    FILES_MATCHING
+    PATTERN "*.hpp"
+  )
+endif ()
+
+if (TARGET muesli_bt_integration_ros2)
+  install(
+    DIRECTORY integrations/ros2/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/ros2
     FILES_MATCHING
     PATTERN "*.hpp"
   )

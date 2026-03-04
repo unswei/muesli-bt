@@ -21,6 +21,7 @@ cmake -S . -B build/install-core -G Ninja \
   -DCMAKE_INSTALL_PREFIX="$PWD/build/install-root" \
   -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
   -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+  -DMUESLI_BT_BUILD_INTEGRATION_ROS2=OFF \
   -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
   -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
 cmake --build build/install-core --parallel
@@ -38,6 +39,9 @@ Enable Webots integration export:
 
 If the Webots SDK is not available, the runtime still builds/installs and
 `muesli_bt::integration_webots` is omitted.
+
+Enable ROS2 integration skeleton export:
+- `-DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON`
 
 3) consume with find_package
 ----------------------------
@@ -63,6 +67,10 @@ endif()
 
 if(TARGET muesli_bt::integration_webots)
   target_link_libraries(app PRIVATE muesli_bt::integration_webots)
+endif()
+
+if(TARGET muesli_bt::integration_ros2)
+  target_link_libraries(app PRIVATE muesli_bt::integration_ros2)
 endif()
 ```
 

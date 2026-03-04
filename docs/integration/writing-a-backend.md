@@ -9,7 +9,8 @@ A backend is your [host](../terminology.md#host) integration layer for `env.*`.
 - Implemented: `env.api.v1` core capability built-ins (`env.info`, `env.attach`, `env.configure`, `env.reset`, `env.observe`, `env.act`, `env.step`, `env.run-loop`, `env.debug-draw`)
 - Implemented: `pybullet` backend adapter (racecar demo path)
 - Implemented: `webots` backend adapter (e-puck demo path, `reset=false`)
-- Planned: dedicated ROS2 backend module (not yet in-tree)
+- Implemented: ROS2 backend skeleton extension target (`muesli_bt::integration_ros2`)
+- Planned: ROS2 topic/action/service transport binding and conformance expansion (scope defined in [ROS2 backend scope](ros2-backend-scope.md))
 
 Validation references:
 
@@ -35,7 +36,7 @@ Public headers for this flow:
 - `muslisp/extensions.hpp`
 - `bt/runtime_host.hpp`
 - `bt/event_log.hpp`
-- integration headers (for PyBullet: `pybullet/extension.hpp`, `pybullet/racecar_demo.hpp`; for Webots: `webots/extension.hpp`)
+- integration headers (PyBullet: `pybullet/extension.hpp`, `pybullet/racecar_demo.hpp`; Webots: `webots/extension.hpp`; ROS2 skeleton: `ros2/extension.hpp`)
 
 Event callback interface for inspectors:
 
@@ -51,10 +52,20 @@ Event callback interface for inspectors:
 5. provide a safe fallback action path
 6. optionally implement `env.reset`
 
+## Key Naming Contract
+
+Use one naming scheme across all backends:
+
+- observation schema key: `obs_schema`
+- action schema key: `action_schema`
+- state schema key (when state vectors/maps are present): `state_schema`
+
+Avoid introducing alternate names for the same concept in backend docs or examples.
+
 ## Observation Path (`env.observe`)
 
 - read sensors (camera, lidar, proprioception, state estimator)
-- build observation map with explicit schema id/version
+- build observation map with explicit `obs_schema` and (when applicable) `state_schema`
 - include timestamp/tick metadata where useful
 - keep shapes and units stable across runs
 
@@ -62,7 +73,8 @@ Example map shape:
 
 ```lisp
 (map.make
-  'schema_version "racecar.obs.v1"
+  'obs_schema "racecar.obs.v1"
+  'state_schema "racecar.state.v1"
   'state_vec (list x y yaw speed)
   'rays ray_distances
   't_ms now_ms)
@@ -120,7 +132,7 @@ Implemented:
 - [x] reproducible demo scripts exist (PyBullet racecar, Webots e-puck variants)
 
 Planned:
-- [ ] dedicated ROS2 backend target and packaging
+- [x] dedicated ROS2 backend target and packaging skeleton
 - [ ] additional production backends beyond demo-focused adapters
 
 Known limitations:
@@ -155,4 +167,5 @@ while (running) {
 
 - [Integration Overview](overview.md)
 - [Environment API (`env.*`)](env-api.md)
+- [ROS2 Backend Scope](ros2-backend-scope.md)
 - [Sensing And Blackboard](sensing-and-blackboard.md)

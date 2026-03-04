@@ -18,7 +18,7 @@ Webots e-puck logs show fields like:
 - `obs.proximity` (8 proximity channels)
 - `obs.min_obstacle`
 - `obs.line_error` (line-follow world)
-- `obs.obs_schema` (for example `epuck.line.obs.v1`)
+- `obs_schema` (for example `epuck.line.obs.v1`)
 
 Typical mapping logic in Lisp:
 

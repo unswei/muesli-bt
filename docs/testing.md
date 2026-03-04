@@ -34,6 +34,7 @@ Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated i
 - `scheduler_cancel_run.jsonl` (async cancellation edge case)
 - `vla_run.jsonl`
 - `vla_cancel_run.jsonl` (async cancellation edge case)
+- `vla_late_completion_drop_run.jsonl` (late completion dropped after cancellation)
 - `deadline_fallback_run.jsonl` (deadline exceeded with safe fallback)
 - `resetless_unsupported_run.jsonl` (multi-episode request on reset-less backend)
 
@@ -41,6 +42,7 @@ Runtime-contract fixture bundles for reproducibility are stored under `fixtures/
 
 - `fixtures/budget-warning-case/`
 - `fixtures/deadline-cancel-case/`
+- `fixtures/late-completion-drop-case/`
 - `fixtures/determinism-replay-case/`
 
 ## Run Tests

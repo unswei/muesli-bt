@@ -79,6 +79,89 @@ Supports single-episode and multi-episode execution.
         a))))
 ```
 
+### Observer Callback Pattern
+
+Use `observer` when you want per-tick analytics without changing `on_tick` return values.
+
+```lisp
+(begin
+  (define stats (map.make))
+  (map.set! stats 'ticks 0)
+  (map.set! stats 'fallback_ticks 0)
+  (map.set! stats 'overrun_ticks 0)
+
+  (define observer
+    (lambda (record)
+      (begin
+        (map.set! stats 'ticks (+ (map.get stats 'ticks 0) 1))
+        (if (map.get record 'used_fallback #f)
+            (map.set! stats 'fallback_ticks (+ (map.get stats 'fallback_ticks 0) 1))
+            nil)
+        (if (map.get record 'overrun #f)
+            (map.set! stats 'overrun_ticks (+ (map.get stats 'overrun_ticks 0) 1))
+            nil))))
+
+  (define cfg (map.make))
+  (define safe (map.make))
+  (map.set! safe 'action_schema "demo.action.v1")
+  (map.set! safe 'u (list 0.0 0.0))
+  (map.set! cfg 'tick_hz 20)
+  (map.set! cfg 'max_ticks 40)
+  (map.set! cfg 'safe_action safe)
+  (map.set! cfg 'observer observer)
+  (map.set! cfg 'log_path "logs/run-loop-observer.jsonl")
+
+  (define result
+    (env.run-loop
+      cfg
+      (lambda (obs)
+        (let ((a (map.make)))
+          (map.set! a 'action_schema "demo.action.v1")
+          (map.set! a 'u (list 0.1 0.0))
+          a))))
+
+  (list result stats))
+```
+
+### Multi-Episode Analytics
+
+`env.run-loop` returns summary counters that are stable across backends:
+
+```lisp
+(begin
+  (define cfg (map.make))
+  (define safe (map.make))
+  (map.set! safe 'action_schema "demo.action.v1")
+  (map.set! safe 'u (list 0.0 0.0))
+  (map.set! cfg 'tick_hz 20)
+  (map.set! cfg 'max_ticks 300)
+  (map.set! cfg 'step_max 100)
+  (map.set! cfg 'episode_max 3)
+  (map.set! cfg 'safe_action safe)
+
+  (define result
+    (env.run-loop
+      cfg
+      (lambda (obs)
+        (let ((a (map.make)))
+          (map.set! a 'action_schema "demo.action.v1")
+          (map.set! a 'u (list 0.1 0.0))
+          a))))
+
+  (define episodes (map.get result 'episodes_completed 0))
+  (define steps (map.get result 'steps_total 0))
+  (define analytics (map.make))
+  (map.set! analytics 'episodes_completed episodes)
+  (map.set! analytics 'steps_total steps)
+  (map.set! analytics 'last_episode_steps (map.get result 'last_episode_steps 0))
+  (map.set! analytics 'fallback_count (map.get result 'fallback_count 0))
+  (map.set! analytics 'overrun_count (map.get result 'overrun_count 0))
+  (if (> episodes 0)
+      (map.set! analytics 'avg_steps_per_episode (/ steps episodes))
+      (map.set! analytics 'avg_steps_per_episode 0.0))
+  analytics)
+```
+
 ## Notes
 
 - If `on_tick` overruns, runtime uses last-good or safe action and continues.

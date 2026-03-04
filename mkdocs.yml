@@ -122,10 +122,12 @@ nav:
       - Overview: integration/overview.md
       - env API (`env.api.v1`): integration/env-api.md
       - Writing A Backend: integration/writing-a-backend.md
+      - ROS2 Backend Scope: integration/ros2-backend-scope.md
       - Sensing and Blackboard: integration/sensing-and-blackboard.md
   - Contracts:
       - Index: contracts/README.md
       - Runtime Contract v1: contracts/runtime-contract-v1.md
+      - Studio Compatibility Matrix: contracts/studio-compatibility-matrix.md
       - Compatibility Policy: contracts/compatibility.md
       - Conformance Levels: contracts/conformance.md
       - muesli-studio Integration: contracts/muesli-studio-integration.md

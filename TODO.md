@@ -4,9 +4,10 @@ This backlog is maintained forward from March 2, 2026.
 
 ## now
 
-- finalise ROS2 backend scope and create an initial `integrations/ros2` skeleton
-- add documentation examples for `env.run-loop` observer callback patterns and multi-episode analytics
-- audit environment backend docs for strict key naming consistency (`obs_schema`, `action_schema`, `state_schema`)
+- [x] finalise ROS2 backend scope documentation (`docs/integration/ros2-backend-scope.md`)
+- [x] create an initial `integrations/ros2` skeleton
+- [x] add documentation examples for `env.run-loop` observer callback patterns and multi-episode analytics
+- [x] audit environment backend docs for strict key naming consistency (`obs_schema`, `action_schema`, `state_schema`)
 
 ### studio integration readiness
 
@@ -22,8 +23,8 @@ This backlog is maintained forward from March 2, 2026.
 - [x] export integration target (`muesli_bt::integration_pybullet`) with installable headers
 - [x] downstream consumer smoke proves runtime+integration attach and tick path via installed/public headers
 - [x] optional Webots integration target export (`muesli_bt::integration_webots`) with installable headers and attach API
-- [ ] add extended fixture coverage for asynchronous cancellation edge cases
-- [ ] add dedicated Studio compatibility matrix against release tags and `main`
+- [x] add extended fixture coverage for asynchronous cancellation edge cases
+- [x] add dedicated Studio compatibility matrix against release tags and `main`
 
 ## next
 

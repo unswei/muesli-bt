@@ -20,6 +20,9 @@
 #include "pybullet/extension.hpp"
 #include "pybullet/racecar_demo.hpp"
 #endif
+#if MUESLI_BT_WITH_ROS2_INTEGRATION
+#include "ros2/extension.hpp"
+#endif
 #include "muslisp/env.hpp"
 #include "muslisp/env_api.hpp"
 #include "muslisp/error.hpp"
@@ -66,6 +69,16 @@ muslisp::env_ptr create_env_with_pybullet_extension() {
     return muslisp::create_global_env(std::move(config));
 #else
     throw std::runtime_error("pybullet integration tests are disabled");
+#endif
+}
+
+muslisp::env_ptr create_env_with_ros2_extension() {
+#if MUESLI_BT_WITH_ROS2_INTEGRATION
+    muslisp::runtime_config config;
+    config.register_extension(muslisp::integrations::ros2::make_extension());
+    return muslisp::create_global_env(std::move(config));
+#else
+    throw std::runtime_error("ros2 integration tests are disabled");
 #endif
 }
 
@@ -3034,6 +3047,20 @@ void test_pybullet_backend_absent_in_core_env() {
     }
 }
 
+void test_ros2_backend_absent_in_core_env() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    try {
+        (void)eval_text("(env.attach \"ros2\")", env);
+        throw std::runtime_error("expected env.attach to reject unknown ros2 backend without extension");
+    } catch (const lisp_error& e) {
+        const std::string msg = e.what();
+        check(msg.find("unknown backend") != std::string::npos, "missing unknown backend error for ros2 attach");
+    }
+}
+
 #if MUESLI_BT_WITH_PYBULLET_INTEGRATION
 void test_pybullet_backend_present_with_extension() {
     using namespace muslisp;
@@ -3043,6 +3070,35 @@ void test_pybullet_backend_present_with_extension() {
     (void)eval_text("(env.attach \"pybullet\")", env);
     check(string_value(eval_text("(map.get (env.info) 'backend \"\")", env)) == "pybullet",
           "env.info backend should be pybullet when extension is installed");
+}
+#endif
+
+#if MUESLI_BT_WITH_ROS2_INTEGRATION
+void test_ros2_backend_present_with_extension() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_env_with_ros2_extension();
+    (void)eval_text("(env.attach \"ros2\")", env);
+    check(string_value(eval_text("(map.get (env.info) 'backend \"\")", env)) == "ros2",
+          "env.info backend should be ros2 when extension is installed");
+
+    check(string_value(eval_text("(map.get (env.observe) 'obs_schema \"\")", env)) == "ros2.obs.v1",
+          "ros2 observe obs_schema mismatch");
+
+    (void)eval_text(
+        "(define a "
+        "  (begin "
+        "    (define m (map.make)) "
+        "    (map.set! m 'action_schema \"ros2.action.v1\") "
+        "    (map.set! m 'u (list 0.25 0.5)) "
+        "    m))",
+        env);
+    (void)eval_text("(env.act a)", env);
+    check(is_truthy(eval_text("(env.step)", env)), "ros2 env.step should continue");
+
+    check(integer_value(eval_text("(map.get (map.get (env.observe) 'info (map.make)) 'step -1)", env)) >= 1,
+          "ros2 backend step counter should advance");
 }
 #endif
 
@@ -3101,6 +3157,7 @@ int main() {
         {"event log deterministic mode + canonical serialisation", test_event_log_deterministic_mode_and_canonical_serialisation},
         {"runtime host deterministic test mode", test_runtime_host_deterministic_test_mode},
         {"pybullet backend absent in core env", test_pybullet_backend_absent_in_core_env},
+        {"ros2 backend absent in core env", test_ros2_backend_absent_in_core_env},
 #if MUESLI_BT_WITH_PYBULLET_INTEGRATION
         {"env generic pybullet backend contract", test_env_generic_pybullet_backend_contract},
         {"env run-loop log record shape", test_env_run_loop_log_record_shape},
@@ -3108,6 +3165,9 @@ int main() {
         {"racecar run-loop contract", test_racecar_loop_contract},
         {"racecar run-loop error safe-action", test_racecar_loop_error_safe_action},
         {"racecar planner model + env.api contract", test_racecar_planner_model_and_env_api_contract},
+#endif
+#if MUESLI_BT_WITH_ROS2_INTEGRATION
+        {"ros2 backend present with extension", test_ros2_backend_present_with_extension},
 #endif
         {"phase5 ring buffer bounds", test_phase5_ring_buffer_bounds},
         {"phase6 sample wrappers tree", test_phase6_sample_wrappers_tree},

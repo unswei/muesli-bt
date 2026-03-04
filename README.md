@@ -119,11 +119,24 @@ add_executable(mbt_inspector ...)
 target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_webots)
 ```
 
+If installed with `-DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON`, the package exports the initial ROS2 skeleton target `muesli_bt::integration_ros2`:
+
+```cmake
+find_package(muesli_bt CONFIG REQUIRED)
+
+add_executable(mbt_inspector ...)
+target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_ros2)
+```
+
 Downstream consumers can probe optional integration targets safely:
 
 ```cmake
 if(TARGET muesli_bt::integration_webots)
   target_link_libraries(mbt_inspector PRIVATE muesli_bt::integration_webots)
+endif()
+
+if(TARGET muesli_bt::integration_ros2)
+  target_link_libraries(mbt_inspector PRIVATE muesli_bt::integration_ros2)
 endif()
 ```
 
@@ -307,7 +320,7 @@ ctest --test-dir build/dev --output-on-failure
 ## Repository Layout
 
 - `src/`, `include/`: core runtime, evaluator, BT engine, planner, VLA integration
-- `integrations/`: optional backend integrations (for example `integrations/pybullet/`)
+- `integrations/`: optional backend integrations (for example `integrations/pybullet/`, `integrations/webots/`, `integrations/ros2/`)
 - `examples/bt/`: compact BT scripts
 - `examples/repl_scripts/`: end-to-end experiments and demos
 - `examples/pybullet_racecar/`: racecar demo package

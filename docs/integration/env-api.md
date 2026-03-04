@@ -30,6 +30,14 @@ A [host](../terminology.md#host) (backend) can implement this surface for Webots
 - `env.run-loop`
 : managed loop wrapper around observe/tick/act/step with deadline/fallback handling.
 
+## Canonical Key Naming
+
+Backends should use consistent schema key names:
+
+- observation maps: `obs_schema`
+- action maps: `action_schema`
+- backend state payloads (when present): `state_schema`
+
 ## Step Semantics
 
 `env.step` means "advance one control increment".
@@ -59,3 +67,4 @@ If `episode_max > 1` and backend reset is unsupported, `env.run-loop` returns `:
 - [env.step](../language/reference/builtins/env/env-step.md)
 - [env.run-loop](../language/reference/builtins/env/env-run-loop.md)
 - [env.reset](../language/reference/builtins/env/env-reset.md)
+- [ROS2 backend scope](ros2-backend-scope.md)

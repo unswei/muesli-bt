@@ -1,0 +1,11 @@
+{
+  "contract_id": "runtime-contract-v1.0.0",
+  "contract_version": "1.0.0",
+  "fixture_name": "late-completion-drop-case",
+  "generated_from_commit_time_utc": "2026-03-03T11:56:19Z",
+  "generator": "tools/fixtures/update_fixture.py",
+  "git_sha": "c9dab28172d343d2088bf5c4b2e89eec23fd516b",
+  "provenance_model": "deterministic-from-git",
+  "schema": "mbt.evt.v1",
+  "schema_path": "schemas/event_log/v1/mbt.evt.v1.schema.json"
+}

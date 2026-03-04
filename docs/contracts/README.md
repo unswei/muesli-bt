@@ -6,6 +6,7 @@ This directory contains public integration contracts maintained by `muesli-bt`.
 
 - [runtime contract v1](runtime-contract-v1.md)
 - [muesli-studio integration contract](muesli-studio-integration.md)
+- [studio compatibility matrix](studio-compatibility-matrix.md)
 - [compatibility policy](compatibility.md)
 - [conformance levels](conformance.md)
 - [canonical event schema (`mbt.evt.v1`)](https://github.com/unswei/muesli-bt/blob/main/schemas/event_log/v1/mbt.evt.v1.schema.json)
@@ -15,6 +16,10 @@ This directory contains public integration contracts maintained by `muesli-bt`.
 | contract profile | muesli-bt tag | schema version | runtime contract version | deterministic mode |
 | --- | --- | --- | --- | --- |
 | supports runtime contract v1 + studio integration requirements (`mbt.evt.v1` parser enabled) | `v0.1.0+` | `mbt.evt.v1` | `1.0.0` | supported (`bt::runtime_host::enable_deterministic_test_mode(...)`) |
+
+Studio pinning matrix:
+
+- [studio compatibility matrix](studio-compatibility-matrix.md)
 
 ## related artefacts
 

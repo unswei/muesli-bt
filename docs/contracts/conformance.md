@@ -27,6 +27,7 @@ Use this page when:
 - `L2` ROS 2 conformance:
   - rosbag-driven conformance checks
   - nightly or on-demand
+  - backend scope and deliverables tracked in [ROS2 backend scope](../integration/ros2-backend-scope.md)
 
 ### required artefacts
 
@@ -69,6 +70,7 @@ Published L0 fixture bundles:
 
 - `fixtures/budget-warning-case`
 - `fixtures/deadline-cancel-case`
+- `fixtures/late-completion-drop-case`
 - `fixtures/determinism-replay-case`
 
 ## gotchas

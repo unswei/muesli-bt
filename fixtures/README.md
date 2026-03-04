@@ -8,6 +8,13 @@ Runtime-contract fixture bundles are stored as:
 - `fixtures/<name>/expected_metrics.json`
 - `fixtures/<name>/manifest.json`
 
+Current bundles:
+
+- `budget-warning-case`
+- `deadline-cancel-case`
+- `late-completion-drop-case`
+- `determinism-replay-case`
+
 Update and verify using:
 
 ```bash

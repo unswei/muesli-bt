@@ -27,6 +27,7 @@ Optional integration targets (only when built and exported):
 
 - `muesli_bt::integration_pybullet`
 - `muesli_bt::integration_webots`
+- `muesli_bt::integration_ros2` (initial skeleton target)
 
 ## api / syntax
 
@@ -38,6 +39,7 @@ cmake -S . -B build/install-core -G Ninja \
   -DCMAKE_INSTALL_PREFIX="$PWD/build/install-root" \
   -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
   -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+  -DMUESLI_BT_BUILD_INTEGRATION_ROS2=OFF \
   -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
   -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
 cmake --build build/install-core --parallel
@@ -62,6 +64,10 @@ endif()
 
 if(TARGET muesli_bt::integration_webots)
   target_link_libraries(app PRIVATE muesli_bt::integration_webots)
+endif()
+
+if(TARGET muesli_bt::integration_ros2)
+  target_link_libraries(app PRIVATE muesli_bt::integration_ros2)
 endif()
 ```
 
@@ -101,6 +107,7 @@ Studio/tooling contract assets are installed with the package and exposed via
 ## gotchas
 
 - `muesli_bt::integration_webots` is omitted when Webots SDK is unavailable.
+- `muesli_bt::integration_ros2` is a skeleton target; ROS transport wiring is not included yet.
 - enabling `MUESLI_BT_BUILD_PYTHON_BRIDGE` requires PyBullet integration.
 - do not link against non-exported internal targets; only use imported
   `muesli_bt::*` targets.
