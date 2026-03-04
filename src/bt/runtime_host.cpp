@@ -102,6 +102,28 @@ std::vector<double> bb_value_as_vector(const bb_value& value, const std::string&
     throw std::runtime_error(where + ": expected numeric or numeric-vector blackboard value");
 }
 
+bool bb_value_truthy(const bb_value& value) {
+    if (std::holds_alternative<std::monostate>(value)) {
+        return false;
+    }
+    if (const auto* b = std::get_if<bool>(&value)) {
+        return *b;
+    }
+    if (const auto* i = std::get_if<std::int64_t>(&value)) {
+        return *i != 0;
+    }
+    if (const auto* f = std::get_if<double>(&value)) {
+        return std::isfinite(*f) && std::fabs(*f) > 1e-9;
+    }
+    if (const auto* s = std::get_if<std::string>(&value)) {
+        return !s->empty() && *s != "0" && *s != "false";
+    }
+    if (const auto* vec = std::get_if<std::vector<double>>(&value)) {
+        return !vec->empty();
+    }
+    return true;
+}
+
 std::string require_key_arg_or_default(const std::span<const muslisp::value> args,
                                        std::size_t index,
                                        const std::string& where,
@@ -132,6 +154,8 @@ runtime_host::runtime_host()
       vla_(&scheduler_),
       owned_clock_(std::make_unique<system_clock_service>()),
       owned_robot_(std::make_unique<demo_robot_service>()) {
+    install_demo_callbacks(*this);
+
     clock_ = owned_clock_.get();
     robot_ = owned_robot_.get();
     events_.set_host_info("muesli-bt", "dev", "native");
@@ -414,6 +438,15 @@ void install_demo_callbacks(runtime_host& host) {
         return ctx.bb_get(key) != nullptr;
     });
 
+    reg.register_condition("bb-truthy", [](tick_context& ctx, std::span<const muslisp::value> args) {
+        const std::string key = require_key_arg(args, 0, "bb-truthy");
+        const bb_entry* entry = ctx.bb_get(key);
+        if (!entry) {
+            return false;
+        }
+        return bb_value_truthy(entry->value);
+    });
+
     reg.register_condition("battery-ok", [](tick_context& ctx, std::span<const muslisp::value>) {
         if (!ctx.svc.robot) {
             return false;
@@ -457,6 +490,35 @@ void install_demo_callbacks(runtime_host& host) {
         ctx.bb_put(key, bb_value{v}, "bb-put-float");
         return status::success;
     });
+
+    reg.register_action("select-action",
+                        [](tick_context& ctx, node_id, node_memory&, std::span<const muslisp::value> args) {
+                            const std::string source_key = require_key_arg(args, 0, "select-action");
+                            const std::int64_t branch_id = require_int_arg(args, 1, "select-action");
+                            std::string out_key = "action_vec";
+                            if (args.size() > 2) {
+                                out_key = require_key_arg(args, 2, "select-action");
+                            }
+
+                            const bb_entry* source = ctx.bb_get(source_key);
+                            if (!source) {
+                                return status::failure;
+                            }
+
+                            std::vector<double> action;
+                            try {
+                                action = bb_value_as_vector(source->value, "select-action");
+                            } catch (const std::exception&) {
+                                return status::failure;
+                            }
+                            if (action.size() < 2) {
+                                return status::failure;
+                            }
+
+                            ctx.bb_put(out_key, bb_value{std::move(action)}, "select-action");
+                            ctx.bb_put("active_branch", bb_value{branch_id}, "select-action");
+                            return status::success;
+                        });
 
     reg.register_condition("goal-reached-1d", [](tick_context& ctx, std::span<const muslisp::value> args) {
         const std::string state_key = require_key_arg_or_default(args, 0, "goal-reached-1d", "state");

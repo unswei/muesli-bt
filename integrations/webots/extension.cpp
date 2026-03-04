@@ -6,7 +6,6 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -123,66 +122,6 @@ muslisp::value numeric_vector_to_lisp_list(const std::vector<double>& values) {
         roots.add(&out.back());
     }
     return muslisp::list_from_vector(out);
-}
-
-std::string require_key_arg(std::span<const muslisp::value> args, std::size_t index, const std::string& where) {
-    if (index >= args.size()) {
-        throw std::runtime_error(where + ": missing key argument");
-    }
-    if (muslisp::is_symbol(args[index])) {
-        return muslisp::symbol_name(args[index]);
-    }
-    if (muslisp::is_string(args[index])) {
-        return muslisp::string_value(args[index]);
-    }
-    throw std::runtime_error(where + ": key must be symbol or string");
-}
-
-std::int64_t require_int_arg(std::span<const muslisp::value> args, std::size_t index, const std::string& where) {
-    if (index >= args.size() || !muslisp::is_integer(args[index])) {
-        throw std::runtime_error(where + ": expected integer argument");
-    }
-    return muslisp::integer_value(args[index]);
-}
-
-std::vector<double> bb_to_vector(const bt::bb_value& value) {
-    if (const auto* vec = std::get_if<std::vector<double>>(&value)) {
-        return *vec;
-    }
-    if (const auto* f = std::get_if<double>(&value)) {
-        return {*f, *f};
-    }
-    if (const auto* i = std::get_if<std::int64_t>(&value)) {
-        const double d = static_cast<double>(*i);
-        return {d, d};
-    }
-    return {};
-}
-
-bool bb_truthy(const bt::bb_entry* entry) {
-    if (!entry) {
-        return false;
-    }
-    const bt::bb_value& value = entry->value;
-    if (std::holds_alternative<std::monostate>(value)) {
-        return false;
-    }
-    if (const auto* b = std::get_if<bool>(&value)) {
-        return *b;
-    }
-    if (const auto* i = std::get_if<std::int64_t>(&value)) {
-        return *i != 0;
-    }
-    if (const auto* f = std::get_if<double>(&value)) {
-        return std::isfinite(*f) && std::fabs(*f) > 1e-9;
-    }
-    if (const auto* s = std::get_if<std::string>(&value)) {
-        return !s->empty() && *s != "0" && *s != "false";
-    }
-    if (const auto* vec = std::get_if<std::vector<double>>(&value)) {
-        return !vec->empty();
-    }
-    return true;
 }
 
 class webots_env_backend final : public muslisp::env_backend {
@@ -443,43 +382,12 @@ private:
 }  // namespace
 
 void bt::integrations::webots::install_callbacks(bt::runtime_host& host) {
-    bt::registry& reg = host.callbacks();
-
-    reg.register_condition("bb-truthy",
-                           [](bt::tick_context& ctx, std::span<const muslisp::value> args) {
-                               const std::string key = require_key_arg(args, 0, "bb-truthy");
-                               return bb_truthy(ctx.bb_get(key));
-                           });
-
-    reg.register_action("select-action",
-                        [](bt::tick_context& ctx, bt::node_id, bt::node_memory&, std::span<const muslisp::value> args) {
-                            const std::string source_key = require_key_arg(args, 0, "select-action");
-                            const std::int64_t branch_id = require_int_arg(args, 1, "select-action");
-                            std::string out_key = "action_vec";
-                            if (args.size() > 2) {
-                                out_key = require_key_arg(args, 2, "select-action");
-                            }
-
-                            const bt::bb_entry* source = ctx.bb_get(source_key);
-                            if (!source) {
-                                return bt::status::failure;
-                            }
-
-                            std::vector<double> action = bb_to_vector(source->value);
-                            if (action.size() < 2) {
-                                return bt::status::failure;
-                            }
-                            action[0] = clamp_double(action[0], -kMaxWheelSpeed, kMaxWheelSpeed);
-                            action[1] = clamp_double(action[1], -kMaxWheelSpeed, kMaxWheelSpeed);
-
-                            ctx.bb_put(out_key, bt::bb_value{std::move(action)}, "select-action");
-                            ctx.bb_put("active_branch", bt::bb_value{branch_id}, "select-action");
-                            return bt::status::success;
-                        });
+    // Compatibility shim: callbacks are now part of core demo callbacks.
+    bt::install_demo_callbacks(host);
 }
 
 void webots_extension::register_bt(bt::runtime_host& host) const {
-    bt::integrations::webots::install_callbacks(host);
+    (void)host;
 }
 
 std::unique_ptr<muslisp::extension> muslisp::integrations::webots::make_extension(::webots::Robot* robot,

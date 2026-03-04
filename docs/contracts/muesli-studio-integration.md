@@ -52,7 +52,7 @@ Required capabilities include:
   - `muslisp::runtime_config::register_extension(...)`
   - `muslisp::create_global_env(runtime_config)`
   - integration adapter attach entry points (for example `bt::set_racecar_sim_adapter(...)` for PyBullet)
-  - Webots attach entry points (`muslisp::integrations::webots::make_extension(...)` and `bt::integrations::webots::install_callbacks(...)`)
+  - Webots attach entry point (`muslisp::integrations::webots::make_extension(...)`)
   - ROS2 skeleton attach entry point (`muslisp::integrations::ros2::make_extension(...)`)
 
 ### requirement 3: event callback contract
@@ -228,9 +228,10 @@ muslisp::runtime_config cfg;
 cfg.register_extension(muslisp::integrations::webots::make_extension(robot_ptr));
 muslisp::env_ptr env = muslisp::create_global_env(std::move(cfg));
 
-bt::integrations::webots::install_callbacks(bt::default_runtime_host());
 muslisp::eval_source("(env.attach \"webots\")", env);
 ```
+
+Legacy note: `bt::integrations::webots::install_callbacks(...)` remains available as a compatibility shim but is not required for new attach flows.
 
 ROS2 skeleton attach flow:
 

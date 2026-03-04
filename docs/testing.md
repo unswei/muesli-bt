@@ -22,6 +22,7 @@ Coverage includes:
 - VLA BT nodes (`vla-request`, `vla-wait`, `vla-cancel`) including cancel flow
 - [host](terminology.md#host) wrappers and typed robot interface injection
 - `env.run-loop` multi-episode semantics for reset-capable and reset-less backends
+- generic `env.*` backend contract checks for PyBullet and ROS2 skeleton adapters
 - runtime-contract L0 conformance checks (tick ordering, budget/deadline hooks, async lifecycle, determinism)
 
 ## canonical event fixture suite
@@ -63,6 +64,12 @@ Validate and verify fixtures:
 ```bash
 python3 tools/validate_log.py --schema schemas/event_log/v1/mbt.evt.v1.schema.json tests/fixtures/mbt.evt.v1/*.jsonl
 python3 tools/fixtures/verify_fixture.py
+```
+
+Verify docs snippet freshness against `examples/**` source files:
+
+```bash
+python3 scripts/check_docs_snippet_freshness.py
 ```
 
 ## Deterministic BT Tests

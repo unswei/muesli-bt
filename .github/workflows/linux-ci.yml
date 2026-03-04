@@ -112,6 +112,18 @@ jobs:
           bash ./scripts/setup-python-env.sh .venv-py311
           .venv-py311/bin/python -m mkdocs build --strict
 
+  docs-snippet-freshness:
+    name: docs-snippet-freshness
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify docs snippet freshness
+        run: python3 ./scripts/check_docs_snippet_freshness.py
+
   schema-validation:
     name: schema-validation
     if: github.event_name != 'schedule'
@@ -197,6 +209,36 @@ jobs:
 
       - name: Run L0 conformance tests
         run: ctest --test-dir build/conformance-l0 -R muesli_bt_conformance_tests --output-on-failure
+
+  ros2-skeleton-contract:
+    name: ros2-skeleton-contract
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++
+
+      - name: Configure ROS2 skeleton build
+        run: |
+          cmake -S . -B build/ros2-skeleton-contract -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON \
+            -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
+            -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+            -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+            -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+
+      - name: Build tests
+        run: cmake --build build/ros2-skeleton-contract --target muslisp_tests --parallel
+
+      - name: Run env contract tests
+        run: ctest --test-dir build/ros2-skeleton-contract -R muslisp_tests --output-on-failure
 
   conformance-l1-sim:
     name: conformance-l1-sim

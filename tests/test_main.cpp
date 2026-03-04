@@ -3074,6 +3074,83 @@ void test_pybullet_backend_present_with_extension() {
 #endif
 
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
+void test_env_generic_ros2_backend_contract() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_env_with_ros2_extension();
+
+    (void)eval_text("(env.attach \"ros2\")", env);
+    check(boolean_value(eval_text("(map.get (env.info) 'attached #f)", env)),
+          "env.info should report attached after ros2 attach");
+    check(string_value(eval_text("(map.get (env.info) 'backend \"\")", env)) == "ros2", "env.info backend mismatch for ros2");
+    check(boolean_value(eval_text("(map.get (map.get (env.info) 'supports (map.make)) 'reset #f)", env)),
+          "env.info supports.reset should be true for ros2 backend");
+
+    (void)eval_text(
+        "(begin "
+        "  (define cfg (map.make)) "
+        "  (map.set! cfg 'tick_hz 1000) "
+        "  (map.set! cfg 'steps_per_tick 3) "
+        "  (map.set! cfg 'obs_schema \"ros2.obs.test.v1\") "
+        "  (map.set! cfg 'state_schema \"ros2.state.test.v1\") "
+        "  (map.set! cfg 'action_schema \"ros2.action.test.v1\") "
+        "  (env.configure cfg))",
+        env);
+    (void)eval_text("(define obs0 (env.reset 42))", env);
+    value obs0 = eval_text("obs0", env);
+    check(is_map(obs0), "env.reset should return observation map for ros2");
+    check(string_value(eval_text("(map.get obs0 'obs_schema \"\")", env)) == "ros2.obs.test.v1", "ros2 reset obs_schema mismatch");
+    check(integer_value(eval_text("(map.get obs0 'episode -1)", env)) == 1, "ros2 reset should set episode to 1");
+    check(integer_value(eval_text("(map.get obs0 'step -1)", env)) == 0, "ros2 reset should set step to 0");
+    check(string_value(eval_text("(map.get (map.get obs0 'info (map.make)) 'state_schema \"\")", env)) == "ros2.state.test.v1",
+          "ros2 reset state_schema mismatch");
+    check(integer_value(eval_text("(map.get (map.get obs0 'info (map.make)) 'seed -1)", env)) == 42,
+          "ros2 reset should persist provided seed");
+
+    (void)eval_text(
+        "(begin "
+        "  (define a (map.make)) "
+        "  (map.set! a 'action_schema \"ros2.action.test.v1\") "
+        "  (map.set! a 'u (list 0.2 0.4)) "
+        "  (env.act a))",
+        env);
+    value step_ok = eval_text("(env.step)", env);
+    check(is_boolean(step_ok) && boolean_value(step_ok), "ros2 env.step should return true");
+    check(integer_value(eval_text("(map.get (map.get (env.observe) 'info (map.make)) 'step -1)", env)) == 3,
+          "ros2 env.step should apply configured steps_per_tick");
+
+    (void)eval_text(
+        "(define on-tick-ros2 "
+        "  (lambda (obs) "
+        "    (begin "
+        "      (define a (map.make)) "
+        "      (map.set! a 'action_schema \"ros2.action.test.v1\") "
+        "      (map.set! a 'u (list 0.0 0.1)) "
+        "      a)))",
+        env);
+    (void)eval_text(
+        "(define loop-result-ros2 "
+        "  (env.run-loop "
+        "    (begin "
+        "      (define cfg (map.make)) "
+        "      (define safe (map.make)) "
+        "      (map.set! safe 'action_schema \"ros2.action.test.v1\") "
+        "      (map.set! safe 'u (list 0.0 0.0)) "
+        "      (map.set! cfg 'tick_hz 1000) "
+        "      (map.set! cfg 'max_ticks 2) "
+        "      (map.set! cfg 'safe_action safe) "
+        "      cfg) "
+        "    on-tick-ros2))",
+        env);
+    check(symbol_name(eval_text("(map.get loop-result-ros2 'status ':none)", env)) == ":stopped",
+          "ros2 env.run-loop should stop on max ticks");
+    check(integer_value(eval_text("(map.get loop-result-ros2 'ticks -1)", env)) == 2,
+          "ros2 env.run-loop ticks mismatch");
+    check(integer_value(eval_text("(map.get loop-result-ros2 'episodes -1)", env)) == 1,
+          "ros2 env.run-loop episodes mismatch");
+}
+
 void test_ros2_backend_present_with_extension() {
     using namespace muslisp;
 
@@ -3167,6 +3244,7 @@ int main() {
         {"racecar planner model + env.api contract", test_racecar_planner_model_and_env_api_contract},
 #endif
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
+        {"env generic ros2 backend contract", test_env_generic_ros2_backend_contract},
         {"ros2 backend present with extension", test_ros2_backend_present_with_extension},
 #endif
         {"phase5 ring buffer bounds", test_phase5_ring_buffer_bounds},

@@ -46,6 +46,7 @@ Conformance is layered so reviewers can separate core runtime semantics from hea
 - `L0`: core-only runtime contract checks (fast, deterministic, PR-safe)
 - `L1`: simulator integration conformance (PyBullet/Webots)
 - `L2`: ROS 2 conformance (rosbag-driven)
+- Generic `env.*` contract coverage in `muslisp_tests` includes both PyBullet and ROS2 skeleton backends.
 
 Runbook and checklist: [conformance levels](docs/contracts/conformance.md).
 
@@ -118,6 +119,8 @@ find_package(muesli_bt CONFIG REQUIRED)
 add_executable(mbt_inspector ...)
 target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_webots)
 ```
+
+The legacy `bt::integrations::webots::install_callbacks(...)` hook remains available as a compatibility shim, but new consumers do not need it.
 
 If installed with `-DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON`, the package exports the initial ROS2 skeleton target `muesli_bt::integration_ros2`:
 

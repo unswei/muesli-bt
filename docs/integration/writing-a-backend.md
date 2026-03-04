@@ -15,7 +15,7 @@ A backend is your [host](../terminology.md#host) integration layer for `env.*`.
 Validation references:
 
 - env core contract tests: `tests/test_main.cpp` (`test_env_core_interface_unattached`)
-- env generic backend contract tests: `tests/test_main.cpp` (`test_env_generic_pybullet_backend_contract`)
+- env generic backend contract tests: `tests/test_main.cpp` (`test_env_generic_pybullet_backend_contract`, `test_env_generic_ros2_backend_contract`)
 - multi-episode run-loop tests: `tests/test_main.cpp` (`test_env_run_loop_multi_episode_reset_true`, `test_env_run_loop_multi_episode_reset_false`)
 - pybullet backend extension: `integrations/pybullet/extension.cpp`
 - webots backend extension: `integrations/webots/extension.cpp`
