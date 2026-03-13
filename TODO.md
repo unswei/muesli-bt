@@ -7,7 +7,6 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 
 - `v0.3.0`: run `muesli-studio` compatibility check against `v0.2.0` and record the result in `docs/contracts/studio-compatibility-matrix.md`
 - `v0.3.0`: promote the current ROS2 thin adaptor from rolling `main` work to a documented release baseline on Ubuntu 22.04 + Humble
-- `v0.3.0`: harden backend schema validation with explicit version compatibility checks
 
 ## next
 

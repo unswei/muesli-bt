@@ -115,6 +115,7 @@ The first ROS2 backend should present this public contract through `env.api.v1`:
 
 - backend name: `ros2`
 - env API id: `env.api.v1`
+- backend version: `ros2.transport.v1`
 - observation schema: `ros2.obs.v1`
 - state schema: `ros2.state.v1`
 - action schema: `ros2.action.v1`
@@ -126,6 +127,7 @@ For the in-tree skeleton backend used before Linux bring-up:
 - reset policy is configurable and explicit
 - action payloads use a map-based `u` payload
 - malformed config keys fail cleanly
+- malformed schema ids or incompatible schema majors fail cleanly
 - backend-specific schema/config metadata is exposed through `env.info`
 
 ### phased work plan
@@ -303,6 +305,7 @@ This is the current canonical rosbag replay command because it exercises the sup
 `env.info` for the ROS2 backend should expose at least:
 
 - `backend`: `"ros2"`
+- `backend_version`: `"ros2.transport.v1"`
 - `env_api`: `"env.api.v1"`
 - `obs_schema`: `"ros2.obs.v1"`
 - `state_schema`: `"ros2.state.v1"`
@@ -314,6 +317,14 @@ This is the current canonical rosbag replay command because it exercises the sup
 - `node_name`: backend node identity for Linux debugging
 
 ### canonical schemas
+
+The released baseline is the `v1` family:
+
+- `ros2.obs.v1`
+- `ros2.state.v1`
+- `ros2.action.v1`
+
+Tests and conformance harnesses may use suffixes such as `ros2.obs.test.v1` or `ros2.action.conformance.v1`, but the schema id must stay in the matching `ros2.obs.*.v1`, `ros2.state.*.v1`, or `ros2.action.*.v1` family. `v2+` ids are intentionally rejected by the current backend.
 
 #### `ros2.state.v1`
 
@@ -384,6 +395,7 @@ This keeps the first real backend reviewable and deterministic enough for tests.
 
 The initial documented config keys are:
 
+- `backend_version` for explicit transport compatibility checks; when set, it must be `ros2.transport.v1`
 - `control_hz`
 - `observe_timeout_ms`
 - `step_timeout_ms`
@@ -417,6 +429,7 @@ ctest --test-dir build/linux-ros2 --output-on-failure
   (env.attach "ros2")
 
   (define cfg (map.make))
+  (map.set! cfg 'backend_version "ros2.transport.v1")
   (map.set! cfg 'control_hz 50)
   (map.set! cfg 'topic_ns "/robot")
   (map.set! cfg 'obs_source "odom")
@@ -446,6 +459,7 @@ ctest --test-dir build/linux-ros2 --output-on-failure
 - `muslisp` alone does not auto-register the ROS2 extension. Use `muslisp_ros2` or embed `muslisp::integrations::ros2::make_extension(...)` in your own host.
 - The first Linux backend only binds `Odometry` in and `Twist` out. Broader transport support belongs in later PRs.
 - `reset_mode="stub"` is for deterministic harnesses and tests. It is not a full simulator or robot reset.
+- `backend_version`, `obs_schema`, `state_schema`, and `action_schema` are version-checked. Stay within the current `ros2.*.v1` families until the contract is intentionally bumped.
 - Do not let ROS message names or executor details leak into core semantics.
 - Do not bypass canonical event output with alternate ROS-only logs.
 - Keep reset behaviour explicit from the first PR series.

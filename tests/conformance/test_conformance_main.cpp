@@ -470,6 +470,8 @@ void test_ros2_info_surface_conformance() {
           "ros2 info conformance: backend mismatch");
     check(string_value(eval_text("(map.get (env.info) 'env_api \"\")", env)) == "env.api.v1",
           "ros2 info conformance: env_api mismatch");
+    check(string_value(eval_text("(map.get (env.info) 'backend_version \"\")", env)) == "ros2.transport.v1",
+          "ros2 info conformance: backend_version mismatch");
     check(string_value(eval_text("(map.get (env.info) 'obs_schema \"\")", env)) == "ros2.obs.conformance.v1",
           "ros2 info conformance: obs_schema mismatch");
     check(string_value(eval_text("(map.get (env.info) 'state_schema \"\")", env)) == "ros2.state.conformance.v1",

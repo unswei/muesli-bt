@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -138,6 +139,71 @@ std::string resolve_topic_name(const std::string& topic_ns, const std::string& n
         return "/" + name;
     }
     return ns + "/" + name;
+}
+
+struct parsed_schema_id {
+    std::string prefix;
+    std::int64_t major = 0;
+};
+
+bool is_schema_segment_char(char c) {
+    return std::isalnum(static_cast<unsigned char>(c)) != 0 || c == '_' || c == '-';
+}
+
+parsed_schema_id parse_schema_id(const std::string& schema_id, const std::string& where) {
+    if (schema_id.empty()) {
+        throw std::runtime_error(where + ": schema id must not be empty");
+    }
+    for (char c : schema_id) {
+        if (c != '.' && !is_schema_segment_char(c)) {
+            throw std::runtime_error(where + ": invalid schema id: " + schema_id);
+        }
+    }
+
+    const std::size_t suffix_pos = schema_id.rfind(".v");
+    if (suffix_pos == std::string::npos || suffix_pos == 0 || suffix_pos + 2 >= schema_id.size()) {
+        throw std::runtime_error(where + ": schema id must end with .v<major>: " + schema_id);
+    }
+    if (schema_id[suffix_pos - 1] == '.') {
+        throw std::runtime_error(where + ": schema id contains empty segment: " + schema_id);
+    }
+    for (std::size_t i = 0; i < suffix_pos; ++i) {
+        if (schema_id[i] == '.' && (i == 0 || i + 1 == suffix_pos || schema_id[i + 1] == '.')) {
+            throw std::runtime_error(where + ": schema id contains empty segment: " + schema_id);
+        }
+    }
+    for (std::size_t i = suffix_pos + 2; i < schema_id.size(); ++i) {
+        if (!std::isdigit(static_cast<unsigned char>(schema_id[i]))) {
+            throw std::runtime_error(where + ": schema id major version must be numeric: " + schema_id);
+        }
+    }
+
+    parsed_schema_id out;
+    out.prefix = schema_id.substr(0, suffix_pos);
+    out.major = std::stoll(schema_id.substr(suffix_pos + 2));
+    return out;
+}
+
+void validate_backend_version_guard(const std::string& backend_version, const std::string& where) {
+    const parsed_schema_id parsed = parse_schema_id(backend_version, where);
+    if (parsed.prefix != "ros2.transport" || parsed.major != 1) {
+        throw std::runtime_error(where + ": unsupported backend_version: " + backend_version +
+                                 " (expected ros2.transport.v1)");
+    }
+}
+
+void validate_ros2_schema_id_family(const std::string& schema_id,
+                                    const std::string& expected_prefix,
+                                    const std::string& where) {
+    const parsed_schema_id parsed = parse_schema_id(schema_id, where);
+    const std::string nested_prefix = expected_prefix + ".";
+    if (parsed.prefix != expected_prefix && parsed.prefix.rfind(nested_prefix, 0) != 0) {
+        throw std::runtime_error(where + ": schema id must stay within the " + expected_prefix +
+                                 ".v1 family: " + schema_id);
+    }
+    if (parsed.major != 1) {
+        throw std::runtime_error(where + ": unsupported schema major version: " + schema_id + " (expected v1)");
+    }
 }
 
 std::int64_t stamp_to_ms(const builtin_interfaces::msg::Time& stamp) {
@@ -314,6 +380,7 @@ public:
             "success_predicate",
             "observer",
             "schema_version",
+            "backend_version",
             "obs_schema",
             "state_schema",
             "action_schema",
@@ -339,21 +406,42 @@ public:
             }
         }
 
+        std::string obs_schema = obs_schema_;
+        std::string state_schema = state_schema_;
+        std::string action_schema = action_schema_;
+        std::int64_t control_hz = control_hz_;
+        std::int64_t observe_timeout_ms = observe_timeout_ms_;
+        std::int64_t step_timeout_ms = step_timeout_ms_;
+        bool use_sim_time = use_sim_time_;
+        bool require_fresh_obs = require_fresh_obs_;
+        std::string action_clamp = action_clamp_;
+        std::string topic_ns = topic_ns_;
+        std::string obs_source = obs_source_;
+        std::string action_sink = action_sink_;
+        std::string reset_mode = reset_mode_;
+
         if (const auto candidate = map_lookup_option(opts, "obs_schema")) {
-            obs_schema_ = require_text_value(*candidate, "configure.obs_schema");
+            obs_schema = require_text_value(*candidate, "configure.obs_schema");
         }
         if (const auto candidate = map_lookup_option(opts, "state_schema")) {
-            state_schema_ = require_text_value(*candidate, "configure.state_schema");
+            state_schema = require_text_value(*candidate, "configure.state_schema");
         }
         if (const auto candidate = map_lookup_option(opts, "action_schema")) {
-            action_schema_ = require_text_value(*candidate, "configure.action_schema");
+            action_schema = require_text_value(*candidate, "configure.action_schema");
         }
+        if (const auto candidate = map_lookup_option(opts, "backend_version")) {
+            validate_backend_version_guard(require_text_value(*candidate, "configure.backend_version"),
+                                           "configure.backend_version");
+        }
+        validate_ros2_schema_id_family(obs_schema, "ros2.obs", "configure.obs_schema");
+        validate_ros2_schema_id_family(state_schema, "ros2.state", "configure.state_schema");
+        validate_ros2_schema_id_family(action_schema, "ros2.action", "configure.action_schema");
         if (const auto candidate = map_lookup_option(opts, "control_hz")) {
             if (!is_integer(*candidate)) {
                 throw std::runtime_error("configure: control_hz must be integer");
             }
-            control_hz_ = integer_value(*candidate);
-            if (control_hz_ <= 0) {
+            control_hz = integer_value(*candidate);
+            if (control_hz <= 0) {
                 throw std::runtime_error("configure: control_hz must be > 0");
             }
         }
@@ -361,8 +449,8 @@ public:
             if (!is_integer(*candidate)) {
                 throw std::runtime_error("configure: observe_timeout_ms must be integer");
             }
-            observe_timeout_ms_ = integer_value(*candidate);
-            if (observe_timeout_ms_ <= 0) {
+            observe_timeout_ms = integer_value(*candidate);
+            if (observe_timeout_ms <= 0) {
                 throw std::runtime_error("configure: observe_timeout_ms must be > 0");
             }
         }
@@ -370,38 +458,52 @@ public:
             if (!is_integer(*candidate)) {
                 throw std::runtime_error("configure: step_timeout_ms must be integer");
             }
-            step_timeout_ms_ = integer_value(*candidate);
-            if (step_timeout_ms_ <= 0) {
+            step_timeout_ms = integer_value(*candidate);
+            if (step_timeout_ms <= 0) {
                 throw std::runtime_error("configure: step_timeout_ms must be > 0");
             }
         }
         if (const auto candidate = map_lookup_option(opts, "use_sim_time")) {
-            use_sim_time_ = require_bool_value(*candidate, "configure.use_sim_time");
+            use_sim_time = require_bool_value(*candidate, "configure.use_sim_time");
         }
         if (const auto candidate = map_lookup_option(opts, "require_fresh_obs")) {
-            require_fresh_obs_ = require_bool_value(*candidate, "configure.require_fresh_obs");
+            require_fresh_obs = require_bool_value(*candidate, "configure.require_fresh_obs");
         }
         if (const auto candidate = map_lookup_option(opts, "action_clamp")) {
-            action_clamp_ = require_text_value(*candidate, "configure.action_clamp");
-            if (action_clamp_ != "clamp" && action_clamp_ != "reject") {
+            action_clamp = require_text_value(*candidate, "configure.action_clamp");
+            if (action_clamp != "clamp" && action_clamp != "reject") {
                 throw std::runtime_error("configure: action_clamp must be 'clamp' or 'reject'");
             }
         }
         if (const auto candidate = map_lookup_option(opts, "topic_ns")) {
-            topic_ns_ = normalise_topic_ns(require_text_value(*candidate, "configure.topic_ns"));
+            topic_ns = normalise_topic_ns(require_text_value(*candidate, "configure.topic_ns"));
         }
         if (const auto candidate = map_lookup_option(opts, "obs_source")) {
-            obs_source_ = require_text_value(*candidate, "configure.obs_source");
+            obs_source = require_text_value(*candidate, "configure.obs_source");
         }
         if (const auto candidate = map_lookup_option(opts, "action_sink")) {
-            action_sink_ = require_text_value(*candidate, "configure.action_sink");
+            action_sink = require_text_value(*candidate, "configure.action_sink");
         }
         if (const auto candidate = map_lookup_option(opts, "reset_mode")) {
-            reset_mode_ = require_text_value(*candidate, "configure.reset_mode");
-            if (reset_mode_ != "stub" && reset_mode_ != "unsupported") {
+            reset_mode = require_text_value(*candidate, "configure.reset_mode");
+            if (reset_mode != "stub" && reset_mode != "unsupported") {
                 throw std::runtime_error("configure: reset_mode must be 'stub' or 'unsupported'");
             }
         }
+
+        obs_schema_ = std::move(obs_schema);
+        state_schema_ = std::move(state_schema);
+        action_schema_ = std::move(action_schema);
+        control_hz_ = control_hz;
+        observe_timeout_ms_ = observe_timeout_ms;
+        step_timeout_ms_ = step_timeout_ms;
+        use_sim_time_ = use_sim_time;
+        require_fresh_obs_ = require_fresh_obs;
+        action_clamp_ = std::move(action_clamp);
+        topic_ns_ = std::move(topic_ns);
+        obs_source_ = std::move(obs_source);
+        action_sink_ = std::move(action_sink);
+        reset_mode_ = std::move(reset_mode);
 
         ensure_runtime();
         rebuild_transport();

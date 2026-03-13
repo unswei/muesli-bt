@@ -3112,9 +3112,12 @@ void test_env_generic_ros2_backend_contract() {
           "env.info supports.reset should default to false for ros2 backend");
     check(string_value(eval_text("(map.get (env.info) 'env_api \"\")", env)) == "env.api.v1",
           "ros2 env.info env_api mismatch");
+    check(string_value(eval_text("(map.get (env.info) 'backend_version \"\")", env)) == "ros2.transport.v1",
+          "ros2 env.info backend_version mismatch");
 
     (void)eval_text(ros2_configure_script(
                          harness.topic_ns(),
+                         "  (map.set! cfg 'backend_version \"ros2.transport.v1\") "
                          "  (map.set! cfg 'obs_schema \"ros2.obs.test.v1\") "
                          "  (map.set! cfg 'state_schema \"ros2.state.test.v1\") "
                          "  (map.set! cfg 'action_schema \"ros2.action.test.v1\") "
@@ -3264,9 +3267,49 @@ void test_ros2_backend_config_validation_and_reset_policy() {
               "ros2 env.configure unknown-key error mismatch");
     }
 
+    try {
+        (void)eval_text(
+            "(begin "
+            "  (define cfg (map.make)) "
+            "  (map.set! cfg 'backend_version \"ros2.transport.v2\") "
+            "  (env.configure cfg))",
+            env);
+        throw std::runtime_error("expected ros2 env.configure to reject unsupported backend_version");
+    } catch (const lisp_error& e) {
+        check(std::string(e.what()).find("unsupported backend_version") != std::string::npos,
+              "ros2 env.configure backend_version error mismatch");
+    }
+
+    try {
+        (void)eval_text(
+            "(begin "
+            "  (define cfg (map.make)) "
+            "  (map.set! cfg 'obs_schema \"racecar.obs.v1\") "
+            "  (env.configure cfg))",
+            env);
+        throw std::runtime_error("expected ros2 env.configure to reject non-ros2 obs_schema family");
+    } catch (const lisp_error& e) {
+        check(std::string(e.what()).find("ros2.obs") != std::string::npos,
+              "ros2 env.configure obs_schema family error mismatch");
+    }
+
+    try {
+        (void)eval_text(
+            "(begin "
+            "  (define cfg (map.make)) "
+            "  (map.set! cfg 'action_schema \"ros2.action.v2\") "
+            "  (env.configure cfg))",
+            env);
+        throw std::runtime_error("expected ros2 env.configure to reject unsupported action_schema major");
+    } catch (const lisp_error& e) {
+        check(std::string(e.what()).find("expected v1") != std::string::npos,
+              "ros2 env.configure action_schema major error mismatch");
+    }
+
     (void)eval_text(
         "(begin "
         "  (define cfg (map.make)) "
+        "  (map.set! cfg 'backend_version \"ros2.transport.v1\") "
         "  (map.set! cfg 'action_clamp \"reject\") "
         "  (map.set! cfg 'reset_mode \"unsupported\") "
         "  (env.configure cfg))",
