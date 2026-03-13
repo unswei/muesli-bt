@@ -340,6 +340,11 @@ jobs:
           source /opt/ros/humble/setup.bash
           ctest --test-dir build/conformance-l2-ros2-humble -R muesli_bt_conformance_l2_rosbag_tests --output-on-failure
 
+      - name: Verify ROS2 L2 artefacts
+        run: |
+          python3 tools/verify_ros2_l2_artifacts.py \
+            --artifact-root build/conformance-l2-ros2-humble/ros2_l2_artifacts
+
       - name: Verify ROS2 fixture bundle
         run: |
           python3 tools/fixtures/verify_fixture.py \
@@ -352,9 +357,10 @@ jobs:
         if: always()
         run: |
           source /opt/ros/humble/setup.bash
-          if [ -d build/conformance-l2-ros2-humble/ros2_l2_artifacts/rosbag-replay-case/odom_bag ]; then
-            ros2 bag info build/conformance-l2-ros2-humble/ros2_l2_artifacts/rosbag-replay-case/odom_bag
-          fi
+          shopt -s nullglob
+          for bag in build/conformance-l2-ros2-humble/ros2_l2_artifacts/*/odom_bag; do
+            ros2 bag info "$bag"
+          done
 
       - name: Upload ROS2 L2 artefacts
         if: always()

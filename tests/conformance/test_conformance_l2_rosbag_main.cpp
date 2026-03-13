@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -15,6 +16,7 @@
 #include <thread>
 #include <vector>
 
+#include <geometry_msgs/msg/twist.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/executors/single_threaded_executor.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -144,6 +146,27 @@ struct odom_sample {
     double vx = 0.0;
     double vy = 0.0;
     double wz = 0.0;
+};
+
+struct scenario_paths {
+    std::filesystem::path scenario_dir;
+    std::filesystem::path bag_dir;
+    std::filesystem::path log_path;
+    std::filesystem::path summary_path;
+};
+
+struct scenario_summary {
+    std::string scenario;
+    std::string status;
+    std::string message;
+    std::int64_t ticks = 0;
+    std::int64_t fallback_count = 0;
+    std::int64_t overrun_count = 0;
+    std::int64_t backend_published_actions = 0;
+    std::size_t command_count = 0;
+    geometry_msgs::msg::Twist last_command{};
+    std::size_t log_lines = 0;
+    std::optional<double> final_obs_x{};
 };
 
 nav_msgs::msg::Odometry make_odom_message(const odom_sample& sample) {
@@ -286,75 +309,208 @@ std::string ros2_configure_script(const std::string& topic_ns, const std::string
            "  (env.configure cfg))";
 }
 
-void write_summary(const std::filesystem::path& summary_path,
-                   const std::string& status,
-                   std::int64_t ticks,
-                   std::int64_t fallback_count,
-                   std::int64_t overrun_count,
-                   std::int64_t backend_published_actions,
-                   std::size_t command_count,
-                   const geometry_msgs::msg::Twist& command,
-                   std::size_t log_lines) {
+scenario_paths prepare_scenario(const std::string& name) {
+    const std::filesystem::path scenario_dir = l2_artifact_root() / name;
+    std::error_code ec;
+    std::filesystem::remove_all(scenario_dir, ec);
+    std::filesystem::create_directories(scenario_dir);
+    return {
+        .scenario_dir = scenario_dir,
+        .bag_dir = scenario_dir / "odom_bag",
+        .log_path = scenario_dir / "run_loop_records.jsonl",
+        .summary_path = scenario_dir / "summary.json",
+    };
+}
+
+void write_summary(const std::filesystem::path& summary_path, const scenario_summary& summary) {
     std::ofstream out(summary_path);
     check(out.good(), "failed to open summary path: " + summary_path.string());
     out << "{\n"
-        << "  \"status\": \"" << status << "\",\n"
-        << "  \"ticks\": " << ticks << ",\n"
-        << "  \"fallback_count\": " << fallback_count << ",\n"
-        << "  \"overrun_count\": " << overrun_count << ",\n"
-        << "  \"backend_published_actions\": " << backend_published_actions << ",\n"
-        << "  \"command_count\": " << command_count << ",\n"
+        << "  \"scenario\": \"" << summary.scenario << "\",\n"
+        << "  \"status\": \"" << summary.status << "\",\n"
+        << "  \"message\": " << lisp_string_literal(summary.message) << ",\n"
+        << "  \"ticks\": " << summary.ticks << ",\n"
+        << "  \"fallback_count\": " << summary.fallback_count << ",\n"
+        << "  \"overrun_count\": " << summary.overrun_count << ",\n"
+        << "  \"backend_published_actions\": " << summary.backend_published_actions << ",\n"
+        << "  \"command_count\": " << summary.command_count << ",\n"
         << "  \"last_command\": {\n"
-        << "    \"linear_x\": " << command.linear.x << ",\n"
-        << "    \"linear_y\": " << command.linear.y << ",\n"
-        << "    \"angular_z\": " << command.angular.z << "\n"
+        << "    \"linear_x\": " << summary.last_command.linear.x << ",\n"
+        << "    \"linear_y\": " << summary.last_command.linear.y << ",\n"
+        << "    \"angular_z\": " << summary.last_command.angular.z << "\n"
         << "  },\n"
-        << "  \"log_lines\": " << log_lines << "\n"
-        << "}\n";
+        << "  \"log_lines\": " << summary.log_lines << ",\n";
+    if (summary.final_obs_x.has_value()) {
+        out << "  \"final_obs_x\": " << *summary.final_obs_x << "\n";
+    } else {
+        out << "  \"final_obs_x\": null\n";
+    }
+    out << "}\n";
+}
+
+std::optional<muslisp::value> map_lookup_text_key(muslisp::value map_obj, const std::string& key) {
+    if (!muslisp::is_map(map_obj)) {
+        return std::nullopt;
+    }
+    for (const auto& [map_key, map_value] : map_obj->map_data) {
+        if ((map_key.type == muslisp::map_key_type::string || map_key.type == muslisp::map_key_type::symbol) &&
+            map_key.text_data == key) {
+            return map_value;
+        }
+    }
+    return std::nullopt;
+}
+
+muslisp::value decode_json_text(const std::string& text, muslisp::env_ptr env) {
+    return eval_text("(json.decode " + lisp_string_literal(text) + ")", env);
+}
+
+double number_value_checked(muslisp::value v, const std::string& where) {
+    if (muslisp::is_integer(v)) {
+        return static_cast<double>(muslisp::integer_value(v));
+    }
+    if (muslisp::is_float(v)) {
+        return muslisp::float_value(v);
+    }
+    throw std::runtime_error(where + ": expected number");
+}
+
+muslisp::value require_map_field(muslisp::value map_obj, const std::string& key, const std::string& where) {
+    const auto result = map_lookup_text_key(map_obj, key);
+    if (!result.has_value() || !muslisp::is_map(*result)) {
+        throw std::runtime_error(where + ": missing map field '" + key + "'");
+    }
+    return *result;
+}
+
+std::string require_text_field(muslisp::value map_obj, const std::string& key, const std::string& where) {
+    const auto result = map_lookup_text_key(map_obj, key);
+    if (!result.has_value()) {
+        throw std::runtime_error(where + ": missing text field '" + key + "'");
+    }
+    if (muslisp::is_string(*result)) {
+        return muslisp::string_value(*result);
+    }
+    if (muslisp::is_symbol(*result)) {
+        return muslisp::symbol_name(*result);
+    }
+    throw std::runtime_error(where + ": expected text field '" + key + "'");
+}
+
+std::int64_t require_int_field(muslisp::value map_obj, const std::string& key, const std::string& where) {
+    const auto result = map_lookup_text_key(map_obj, key);
+    if (!result.has_value() || !muslisp::is_integer(*result)) {
+        throw std::runtime_error(where + ": missing integer field '" + key + "'");
+    }
+    return muslisp::integer_value(*result);
+}
+
+double require_number_field(muslisp::value map_obj, const std::string& key, const std::string& where) {
+    const auto result = map_lookup_text_key(map_obj, key);
+    if (!result.has_value()) {
+        throw std::runtime_error(where + ": missing numeric field '" + key + "'");
+    }
+    return number_value_checked(*result, where + "." + key);
+}
+
+bool require_bool_field(muslisp::value map_obj, const std::string& key, const std::string& where) {
+    const auto result = map_lookup_text_key(map_obj, key);
+    if (!result.has_value() || !muslisp::is_boolean(*result)) {
+        throw std::runtime_error(where + ": missing boolean field '" + key + "'");
+    }
+    return muslisp::boolean_value(*result);
+}
+
+void verify_common_record_shape(muslisp::value record,
+                                const std::string& expected_schema,
+                                std::int64_t expected_tick,
+                                std::int64_t expected_t_ms,
+                                bool expected_used_fallback,
+                                bool expected_overrun) {
+    check(require_text_field(record, "schema_version", "record") == expected_schema, "record schema_version mismatch");
+    check(require_int_field(record, "tick", "record") == expected_tick, "record tick mismatch");
+    check(require_int_field(record, "t_ms", "record") == expected_t_ms, "record t_ms mismatch");
+    check(require_bool_field(record, "used_fallback", "record") == expected_used_fallback,
+          "record used_fallback mismatch");
+    check(require_bool_field(record, "overrun", "record") == expected_overrun, "record overrun mismatch");
+
+    const muslisp::value budget = require_map_field(record, "budget", "record");
+    check_close(require_number_field(budget, "tick_budget_ms", "record.budget"), 200.0, 1e-6,
+                "record tick_budget_ms mismatch");
+    check(require_number_field(budget, "tick_time_ms", "record.budget") >= 0.0,
+          "record tick_time_ms should be non-negative");
+
+    const muslisp::value obs = require_map_field(record, "obs", "record");
+    check(require_text_field(obs, "obs_schema", "record.obs") == "ros2.obs.v1", "record obs_schema mismatch");
+    check(require_text_field(obs, "state_schema", "record.obs") == "ros2.state.v1", "record state_schema mismatch");
+    const muslisp::value state = require_map_field(obs, "state", "record.obs");
+    check(require_text_field(state, "state_schema", "record.obs.state") == "ros2.state.v1",
+          "record state.state_schema mismatch");
+
+    const muslisp::value action = require_map_field(record, "action", "record");
+    check(require_text_field(action, "action_schema", "record.action") == "ros2.action.v1",
+          "record action_schema mismatch");
+}
+
+void verify_pose_x(muslisp::value record, double expected_x, const std::string& where) {
+    const muslisp::value obs = require_map_field(record, "obs", where);
+    const muslisp::value state = require_map_field(obs, "state", where + ".obs");
+    const muslisp::value pose = require_map_field(state, "pose", where + ".obs.state");
+    check_close(require_number_field(pose, "x", where + ".obs.state.pose"), expected_x, 1e-6, where + ": pose.x mismatch");
+}
+
+void verify_action_components(muslisp::value action,
+                              double linear_x,
+                              double linear_y,
+                              double angular_z,
+                              const std::string& where) {
+    const muslisp::value u = require_map_field(action, "u", where);
+    check_close(require_number_field(u, "linear_x", where + ".u"), linear_x, 1e-6, where + ": linear_x mismatch");
+    check_close(require_number_field(u, "linear_y", where + ".u"), linear_y, 1e-6, where + ": linear_y mismatch");
+    check_close(require_number_field(u, "angular_z", where + ".u"), angular_z, 1e-6, where + ": angular_z mismatch");
+}
+
+std::string result_message(muslisp::env_ptr env) {
+    return muslisp::string_value(eval_text("(map.get rosbag-run-result 'message \"\")", env));
+}
+
+std::string safe_action_snippet() {
+    return "(define safe (map.make)) "
+           "(define safe-u (map.make)) "
+           "(map.set! safe 'action_schema \"ros2.action.v1\") "
+           "(map.set! safe 't_ms 0) "
+           "(map.set! safe-u 'linear_x 0.0) "
+           "(map.set! safe-u 'linear_y 0.0) "
+           "(map.set! safe-u 'angular_z 0.0) "
+           "(map.set! safe 'u safe-u) ";
 }
 
 void test_ros2_rosbag_replay_conformance() {
     using namespace muslisp;
 
-    const std::filesystem::path scenario_dir = l2_artifact_root() / "rosbag-replay-case";
-    std::error_code ec;
-    std::filesystem::remove_all(scenario_dir, ec);
-    std::filesystem::create_directories(scenario_dir);
-
+    const scenario_paths paths = prepare_scenario("rosbag-replay-case");
     const std::string topic_ns = "/l2bag";
     const std::string odom_topic = resolve_topic_name(topic_ns, "odom");
-    const std::filesystem::path bag_dir = scenario_dir / "odom_bag";
-    const std::filesystem::path log_path = scenario_dir / "run_loop_records.jsonl";
-    const std::filesystem::path summary_path = scenario_dir / "summary.json";
-
     const std::vector<odom_sample> samples = {
         {.t_ns = 1'700'000'000'000'000'000LL, .x = 0.2, .y = 0.0, .yaw = 0.0, .vx = 0.1, .vy = 0.0, .wz = 0.0},
         {.t_ns = 1'700'000'000'040'000'000LL, .x = 1.6, .y = -0.1, .yaw = 0.2, .vx = 0.15, .vy = 0.0, .wz = 0.05},
     };
-    write_odometry_bag(bag_dir, odom_topic, samples);
-
-    check(std::filesystem::exists(bag_dir / "metadata.yaml"), "ros2 rosbag conformance: missing bag metadata");
+    write_odometry_bag(paths.bag_dir, odom_topic, samples);
+    check(std::filesystem::exists(paths.bag_dir / "metadata.yaml"), "ros2 rosbag replay: missing bag metadata");
 
     test_support::ros2_test_harness harness(topic_ns);
     env_ptr env = create_env_with_ros2_extension();
     (void)eval_text("(env.attach \"ros2\")", env);
     (void)eval_text(ros2_configure_script(topic_ns), env);
     check(harness.wait_for_transport_ready(std::chrono::milliseconds(1000)),
-          "ros2 rosbag conformance: transport should be ready after configure");
+          "ros2 rosbag replay: transport should be ready after configure");
 
-    ros2_bag_replayer player(bag_dir, odom_topic);
+    ros2_bag_replayer player(paths.bag_dir, odom_topic);
     player.start();
 
     const std::string run_expr =
         "(begin "
-        "  (define safe (map.make)) "
-        "  (define safe-u (map.make)) "
-        "  (map.set! safe 'action_schema \"ros2.action.v1\") "
-        "  (map.set! safe 't_ms 0) "
-        "  (map.set! safe-u 'linear_x 0.0) "
-        "  (map.set! safe-u 'linear_y 0.0) "
-        "  (map.set! safe-u 'angular_z 0.0) "
-        "  (map.set! safe 'u safe-u) "
+        + safe_action_snippet() +
         "  (define rosbag-run-result "
         "    (env.run-loop "
         "      (begin "
@@ -366,7 +522,7 @@ void test_ros2_rosbag_replay_conformance() {
         "        (map.set! cfg 'safe_action safe) "
         "        (map.set! cfg 'schema_version \"ros2.l2.v1\") "
         "        (map.set! cfg 'log_path " +
-        lisp_string_literal(log_path.string()) +
+        lisp_string_literal(paths.log_path.string()) +
         ") "
         "        cfg) "
         "      (lambda (obs) "
@@ -382,80 +538,402 @@ void test_ros2_rosbag_replay_conformance() {
         "          a)))) "
         "  rosbag-run-result)";
     const value run_result = eval_text(run_expr, env);
-    check(is_map(run_result), "ros2 rosbag conformance: env.run-loop should return a map");
+    check(is_map(run_result), "ros2 rosbag replay: env.run-loop should return a map");
 
     check(player.wait_for_completion(std::chrono::seconds(3)),
-          "ros2 rosbag conformance: timed out waiting for rosbag playback");
-    check(harness.wait_for_command_count(1, std::chrono::milliseconds(750)),
-          "ros2 rosbag conformance: expected at least one published cmd_vel command");
+          "ros2 rosbag replay: timed out waiting for rosbag playback");
+    check(harness.wait_for_command_count(1, std::chrono::milliseconds(1000)),
+          "ros2 rosbag replay: expected at least one published cmd_vel command");
 
     const std::string status = symbol_name(eval_text("(map.get rosbag-run-result 'status ':none)", env));
-    check(status == ":stopped", "ros2 rosbag conformance: expected :stopped status, got " + status);
+    check(status == ":stopped", "ros2 rosbag replay: expected :stopped status, got " + status);
+    const std::string message = result_message(env);
     const std::int64_t ticks = integer_value(eval_text("(map.get rosbag-run-result 'ticks -1)", env));
-    check(ticks == 2, "ros2 rosbag conformance: expected two ticks");
+    check(ticks == 2, "ros2 rosbag replay: expected two ticks");
     const std::int64_t fallback_count = integer_value(eval_text("(map.get rosbag-run-result 'fallback_count -1)", env));
-    check(fallback_count == 0, "ros2 rosbag conformance: unexpected fallback_count");
+    check(fallback_count == 0, "ros2 rosbag replay: unexpected fallback_count");
     const std::int64_t overrun_count = integer_value(eval_text("(map.get rosbag-run-result 'overrun_count -1)", env));
-    check(overrun_count == 0, "ros2 rosbag conformance: unexpected overrun_count");
+    check(overrun_count == 0, "ros2 rosbag replay: unexpected overrun_count");
     const std::int64_t backend_published_actions =
         integer_value(eval_text("(map.get (env.info) 'published_actions -1)", env));
-    check(backend_published_actions == 2,
-          "ros2 rosbag conformance: backend should report two published actions");
+    check(backend_published_actions == 2, "ros2 rosbag replay: backend should report two published actions");
 
-    check_close(float_value(eval_text(
-                    "(map.get (map.get (map.get (map.get rosbag-run-result 'final_obs (map.make)) "
-                    "'state (map.make)) 'pose (map.make)) 'x 0.0)",
-                    env)),
-                1.6,
-                1e-6,
-                "ros2 rosbag conformance: final_obs pose.x mismatch");
+    const double final_obs_x =
+        float_value(eval_text(
+            "(map.get (map.get (map.get (map.get rosbag-run-result 'final_obs (map.make)) "
+            "'state (map.make)) 'pose (map.make)) 'x 0.0)",
+            env));
+    check_close(final_obs_x, 1.6, 1e-6, "ros2 rosbag replay: final_obs pose.x mismatch");
 
     const auto command = harness.last_command();
-    check_close(command.linear.x, 0.25, 1e-6, "ros2 rosbag conformance: linear.x mismatch");
-    check_close(command.linear.y, 0.0, 1e-6, "ros2 rosbag conformance: linear.y mismatch");
-    check_close(command.angular.z, 0.05, 1e-6, "ros2 rosbag conformance: angular.z mismatch");
+    check_close(command.linear.x, 0.25, 1e-6, "ros2 rosbag replay: linear.x mismatch");
+    check_close(command.linear.y, 0.0, 1e-6, "ros2 rosbag replay: linear.y mismatch");
+    check_close(command.angular.z, 0.05, 1e-6, "ros2 rosbag replay: angular.z mismatch");
 
-    const auto lines = read_non_empty_lines(log_path);
-    check(lines.size() == 2, "ros2 rosbag conformance: expected two run-loop records");
-    check(lines.front().find("\"schema_version\":\"ros2.l2.v1\"") != std::string::npos,
-          "ros2 rosbag conformance: first log record missing schema_version");
-    check(lines.back().find("\"used_fallback\":false") != std::string::npos,
-          "ros2 rosbag conformance: expected used_fallback=false");
-    check(lines.back().find("\"overrun\":false") != std::string::npos,
-          "ros2 rosbag conformance: expected overrun=false");
-    check(lines.back().find("\"action_schema\":\"ros2.action.v1\"") != std::string::npos,
-          "ros2 rosbag conformance: missing action schema in log record");
+    const auto lines = read_non_empty_lines(paths.log_path);
+    check(lines.size() == 2, "ros2 rosbag replay: expected two run-loop records");
+    const value record1 = decode_json_text(lines[0], env);
+    const value record2 = decode_json_text(lines[1], env);
+    verify_common_record_shape(record1, "ros2.l2.v1", 1, 1'700'000'000'000LL, false, false);
+    verify_common_record_shape(record2, "ros2.l2.v1", 2, 1'700'000'000'040LL, false, false);
+    verify_pose_x(record1, 0.2, "ros2 rosbag replay record1");
+    verify_pose_x(record2, 1.6, "ros2 rosbag replay record2");
+    verify_action_components(require_map_field(record1, "action", "ros2 rosbag replay record1"), 0.25, 0.0, 0.05,
+                             "ros2 rosbag replay record1 action");
+    verify_action_components(require_map_field(record2, "action", "ros2 rosbag replay record2"), 0.25, 0.0, 0.05,
+                             "ros2 rosbag replay record2 action");
+    check(!map_lookup_text_key(record1, "error").has_value(), "ros2 rosbag replay: unexpected error field");
+    check(!map_lookup_text_key(record2, "error").has_value(), "ros2 rosbag replay: unexpected error field");
 
-    write_summary(summary_path,
-                  status,
-                  ticks,
-                  fallback_count,
-                  overrun_count,
-                  backend_published_actions,
-                  harness.command_count(),
-                  command,
-                  lines.size());
-    check(std::filesystem::exists(summary_path), "ros2 rosbag conformance: missing summary artifact");
+    write_summary(
+        paths.summary_path,
+        {
+            .scenario = "rosbag-replay-case",
+            .status = status,
+            .message = message,
+            .ticks = ticks,
+            .fallback_count = fallback_count,
+            .overrun_count = overrun_count,
+            .backend_published_actions = backend_published_actions,
+            .command_count = harness.command_count(),
+            .last_command = command,
+            .log_lines = lines.size(),
+            .final_obs_x = final_obs_x,
+        });
+    check(std::filesystem::exists(paths.summary_path), "ros2 rosbag replay: missing summary artefact");
+}
+
+void test_ros2_rosbag_clamp_conformance() {
+    using namespace muslisp;
+
+    const scenario_paths paths = prepare_scenario("rosbag-clamped-action-case");
+    const std::string topic_ns = "/l2clamp";
+    const std::string odom_topic = resolve_topic_name(topic_ns, "odom");
+    const std::vector<odom_sample> samples = {
+        {.t_ns = 1'700'000'100'000'000'000LL, .x = -0.4, .y = 0.2, .yaw = -0.1, .vx = 0.05, .vy = 0.01, .wz = 0.0},
+        {.t_ns = 1'700'000'100'040'000'000LL, .x = 0.8, .y = 0.4, .yaw = 0.3, .vx = 0.06, .vy = -0.02, .wz = 0.1},
+    };
+    write_odometry_bag(paths.bag_dir, odom_topic, samples);
+    check(std::filesystem::exists(paths.bag_dir / "metadata.yaml"), "ros2 rosbag clamp: missing bag metadata");
+
+    test_support::ros2_test_harness harness(topic_ns);
+    env_ptr env = create_env_with_ros2_extension();
+    (void)eval_text("(env.attach \"ros2\")", env);
+    (void)eval_text(ros2_configure_script(topic_ns), env);
+    check(harness.wait_for_transport_ready(std::chrono::milliseconds(1000)),
+          "ros2 rosbag clamp: transport should be ready after configure");
+
+    ros2_bag_replayer player(paths.bag_dir, odom_topic);
+    player.start();
+
+    const std::string run_expr =
+        "(begin "
+        + safe_action_snippet() +
+        "  (define rosbag-run-result "
+        "    (env.run-loop "
+        "      (begin "
+        "        (define cfg (map.make)) "
+        "        (map.set! cfg 'tick_hz 5) "
+        "        (map.set! cfg 'max_ticks 2) "
+        "        (map.set! cfg 'step_max 2) "
+        "        (map.set! cfg 'realtime #t) "
+        "        (map.set! cfg 'safe_action safe) "
+        "        (map.set! cfg 'schema_version \"ros2.l2.clamp.v1\") "
+        "        (map.set! cfg 'log_path " +
+        lisp_string_literal(paths.log_path.string()) +
+        ") "
+        "        cfg) "
+        "      (lambda (obs) "
+        "        (begin "
+        "          (define a (map.make)) "
+        "          (define u (map.make)) "
+        "          (map.set! a 'action_schema \"ros2.action.v1\") "
+        "          (map.set! a 't_ms (map.get obs 't_ms 0)) "
+        "          (map.set! u 'linear_x 2.5) "
+        "          (map.set! u 'linear_y -2.0) "
+        "          (map.set! u 'angular_z 1.5) "
+        "          (map.set! a 'u u) "
+        "          a)))) "
+        "  rosbag-run-result)";
+    const value run_result = eval_text(run_expr, env);
+    check(is_map(run_result), "ros2 rosbag clamp: env.run-loop should return a map");
+
+    check(player.wait_for_completion(std::chrono::seconds(3)),
+          "ros2 rosbag clamp: timed out waiting for rosbag playback");
+    check(harness.wait_for_command_count(1, std::chrono::milliseconds(1000)),
+          "ros2 rosbag clamp: expected at least one published cmd_vel command");
+
+    const std::string status = symbol_name(eval_text("(map.get rosbag-run-result 'status ':none)", env));
+    check(status == ":stopped", "ros2 rosbag clamp: expected :stopped status, got " + status);
+    const std::string message = result_message(env);
+    const std::int64_t ticks = integer_value(eval_text("(map.get rosbag-run-result 'ticks -1)", env));
+    check(ticks == 2, "ros2 rosbag clamp: expected two ticks");
+    const std::int64_t fallback_count = integer_value(eval_text("(map.get rosbag-run-result 'fallback_count -1)", env));
+    check(fallback_count == 0, "ros2 rosbag clamp: unexpected fallback_count");
+    const std::int64_t overrun_count = integer_value(eval_text("(map.get rosbag-run-result 'overrun_count -1)", env));
+    check(overrun_count == 0, "ros2 rosbag clamp: unexpected overrun_count");
+    const std::int64_t backend_published_actions =
+        integer_value(eval_text("(map.get (env.info) 'published_actions -1)", env));
+    check(backend_published_actions == 2, "ros2 rosbag clamp: backend should report two published actions");
+
+    const double final_obs_x =
+        float_value(eval_text(
+            "(map.get (map.get (map.get (map.get rosbag-run-result 'final_obs (map.make)) "
+            "'state (map.make)) 'pose (map.make)) 'x 0.0)",
+            env));
+    check_close(final_obs_x, 0.8, 1e-6, "ros2 rosbag clamp: final_obs pose.x mismatch");
+
+    const auto command = harness.last_command();
+    check_close(command.linear.x, 1.0, 1e-6, "ros2 rosbag clamp: linear.x should be clamped");
+    check_close(command.linear.y, -1.0, 1e-6, "ros2 rosbag clamp: linear.y should be clamped");
+    check_close(command.angular.z, 1.0, 1e-6, "ros2 rosbag clamp: angular.z should be clamped");
+
+    const auto lines = read_non_empty_lines(paths.log_path);
+    check(lines.size() == 2, "ros2 rosbag clamp: expected two run-loop records");
+    const value record1 = decode_json_text(lines[0], env);
+    const value record2 = decode_json_text(lines[1], env);
+    verify_common_record_shape(record1, "ros2.l2.clamp.v1", 1, 1'700'000'100'000LL, false, false);
+    verify_common_record_shape(record2, "ros2.l2.clamp.v1", 2, 1'700'000'100'040LL, false, false);
+    verify_pose_x(record1, -0.4, "ros2 rosbag clamp record1");
+    verify_pose_x(record2, 0.8, "ros2 rosbag clamp record2");
+    verify_action_components(require_map_field(record1, "action", "ros2 rosbag clamp record1"), 2.5, -2.0, 1.5,
+                             "ros2 rosbag clamp record1 action");
+    verify_action_components(require_map_field(record2, "action", "ros2 rosbag clamp record2"), 2.5, -2.0, 1.5,
+                             "ros2 rosbag clamp record2 action");
+    check(!map_lookup_text_key(record1, "error").has_value(), "ros2 rosbag clamp: unexpected error field");
+    check(!map_lookup_text_key(record2, "error").has_value(), "ros2 rosbag clamp: unexpected error field");
+
+    write_summary(
+        paths.summary_path,
+        {
+            .scenario = "rosbag-clamped-action-case",
+            .status = status,
+            .message = message,
+            .ticks = ticks,
+            .fallback_count = fallback_count,
+            .overrun_count = overrun_count,
+            .backend_published_actions = backend_published_actions,
+            .command_count = harness.command_count(),
+            .last_command = command,
+            .log_lines = lines.size(),
+            .final_obs_x = final_obs_x,
+        });
+    check(std::filesystem::exists(paths.summary_path), "ros2 rosbag clamp: missing summary artefact");
+}
+
+void test_ros2_rosbag_invalid_action_fallback_conformance() {
+    using namespace muslisp;
+
+    const scenario_paths paths = prepare_scenario("rosbag-invalid-action-fallback-case");
+    const std::string topic_ns = "/l2invalid";
+    const std::string odom_topic = resolve_topic_name(topic_ns, "odom");
+    const std::vector<odom_sample> samples = {
+        {.t_ns = 1'700'000'200'000'000'000LL, .x = 0.4, .y = 0.1, .yaw = 0.0, .vx = 0.02, .vy = 0.0, .wz = 0.0},
+    };
+    write_odometry_bag(paths.bag_dir, odom_topic, samples);
+    check(std::filesystem::exists(paths.bag_dir / "metadata.yaml"),
+          "ros2 rosbag invalid-action: missing bag metadata");
+
+    test_support::ros2_test_harness harness(topic_ns);
+    env_ptr env = create_env_with_ros2_extension();
+    (void)eval_text("(env.attach \"ros2\")", env);
+    (void)eval_text(ros2_configure_script(topic_ns), env);
+    check(harness.wait_for_transport_ready(std::chrono::milliseconds(1000)),
+          "ros2 rosbag invalid-action: transport should be ready after configure");
+
+    ros2_bag_replayer player(paths.bag_dir, odom_topic);
+    player.start();
+
+    const std::string run_expr =
+        "(begin "
+        + safe_action_snippet() +
+        "  (define rosbag-run-result "
+        "    (env.run-loop "
+        "      (begin "
+        "        (define cfg (map.make)) "
+        "        (map.set! cfg 'tick_hz 5) "
+        "        (map.set! cfg 'max_ticks 2) "
+        "        (map.set! cfg 'step_max 2) "
+        "        (map.set! cfg 'realtime #t) "
+        "        (map.set! cfg 'safe_action safe) "
+        "        (map.set! cfg 'schema_version \"ros2.l2.invalid.v1\") "
+        "        (map.set! cfg 'log_path " +
+        lisp_string_literal(paths.log_path.string()) +
+        ") "
+        "        cfg) "
+        "      (lambda (obs) "
+        "        (begin "
+        "          (define bad (map.make)) "
+        "          (map.set! bad 'action_schema \"ros2.action.v1\") "
+        "          (map.set! bad 't_ms (map.get obs 't_ms 0)) "
+        "          (map.set! bad 'u 1) "
+        "          bad)))) "
+        "  rosbag-run-result)";
+    const value run_result = eval_text(run_expr, env);
+    check(is_map(run_result), "ros2 rosbag invalid-action: env.run-loop should return a map");
+
+    check(player.wait_for_completion(std::chrono::seconds(3)),
+          "ros2 rosbag invalid-action: timed out waiting for rosbag playback");
+    check(harness.wait_for_command_count(1, std::chrono::milliseconds(1000)),
+          "ros2 rosbag invalid-action: expected one published safe command");
+
+    const std::string status = symbol_name(eval_text("(map.get rosbag-run-result 'status ':none)", env));
+    check(status == ":error", "ros2 rosbag invalid-action: expected :error status, got " + status);
+    const std::string message = result_message(env);
+    check(message.find("u must be a map") != std::string::npos,
+          "ros2 rosbag invalid-action: unexpected message: " + message);
+    const std::int64_t ticks = integer_value(eval_text("(map.get rosbag-run-result 'ticks -1)", env));
+    check(ticks == 1, "ros2 rosbag invalid-action: expected one tick");
+    const std::int64_t fallback_count = integer_value(eval_text("(map.get rosbag-run-result 'fallback_count -1)", env));
+    check(fallback_count == 1, "ros2 rosbag invalid-action: expected fallback_count=1");
+    const std::int64_t overrun_count = integer_value(eval_text("(map.get rosbag-run-result 'overrun_count -1)", env));
+    check(overrun_count == 0, "ros2 rosbag invalid-action: unexpected overrun_count");
+    const std::int64_t backend_published_actions =
+        integer_value(eval_text("(map.get (env.info) 'published_actions -1)", env));
+    check(backend_published_actions == 1, "ros2 rosbag invalid-action: backend should report one published action");
+
+    const double final_obs_x =
+        float_value(eval_text(
+            "(map.get (map.get (map.get (map.get rosbag-run-result 'final_obs (map.make)) "
+            "'state (map.make)) 'pose (map.make)) 'x 0.0)",
+            env));
+    check_close(final_obs_x, 0.4, 1e-6, "ros2 rosbag invalid-action: final_obs pose.x mismatch");
+
+    const auto command = harness.last_command();
+    check_close(command.linear.x, 0.0, 1e-6, "ros2 rosbag invalid-action: safe linear.x mismatch");
+    check_close(command.linear.y, 0.0, 1e-6, "ros2 rosbag invalid-action: safe linear.y mismatch");
+    check_close(command.angular.z, 0.0, 1e-6, "ros2 rosbag invalid-action: safe angular.z mismatch");
+
+    const auto lines = read_non_empty_lines(paths.log_path);
+    check(lines.size() == 1, "ros2 rosbag invalid-action: expected one run-loop record");
+    const value record = decode_json_text(lines[0], env);
+    verify_common_record_shape(record, "ros2.l2.invalid.v1", 1, 1'700'000'200'000LL, true, false);
+    verify_pose_x(record, 0.4, "ros2 rosbag invalid-action record");
+    verify_action_components(require_map_field(record, "action", "ros2 rosbag invalid-action record"), 0.0, 0.0, 0.0,
+                             "ros2 rosbag invalid-action record action");
+    const auto error_field = map_lookup_text_key(record, "error");
+    check(error_field.has_value() && muslisp::is_string(*error_field),
+          "ros2 rosbag invalid-action: missing error field");
+    check(muslisp::string_value(*error_field).find("u must be a map") != std::string::npos,
+          "ros2 rosbag invalid-action: error field mismatch");
+    const muslisp::value on_tick = require_map_field(record, "on_tick", "ros2 rosbag invalid-action record");
+    const auto on_tick_u = map_lookup_text_key(on_tick, "u");
+    check(on_tick_u.has_value() && muslisp::is_integer(*on_tick_u) && muslisp::integer_value(*on_tick_u) == 1,
+          "ros2 rosbag invalid-action: expected malformed on_tick payload to be preserved");
+
+    write_summary(
+        paths.summary_path,
+        {
+            .scenario = "rosbag-invalid-action-fallback-case",
+            .status = status,
+            .message = message,
+            .ticks = ticks,
+            .fallback_count = fallback_count,
+            .overrun_count = overrun_count,
+            .backend_published_actions = backend_published_actions,
+            .command_count = harness.command_count(),
+            .last_command = command,
+            .log_lines = lines.size(),
+            .final_obs_x = final_obs_x,
+        });
+    check(std::filesystem::exists(paths.summary_path), "ros2 rosbag invalid-action: missing summary artefact");
+}
+
+void test_ros2_reset_unsupported_policy_artifact() {
+    using namespace muslisp;
+
+    const scenario_paths paths = prepare_scenario("reset-unsupported-case");
+    env_ptr env = create_env_with_ros2_extension();
+    (void)eval_text("(env.attach \"ros2\")", env);
+    (void)eval_text(
+        ros2_configure_script(
+            "/l2reset",
+            "  (map.set! cfg 'reset_mode \"unsupported\") "),
+        env);
+
+    const std::string run_expr =
+        "(begin "
+        "  (define rosbag-run-result "
+        "    (env.run-loop "
+        "      (begin "
+        "        (define cfg (map.make)) "
+        "        (map.set! cfg 'tick_hz 5) "
+        "        (map.set! cfg 'max_ticks 1) "
+        "        (map.set! cfg 'episode_max 2) "
+        "        (map.set! cfg 'schema_version \"ros2.l2.reset-policy.v1\") "
+        "        (map.set! cfg 'log_path " +
+        lisp_string_literal(paths.log_path.string()) +
+        ") "
+        "        cfg) "
+        "      (lambda (obs) #t))) "
+        "  rosbag-run-result)";
+    const value run_result = eval_text(run_expr, env);
+    check(is_map(run_result), "ros2 reset policy artefact: env.run-loop should return a map");
+
+    const std::string status = symbol_name(eval_text("(map.get rosbag-run-result 'status ':none)", env));
+    check(status == ":unsupported", "ros2 reset policy artefact: expected :unsupported status, got " + status);
+    const std::string message = result_message(env);
+    check(message.find("episode_max>1 requires env.reset capability") != std::string::npos,
+          "ros2 reset policy artefact: message mismatch");
+    const std::int64_t ticks = integer_value(eval_text("(map.get rosbag-run-result 'ticks -1)", env));
+    check(ticks == 0, "ros2 reset policy artefact: expected zero ticks");
+    const std::int64_t fallback_count = integer_value(eval_text("(map.get rosbag-run-result 'fallback_count -1)", env));
+    check(fallback_count == 0, "ros2 reset policy artefact: unexpected fallback_count");
+    const std::int64_t overrun_count = integer_value(eval_text("(map.get rosbag-run-result 'overrun_count -1)", env));
+    check(overrun_count == 0, "ros2 reset policy artefact: unexpected overrun_count");
+    const std::int64_t backend_published_actions =
+        integer_value(eval_text("(map.get (env.info) 'published_actions -1)", env));
+    check(backend_published_actions == 0, "ros2 reset policy artefact: backend should not publish actions");
+    check(!std::filesystem::exists(paths.log_path), "ros2 reset policy artefact: unexpected log file");
+
+    write_summary(
+        paths.summary_path,
+        {
+            .scenario = "reset-unsupported-case",
+            .status = status,
+            .message = message,
+            .ticks = ticks,
+            .fallback_count = fallback_count,
+            .overrun_count = overrun_count,
+            .backend_published_actions = backend_published_actions,
+            .command_count = 0,
+            .last_command = geometry_msgs::msg::Twist{},
+            .log_lines = 0,
+            .final_obs_x = std::nullopt,
+        });
+    check(std::filesystem::exists(paths.summary_path), "ros2 reset policy artefact: missing summary artefact");
+}
+
+void cleanup_runtime() {
+    muslisp::env_api_reset();
+    if (rclcpp::ok()) {
+        rclcpp::shutdown();
+    }
+}
+
+void run_case(const std::string& label, const std::function<void()>& fn) {
+    try {
+        fn();
+        std::cout << "[PASS] " << label << '\n';
+    } catch (...) {
+        cleanup_runtime();
+        throw;
+    }
+    cleanup_runtime();
 }
 
 }  // namespace
 
 int main() {
-    const auto cleanup = []() {
-        muslisp::env_api_reset();
-        if (rclcpp::ok()) {
-            rclcpp::shutdown();
-        }
-    };
-
     try {
-        test_ros2_rosbag_replay_conformance();
-        std::cout << "[PASS] ros2 rosbag replay conformance\n";
-        cleanup();
+        run_case("ros2 rosbag replay conformance", test_ros2_rosbag_replay_conformance);
+        run_case("ros2 rosbag clamp conformance", test_ros2_rosbag_clamp_conformance);
+        run_case("ros2 rosbag invalid-action fallback conformance", test_ros2_rosbag_invalid_action_fallback_conformance);
+        run_case("ros2 reset policy artefact", test_ros2_reset_unsupported_policy_artifact);
         return 0;
     } catch (const std::exception& e) {
-        std::cerr << "[FAIL] ros2 rosbag replay conformance: " << e.what() << '\n';
-        cleanup();
+        std::cerr << "[FAIL] " << e.what() << '\n';
+        cleanup_runtime();
         return 1;
     }
 }

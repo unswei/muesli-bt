@@ -10,8 +10,9 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - Added stronger generic ROS2 skeleton coverage for configuration validation, reset policy, canonical observation/action shapes, and invalid-action fallback behaviour.
 - Added Linux ROS-backed test harness coverage using `nav_msgs/msg/Odometry` input and `geometry_msgs/msg/Twist` output.
 - Added installed-package ROS2 consumer smoke coverage on Ubuntu 22.04 + Humble.
-- Added a Linux-only rosbag-backed ROS2 `L2` replay test and artefact output for the first deterministic replay scenario.
+- Added a Linux-only rosbag-backed ROS2 `L2` replay corpus and artefact output for nominal replay, clamped actions, invalid-action fallback, and reset-unsupported policy checks.
 - Added push/PR CI gating for `conformance-l2-ros2-humble`, so the rosbag-backed ROS2 `L2` replay lane now runs in ordinary CI as well as scheduled or manual workflows.
+- Added `tools/verify_ros2_l2_artifacts.py` so CI validates generated ROS2 `L2` summaries and run-loop artefacts structurally, not just by test exit status.
 
 ### Changed
 - ROS2 integration now requires real ROS package discovery when `MUESLI_BT_BUILD_INTEGRATION_ROS2=ON`; configure fails cleanly when `rclcpp` is not discoverable.
@@ -19,7 +20,7 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - ROS2 backend now uses real Linux transport for `env.observe` / `env.act` / `env.step` via `Odometry` and `Twist`, while keeping canonical `ros2.obs.v1`, `ros2.state.v1`, and `ros2.action.v1`.
 - ROS2 reset policy now defaults to `unsupported`; `reset_mode="stub"` is retained for deterministic harnesses and tests.
 - Package exports now preserve the correct installed share directory and ROS dependency discovery for downstream ROS2 consumers.
-- ROS2 scope, backend-writing guidance, conformance notes, and backlog planning now reflect the first implemented Linux transport lane and the first automated rosbag-backed `L2` replay case.
+- ROS2 scope, backend-writing guidance, conformance notes, and backlog planning now reflect the first implemented Linux transport lane, the first replay corpus in `L2`, and the explicit first-milestone decision to keep real reset unsupported.
 
 ## [0.2.0] - 2026-03-04
 

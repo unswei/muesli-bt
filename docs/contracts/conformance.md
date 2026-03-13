@@ -30,8 +30,8 @@ Use this page when:
   - Linux-only
   - true ROS2 transport, executor, distro, and packaging validation belongs here
   - backend scope and deliverables tracked in [ROS2 backend scope](../integration/ros2-backend-scope.md)
-  - the current automated `L2` lane runs the ROS-backed contract tests plus one real rosbag-backed replay scenario
-  - broader rosbag coverage and richer replay corpora are still open work
+  - the current automated `L2` lane runs the ROS-backed contract tests plus a small rosbag-backed replay corpus
+  - the current corpus covers nominal replay, clamped actions, invalid-action fallback, and explicit reset-unsupported policy artefacts
 
 ### required artefacts
 
@@ -81,7 +81,7 @@ cmake --build build/linux-ros2 -j
 ctest --test-dir build/linux-ros2 --output-on-failure
 ```
 
-Run the current rosbag-backed `L2` replay scenario locally:
+Run the current rosbag-backed `L2` replay corpus locally:
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -94,6 +94,7 @@ cmake -S . -B build/linux-ros2-l2 -G Ninja \
   -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
 cmake --build build/linux-ros2-l2 --target muesli_bt_conformance_l2_rosbag_tests -j
 ctest --test-dir build/linux-ros2-l2 -R muesli_bt_conformance_l2_rosbag_tests --output-on-failure
+python3 tools/verify_ros2_l2_artifacts.py --artifact-root build/linux-ros2-l2/ros2_l2_artifacts
 ```
 
 Verify install/export plus the ROS2 consumer smoke:
@@ -149,7 +150,8 @@ Published pre-Linux ROS2 surrogate bundles:
 
 - L0 should stay fast and hermetic; do not add simulator dependencies.
 - Pre-Linux ROS2 work should extend L0-style generic coverage, not pretend to be transport conformance.
-- The current Linux ROS2 validation uses both a deterministic ROS-backed harness and one rosbag-backed replay case.
+- The current Linux ROS2 validation uses both a deterministic ROS-backed harness and a small rosbag-backed replay corpus.
+- The first Linux milestone keeps real reset unsupported; `reset_mode="stub"` remains reserved for deterministic harnesses and tests.
 - L2 failures now block ordinary CI for Linux ROS2 changes, so keep replay scenarios deterministic and narrowly scoped.
 - Deterministic fixtures are provenance-controlled; edit through update tooling only.
 

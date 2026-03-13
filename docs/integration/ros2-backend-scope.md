@@ -40,12 +40,13 @@ What is implemented today:
   - default `reset_mode` is `unsupported`
   - `reset_mode="stub"` is retained for deterministic harnesses and tests only
 - Linux ROS-backed tests plus installed-package consumer smoke coverage
+- Linux `L2` replay corpus covering nominal replay, clamped actions, invalid-action fallback, and reset-unsupported artefacts
 
 What is still intentionally incomplete:
 
-- simulator or robot reset beyond the explicit stub mode
-- broader rosbag-backed `L2` evidence beyond the first replay case
-- richer canonical-log parity checks in the `L2` artefacts
+- simulator or robot reset beyond the explicit unsupported/stub policy
+- broader transport coverage beyond the current `Odometry` / `Twist` path
+- canonical `mbt.evt.v1` parity for ROS-backed run-loop observability beyond the current run-loop artefact checks
 
 ## how it works
 
@@ -172,8 +173,9 @@ Deliverables:
 Status:
 
 - completed for the first `Odometry` / `Twist` transport path on Ubuntu 22.04 + Humble
-- completed for the first automated rosbag-backed replay scenario in Linux-only `L2`
-- still open for richer reset behaviour, broader transport coverage, and a broader replay corpus
+- completed for the first automated Linux-only `L2` replay corpus
+- explicit first-milestone reset decision is now locked: real reset stays unsupported, with `stub` reserved for tests and harnesses
+- still open for broader transport coverage and canonical event-stream parity
 
 `phase 7: land L2 conformance`
 
