@@ -1,0 +1,18 @@
+{
+  "absent_types": [
+    "error"
+  ],
+  "event_count": 7,
+  "events_sha256": "61b11cf808b6f5a1afa507926e51ee2c81e1f2be52c3cdde0fe0df5e3f2008a0",
+  "node_status_sequence": [
+    "1:success"
+  ],
+  "required_types": [
+    "run_start",
+    "tick_begin",
+    "bb_write",
+    "node_enter",
+    "node_exit",
+    "tick_end"
+  ]
+}

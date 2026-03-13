@@ -32,6 +32,11 @@ if(TARGET muesli_bt::integration_webots)
   target_link_libraries(mbt_inspector_webots_smoketest PRIVATE muesli_bt::runtime muesli_bt::integration_webots)
 endif()
 
-if(NOT TARGET muesli_bt::integration_pybullet AND NOT TARGET muesli_bt::integration_webots)
+if(TARGET muesli_bt::integration_ros2)
+  add_executable(mbt_inspector_ros2_smoketest ros2_main.cpp)
+  target_link_libraries(mbt_inspector_ros2_smoketest PRIVATE muesli_bt::runtime muesli_bt::integration_ros2)
+endif()
+
+if(NOT TARGET muesli_bt::integration_pybullet AND NOT TARGET muesli_bt::integration_webots AND NOT TARGET muesli_bt::integration_ros2)
   message(FATAL_ERROR "At least one integration target is required for this smoketest")
 endif()

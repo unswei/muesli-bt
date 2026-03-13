@@ -4,13 +4,15 @@ This guide shows the minimum work needed to connect a new simulator or robot.
 
 A backend is your [host](../terminology.md#host) integration layer for `env.*`.
 
+Keep the runtime semantics backend-agnostic. Your backend adapts transport and device details to the `env.api.v1` contract; it should not redefine that contract.
+
 ## Current State
 
 - Implemented: `env.api.v1` core capability built-ins (`env.info`, `env.attach`, `env.configure`, `env.reset`, `env.observe`, `env.act`, `env.step`, `env.run-loop`, `env.debug-draw`)
 - Implemented: `pybullet` backend adapter (racecar demo path)
 - Implemented: `webots` backend adapter (e-puck demo path, `reset=false`)
-- Implemented: ROS2 backend skeleton extension target (`muesli_bt::integration_ros2`)
-- Planned: ROS2 topic/action/service transport binding and conformance expansion (scope defined in [ROS2 backend scope](ros2-backend-scope.md))
+- Implemented: ROS2 backend transport target (`muesli_bt::integration_ros2`) for Linux/Humble using `nav_msgs/msg/Odometry` input and `geometry_msgs/msg/Twist` output
+- Planned: broader ROS2 transport surfaces, richer reset handling, and `L2` replay/CI expansion (scope defined in [ROS2 backend scope](ros2-backend-scope.md))
 
 Validation references:
 
@@ -36,7 +38,7 @@ Public headers for this flow:
 - `muslisp/extensions.hpp`
 - `bt/runtime_host.hpp`
 - `bt/event_log.hpp`
-- integration headers (PyBullet: `pybullet/extension.hpp`, `pybullet/racecar_demo.hpp`; Webots: `webots/extension.hpp`; ROS2 skeleton: `ros2/extension.hpp`)
+- integration headers (PyBullet: `pybullet/extension.hpp`, `pybullet/racecar_demo.hpp`; Webots: `webots/extension.hpp`; ROS2: `ros2/extension.hpp`, `ros2/backend.hpp`)
 
 Event callback interface for inspectors:
 
@@ -45,12 +47,12 @@ Event callback interface for inspectors:
 
 ## Minimal Responsibilities
 
-1. expose `env.info` with backend name + schema ids
+1. expose `env.info` with backend name, capability flags, and any backend-specific schema/config metadata
 2. implement `env.observe` and return a stable observation map
-3. implement `env.act` with action validation/clamping
+3. implement `env.act` with action validation and explicit clamp/reject behaviour
 4. implement `env.step` for your timing model
 5. provide a safe fallback action path
-6. optionally implement `env.reset`
+6. implement `env.reset` or report clearly that reset is unsupported
 
 ## Key Naming Contract
 
@@ -62,12 +64,24 @@ Use one naming scheme across all backends:
 
 Avoid introducing alternate names for the same concept in backend docs or examples.
 
+## Configure Contract
+
+Document the accepted `env.configure` keys for each backend and keep the policy explicit:
+
+- accepted keys and types
+- whether unknown keys are rejected or ignored
+- which keys are runtime-level versus transport-level
+- what the reset policy is
+
+For the ROS2 bring-up path, rejecting malformed or unknown backend-specific keys is preferred so contract drift is obvious early. For the current Linux ROS2 backend, `reset_mode="unsupported"` is the default and `reset_mode="stub"` is reserved for deterministic harnesses/tests.
+
 ## Observation Path (`env.observe`)
 
 - read sensors (camera, lidar, proprioception, state estimator)
 - build observation map with explicit `obs_schema` and (when applicable) `state_schema`
 - include timestamp/tick metadata where useful
 - keep shapes and units stable across runs
+- prefer canonical maps over raw transport payloads
 
 Example map shape:
 
@@ -84,7 +98,7 @@ Example map shape:
 
 - define canonical action schema (`action.u.v1` or backend-specific id)
 - validate dimension and numeric finiteness
-- clamp to bounds before applying
+- clamp to bounds or reject out-of-range values according to documented policy
 - reject malformed actions and apply fallback safely
 
 ## Step Path (`env.step`)
@@ -108,6 +122,8 @@ If reset exists, document exactly what resets:
 - world/robot state
 - controller integrators/state estimators
 - episode counters/logging context
+
+If reset does not exist, make that explicit in `env.info` and in backend docs. Do not leave multi-episode behaviour ambiguous.
 
 ## Safe Fallback
 

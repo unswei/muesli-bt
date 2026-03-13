@@ -1,6 +1,7 @@
 #include <chrono>
 #include <cctype>
 #include <cstdint>
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -13,6 +14,14 @@
 
 #include "bt/compiler.hpp"
 #include "bt/runtime_host.hpp"
+#if MUESLI_BT_WITH_ROS2_INTEGRATION
+#include "muslisp/env.hpp"
+#include "muslisp/env_api.hpp"
+#include "muslisp/error.hpp"
+#include "muslisp/eval.hpp"
+#include "ros2/extension.hpp"
+#include "tests/ros2_test_harness.hpp"
+#endif
 #include "muslisp/reader.hpp"
 #include "muslisp/value.hpp"
 #include "tests/conformance/mock_backend.hpp"
@@ -24,6 +33,72 @@ void check(bool condition, const std::string& message) {
         throw std::runtime_error(message);
     }
 }
+
+void check_close(double actual, double expected, double epsilon, const std::string& message) {
+    if (std::fabs(actual - expected) > epsilon) {
+        throw std::runtime_error(message + " (expected " + std::to_string(expected) + ", got " + std::to_string(actual) + ")");
+    }
+}
+
+#if MUESLI_BT_WITH_ROS2_INTEGRATION
+muslisp::value eval_text(const std::string& source, muslisp::env_ptr env) {
+    return muslisp::eval_source(source, env);
+}
+
+muslisp::env_ptr create_env_with_ros2_extension() {
+    muslisp::runtime_config config;
+    config.register_extension(muslisp::integrations::ros2::make_extension());
+    return muslisp::create_global_env(std::move(config));
+}
+
+std::string lisp_string_literal(const std::string& text) {
+    std::string escaped;
+    escaped.reserve(text.size() + 2);
+    escaped.push_back('"');
+    for (char c : text) {
+        switch (c) {
+            case '\\':
+                escaped += "\\\\";
+                break;
+            case '"':
+                escaped += "\\\"";
+                break;
+            case '\n':
+                escaped += "\\n";
+                break;
+            case '\t':
+                escaped += "\\t";
+                break;
+            case '\r':
+                escaped += "\\r";
+                break;
+            default:
+                escaped.push_back(c);
+                break;
+        }
+    }
+    escaped.push_back('"');
+    return escaped;
+}
+
+std::string ros2_configure_script(const std::string& topic_ns, const std::string& extra_lines = {}) {
+    return "(begin "
+           "  (define cfg (map.make)) "
+           "  (map.set! cfg 'control_hz 25) "
+           "  (map.set! cfg 'observe_timeout_ms 50) "
+           "  (map.set! cfg 'step_timeout_ms 50) "
+           "  (map.set! cfg 'topic_ns " +
+           lisp_string_literal(topic_ns) +
+           ") "
+           "  (map.set! cfg 'obs_source \"odom\") "
+           "  (map.set! cfg 'action_sink \"cmd_vel\") "
+           "  (map.set! cfg 'use_sim_time #f) "
+           "  (map.set! cfg 'require_fresh_obs #f) "
+           "  (map.set! cfg 'action_clamp \"clamp\") " +
+           extra_lines +
+           "  (env.configure cfg))";
+}
+#endif
 
 bt::definition compile_bt(std::string_view source) {
     return bt::compile_definition(muslisp::read_one(source));
@@ -372,6 +447,123 @@ void test_determinism_trace_reproducibility() {
     check(first_sig == second_sig, "determinism: expected identical stable traces for identical seeds/inputs");
 }
 
+#if MUESLI_BT_WITH_ROS2_INTEGRATION
+void test_ros2_info_surface_conformance() {
+    using namespace muslisp;
+
+    env_ptr env = create_env_with_ros2_extension();
+    (void)eval_text("(env.attach \"ros2\")", env);
+    (void)eval_text(
+        "(begin "
+        "  (define cfg (map.make)) "
+        "  (map.set! cfg 'obs_schema \"ros2.obs.conformance.v1\") "
+        "  (map.set! cfg 'state_schema \"ros2.state.conformance.v1\") "
+        "  (map.set! cfg 'action_schema \"ros2.action.conformance.v1\") "
+        "  (map.set! cfg 'control_hz 25) "
+        "  (map.set! cfg 'obs_source \"odom\") "
+        "  (map.set! cfg 'action_sink \"cmd_vel\") "
+        "  (map.set! cfg 'reset_mode \"stub\") "
+        "  (env.configure cfg))",
+        env);
+
+    check(string_value(eval_text("(map.get (env.info) 'backend \"\")", env)) == "ros2",
+          "ros2 info conformance: backend mismatch");
+    check(string_value(eval_text("(map.get (env.info) 'env_api \"\")", env)) == "env.api.v1",
+          "ros2 info conformance: env_api mismatch");
+    check(string_value(eval_text("(map.get (env.info) 'obs_schema \"\")", env)) == "ros2.obs.conformance.v1",
+          "ros2 info conformance: obs_schema mismatch");
+    check(string_value(eval_text("(map.get (env.info) 'state_schema \"\")", env)) == "ros2.state.conformance.v1",
+          "ros2 info conformance: state_schema mismatch");
+    check(string_value(eval_text("(map.get (env.info) 'action_schema \"\")", env)) == "ros2.action.conformance.v1",
+          "ros2 info conformance: action_schema mismatch");
+    check(boolean_value(eval_text("(map.get (env.info) 'reset_supported #f)", env)),
+          "ros2 info conformance: reset_supported mismatch");
+    check(integer_value(eval_text("(map.get (map.get (env.info) 'config (map.make)) 'control_hz -1)", env)) == 25,
+          "ros2 info conformance: control_hz mismatch");
+}
+
+void test_ros2_reset_policy_conformance() {
+    using namespace muslisp;
+
+    env_ptr env = create_env_with_ros2_extension();
+    (void)eval_text("(env.attach \"ros2\")", env);
+    (void)eval_text(
+        "(begin "
+        "  (define cfg (map.make)) "
+        "  (map.set! cfg 'reset_mode \"unsupported\") "
+        "  (env.configure cfg))",
+        env);
+
+    check(!boolean_value(eval_text("(map.get (env.info) 'reset_supported #t)", env)),
+          "ros2 reset policy conformance: reset_supported should be false");
+
+    (void)eval_text(
+        "(define loop_result "
+        "  (env.run-loop "
+        "    (begin "
+        "      (define cfg (map.make)) "
+        "      (map.set! cfg 'tick_hz 1000) "
+        "      (map.set! cfg 'max_ticks 1) "
+        "      (map.set! cfg 'episode_max 2) "
+        "      cfg) "
+        "    (lambda (obs) #t)))",
+        env);
+    const value loop_result = eval_text("loop_result", env);
+    check(is_map(loop_result), "ros2 reset policy conformance: env.run-loop should return map");
+    check(symbol_name(eval_text("(map.get loop_result 'status ':none)", env)) == ":unsupported",
+          "ros2 reset policy conformance: env.run-loop should return :unsupported");
+}
+
+void test_ros2_transport_conformance() {
+    using namespace muslisp;
+
+    test_support::ros2_test_harness harness("/conformance");
+    env_ptr env = create_env_with_ros2_extension();
+    (void)eval_text("(env.attach \"ros2\")", env);
+    (void)eval_text(
+        ros2_configure_script(
+            harness.topic_ns(),
+            "  (map.set! cfg 'obs_schema \"ros2.obs.conformance.v1\") "
+            "  (map.set! cfg 'state_schema \"ros2.state.conformance.v1\") "
+            "  (map.set! cfg 'action_schema \"ros2.action.conformance.v1\") "),
+        env);
+    check(harness.wait_for_transport_ready(std::chrono::milliseconds(500)),
+          "ros2 transport conformance: transport should be ready after configure");
+
+    harness.publish_odom(2.0, -1.0, 0.25, 0.3, -0.1, 0.05);
+    (void)eval_text("(define obs_ros2 (env.observe))", env);
+    check(string_value(eval_text("(map.get obs_ros2 'obs_schema \"\")", env)) == "ros2.obs.conformance.v1",
+          "ros2 transport conformance: obs_schema mismatch");
+    check_close(float_value(eval_text("(map.get (map.get (map.get obs_ros2 'state (map.make)) 'pose (map.make)) 'x 0.0)", env)),
+                2.0,
+                1e-6,
+                "ros2 transport conformance: pose.x mismatch");
+    check_close(float_value(eval_text("(map.get (map.get (map.get obs_ros2 'state (map.make)) 'twist (map.make)) 'vx 0.0)", env)),
+                0.3,
+                1e-6,
+                "ros2 transport conformance: twist.vx mismatch");
+
+    (void)eval_text(
+        "(begin "
+        "  (define a (map.make)) "
+        "  (define u (map.make)) "
+        "  (map.set! a 'action_schema \"ros2.action.conformance.v1\") "
+        "  (map.set! a 't_ms 11) "
+        "  (map.set! u 'linear_x 0.4) "
+        "  (map.set! u 'linear_y -0.2) "
+        "  (map.set! u 'angular_z 0.3) "
+        "  (map.set! a 'u u) "
+        "  (env.act a))",
+        env);
+    check(harness.wait_for_command_count(1, std::chrono::milliseconds(250)),
+          "ros2 transport conformance: missing published cmd_vel");
+    const auto command = harness.last_command();
+    check_close(command.linear.x, 0.4, 1e-6, "ros2 transport conformance: linear.x mismatch");
+    check_close(command.linear.y, -0.2, 1e-6, "ros2 transport conformance: linear.y mismatch");
+    check_close(command.angular.z, 0.3, 1e-6, "ros2 transport conformance: angular.z mismatch");
+}
+#endif
+
 }  // namespace
 
 int main() {
@@ -381,6 +573,20 @@ int main() {
         {"deadline overrun requests async cancellation", test_deadline_overrun_requests_async_cancellation},
         {"async lifecycle and idempotent cancel", test_async_lifecycle_and_idempotent_cancel},
         {"determinism trace reproducibility", test_determinism_trace_reproducibility},
+#if MUESLI_BT_WITH_ROS2_INTEGRATION
+        {"ros2 info surface conformance", test_ros2_info_surface_conformance},
+        {"ros2 reset policy conformance", test_ros2_reset_policy_conformance},
+        {"ros2 transport conformance", test_ros2_transport_conformance},
+#endif
+    };
+
+    const auto cleanup = []() {
+#if MUESLI_BT_WITH_ROS2_INTEGRATION
+        muslisp::env_api_reset();
+        if (rclcpp::ok()) {
+            rclcpp::shutdown();
+        }
+#endif
     };
 
     std::size_t passed = 0;
@@ -391,10 +597,12 @@ int main() {
             std::cout << "[PASS] " << name << '\n';
         } catch (const std::exception& e) {
             std::cerr << "[FAIL] " << name << ": " << e.what() << '\n';
+            cleanup();
             return 1;
         }
     }
 
     std::cout << "All conformance tests passed (" << passed << "/" << tests.size() << ").\n";
+    cleanup();
     return 0;
 }

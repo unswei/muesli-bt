@@ -22,6 +22,7 @@
 #endif
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
 #include "ros2/extension.hpp"
+#include "ros2_test_harness.hpp"
 #endif
 #include "muslisp/env.hpp"
 #include "muslisp/env_api.hpp"
@@ -127,6 +128,28 @@ std::string lisp_string_literal(const std::string& text) {
     escaped.push_back('"');
     return escaped;
 }
+
+#if MUESLI_BT_WITH_ROS2_INTEGRATION
+std::string ros2_configure_script(const std::string& topic_ns, const std::string& extra_lines = {}) {
+    return "(begin "
+           "  (define cfg (map.make)) "
+           "  (map.set! cfg 'tick_hz 1000) "
+           "  (map.set! cfg 'steps_per_tick 1) "
+           "  (map.set! cfg 'control_hz 50) "
+           "  (map.set! cfg 'observe_timeout_ms 50) "
+           "  (map.set! cfg 'step_timeout_ms 50) "
+           "  (map.set! cfg 'use_sim_time #f) "
+           "  (map.set! cfg 'require_fresh_obs #f) "
+           "  (map.set! cfg 'action_clamp \"clamp\") "
+           "  (map.set! cfg 'topic_ns " +
+           lisp_string_literal(topic_ns) +
+           ") "
+           "  (map.set! cfg 'obs_source \"odom\") "
+           "  (map.set! cfg 'action_sink \"cmd_vel\") " +
+           extra_lines +
+           "  (env.configure cfg))";
+}
+#endif
 
 void test_reader_basics() {
     using namespace muslisp;
@@ -3079,64 +3102,132 @@ void test_env_generic_ros2_backend_contract() {
 
     reset_bt_runtime_host();
     env_ptr env = create_env_with_ros2_extension();
+    test_support::ros2_test_harness harness("/robot");
 
     (void)eval_text("(env.attach \"ros2\")", env);
     check(boolean_value(eval_text("(map.get (env.info) 'attached #f)", env)),
           "env.info should report attached after ros2 attach");
     check(string_value(eval_text("(map.get (env.info) 'backend \"\")", env)) == "ros2", "env.info backend mismatch for ros2");
-    check(boolean_value(eval_text("(map.get (map.get (env.info) 'supports (map.make)) 'reset #f)", env)),
-          "env.info supports.reset should be true for ros2 backend");
+    check(!boolean_value(eval_text("(map.get (map.get (env.info) 'supports (map.make)) 'reset #t)", env)),
+          "env.info supports.reset should default to false for ros2 backend");
+    check(string_value(eval_text("(map.get (env.info) 'env_api \"\")", env)) == "env.api.v1",
+          "ros2 env.info env_api mismatch");
 
-    (void)eval_text(
-        "(begin "
-        "  (define cfg (map.make)) "
-        "  (map.set! cfg 'tick_hz 1000) "
-        "  (map.set! cfg 'steps_per_tick 3) "
-        "  (map.set! cfg 'obs_schema \"ros2.obs.test.v1\") "
-        "  (map.set! cfg 'state_schema \"ros2.state.test.v1\") "
-        "  (map.set! cfg 'action_schema \"ros2.action.test.v1\") "
-        "  (env.configure cfg))",
-        env);
+    (void)eval_text(ros2_configure_script(
+                         harness.topic_ns(),
+                         "  (map.set! cfg 'obs_schema \"ros2.obs.test.v1\") "
+                         "  (map.set! cfg 'state_schema \"ros2.state.test.v1\") "
+                         "  (map.set! cfg 'action_schema \"ros2.action.test.v1\") "
+                         "  (map.set! cfg 'reset_mode \"stub\") "),
+                     env);
+    check(harness.wait_for_transport_ready(std::chrono::milliseconds(500)),
+          "ros2 test harness transport should be ready after configure");
+    check(string_value(eval_text("(map.get (env.info) 'obs_schema \"\")", env)) == "ros2.obs.test.v1",
+          "ros2 env.info obs_schema mismatch");
+    check(string_value(eval_text("(map.get (env.info) 'state_schema \"\")", env)) == "ros2.state.test.v1",
+          "ros2 env.info state_schema mismatch");
+    check(string_value(eval_text("(map.get (env.info) 'action_schema \"\")", env)) == "ros2.action.test.v1",
+          "ros2 env.info action_schema mismatch");
+    check(boolean_value(eval_text("(map.get (env.info) 'run_loop_supported #f)", env)),
+          "ros2 env.info run_loop_supported mismatch");
+    check(string_value(eval_text("(car (map.get (env.info) 'capabilities nil))", env)) == "observe",
+          "ros2 env.info capabilities should begin with observe");
+    check(integer_value(eval_text("(map.get (map.get (env.info) 'config (map.make)) 'control_hz -1)", env)) == 50,
+          "ros2 env.info config control_hz mismatch");
+    check(string_value(eval_text("(map.get (map.get (env.info) 'config (map.make)) 'topic_ns \"\")", env)) == "/robot",
+          "ros2 env.info config topic_ns mismatch");
+    check(boolean_value(eval_text("(map.get (env.info) 'reset_supported #f)", env)),
+          "ros2 env.info reset_supported should reflect stub reset mode");
+    check(string_value(eval_text("(map.get (env.info) 'obs_topic \"\")", env)) == "/robot/odom",
+          "ros2 env.info obs_topic mismatch");
+    check(string_value(eval_text("(map.get (env.info) 'action_topic \"\")", env)) == "/robot/cmd_vel",
+          "ros2 env.info action_topic mismatch");
+
     (void)eval_text("(define obs0 (env.reset 42))", env);
     value obs0 = eval_text("obs0", env);
     check(is_map(obs0), "env.reset should return observation map for ros2");
     check(string_value(eval_text("(map.get obs0 'obs_schema \"\")", env)) == "ros2.obs.test.v1", "ros2 reset obs_schema mismatch");
+    check(string_value(eval_text("(map.get obs0 'state_schema \"\")", env)) == "ros2.state.test.v1",
+          "ros2 reset top-level state_schema mismatch");
     check(integer_value(eval_text("(map.get obs0 'episode -1)", env)) == 1, "ros2 reset should set episode to 1");
     check(integer_value(eval_text("(map.get obs0 'step -1)", env)) == 0, "ros2 reset should set step to 0");
-    check(string_value(eval_text("(map.get (map.get obs0 'info (map.make)) 'state_schema \"\")", env)) == "ros2.state.test.v1",
+    check(string_value(eval_text("(map.get (map.get obs0 'state (map.make)) 'state_schema \"\")", env)) == "ros2.state.test.v1",
           "ros2 reset state_schema mismatch");
+    check(string_value(eval_text("(map.get (map.get obs0 'state (map.make)) 'frame_id \"\")", env)) == "map",
+          "ros2 reset frame_id mismatch");
     check(integer_value(eval_text("(map.get (map.get obs0 'info (map.make)) 'seed -1)", env)) == 42,
           "ros2 reset should persist provided seed");
+
+    harness.publish_odom(1.25, -0.5, 0.3, 0.15, -0.05, 0.2);
+    (void)eval_text("(define obs1 (env.observe))", env);
+    check_close(float_value(eval_text("(map.get (map.get (map.get obs1 'state (map.make)) 'pose (map.make)) 'x 0.0)", env)),
+                1.25,
+                1e-6,
+                "ros2 observe should expose odom pose.x");
+    check_close(float_value(eval_text("(map.get (map.get (map.get obs1 'state (map.make)) 'twist (map.make)) 'vx 0.0)", env)),
+                0.15,
+                1e-6,
+                "ros2 observe should expose canonical twist.vx");
+    check(boolean_value(eval_text("(map.get (map.get obs1 'flags (map.make)) 'fresh_obs #f)", env)),
+          "ros2 observe should mark the first received odom sample as fresh");
 
     (void)eval_text(
         "(begin "
         "  (define a (map.make)) "
+        "  (define u (map.make)) "
         "  (map.set! a 'action_schema \"ros2.action.test.v1\") "
-        "  (map.set! a 'u (list 0.2 0.4)) "
+        "  (map.set! a 't_ms 7) "
+        "  (map.set! u 'linear_x 0.2) "
+        "  (map.set! u 'linear_y -0.1) "
+        "  (map.set! u 'angular_z 0.4) "
+        "  (map.set! a 'u u) "
         "  (env.act a))",
         env);
+    check(harness.wait_for_command_count(1, std::chrono::milliseconds(250)),
+          "ros2 env.act should publish a cmd_vel command");
+    const auto first_command = harness.last_command();
+    check_close(first_command.linear.x, 0.2, 1e-6, "ros2 env.act linear.x publish mismatch");
+    check_close(first_command.linear.y, -0.1, 1e-6, "ros2 env.act linear.y publish mismatch");
+    check_close(first_command.angular.z, 0.4, 1e-6, "ros2 env.act angular.z publish mismatch");
+
     value step_ok = eval_text("(env.step)", env);
     check(is_boolean(step_ok) && boolean_value(step_ok), "ros2 env.step should return true");
-    check(integer_value(eval_text("(map.get (map.get (env.observe) 'info (map.make)) 'step -1)", env)) == 3,
-          "ros2 env.step should apply configured steps_per_tick");
+    (void)eval_text("(define obs2 (env.observe))", env);
+    check(integer_value(eval_text("(map.get obs2 'step -1)", env)) == 1,
+          "ros2 env.step should advance the runtime step counter");
+    check_close(float_value(eval_text("(map.get (map.get (map.get obs2 'state (map.make)) 'twist (map.make)) 'vx 0.0)", env)),
+                0.15,
+                1e-6,
+                "ros2 observe should preserve the latest received odom twist");
 
     (void)eval_text(
         "(define on-tick-ros2 "
         "  (lambda (obs) "
         "    (begin "
         "      (define a (map.make)) "
+        "      (define u (map.make)) "
         "      (map.set! a 'action_schema \"ros2.action.test.v1\") "
-        "      (map.set! a 'u (list 0.0 0.1)) "
+        "      (map.set! a 't_ms (map.get obs 't_ms 0)) "
+        "      (map.set! u 'linear_x 0.0) "
+        "      (map.set! u 'linear_y 0.0) "
+        "      (map.set! u 'angular_z 0.1) "
+        "      (map.set! a 'u u) "
         "      a)))",
         env);
+    harness.publish_odom(1.5, -0.25, 0.4, 0.1, 0.0, 0.05);
     (void)eval_text(
         "(define loop-result-ros2 "
         "  (env.run-loop "
         "    (begin "
         "      (define cfg (map.make)) "
         "      (define safe (map.make)) "
+        "      (define safe-u (map.make)) "
         "      (map.set! safe 'action_schema \"ros2.action.test.v1\") "
-        "      (map.set! safe 'u (list 0.0 0.0)) "
+        "      (map.set! safe 't_ms 0) "
+        "      (map.set! safe-u 'linear_x 0.0) "
+        "      (map.set! safe-u 'linear_y 0.0) "
+        "      (map.set! safe-u 'angular_z 0.0) "
+        "      (map.set! safe 'u safe-u) "
         "      (map.set! cfg 'tick_hz 1000) "
         "      (map.set! cfg 'max_ticks 2) "
         "      (map.set! cfg 'safe_action safe) "
@@ -3149,6 +3240,135 @@ void test_env_generic_ros2_backend_contract() {
           "ros2 env.run-loop ticks mismatch");
     check(integer_value(eval_text("(map.get loop-result-ros2 'episodes -1)", env)) == 1,
           "ros2 env.run-loop episodes mismatch");
+    check(harness.wait_for_command_count(3, std::chrono::milliseconds(250)),
+          "ros2 env.run-loop should publish actions through cmd_vel");
+}
+
+void test_ros2_backend_config_validation_and_reset_policy() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_env_with_ros2_extension();
+    (void)eval_text("(env.attach \"ros2\")", env);
+
+    try {
+        (void)eval_text(
+            "(begin "
+            "  (define cfg (map.make)) "
+            "  (map.set! cfg 'unknown_key 1) "
+            "  (env.configure cfg))",
+            env);
+        throw std::runtime_error("expected ros2 env.configure to reject unknown keys");
+    } catch (const lisp_error& e) {
+        check(std::string(e.what()).find("unknown option") != std::string::npos,
+              "ros2 env.configure unknown-key error mismatch");
+    }
+
+    (void)eval_text(
+        "(begin "
+        "  (define cfg (map.make)) "
+        "  (map.set! cfg 'action_clamp \"reject\") "
+        "  (map.set! cfg 'reset_mode \"unsupported\") "
+        "  (env.configure cfg))",
+        env);
+    check(!boolean_value(eval_text("(map.get (map.get (env.info) 'supports (map.make)) 'reset #t)", env)),
+          "ros2 env.info supports.reset should track reset_mode");
+    check(!boolean_value(eval_text("(map.get (env.info) 'reset_supported #t)", env)),
+          "ros2 env.info reset_supported should track reset_mode");
+
+    try {
+        (void)eval_text("(env.reset nil)", env);
+        throw std::runtime_error("expected ros2 env.reset to fail when reset_mode is unsupported");
+    } catch (const lisp_error& e) {
+        check(std::string(e.what()).find("does not support reset") != std::string::npos,
+              "ros2 env.reset unsupported error mismatch");
+    }
+
+    try {
+        (void)eval_text(
+            "(begin "
+            "  (define a (map.make)) "
+            "  (define u (map.make)) "
+            "  (map.set! a 'action_schema \"ros2.action.v1\") "
+            "  (map.set! a 't_ms 1) "
+            "  (map.set! u 'linear_x 2.0) "
+            "  (map.set! u 'linear_y 0.0) "
+            "  (map.set! u 'angular_z 0.0) "
+            "  (map.set! a 'u u) "
+            "  (env.act a))",
+            env);
+        throw std::runtime_error("expected ros2 env.act reject policy to reject out-of-range actions");
+    } catch (const lisp_error& e) {
+        check(std::string(e.what()).find("out of range") != std::string::npos,
+              "ros2 env.act reject-policy error mismatch");
+    }
+
+    (void)eval_text(
+        "(define loop-result-ros2-unsupported "
+        "  (env.run-loop "
+        "    (begin "
+        "      (define cfg (map.make)) "
+        "      (map.set! cfg 'tick_hz 1000) "
+        "      (map.set! cfg 'max_ticks 1) "
+        "      (map.set! cfg 'episode_max 2) "
+        "      cfg) "
+        "    (lambda (obs) #t)))",
+        env);
+    check(symbol_name(eval_text("(map.get loop-result-ros2-unsupported 'status ':none)", env)) == ":unsupported",
+          "ros2 env.run-loop should report unsupported when reset_mode disables reset");
+}
+
+void test_ros2_backend_invalid_action_fallback() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_env_with_ros2_extension();
+    test_support::ros2_test_harness harness("/invalid");
+    (void)eval_text("(env.attach \"ros2\")", env);
+    (void)eval_text(ros2_configure_script(harness.topic_ns()), env);
+    check(harness.wait_for_transport_ready(std::chrono::milliseconds(500)),
+          "ros2 invalid-action transport should be ready after configure");
+    harness.publish_odom(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+
+    (void)eval_text(
+        "(define loop-result-ros2-invalid "
+        "  (env.run-loop "
+        "    (begin "
+        "      (define cfg (map.make)) "
+        "      (define safe (map.make)) "
+        "      (define safe-u (map.make)) "
+        "      (map.set! safe 'action_schema \"ros2.action.v1\") "
+        "      (map.set! safe 't_ms 0) "
+        "      (map.set! safe-u 'linear_x 0.0) "
+        "      (map.set! safe-u 'linear_y 0.0) "
+        "      (map.set! safe-u 'angular_z 0.0) "
+        "      (map.set! safe 'u safe-u) "
+        "      (map.set! cfg 'tick_hz 1) "
+        "      (map.set! cfg 'max_ticks 2) "
+        "      (map.set! cfg 'safe_action safe) "
+        "      cfg) "
+        "    (lambda (obs) "
+        "      (begin "
+        "        (define bad (map.make)) "
+        "        (map.set! bad 'action_schema \"ros2.action.v1\") "
+        "        (map.set! bad 't_ms (map.get obs 't_ms 0)) "
+        "        (map.set! bad 'u 1) "
+        "        bad))))",
+        env);
+
+    const std::string invalid_status = symbol_name(eval_text("(map.get loop-result-ros2-invalid 'status ':none)", env));
+    check(invalid_status == ":error",
+          "ros2 env.run-loop should return error when on_tick action is malformed (got " + invalid_status + ")");
+    check(integer_value(eval_text("(map.get loop-result-ros2-invalid 'fallback_count -1)", env)) == 1,
+          "ros2 env.run-loop should count safe-action fallback on malformed action");
+    const std::string message = string_value(eval_text("(map.get loop-result-ros2-invalid 'message \"\")", env));
+    check(message.find("u must be a map") != std::string::npos,
+          "ros2 env.run-loop malformed-action message mismatch");
+    check(harness.wait_for_command_count(1, std::chrono::milliseconds(250)),
+          "ros2 invalid-action fallback should still publish the safe command");
+    const auto safe_command = harness.last_command();
+    check_close(safe_command.linear.x, 0.0, 1e-6, "ros2 safe fallback linear.x mismatch");
+    check_close(safe_command.angular.z, 0.0, 1e-6, "ros2 safe fallback angular.z mismatch");
 }
 
 void test_ros2_backend_present_with_extension() {
@@ -3156,25 +3376,39 @@ void test_ros2_backend_present_with_extension() {
 
     reset_bt_runtime_host();
     env_ptr env = create_env_with_ros2_extension();
+    test_support::ros2_test_harness harness("/present");
     (void)eval_text("(env.attach \"ros2\")", env);
     check(string_value(eval_text("(map.get (env.info) 'backend \"\")", env)) == "ros2",
           "env.info backend should be ros2 when extension is installed");
+    (void)eval_text(ros2_configure_script(harness.topic_ns()), env);
+    check(harness.wait_for_transport_ready(std::chrono::milliseconds(500)),
+          "ros2 backend presence transport should be ready after configure");
+    harness.publish_odom(0.75, 0.1, 0.2, 0.05, 0.0, 0.1);
 
     check(string_value(eval_text("(map.get (env.observe) 'obs_schema \"\")", env)) == "ros2.obs.v1",
           "ros2 observe obs_schema mismatch");
+    check(string_value(eval_text("(map.get (env.observe) 'state_schema \"\")", env)) == "ros2.state.v1",
+          "ros2 observe state_schema mismatch");
 
     (void)eval_text(
         "(define a "
         "  (begin "
         "    (define m (map.make)) "
+        "    (define u (map.make)) "
         "    (map.set! m 'action_schema \"ros2.action.v1\") "
-        "    (map.set! m 'u (list 0.25 0.5)) "
+        "    (map.set! m 't_ms 1) "
+        "    (map.set! u 'linear_x 0.25) "
+        "    (map.set! u 'linear_y 0.0) "
+        "    (map.set! u 'angular_z 0.5) "
+        "    (map.set! m 'u u) "
         "    m))",
         env);
     (void)eval_text("(env.act a)", env);
     check(is_truthy(eval_text("(env.step)", env)), "ros2 env.step should continue");
+    check(harness.wait_for_command_count(1, std::chrono::milliseconds(250)),
+          "ros2 backend presence smoke should publish one command");
 
-    check(integer_value(eval_text("(map.get (map.get (env.observe) 'info (map.make)) 'step -1)", env)) >= 1,
+    check(integer_value(eval_text("(map.get (env.observe) 'step -1)", env)) >= 1,
           "ros2 backend step counter should advance");
 }
 #endif
@@ -3245,11 +3479,22 @@ int main() {
 #endif
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
         {"env generic ros2 backend contract", test_env_generic_ros2_backend_contract},
+        {"ros2 backend config validation and reset policy", test_ros2_backend_config_validation_and_reset_policy},
+        {"ros2 backend invalid action fallback", test_ros2_backend_invalid_action_fallback},
         {"ros2 backend present with extension", test_ros2_backend_present_with_extension},
 #endif
         {"phase5 ring buffer bounds", test_phase5_ring_buffer_bounds},
         {"phase6 sample wrappers tree", test_phase6_sample_wrappers_tree},
         {"phase6 custom robot interface", test_phase6_custom_robot_interface},
+    };
+
+    const auto cleanup = []() {
+#if MUESLI_BT_WITH_ROS2_INTEGRATION
+        muslisp::env_api_reset();
+        if (rclcpp::ok()) {
+            rclcpp::shutdown();
+        }
+#endif
     };
 
     std::size_t passed = 0;
@@ -3260,10 +3505,12 @@ int main() {
             std::cout << "[PASS] " << name << '\n';
         } catch (const std::exception& e) {
             std::cerr << "[FAIL] " << name << ": " << e.what() << '\n';
+            cleanup();
             return 1;
         }
     }
 
     std::cout << "All tests passed (" << passed << "/" << tests.size() << ").\n";
+    cleanup();
     return 0;
 }

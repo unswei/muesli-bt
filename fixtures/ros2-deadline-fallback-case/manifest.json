@@ -1,0 +1,11 @@
+{
+  "contract_id": "runtime-contract-v1.0.0",
+  "contract_version": "1.0.0",
+  "fixture_name": "ros2-deadline-fallback-case",
+  "generated_from_commit_time_utc": "2026-03-04T03:12:26Z",
+  "generator": "tools/fixtures/update_fixture.py",
+  "git_sha": "84511b80a4b6d34951905ea53eeec6658f040903",
+  "provenance_model": "deterministic-from-git",
+  "schema": "mbt.evt.v1",
+  "schema_path": "schemas/event_log/v1/mbt.evt.v1.schema.json"
+}

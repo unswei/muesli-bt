@@ -1,0 +1,14 @@
+{
+  "absent_types": [
+    "planner_call_start"
+  ],
+  "event_count": 5,
+  "events_sha256": "0af12a0a4947cd85ddf7f3a03232e90c6cf96c91653796be8036c1715d78a241",
+  "required_types": [
+    "run_start",
+    "tick_begin",
+    "error",
+    "bb_write",
+    "tick_end"
+  ]
+}

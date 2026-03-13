@@ -16,6 +16,7 @@ Returns environment capability metadata for the fixed `env.*` interface.
   - `backend_version` (string or `nil`)
   - `supports` (map of booleans like `reset`, `debug_draw`, `headless`, `realtime_pacing`, `deterministic_seed`)
   - optional `notes` (string)
+  - optional backend-specific metadata such as schema ids, reset policy, capability tags, or config
 
 ## Errors And Edge Cases
 
@@ -33,13 +34,16 @@ Returns environment capability metadata for the fixed `env.*` interface.
 
 ```lisp
 (begin
-  (env.attach "pybullet")
-  (map.get (env.info) 'supports (map.make)))
+  (env.attach "ros2")
+  (list (map.get (env.info) 'backend "")
+        (map.get (env.info) 'obs_schema "")
+        (map.get (env.info) 'reset_supported #f)))
 ```
 
 ## Notes
 
 - `env.info` is always available, even before backend attachment.
+- Backends may add extra metadata fields, but should not replace the stable core fields above.
 
 ## See Also
 

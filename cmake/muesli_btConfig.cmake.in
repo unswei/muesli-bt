@@ -1,6 +1,19 @@
 @PACKAGE_INIT@
 
-set(muesli_bt_SHARE_DIR "@PACKAGE_MUESLI_BT_INSTALL_SHAREDIR@")
+include(CMakeFindDependencyMacro)
+
+set(_muesli_bt_package_prefix "${PACKAGE_PREFIX_DIR}")
+set_and_check(muesli_bt_SHARE_DIR "${_muesli_bt_package_prefix}/share/muesli_bt")
+set(muesli_bt_SHARE_DIR "${muesli_bt_SHARE_DIR}" CACHE INTERNAL "Installed muesli_bt share directory")
+
+if("@MUESLI_BT_PACKAGE_HAS_ROS2_INTEGRATION_TARGET@" STREQUAL "TRUE")
+  find_dependency(rclcpp REQUIRED)
+  find_dependency(nav_msgs REQUIRED)
+  find_dependency(geometry_msgs REQUIRED)
+endif()
+
+set(PACKAGE_PREFIX_DIR "${_muesli_bt_package_prefix}")
+unset(_muesli_bt_package_prefix)
 
 include("${CMAKE_CURRENT_LIST_DIR}/muesli_btTargets.cmake")
 

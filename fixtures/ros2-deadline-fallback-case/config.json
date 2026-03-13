@@ -1,0 +1,7 @@
+{
+  "backend": "ros2",
+  "deterministic_mode": true,
+  "reset_mode": "stub",
+  "scenario": "ros2_deadline_overrun_uses_safe_fallback",
+  "tick_budget_ms": 20
+}

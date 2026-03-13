@@ -1,5 +1,5 @@
 {
-  "version": 6,
+  "version": 2,
   "cmakeMinimumRequired": {
     "major": 3,
     "minor": 20,
@@ -31,6 +31,7 @@
       "binaryDir": "${sourceDir}/build/core-only",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "MUESLI_BT_BUILD_INTEGRATION_ROS2": "OFF",
         "MUESLI_BT_BUILD_INTEGRATION_PYBULLET": "OFF",
         "MUESLI_BT_BUILD_INTEGRATION_WEBOTS": "OFF",
         "MUESLI_BT_BUILD_PYTHON_BRIDGE": "OFF",

@@ -7,7 +7,7 @@ A [host](../terminology.md#host) (backend) can implement this surface for Webots
 ## Core Calls And Intent
 
 - `env.info`
-: return backend identity/capabilities/schemas.
+: return backend identity, capability flags, and backend-specific schema/config metadata.
 
 - `env.attach`
 : attach/select backend instance.
@@ -38,6 +38,30 @@ Backends should use consistent schema key names:
 - action maps: `action_schema`
 - backend state payloads (when present): `state_schema`
 
+Backends may add more fields, but should not invent alternate key names for these three concepts.
+
+## Backend Metadata Contract
+
+`env.info` always exposes:
+
+- `api_version`
+- `attached`
+- `backend`
+- `backend_version`
+- `supports`
+- optional `notes`
+
+Backends may expose additional metadata when attached. For example, the ROS2 skeleton backend exposes:
+
+- `env_api`
+- `obs_schema`
+- `state_schema`
+- `action_schema`
+- `reset_supported`
+- `run_loop_supported`
+- `capabilities`
+- backend-specific `config`
+
 ## Step Semantics
 
 `env.step` means "advance one control increment".
@@ -56,6 +80,16 @@ Backends should use consistent schema key names:
 - multi-episode execution via `episode_max`/`step_max` when backend reset is supported
 
 If `episode_max > 1` and backend reset is unsupported, `env.run-loop` returns `:unsupported`.
+
+## Backend Validation Expectations
+
+Backends should:
+
+- reject malformed config values cleanly
+- document whether unknown config keys are rejected or ignored
+- validate action schema ids and payload shapes
+- make reset support explicit rather than implicit
+- keep transport-specific details out of the `env.api.v1` semantics
 
 ## Formal Reference
 

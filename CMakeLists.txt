@@ -17,7 +17,7 @@ option(MUESLI_BT_BUILD_PYTHON_BRIDGE "Build the Python bridge module (muesli_bt_
 option(MUESLI_BT_BUILD_WEBOTS_EXAMPLES "Build the Webots e-puck example controllers" OFF)
 option(MUESLI_BT_BUILD_INTEGRATION_PYBULLET "Build the PyBullet integration library" ON)
 option(MUESLI_BT_BUILD_INTEGRATION_WEBOTS "Build the Webots integration library" ON)
-option(MUESLI_BT_BUILD_INTEGRATION_ROS2 "Build the ROS2 integration skeleton library" OFF)
+option(MUESLI_BT_BUILD_INTEGRATION_ROS2 "Build the ROS2 integration library" OFF)
 
 add_library(
   muesli_bt_core
@@ -168,9 +168,26 @@ if (MUESLI_BT_BUILD_INTEGRATION_WEBOTS AND MUESLI_BT_HAVE_WEBOTS)
 endif ()
 
 if (MUESLI_BT_BUILD_INTEGRATION_ROS2)
-  add_library(muesli_bt_integration_ros2 integrations/ros2/extension.cpp)
+  if (NOT UNIX OR APPLE)
+    message(
+      FATAL_ERROR
+        "MUESLI_BT_BUILD_INTEGRATION_ROS2=ON requires a Linux ROS 2 environment. "
+        "Use Ubuntu 22.04 + Humble for the first supported lane."
+    )
+  endif ()
 
-  target_link_libraries(muesli_bt_integration_ros2 PUBLIC muesli_bt_core)
+  find_package(rclcpp REQUIRED)
+  find_package(nav_msgs REQUIRED)
+  find_package(geometry_msgs REQUIRED)
+
+  add_library(muesli_bt_integration_ros2 integrations/ros2/backend.cpp integrations/ros2/extension.cpp)
+
+  target_link_libraries(
+    muesli_bt_integration_ros2
+    PUBLIC muesli_bt_core rclcpp::rclcpp nav_msgs::nav_msgs__rosidl_generator_cpp
+           nav_msgs::nav_msgs__rosidl_typesupport_cpp geometry_msgs::geometry_msgs__rosidl_generator_cpp
+           geometry_msgs::geometry_msgs__rosidl_typesupport_cpp
+  )
   target_include_directories(
     muesli_bt_integration_ros2
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -331,6 +348,12 @@ add_executable(muesli_bt_conformance_tests tests/conformance/mock_backend.cpp
                                            tests/conformance/test_conformance_main.cpp)
 target_link_libraries(muesli_bt_conformance_tests PRIVATE muesli_bt_core)
 target_include_directories(muesli_bt_conformance_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+if (TARGET muesli_bt_integration_ros2)
+  target_link_libraries(muesli_bt_conformance_tests PRIVATE muesli_bt_integration_ros2)
+  target_compile_definitions(muesli_bt_conformance_tests PRIVATE MUESLI_BT_WITH_ROS2_INTEGRATION=1)
+else ()
+  target_compile_definitions(muesli_bt_conformance_tests PRIVATE MUESLI_BT_WITH_ROS2_INTEGRATION=0)
+endif ()
 
 add_test(NAME muesli_bt_conformance_tests COMMAND muesli_bt_conformance_tests)
 
@@ -418,6 +441,11 @@ install(
   FILE muesli_btTargets.cmake
   DESTINATION ${MUESLI_BT_INSTALL_CMAKEDIR}
 )
+
+set(MUESLI_BT_PACKAGE_HAS_ROS2_INTEGRATION_TARGET FALSE)
+if (TARGET muesli_bt_integration_ros2)
+  set(MUESLI_BT_PACKAGE_HAS_ROS2_INTEGRATION_TARGET TRUE)
+endif ()
 
 configure_package_config_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/muesli_btConfig.cmake.in

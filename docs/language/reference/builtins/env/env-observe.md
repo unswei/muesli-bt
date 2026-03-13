@@ -11,6 +11,7 @@ Returns the current observation from the attached backend.
 - Arguments: none
 - Return: observation map, with required runtime-level fields:
   - `obs_schema` (string)
+  - `state_schema` when backend state is present
   - `t_ms` (integer)
   - `episode` (integer)
   - `step` (integer)
@@ -35,12 +36,13 @@ Returns the current observation from the attached backend.
   (define obs (env.observe))
   (list (map.get obs 'obs_schema "none")
         (map.get obs 't_ms -1)
+        (map.get obs 'state_schema "none")
         (map.get obs 'step -1)))
 ```
 
 ## Notes
 
-- Additional fields (`state_vec`, `done`, `reward`, `info`) are backend/demo-defined.
+- Additional fields such as `state`, `state_vec`, `flags`, `done`, `reward`, and `info` are backend-defined.
 
 ## See Also
 

@@ -166,6 +166,7 @@ Use `observer` when you want per-tick analytics without changing `on_tick` retur
 
 - If `on_tick` overruns, runtime uses last-good or safe action and continues.
 - On runtime error, one safety action + one step is attempted before returning `:error`.
+- `fallback_count` tracks ticks where a fallback or safety action was actually used.
 - `stop_on_success` controls whether success ends the run early or continues until `episode_max`/`step_max`.
 
 ## See Also

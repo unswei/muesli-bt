@@ -56,6 +56,7 @@ OS notes:
 
 - macOS: `brew install cmake ninja python@3.11`
 - Ubuntu/Debian: `sudo apt update && sudo apt install -y cmake ninja-build g++ python3.11 python3.11-venv`
+- Core/no-ROS builds are supported on both Linux and macOS. ROS2 stays optional and Linux-only when enabled.
 
 Build:
 

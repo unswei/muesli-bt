@@ -1,0 +1,7 @@
+{
+  "action_clamp": "reject",
+  "backend": "ros2",
+  "deterministic_mode": true,
+  "reset_mode": "stub",
+  "scenario": "ros2_invalid_action_uses_safe_fallback"
+}

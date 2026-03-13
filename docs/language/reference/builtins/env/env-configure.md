@@ -8,7 +8,9 @@ Applies backend/runtime options before stepping or loop execution.
 
 ## Arguments And Return
 
-- Arguments: map of options (common keys include `tick_hz`, `steps_per_tick`, `seed`, `headless`, `realtime`, `log_path`)
+- Arguments: map of options
+  - common runtime keys include `tick_hz`, `steps_per_tick`, `seed`, `headless`, `realtime`, `log_path`
+  - backend-specific keys are documented per backend
 - Return: `nil`
 
 ## Errors And Edge Cases
@@ -16,6 +18,7 @@ Applies backend/runtime options before stepping or loop execution.
 - backend not attached
 - argument is not a map
 - invalid option types (for example non-integer `tick_hz`)
+- some backends reject unknown backend-specific keys rather than ignoring them
 
 ## Examples
 
@@ -33,16 +36,17 @@ Applies backend/runtime options before stepping or loop execution.
 ```lisp
 (begin
   (define cfg (map.make))
-  (map.set! cfg 'tick_hz 100)
-  (map.set! cfg 'steps_per_tick 4)
-  (map.set! cfg 'realtime #f)
-  (map.set! cfg 'log_path "logs/run.jsonl")
+  (map.set! cfg 'control_hz 50)
+  (map.set! cfg 'obs_source "odom")
+  (map.set! cfg 'action_sink "cmd_vel")
+  (map.set! cfg 'reset_mode "stub")
   (env.configure cfg))
 ```
 
 ## Notes
 
-- Unsupported keys may be ignored by a backend.
+- Keep runtime-generic keys and backend-specific keys explicit in docs.
+- ROS2 bring-up config is documented in the integration docs and rejects malformed or unknown backend-specific keys.
 
 ## See Also
 

@@ -509,9 +509,11 @@ value builtin_env_info(const std::vector<value>& args) {
 
     value out = make_map();
     value supports = make_map();
+    value backend_info = make_nil();
     gc_root_scope roots(default_gc());
     roots.add(&out);
     roots.add(&supports);
+    roots.add(&backend_info);
 
     map_set_symbol(out, "api_version", make_string(kEnvApiVersion));
     map_set_symbol(out, "attached", make_boolean(env_api_is_attached()));
@@ -549,6 +551,18 @@ value builtin_env_info(const std::vector<value>& args) {
     const std::string notes = backend->notes();
     if (!notes.empty()) {
         map_set_symbol(out, "notes", make_string(notes));
+    }
+
+    backend_info = backend->info();
+    if (!is_nil(backend_info)) {
+        if (!is_map(backend_info)) {
+            throw lisp_error("env.info: backend info must be map or nil");
+        }
+        for (const auto& [key, val] : backend_info->map_data) {
+            if (out->map_data.find(key) == out->map_data.end()) {
+                out->map_data[key] = val;
+            }
+        }
     }
     return out;
 }
@@ -888,6 +902,7 @@ value builtin_env_run_loop(const std::vector<value>& args) {
                 }
 
                 const auto action_candidate = extract_action_from_on_tick(on_tick_result);
+                bool action_from_on_tick = false;
 
                 // Use a per-tick deadline so long external pauses (e.g. paused simulator UI)
                 // do not permanently force fallback actions after resume.
@@ -899,8 +914,7 @@ value builtin_env_run_loop(const std::vector<value>& args) {
 
                 if (!overrun && action_candidate.has_value()) {
                     chosen_action = *action_candidate;
-                    last_good_action = chosen_action;
-                    have_last_good_action = true;
+                    action_from_on_tick = true;
                 } else if (have_last_good_action) {
                     chosen_action = last_good_action;
                     used_fallback = true;
@@ -914,6 +928,10 @@ value builtin_env_run_loop(const std::vector<value>& args) {
                 }
 
                 backend->act(chosen_action);
+                if (action_from_on_tick) {
+                    last_good_action = chosen_action;
+                    have_last_good_action = true;
+                }
                 const bool can_continue = perform_step_and_pacing(*backend, tick_hz, realtime);
                 ++steps_total;
                 ++episode_steps;
@@ -962,6 +980,7 @@ value builtin_env_run_loop(const std::vector<value>& args) {
                 }
 
                 if (!is_nil(safety_action)) {
+                    ++fallback_count;
                     try {
                         backend->act(safety_action);
                         (void)perform_step_and_pacing(*backend, tick_hz, realtime);

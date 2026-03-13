@@ -50,6 +50,7 @@ jobs:
           cmake -S . -B build/release-ubuntu -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/build/install-ubuntu" \
+            -DMUESLI_BT_BUILD_INTEGRATION_ROS2=OFF \
             -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON \
             -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
             -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
@@ -126,6 +127,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/build/install-macos" \
+            -DMUESLI_BT_BUILD_INTEGRATION_ROS2=OFF \
             -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON \
             -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
             -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \

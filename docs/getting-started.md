@@ -31,6 +31,8 @@ cmake --build --preset core-only -j
 ctest --preset core-only
 ```
 
+The `core-only` preset explicitly keeps `MUESLI_BT_BUILD_INTEGRATION_ROS2=OFF`, so this path remains portable across supported non-ROS developer hosts such as Linux and macOS.
+
 Install verification (canonical event stream + schema validation):
 
 ```bash

@@ -199,6 +199,7 @@ jobs:
         run: |
           cmake -S . -B build/conformance-l0 -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DMUESLI_BT_BUILD_INTEGRATION_ROS2=OFF \
             -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
             -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
             -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
@@ -210,23 +211,31 @@ jobs:
       - name: Run L0 conformance tests
         run: ctest --test-dir build/conformance-l0 -R muesli_bt_conformance_tests --output-on-failure
 
-  ros2-skeleton-contract:
-    name: ros2-skeleton-contract
-    runs-on: ubuntu-latest
+  ros2-linux-humble:
+    name: ros2-linux-humble
+    runs-on: ubuntu-22.04
     if: github.event_name != 'schedule'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install ROS 2 Humble and build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build g++
+          sudo apt-get install -y ca-certificates cmake curl g++ gnupg lsb-release ninja-build software-properties-common
+          sudo add-apt-repository universe
+          curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/ros-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo \"$UBUNTU_CODENAME\") main" \
+            | sudo tee /etc/apt/sources.list.d/ros2.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y python3-colcon-common-extensions python3-rosdep python3-vcstool ros-dev-tools ros-humble-ros-base
 
-      - name: Configure ROS2 skeleton build
+      - name: Configure ROS2 Humble build
         run: |
-          cmake -S . -B build/ros2-skeleton-contract -G Ninja \
+          source /opt/ros/humble/setup.bash
+          cmake -S . -B build/ros2-linux-humble -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
             -DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON \
             -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
@@ -235,10 +244,15 @@ jobs:
             -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
 
       - name: Build tests
-        run: cmake --build build/ros2-skeleton-contract --target muslisp_tests --parallel
+        run: |
+          source /opt/ros/humble/setup.bash
+          cmake --build build/ros2-linux-humble --target muslisp_tests muesli_bt_conformance_tests --parallel
 
-      - name: Run env contract tests
-        run: ctest --test-dir build/ros2-skeleton-contract -R muslisp_tests --output-on-failure
+      - name: Run env and conformance contract tests
+        run: |
+          source /opt/ros/humble/setup.bash
+          ctest --test-dir build/ros2-linux-humble -R muslisp_tests --output-on-failure
+          ctest --test-dir build/ros2-linux-humble -R muesli_bt_conformance_tests --output-on-failure
 
   conformance-l1-sim:
     name: conformance-l1-sim
@@ -269,9 +283,9 @@ jobs:
       - name: Run simulator-backed checks
         run: ctest --test-dir build/conformance-l1 --output-on-failure --repeat until-pass:2
 
-  conformance-l2-ros2:
-    name: conformance-l2-ros2
-    runs-on: ubuntu-latest
+  conformance-l2-ros2-humble:
+    name: conformance-l2-ros2-humble
+    runs-on: ubuntu-22.04
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 
     steps:
@@ -283,39 +297,87 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install ROS 2 Humble and build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ca-certificates cmake curl g++ gnupg lsb-release ninja-build software-properties-common
+          sudo add-apt-repository universe
+          curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/ros-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo \"$UBUNTU_CODENAME\") main" \
+            | sudo tee /etc/apt/sources.list.d/ros2.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y python3-colcon-common-extensions python3-rosdep python3-vcstool ros-dev-tools ros-humble-ros-base
+
       - name: Install verification dependency
         run: python -m pip install jsonschema
 
-      - name: Run fixture-level ROS2 surrogate checks
+      - name: Configure ROS2 Humble conformance build
         run: |
-          python3 tools/fixtures/verify_fixture.py
-          echo "L2 placeholder: ROS 2 rosbag conformance harness to be wired into this job."
+          source /opt/ros/humble/setup.bash
+          cmake -S . -B build/conformance-l2-ros2-humble -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON \
+            -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
+            -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+            -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+            -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+
+      - name: Build ROS2 Humble conformance targets
+        run: |
+          source /opt/ros/humble/setup.bash
+          cmake --build build/conformance-l2-ros2-humble --target muslisp_tests muesli_bt_conformance_tests --parallel
+
+      - name: Run ROS2 Humble contract tests
+        run: |
+          source /opt/ros/humble/setup.bash
+          ctest --test-dir build/conformance-l2-ros2-humble -R muslisp_tests --output-on-failure
+          ctest --test-dir build/conformance-l2-ros2-humble -R muesli_bt_conformance_tests --output-on-failure
+
+      - name: Verify ROS2 fixture bundle
+        run: |
+          python3 tools/fixtures/verify_fixture.py \
+            --fixture ros2-observe-act-step-case \
+            --fixture ros2-invalid-action-fallback-case \
+            --fixture ros2-reset-unsupported-case \
+            --fixture ros2-deadline-fallback-case
 
   api-consumer-smoketest:
     name: api-consumer-smoketest
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install ROS 2 Humble and build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build g++
+          sudo apt-get install -y ca-certificates cmake curl g++ gnupg lsb-release ninja-build software-properties-common
+          sudo add-apt-repository universe
+          curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/ros-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo \"$UBUNTU_CODENAME\") main" \
+            | sudo tee /etc/apt/sources.list.d/ros2.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y python3-colcon-common-extensions python3-rosdep python3-vcstool ros-dev-tools ros-humble-ros-base
 
       - name: Configure runtime install build
         run: |
+          source /opt/ros/humble/setup.bash
           cmake -S . -B build/install-smoke -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/build/install-root" \
             -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON \
+            -DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON \
+            -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
             -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
             -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
 
       - name: Build and install runtime package
         run: |
+          source /opt/ros/humble/setup.bash
           cmake --build build/install-smoke --parallel
           cmake --install build/install-smoke
 
@@ -326,7 +388,9 @@ jobs:
           test -f build/install-root/include/muslisp/eval.hpp
           test -f build/install-root/include/pybullet/extension.hpp
           test -f build/install-root/include/pybullet/racecar_demo.hpp
+          test -f build/install-root/include/ros2/extension.hpp
           test -f build/install-root/lib/libmuesli_bt_integration_pybullet.a
+          test -f build/install-root/lib/libmuesli_bt_integration_ros2.a
           test -f build/install-root/share/muesli_bt/contracts/muesli-studio-integration.md
           test -f build/install-root/share/muesli_bt/contracts/runtime-contract-v1.md
           test -f build/install-root/share/muesli_bt/contracts/compatibility.md
@@ -334,12 +398,14 @@ jobs:
           test -f build/install-root/share/muesli_bt/schema/mbt.evt.v1.schema.json
           test -f build/install-root/share/muesli_bt/schemas/event_log/v1/mbt.evt.v1.schema.json
           grep -q "set(muesli_bt_SHARE_DIR " build/install-root/lib/cmake/muesli_bt/muesli_btConfig.cmake
+          grep -q "muesli_bt::integration_ros2" build/install-root/lib/cmake/muesli_bt/muesli_btTargets.cmake
           if grep -q "muesli_bt::integration_webots" build/install-root/lib/cmake/muesli_bt/muesli_btTargets.cmake; then
             test -f build/install-root/include/webots/extension.hpp
           fi
 
       - name: Configure and build consumer smoketest
         run: |
+          source /opt/ros/humble/setup.bash
           cmake -S tools/consumer_smoketest -B build/consumer-smoketest -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="${GITHUB_WORKSPACE}/build/install-root"
@@ -347,9 +413,13 @@ jobs:
 
       - name: Run consumer smoketest
         run: |
+          source /opt/ros/humble/setup.bash
           ./build/consumer-smoketest/mbt_inspector_smoketest
           if [ -x ./build/consumer-smoketest/mbt_inspector_webots_smoketest ]; then
             ./build/consumer-smoketest/mbt_inspector_webots_smoketest
+          fi
+          if [ -x ./build/consumer-smoketest/mbt_inspector_ros2_smoketest ]; then
+            ./build/consumer-smoketest/mbt_inspector_ros2_smoketest
           fi
 
   build-and-test:
@@ -380,7 +450,7 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
-        run: cmake --preset dev
+        run: cmake --preset dev -DMUESLI_BT_BUILD_INTEGRATION_ROS2=OFF
 
       - name: Build
         run: cmake --build --preset dev --parallel
@@ -417,6 +487,7 @@ jobs:
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_CXX_FLAGS="${{ matrix.cxx_flags }}" \
+            -DMUESLI_BT_BUILD_INTEGRATION_ROS2=OFF \
             -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
             -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
             -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
@@ -449,6 +520,7 @@ jobs:
         run: |
           cmake -S . -B build/macos-core -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DMUESLI_BT_BUILD_INTEGRATION_ROS2=OFF \
             -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
             -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
             -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
@@ -524,6 +596,7 @@ jobs:
           cmake -S . -B build/macos-webots-install -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="${GITHUB_WORKSPACE}/build/macos-webots-install-root" \
+            -DMUESLI_BT_BUILD_INTEGRATION_ROS2=OFF \
             -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
             -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=ON \
             -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \

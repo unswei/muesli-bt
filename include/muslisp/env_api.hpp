@@ -25,6 +25,7 @@ public:
     [[nodiscard]] virtual std::string backend_version() const { return {}; }
     [[nodiscard]] virtual env_backend_supports supports() const = 0;
     [[nodiscard]] virtual std::string notes() const { return {}; }
+    [[nodiscard]] virtual value info() const { return make_nil(); }
 
     virtual void configure(value opts) = 0;
     [[nodiscard]] virtual value reset(std::optional<std::int64_t> seed) = 0;

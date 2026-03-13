@@ -5,7 +5,19 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 
 ## [Unreleased]
 
-No entries yet.
+### Added
+- Added backend-specific `env.info` metadata support so optional integrations can expose schema ids, capability tags, and backend config without changing core BT semantics.
+- Added stronger generic ROS2 skeleton coverage for configuration validation, reset policy, canonical observation/action shapes, and invalid-action fallback behaviour.
+- Added Linux ROS-backed test harness coverage using `nav_msgs/msg/Odometry` input and `geometry_msgs/msg/Twist` output.
+- Added installed-package ROS2 consumer smoke coverage on Ubuntu 22.04 + Humble.
+
+### Changed
+- ROS2 integration now requires real ROS package discovery when `MUESLI_BT_BUILD_INTEGRATION_ROS2=ON`; configure fails cleanly when `rclcpp` is not discoverable.
+- Core/no-ROS CI and release paths now disable `MUESLI_BT_BUILD_INTEGRATION_ROS2` explicitly so the portable baseline does not depend on host OS or ambient ROS setup.
+- ROS2 backend now uses real Linux transport for `env.observe` / `env.act` / `env.step` via `Odometry` and `Twist`, while keeping canonical `ros2.obs.v1`, `ros2.state.v1`, and `ros2.action.v1`.
+- ROS2 reset policy now defaults to `unsupported`; `reset_mode="stub"` is retained for deterministic harnesses and tests.
+- Package exports now preserve the correct installed share directory and ROS dependency discovery for downstream ROS2 consumers.
+- ROS2 scope, backend-writing guidance, conformance notes, and backlog planning now reflect the first implemented Linux transport lane and the remaining `L2` work.
 
 ## [0.2.0] - 2026-03-04
 
@@ -24,7 +36,7 @@ No entries yet.
   - determinism replay case
 - Added docs snippet freshness checker at `scripts/check_docs_snippet_freshness.py`.
 - Added CI docs snippet freshness gate in `.github/workflows/linux-ci.yml`.
-- Added ROS2-on `env.*` backend contract regression coverage (`test_env_generic_ros2_backend_contract`) and CI lane (`ros2-skeleton-contract`).
+- Added ROS2-on `env.*` backend contract regression coverage (`test_env_generic_ros2_backend_contract`) and CI lane (`ros2-linux-humble`).
 
 ### Changed
 - Canonical event envelopes now include `contract_version`.
@@ -40,9 +52,9 @@ No entries yet.
 - Canonical schema path is now published at `schemas/event_log/v1/mbt.evt.v1.schema.json` with validator `tools/validate_log.py`.
 - Linux CI now includes:
   - explicit `conformance-l0` job on push/PR
-  - nightly/on-demand `conformance-l1-sim` and `conformance-l2-ros2` lanes
+  - nightly/on-demand `conformance-l1-sim` and `conformance-l2-ros2-humble` lanes
   - fixture-bundle drift and verification checks
-- Linux CI now runs both `conformance-l0` and `conformance-l1-sim` on push/PR/workflow-dispatch; `conformance-l2-ros2` remains schedule/on-demand.
+- Linux CI now runs both `conformance-l0` and `conformance-l1-sim` on push/PR/workflow-dispatch; `conformance-l2-ros2-humble` remains schedule/on-demand.
 - README and conformance docs now reflect `L1` as the simulator-backed CI conformance lane while retaining `L0` core coverage.
 - Webots callback attach flow no longer requires explicit callback installation for new consumers; `bt::integrations::webots::install_callbacks(...)` remains as a compatibility shim.
 - Core demo callback registration now includes `bb-truthy` and `select-action`.

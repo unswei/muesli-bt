@@ -8,7 +8,10 @@ Submits the action for the next control tick.
 
 ## Arguments And Return
 
-- Arguments: action map (canonical form uses `action_schema` and `u`)
+- Arguments: action map
+  - canonical form uses `action_schema`
+  - many backends also require `t_ms`
+  - payload shape under `u` is backend/schema specific
 - Return: `nil`
 
 ## Errors And Edge Cases
@@ -33,15 +36,19 @@ Submits the action for the next control tick.
 ```lisp
 (begin
   (define action (map.make))
-  (map.set! action 'action_schema "demo.action.v1")
-  (map.set! action 'u (list 0.1 -0.1 0.0))
-  (map.set! action 'mode ':velocity)
+  (define u (map.make))
+  (map.set! action 'action_schema "ros2.action.v1")
+  (map.set! action 't_ms 0)
+  (map.set! u 'linear_x 0.1)
+  (map.set! u 'linear_y 0.0)
+  (map.set! u 'angular_z -0.1)
+  (map.set! action 'u u)
   (env.act action))
 ```
 
 ## Notes
 
-- Bounds/clamping behaviour is backend/schema dependent.
+- Bounds, clamping, rejection, and fallback behaviour are backend/schema dependent.
 
 ## See Also
 

@@ -1,0 +1,9 @@
+{
+  "action_sink": "cmd_vel",
+  "backend": "ros2",
+  "control_hz": 50,
+  "deterministic_mode": true,
+  "obs_source": "odom",
+  "reset_mode": "stub",
+  "scenario": "ros2_latest_sample_observe_act_step"
+}

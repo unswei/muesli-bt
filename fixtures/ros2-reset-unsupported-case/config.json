@@ -1,0 +1,7 @@
+{
+  "backend": "ros2",
+  "deterministic_mode": true,
+  "episode_max": 2,
+  "reset_mode": "unsupported",
+  "scenario": "ros2_multi_episode_requires_reset"
+}

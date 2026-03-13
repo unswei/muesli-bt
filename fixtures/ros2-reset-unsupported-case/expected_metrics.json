@@ -1,0 +1,11 @@
+{
+  "absent_types": [
+    "tick_begin"
+  ],
+  "event_count": 2,
+  "events_sha256": "2ee3b3dc7e2962e03b030589edd39c04e0450cf3fb4980246e16b583d8f1e605",
+  "required_types": [
+    "run_start",
+    "error"
+  ]
+}
