@@ -27,7 +27,7 @@ The matrix tracks compatibility at the contract level:
 | muesli-bt ref | runtime contract | event schema | studio parser expectation | validation lane | support posture | notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | `v0.1.0` tag | `1.0.0` | `mbt.evt.v1` | parser for `mbt.evt.v1` enabled | release + CI contract/schema/fixture gates | supported | first contract-facing release; no released ROS2 transport baseline |
-| `v0.2.0` tag | `1.0.0` | `mbt.evt.v1` | parser for `mbt.evt.v1` enabled and tolerant of additive runtime-contract events | release + CI contract/schema/fixture gates plus `L0` and `L1` conformance | supported | stable contract/conformance baseline; ROS2 is not yet a released transport surface at this tag |
+| `v0.2.0` tag | `1.0.0` | `mbt.evt.v1` | parser for `mbt.evt.v1` enabled and tolerant of additive runtime-contract events | release + CI contract/schema/fixture gates plus `L0` and `L1` conformance; local `muesli-studio` contract/schema/fixture equality check on March 14, 2026 | supported | stable contract/conformance baseline; ROS2 is not yet a released transport surface at this tag; local check found byte-identical Studio copies of `mbt.evt.v1`, `muesli-studio-integration.md`, and the `minimal` / `planner` / `scheduler` fixture logs |
 | `main` branch (rolling) | `1.0.0` until changed by contract versioning | `mbt.evt.v1` until schema bump | parser for active schema required | push/PR CI plus Linux ROS-backed checks and rosbag-backed `L2` replay on Ubuntu 22.04 + Humble | best-effort (non-stable) | first rolling ROS2 thin-adaptor baseline: `Odometry` in, `Twist` out, real reset unsupported, canonical log parity still being completed |
 
 ## example
