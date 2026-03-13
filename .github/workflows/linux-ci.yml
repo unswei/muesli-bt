@@ -286,7 +286,6 @@ jobs:
   conformance-l2-ros2-humble:
     name: conformance-l2-ros2-humble
     runs-on: ubuntu-22.04
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout

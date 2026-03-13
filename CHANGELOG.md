@@ -11,6 +11,7 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - Added Linux ROS-backed test harness coverage using `nav_msgs/msg/Odometry` input and `geometry_msgs/msg/Twist` output.
 - Added installed-package ROS2 consumer smoke coverage on Ubuntu 22.04 + Humble.
 - Added a Linux-only rosbag-backed ROS2 `L2` replay test and artefact output for the first deterministic replay scenario.
+- Added push/PR CI gating for `conformance-l2-ros2-humble`, so the rosbag-backed ROS2 `L2` replay lane now runs in ordinary CI as well as scheduled or manual workflows.
 
 ### Changed
 - ROS2 integration now requires real ROS package discovery when `MUESLI_BT_BUILD_INTEGRATION_ROS2=ON`; configure fails cleanly when `rclcpp` is not discoverable.

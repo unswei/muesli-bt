@@ -26,7 +26,7 @@ Use this page when:
   - additional push/PR CI gate for simulator-backed integration checks
 - `L2` ROS 2 conformance:
   - rosbag-driven conformance checks
-  - nightly or on-demand
+  - runs in push/PR CI and remains available for scheduled or manual re-runs
   - Linux-only
   - true ROS2 transport, executor, distro, and packaging validation belongs here
   - backend scope and deliverables tracked in [ROS2 backend scope](../integration/ros2-backend-scope.md)
@@ -150,7 +150,7 @@ Published pre-Linux ROS2 surrogate bundles:
 - L0 should stay fast and hermetic; do not add simulator dependencies.
 - Pre-Linux ROS2 work should extend L0-style generic coverage, not pretend to be transport conformance.
 - The current Linux ROS2 validation uses both a deterministic ROS-backed harness and one rosbag-backed replay case.
-- L2 failures should signal integration risk and stay non-blocking by default.
+- L2 failures now block ordinary CI for Linux ROS2 changes, so keep replay scenarios deterministic and narrowly scoped.
 - Deterministic fixtures are provenance-controlled; edit through update tooling only.
 
 ## see also
