@@ -30,7 +30,8 @@ Use this page when:
   - Linux-only
   - true ROS2 transport, executor, distro, and packaging validation belongs here
   - backend scope and deliverables tracked in [ROS2 backend scope](../integration/ros2-backend-scope.md)
-  - local Linux ROS-backed tests and install-smoke validation now exist; the remaining work is to wire them into automated `L2`
+  - the current automated `L2` lane runs the ROS-backed contract tests plus one real rosbag-backed replay scenario
+  - broader rosbag coverage and richer replay corpora are still open work
 
 ### required artefacts
 
@@ -78,6 +79,21 @@ cmake -S . -B build/linux-ros2 -G Ninja \
   -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
 cmake --build build/linux-ros2 -j
 ctest --test-dir build/linux-ros2 --output-on-failure
+```
+
+Run the current rosbag-backed `L2` replay scenario locally:
+
+```bash
+source /opt/ros/humble/setup.bash
+cmake -S . -B build/linux-ros2-l2 -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON \
+  -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
+  -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+  -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+  -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+cmake --build build/linux-ros2-l2 --target muesli_bt_conformance_l2_rosbag_tests -j
+ctest --test-dir build/linux-ros2-l2 -R muesli_bt_conformance_l2_rosbag_tests --output-on-failure
 ```
 
 Verify install/export plus the ROS2 consumer smoke:
@@ -133,7 +149,7 @@ Published pre-Linux ROS2 surrogate bundles:
 
 - L0 should stay fast and hermetic; do not add simulator dependencies.
 - Pre-Linux ROS2 work should extend L0-style generic coverage, not pretend to be transport conformance.
-- The current Linux ROS2 validation uses a deterministic ROS-backed publisher/subscriber harness, not rosbag yet.
+- The current Linux ROS2 validation uses both a deterministic ROS-backed harness and one rosbag-backed replay case.
 - L2 failures should signal integration risk and stay non-blocking by default.
 - Deterministic fixtures are provenance-controlled; edit through update tooling only.
 

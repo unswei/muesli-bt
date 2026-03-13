@@ -336,6 +336,8 @@ else ()
 endif ()
 
 if (TARGET muesli_bt_integration_ros2)
+  find_package(rosbag2_cpp REQUIRED)
+  find_package(rosbag2_storage REQUIRED)
   target_link_libraries(muslisp_tests PRIVATE muesli_bt_integration_ros2)
   target_compile_definitions(muslisp_tests PRIVATE MUESLI_BT_WITH_ROS2_INTEGRATION=1)
 else ()
@@ -356,6 +358,24 @@ else ()
 endif ()
 
 add_test(NAME muesli_bt_conformance_tests COMMAND muesli_bt_conformance_tests)
+
+if (TARGET muesli_bt_integration_ros2)
+  add_executable(muesli_bt_conformance_l2_rosbag_tests tests/conformance/test_conformance_l2_rosbag_main.cpp)
+  target_link_libraries(
+    muesli_bt_conformance_l2_rosbag_tests
+    PRIVATE muesli_bt_core
+            muesli_bt_integration_ros2
+            rosbag2_cpp::rosbag2_cpp
+            rosbag2_storage::rosbag2_storage
+  )
+  target_include_directories(muesli_bt_conformance_l2_rosbag_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_compile_definitions(muesli_bt_conformance_l2_rosbag_tests PRIVATE MUESLI_BT_WITH_ROS2_INTEGRATION=1)
+  add_test(NAME muesli_bt_conformance_l2_rosbag_tests COMMAND muesli_bt_conformance_l2_rosbag_tests)
+  set_tests_properties(
+    muesli_bt_conformance_l2_rosbag_tests
+    PROPERTIES ENVIRONMENT "MUESLI_BT_L2_ARTIFACT_DIR=${CMAKE_BINARY_DIR}/ros2_l2_artifacts"
+  )
+endif ()
 
 install(
   TARGETS muesli_bt_core

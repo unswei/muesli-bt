@@ -326,13 +326,20 @@ jobs:
       - name: Build ROS2 Humble conformance targets
         run: |
           source /opt/ros/humble/setup.bash
-          cmake --build build/conformance-l2-ros2-humble --target muslisp_tests muesli_bt_conformance_tests --parallel
+          cmake --build build/conformance-l2-ros2-humble \
+            --target muslisp_tests muesli_bt_conformance_tests muesli_bt_conformance_l2_rosbag_tests \
+            --parallel
 
       - name: Run ROS2 Humble contract tests
         run: |
           source /opt/ros/humble/setup.bash
           ctest --test-dir build/conformance-l2-ros2-humble -R muslisp_tests --output-on-failure
           ctest --test-dir build/conformance-l2-ros2-humble -R muesli_bt_conformance_tests --output-on-failure
+
+      - name: Run ROS2 Humble rosbag L2 test
+        run: |
+          source /opt/ros/humble/setup.bash
+          ctest --test-dir build/conformance-l2-ros2-humble -R muesli_bt_conformance_l2_rosbag_tests --output-on-failure
 
       - name: Verify ROS2 fixture bundle
         run: |
@@ -341,6 +348,23 @@ jobs:
             --fixture ros2-invalid-action-fallback-case \
             --fixture ros2-reset-unsupported-case \
             --fixture ros2-deadline-fallback-case
+
+      - name: Summarise rosbag evidence
+        if: always()
+        run: |
+          source /opt/ros/humble/setup.bash
+          if [ -d build/conformance-l2-ros2-humble/ros2_l2_artifacts/rosbag-replay-case/odom_bag ]; then
+            ros2 bag info build/conformance-l2-ros2-humble/ros2_l2_artifacts/rosbag-replay-case/odom_bag
+          fi
+
+      - name: Upload ROS2 L2 artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ros2-l2-humble-artefacts
+          path: |
+            build/conformance-l2-ros2-humble/ros2_l2_artifacts
+          if-no-files-found: warn
 
   api-consumer-smoketest:
     name: api-consumer-smoketest

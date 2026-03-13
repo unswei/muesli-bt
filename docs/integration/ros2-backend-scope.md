@@ -44,8 +44,8 @@ What is implemented today:
 What is still intentionally incomplete:
 
 - simulator or robot reset beyond the explicit stub mode
-- rosbag-backed `L2` evidence
-- Linux CI lane that installs ROS 2 and runs the ROS-backed checks automatically
+- broader rosbag-backed `L2` evidence beyond the first replay case
+- richer canonical-log parity checks in the `L2` artefacts
 
 ## how it works
 
@@ -172,7 +172,8 @@ Deliverables:
 Status:
 
 - completed for the first `Odometry` / `Twist` transport path on Ubuntu 22.04 + Humble
-- still open for richer reset behaviour, broader transport coverage, and `L2` replay evidence
+- completed for the first automated rosbag-backed replay scenario in Linux-only `L2`
+- still open for richer reset behaviour, broader transport coverage, and a broader replay corpus
 
 `phase 7: land L2 conformance`
 
