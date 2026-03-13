@@ -148,5 +148,10 @@ nav:
       - Testing And Verification: testing.md
       - Docs Coverage: docs-coverage.md
   - Changelog: changelog.md
+  - Release Notes:
+      - Overview: releases/index.md
+      - v0.2.0: releases/v0.2.0.md
+      - v0.1.0: releases/v0.1.0.md
   - TODO: todo.md
+  - Roadmap To 1.0: roadmap-to-1.0.md
   - Roadmap: limitations-roadmap.md

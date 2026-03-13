@@ -51,7 +51,7 @@ Backends may add more fields, but should not invent alternate key names for thes
 - `supports`
 - optional `notes`
 
-Backends may expose additional metadata when attached. For example, the ROS2 skeleton backend exposes:
+Backends may expose additional metadata when attached. For example, the ROS2 backend exposes:
 
 - `env_api`
 - `obs_schema`

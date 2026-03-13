@@ -78,7 +78,7 @@ python3 scripts/normalise_text_files.py --apply
 - docs updated in the same change (no drift)
 - event schema and fixtures updated together when runtime behaviour changes
 - changelog updated when contract or schema files change
-- release notes for the next tag include explicit contract compatibility notes:
+- release notes for the next tag under `docs/releases/` include explicit contract compatibility notes:
   - previous contract/schema versions
   - new contract/schema versions
   - additive vs breaking impact

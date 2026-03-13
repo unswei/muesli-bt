@@ -1,23 +1,37 @@
 # todo
 
 This backlog is maintained forward from March 2, 2026.
+It is aligned with `docs/roadmap-to-1.0.md`.
 
 ## now
 
-- prepare `v0.2.0` release artefacts (tag, release notes, and release workflow publish checks)
-- run `muesli-studio` compatibility check against `v0.2.0` and record the result in `docs/contracts/studio-compatibility-matrix.md`
+- `v0.3.0`: run `muesli-studio` compatibility check against `v0.2.0` and record the result in `docs/contracts/studio-compatibility-matrix.md`
+- `v0.3.0`: promote the current ROS2 thin adaptor from rolling `main` work to a documented release baseline on Ubuntu 22.04 + Humble
+- `v0.3.0`: harden backend schema validation with explicit version compatibility checks
 
 ## next
 
-- harden backend schema validation with explicit version compatibility checks
-- extend observability exports for long-running multi-episode experiments
-- add production-oriented backend adapters beyond simulator demos
-- deepen ROS2 `L2` evidence beyond the current replay corpus only when there is a concrete new transport path or failure mode to cover
-- add explicit canonical event-log assertions for Linux ROS-backed runs once those runs emit canonical `mbt.evt.v1` output directly rather than run-loop artefact JSONL
+- `v0.4.0`: emit direct canonical `mbt.evt.v1` logs for ROS-backed runs instead of relying on run-loop artefact JSONL
+- `v0.4.0`: add explicit canonical event-log assertions and a replay verification command for ROS-backed runs
+- `v0.4.0`: log and document ROS time-source policy (`sim time` vs wall time)
+- `v0.4.0`: extend observability exports for long-running multi-episode experiments
+- `v0.5.0`: choose one canonical wheeled BT and reuse it across PyBullet, Webots, and ROS2 with adapter-only differences
+- `v0.5.0`: add scripted invariant checks that compare key behaviour or decision traces across simulator and ROS-backed runs
+- `v0.5.0`: publish end-to-end ROS2 consumer docs/examples for the supported path
+- `v0.5.0`: deepen ROS2 `L2` evidence only when there is a concrete new transport path or failure mode to cover
 
 ## later
 
-- extend ROS2 transport binding beyond the first `Odometry` / `Twist` path (`topics` / `actions` / `services`)
-- ensure ROS2 runtime effects are emitted through canonical `mbt.evt.v1` events only (no alternate external log format)
-- add a second supported Linux distro lane (Ubuntu 24.04 + Jazzy) only after Humble is stable
-- publish end-to-end ROS2 consumer docs/examples (attach flow, configuration surface, troubleshooting and reproducibility notes)
+- `v0.6.0`: define host capability bundles for external execution, navigation, and perception services without expanding `env.*` or `planner.plan`
+- `v0.6.0`: define the first manipulator capability contract as a generic host bundle, with MoveIt as the intended first adapter rather than a core semantic surface
+- `v0.6.0`: stabilise planner request/result semantics and make the boundary between `planner.plan` and external host capabilities explicit
+- `v0.7.0`: add extended fixture coverage for async cancellation edge cases and optional ROS-level pre-emption coverage only if it stays thin
+- `v0.8.0`: polish the flagship wheeled demo flow, assets, and reproducible run/log inspection steps
+- `v0.8.0`: add one current Isaac Sim demo through ROS before `v1.0.0`, but keep it as a deployability/demo lane rather than a new semantic surface
+- `v0.9.0`: prefer a second serious scenario built around a simulated robot arm, with Towers of Hanoi as the preferred target if the simulator, MoveIt path, and perception stack stay reproducible
+- `v0.9.0`: add a usable perception path for the manipulator scenario rather than relying on hidden oracle state in the paper-facing demo
+- `v0.9.0`: choose the simulator on reproducibility, MoveIt compatibility, and perception quality first; prefer Isaac Sim if it gives the cleanest ROS-backed manipulator path without blowing up scope
+- `v1.0.0`: finish paper artefacts, baseline comparisons, release hygiene, and exact `L0` / `L1` / `L2` runbooks
+- `post-1.0`: extend ROS2 transport binding beyond the first `Odometry` / `Twist` path (`topics` / `actions` / `services`)
+- `post-1.0`: add a second supported Linux distro lane (Ubuntu 24.04 + Jazzy) after Humble is stable
+- `post-1.0`: add production-oriented backend adapters beyond simulator demos and the thin ROS2 adaptor

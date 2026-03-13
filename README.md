@@ -46,7 +46,7 @@ Conformance is layered so reviewers can separate core runtime semantics from hea
 - `L0`: core-only runtime contract checks (fast, deterministic, PR-safe)
 - `L1`: simulator integration conformance (PyBullet/Webots, push/PR CI gate)
 - `L2`: ROS 2 conformance (rosbag-driven)
-- Generic `env.*` contract coverage in `muslisp_tests` includes both PyBullet and ROS2 skeleton backends.
+- Generic `env.*` contract coverage in `muslisp_tests` includes both PyBullet and ROS2 backends.
 
 Runbook and checklist: [conformance levels](docs/contracts/conformance.md).
 
@@ -123,7 +123,7 @@ target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integr
 
 The legacy `bt::integrations::webots::install_callbacks(...)` hook remains available as a compatibility shim, but new consumers do not need it.
 
-If installed with `-DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON`, the package exports the initial ROS2 skeleton target `muesli_bt::integration_ros2`:
+If installed with `-DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON`, the package exports the first Linux ROS2 transport target `muesli_bt::integration_ros2`:
 
 ```cmake
 find_package(muesli_bt CONFIG REQUIRED)
@@ -304,7 +304,9 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 - [VLA request/response schema](docs/bt/vla-request-response.md)
 - [Observability](docs/observability/logging.md)
 - [Changelog](docs/changelog.md)
+- [Release Notes](docs/releases/index.md)
 - [TODO](docs/todo.md)
+- [Roadmap to 1.0](docs/roadmap-to-1.0.md)
 - [Roadmap](docs/limitations-roadmap.md)
 
 Serve docs locally:

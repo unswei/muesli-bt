@@ -48,6 +48,25 @@ What is still intentionally incomplete:
 - broader transport coverage beyond the current `Odometry` / `Twist` path
 - canonical `mbt.evt.v1` parity for ROS-backed run-loop observability beyond the current run-loop artefact checks
 
+### first supported baseline
+
+The first supported ROS2 baseline is intentionally narrow:
+
+- OS: Ubuntu 22.04
+- ROS distro: ROS 2 Humble
+- input transport: `nav_msgs/msg/Odometry`
+- output transport: `geometry_msgs/msg/Twist`
+- attach path: `(env.attach "ros2")`
+- live reset policy: `reset_mode="unsupported"`
+- test-only reset policy: `reset_mode="stub"`
+
+Non-goals for this first baseline:
+
+- MoveIt integration
+- ROS actions or services
+- multi-robot orchestration
+- simulator-specific reset integration
+
 ## how it works
 
 ### boundary
@@ -223,6 +242,62 @@ Status:
 
 ## api / syntax
 
+### canonical live ROS2 run
+
+The canonical live path currently uses the ROS2-enabled runner binary `muslisp_ros2`.
+
+Terminal A: publish example odometry input on the supported topic path.
+
+```bash
+source /opt/ros/humble/setup.bash
+ros2 topic pub -r 20 /robot/odom nav_msgs/msg/Odometry \
+  '{header: {frame_id: "map"}, child_frame_id: "base_link", pose: {pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}, twist: {twist: {linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}}}'
+```
+
+Terminal B: run the checked-in minimal ROS2 control loop script.
+
+```bash
+source /opt/ros/humble/setup.bash
+cmake -S . -B build/linux-ros2 -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON \
+  -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
+  -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+  -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+  -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+cmake --build build/linux-ros2 -j
+./build/linux-ros2/muslisp_ros2 examples/repl_scripts/ros2-live-odom-twist.lisp
+```
+
+This command drives the backend through `/robot/odom` and publishes actions to `/robot/cmd_vel`.
+It also writes a run-loop artefact to `build/linux-ros2/ros2-live-run.jsonl`.
+
+Source used by the canonical live command:
+
+```lisp
+--8<-- "examples/repl_scripts/ros2-live-odom-twist.lisp"
+```
+
+### canonical rosbag replay command
+
+The canonical replay path today is the `L2` rosbag-backed conformance lane:
+
+```bash
+source /opt/ros/humble/setup.bash
+cmake -S . -B build/linux-ros2-l2 -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON \
+  -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
+  -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+  -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+  -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
+cmake --build build/linux-ros2-l2 --target muesli_bt_conformance_l2_rosbag_tests -j
+ctest --test-dir build/linux-ros2-l2 -R muesli_bt_conformance_l2_rosbag_tests --output-on-failure
+python3 tools/verify_ros2_l2_artifacts.py --artifact-root build/linux-ros2-l2/ros2_l2_artifacts
+```
+
+This is the current canonical rosbag replay command because it exercises the supported Linux ROS2 transport path and verifies the emitted replay artefacts in one reproducible flow.
+
 ### backend identity via `env.info`
 
 `env.info` for the ROS2 backend should expose at least:
@@ -368,6 +443,7 @@ ctest --test-dir build/linux-ros2 --output-on-failure
 - ROS distro and Ubuntu version mismatch will fail before compile.
 - Shells that run CMake on Linux need the ROS setup script sourced first.
 - `MUESLI_BT_BUILD_INTEGRATION_ROS2=ON` now expects real ROS package discovery. Without a sourced ROS shell, CMake will fail while looking for `rclcpp`.
+- `muslisp` alone does not auto-register the ROS2 extension. Use `muslisp_ros2` or embed `muslisp::integrations::ros2::make_extension(...)` in your own host.
 - The first Linux backend only binds `Odometry` in and `Twist` out. Broader transport support belongs in later PRs.
 - `reset_mode="stub"` is for deterministic harnesses and tests. It is not a full simulator or robot reset.
 - Do not let ROS message names or executor details leak into core semantics.

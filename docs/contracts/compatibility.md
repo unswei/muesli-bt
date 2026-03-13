@@ -48,7 +48,7 @@ Breaking changes require:
 Contract-affecting changes must update:
 
 - `CHANGELOG.md` under `Unreleased`
-- release notes for the next tagged release
+- release notes page for the next tagged release under `docs/releases/`
 
 Contract-affecting entries must explicitly state:
 
@@ -78,7 +78,7 @@ Breaking example:
 
 - change `tick` from integer to string
 - publish `mbt.evt.v2`
-- update Studio/parser compatibility matrix and release notes
+- update Studio/parser compatibility matrix and the relevant release notes page
 
 ## gotchas
 

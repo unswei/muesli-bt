@@ -22,7 +22,7 @@ Coverage includes:
 - VLA BT nodes (`vla-request`, `vla-wait`, `vla-cancel`) including cancel flow
 - [host](terminology.md#host) wrappers and typed robot interface injection
 - `env.run-loop` multi-episode semantics for reset-capable and reset-less backends
-- generic `env.*` backend contract checks for PyBullet and ROS2 skeleton adapters
+- generic `env.*` backend contract checks for PyBullet and ROS2 adapters
 - runtime-contract L0 conformance checks (tick ordering, budget/deadline hooks, async lifecycle, determinism)
 
 ## canonical event fixture suite

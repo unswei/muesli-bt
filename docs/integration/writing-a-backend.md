@@ -148,7 +148,7 @@ Implemented:
 - [x] reproducible demo scripts exist (PyBullet racecar, Webots e-puck variants)
 
 Planned:
-- [x] dedicated ROS2 backend target and packaging skeleton
+- [x] dedicated ROS2 backend target and first Linux packaging baseline
 - [ ] additional production backends beyond demo-focused adapters
 
 Known limitations:

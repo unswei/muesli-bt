@@ -201,6 +201,11 @@ endif ()
 add_executable(muslisp src/main.cpp)
 target_link_libraries(muslisp PRIVATE muesli_bt_core)
 
+if (TARGET muesli_bt_integration_ros2)
+  add_executable(muslisp_ros2 tools/muslisp_ros2_main.cpp)
+  target_link_libraries(muslisp_ros2 PRIVATE muesli_bt_integration_ros2)
+endif ()
+
 set(MUESLI_BT_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/muesli_bt")
 set(MUESLI_BT_INSTALL_SHAREDIR "${CMAKE_INSTALL_DATADIR}/muesli_bt")
 
@@ -413,6 +418,7 @@ if (TARGET muesli_bt_integration_ros2)
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   )
+  install(TARGETS muslisp_ros2 RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif ()
 
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

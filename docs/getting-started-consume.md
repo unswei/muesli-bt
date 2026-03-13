@@ -27,7 +27,7 @@ Optional integration targets (only when built and exported):
 
 - `muesli_bt::integration_pybullet`
 - `muesli_bt::integration_webots`
-- `muesli_bt::integration_ros2` (initial skeleton target)
+- `muesli_bt::integration_ros2` (Linux ROS2 transport target)
 
 ## api / syntax
 
@@ -107,7 +107,7 @@ Studio/tooling contract assets are installed with the package and exposed via
 ## gotchas
 
 - `muesli_bt::integration_webots` is omitted when Webots SDK is unavailable.
-- `muesli_bt::integration_ros2` is a skeleton target; ROS transport wiring is not included yet.
+- `muesli_bt::integration_ros2` currently targets Ubuntu 22.04 + ROS 2 Humble with `nav_msgs/msg/Odometry` input and `geometry_msgs/msg/Twist` output.
 - enabling `MUESLI_BT_BUILD_PYTHON_BRIDGE` requires PyBullet integration.
 - do not link against non-exported internal targets; only use imported
   `muesli_bt::*` targets.
