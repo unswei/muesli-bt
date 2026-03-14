@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <participant profile_name="default_participant_profile" is_default_profile="true">
+    <rtps>
+      <name>muesli-bt-fastdds-default</name>
+      <useBuiltinTransports>true</useBuiltinTransports>
+      <builtin>
+        <use_WriterLivelinessProtocol>true</use_WriterLivelinessProtocol>
+      </builtin>
+    </rtps>
+  </participant>
+</profiles>

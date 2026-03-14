@@ -1,0 +1,16 @@
+# local Docker artefacts
+*.log
+*.tmp
+*.tar
+*.tar.gz
+*.sha256
+*.digest
+.env.local
+*.local.env
+.DS_Store
+
+# ad hoc local outputs
+build/
+dist/
+out/
+tmp/
