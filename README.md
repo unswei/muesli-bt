@@ -198,6 +198,16 @@ Then use that same environment for docs:
 - `make demo-run MODE=bt_planner`: runs the racecar demo through the bridge/runtime path.
 - `make verify-install`: runs a deterministic BT smoke run, writes `logs/verify-install.mbt.evt.v1.jsonl`, and validates it against `mbt.evt.v1`.
 
+## Isaac Sim H1 Hero Demo
+
+For a Linux/NVIDIA showcase that keeps the current ROS2 thin adaptor intact, use the checked-in H1 locomotion hero demo:
+
+- Lisp demo assets: `examples/isaac_h1_ros2_hero/`
+- container/tooling helpers: `tools/docker/isaac_lab_vla_stack/`
+- docs page: `docs/examples/isaac-h1-ros2-hero.md`
+
+This path keeps `muesli-bt` on the released `Odometry` -> `Twist` ROS2 surface while Isaac Sim and NVIDIA's H1 controller own the low-level humanoid policy loop.
+
 ## VLA Integration Status
 
 VLA support in this repository is currently **stub integration + contract hooks**.

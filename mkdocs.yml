@@ -69,6 +69,8 @@ nav:
           - e-puck Line Following: examples/webots-epuck-line-following.md
       - PyBullet:
           - Racecar: examples/pybullet-racecar.md
+      - Isaac Sim / ROS2:
+          - H1 Locomotion Hero Demo: examples/isaac-h1-ros2-hero.md
       - More Scripted Examples:
           - Hello BT: examples/hello-bt.md
           - Memoryful Sequence Demo: examples/memoryful-sequence-demo.md
@@ -91,6 +93,7 @@ nav:
           - Webots e-puck Obstacle Source: examples/webots-epuck-obstacle-wall-following-source.md
           - Webots e-puck Line Source: examples/webots-epuck-line-following-source.md
           - PyBullet Racecar Source: examples/pybullet-racecar-source.md
+          - Isaac H1 Hero Source: examples/isaac-h1-ros2-hero-source.md
   - Language:
       - Syntax: language/syntax.md
       - Semantics: language/semantics.md

@@ -24,6 +24,7 @@ mkdir -p \
   "${CACHE_ROOT}/pip-cache" \
   "${CACHE_ROOT}/uv-cache" \
   "${CACHE_ROOT}/hf-cache" \
+  "${CACHE_ROOT}/ros-workspaces" \
   "${CACHE_ROOT}/gl-cache" \
   "${CACHE_ROOT}/compute-cache" \
   "${CACHE_ROOT}/omniverse-logs" \
@@ -80,6 +81,7 @@ DOCKER_ARGS=(
   -v "${CACHE_ROOT}/omniverse-logs:/root/.nvidia-omniverse/logs:rw"
   -v "${CACHE_ROOT}/ov-data:/root/.local/share/ov/data:rw"
   -v "${CACHE_ROOT}/isaaclab-runtime:${ISAACLAB_RUNTIME_ROOT}:rw"
+  -v "${CACHE_ROOT}/ros-workspaces:/workspace/ros-workspaces:rw"
   -v "${REPO_ROOT}:/workspace/muesli-bt:rw"
 )
 

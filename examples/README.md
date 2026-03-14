@@ -17,6 +17,7 @@ This directory contains runnable muesli-bt examples.
 - `bt/`: small BT language/runtime examples.
 - `repl_scripts/`: standalone Lisp algorithm and planner scripts.
 - `repl_scripts/ros2-live-odom-twist.lisp`: minimal live ROS2 control-loop script for the Ubuntu 22.04 + Humble `Odometry` -> `Twist` baseline.
+- `isaac_h1_ros2_hero/`: ROS2 H1 locomotion hero-demo assets, including the checked-in Lisp BT, runtime wrapper, and Isaac topic contract.
 - `pybullet_racecar/`: PyBullet racecar showcase.
 - `../integrations/pybullet/`: shared C++ integration plumbing used by the PyBullet racecar demo.
 

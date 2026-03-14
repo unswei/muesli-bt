@@ -19,6 +19,10 @@ Most examples follow the same pattern:
 
 - [racecar](pybullet-racecar.md)
 
+## Isaac Sim / ROS2
+
+- [H1 locomotion hero demo](isaac-h1-ros2-hero.md)
+
 ## More Scripted Examples
 
 For pure Lisp algorithms and smaller BT samples, see:

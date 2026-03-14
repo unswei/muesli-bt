@@ -1,0 +1,56 @@
+demo: isaac_h1_ros2_hero.v1
+description: >
+  Topic and simulator contract for the H1 locomotion hero demo that keeps
+  muesli-bt on the existing ROS 2 Odometry-to-Twist transport surface.
+
+ros2:
+  namespace: /h1_01
+  backend:
+    attach: ros2
+    backend_version: ros2.transport.v1
+    obs_source: odom
+    action_sink: cmd_vel
+    obs_schema: ros2.obs.v1
+    state_schema: ros2.state.v1
+    action_schema: ros2.action.v1
+  topics:
+    odom:
+      type: nav_msgs/msg/Odometry
+      direction: isaac_to_muesli
+      notes: Base pose and twist for the H1 root link.
+    cmd_vel:
+      type: geometry_msgs/msg/Twist
+      direction: muesli_to_h1_policy
+      notes: High-level locomotion command consumed by NVIDIA's H1 policy node.
+    joint_states:
+      type: sensor_msgs/msg/JointState
+      direction: isaac_to_h1_policy
+      notes: Articulation state published from Isaac Sim.
+    imu:
+      type: sensor_msgs/msg/Imu
+      direction: isaac_to_h1_policy
+      notes: Base IMU signal consumed by the H1 policy node.
+    joint_command:
+      type: sensor_msgs/msg/JointState
+      direction: h1_policy_to_isaac
+      notes: Policy output applied to the H1 articulation controller.
+
+isaac_sim:
+  simulation_services:
+    get_state: /get_simulation_state
+    set_state: /set_simulation_state
+    reset: /reset_simulation
+    step: /step_simulation
+  action_graph_nodes:
+    - ROS2 Context
+    - On Playback Tick
+    - Isaac Read Simulation Time
+    - ROS2 Publish Joint State
+    - ROS2 Subscribe Joint State
+    - Articulation Controller
+    - ROS2 Publish Odometry
+    - ROS2 Publish Raw Transform Tree
+    - ROS2 Publish IMU
+  expected_frames:
+    odom_frame: odom
+    base_frame: base_link
