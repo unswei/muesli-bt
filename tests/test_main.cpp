@@ -3454,6 +3454,26 @@ void test_ros2_backend_present_with_extension() {
     check(integer_value(eval_text("(map.get (env.observe) 'step -1)", env)) >= 1,
           "ros2 backend step counter should advance");
 }
+
+void test_ros2_cleanup_with_live_transport_peer() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_env_with_ros2_extension();
+    test_support::ros2_test_harness harness("/cleanup");
+    (void)eval_text("(env.attach \"ros2\")", env);
+    (void)eval_text(ros2_configure_script(harness.topic_ns()), env);
+    check(harness.wait_for_transport_ready(std::chrono::milliseconds(500)),
+          "ros2 cleanup transport should be ready after configure");
+    harness.publish_odom(0.25, 0.0, 0.0, 0.1, 0.0, 0.0);
+    check(string_value(eval_text("(map.get (env.observe) 'obs_schema \"\")", env)) == "ros2.obs.v1",
+          "ros2 cleanup observe should return canonical obs_schema");
+    if (rclcpp::ok()) {
+        rclcpp::shutdown();
+    }
+    muslisp::env_api_reset();
+    env = nullptr;
+}
 #endif
 
 }  // namespace
@@ -3525,6 +3545,7 @@ int main() {
         {"ros2 backend config validation and reset policy", test_ros2_backend_config_validation_and_reset_policy},
         {"ros2 backend invalid action fallback", test_ros2_backend_invalid_action_fallback},
         {"ros2 backend present with extension", test_ros2_backend_present_with_extension},
+        {"ros2 cleanup with live transport peer", test_ros2_cleanup_with_live_transport_peer},
 #endif
         {"phase5 ring buffer bounds", test_phase5_ring_buffer_bounds},
         {"phase6 sample wrappers tree", test_phase6_sample_wrappers_tree},
@@ -3533,10 +3554,10 @@ int main() {
 
     const auto cleanup = []() {
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
-        muslisp::env_api_reset();
         if (rclcpp::ok()) {
             rclcpp::shutdown();
         }
+        muslisp::env_api_reset();
 #endif
     };
 

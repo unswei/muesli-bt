@@ -13,12 +13,14 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - Added a Linux-only rosbag-backed ROS2 `L2` replay corpus and artefact output for nominal replay, clamped actions, invalid-action fallback, and reset-unsupported policy checks.
 - Added push/PR CI gating for `conformance-l2-ros2-humble`, so the rosbag-backed ROS2 `L2` replay lane now runs in ordinary CI as well as scheduled or manual workflows.
 - Added `tools/verify_ros2_l2_artifacts.py` so CI validates generated ROS2 `L2` summaries and run-loop artefacts structurally, not just by test exit status.
+- Added ROS2 cleanup regression coverage for shutdown with a live transport peer.
 
 ### Changed
 - ROS2 integration now requires real ROS package discovery when `MUESLI_BT_BUILD_INTEGRATION_ROS2=ON`; configure fails cleanly when `rclcpp` is not discoverable.
 - Core/no-ROS CI and release paths now disable `MUESLI_BT_BUILD_INTEGRATION_ROS2` explicitly so the portable baseline does not depend on host OS or ambient ROS setup.
 - ROS2 backend now uses real Linux transport for `env.observe` / `env.act` / `env.step` via `Odometry` and `Twist`, while keeping canonical `ros2.obs.v1`, `ros2.state.v1`, and `ros2.action.v1`.
 - ROS2 reset policy now defaults to `unsupported`; `reset_mode="stub"` is retained for deterministic harnesses and tests.
+- ROS2 teardown now shuts `rclcpp` down before backend-registry reset, disables unused parameter services on the backend node, and allows `muslisp_ros2` to exit cleanly while live ROS peers are present.
 - Package exports now preserve the correct installed share directory and ROS dependency discovery for downstream ROS2 consumers.
 - ROS2 scope, backend-writing guidance, conformance notes, and backlog planning now reflect the first implemented Linux transport lane, the first replay corpus in `L2`, and the explicit first-milestone decision to keep real reset unsupported.
 

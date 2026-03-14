@@ -905,10 +905,10 @@ void test_ros2_reset_unsupported_policy_artifact() {
 }
 
 void cleanup_runtime() {
-    muslisp::env_api_reset();
     if (rclcpp::ok()) {
         rclcpp::shutdown();
     }
+    muslisp::env_api_reset();
 }
 
 void run_case(const std::string& label, const std::function<void()>& fn) {

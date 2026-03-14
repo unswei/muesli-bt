@@ -4,7 +4,10 @@
 #include <string>
 #include <vector>
 
+#include <rclcpp/rclcpp.hpp>
+
 #include "muslisp/error.hpp"
+#include "muslisp/env_api.hpp"
 #include "muslisp/eval.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
@@ -95,6 +98,17 @@ int run_repl(muslisp::env_ptr env) {
     return 0;
 }
 
+void cleanup_runtime() noexcept {
+    if (rclcpp::ok()) {
+        rclcpp::shutdown();
+    }
+    try {
+        muslisp::env_api_reset();
+    } catch (const std::exception&) {
+        // best effort during process shutdown
+    }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -102,11 +116,16 @@ int main(int argc, char** argv) {
         muslisp::runtime_config config;
         config.register_extension(muslisp::integrations::ros2::make_extension());
         muslisp::env_ptr env = muslisp::create_global_env(std::move(config));
+        int rc = 0;
         if (argc > 1) {
-            return run_script(argv[1], env);
+            rc = run_script(argv[1], env);
+        } else {
+            rc = run_repl(env);
         }
-        return run_repl(env);
+        cleanup_runtime();
+        return rc;
     } catch (const std::exception& e) {
+        cleanup_runtime();
         std::cerr << "fatal: " << e.what() << '\n';
         return 1;
     }

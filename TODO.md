@@ -5,14 +5,13 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 
 ## now
 
-- `v0.3.0`: promote the current ROS2 thin adaptor from rolling `main` work to a documented release baseline on Ubuntu 22.04 + Humble
-
-## next
-
 - `v0.4.0`: emit direct canonical `mbt.evt.v1` logs for ROS-backed runs instead of relying on run-loop artefact JSONL
 - `v0.4.0`: add explicit canonical event-log assertions and a replay verification command for ROS-backed runs
 - `v0.4.0`: log and document ROS time-source policy (`sim time` vs wall time)
 - `v0.4.0`: extend observability exports for long-running multi-episode experiments
+
+## next
+
 - `v0.5.0`: choose one canonical wheeled BT and reuse it across PyBullet, Webots, and ROS2 with adapter-only differences
 - `v0.5.0`: add scripted invariant checks that compare key behaviour or decision traces across simulator and ROS-backed runs
 - `v0.5.0`: publish end-to-end ROS2 consumer docs/examples for the supported path

@@ -584,10 +584,10 @@ int main() {
 
     const auto cleanup = []() {
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
-        muslisp::env_api_reset();
         if (rclcpp::ok()) {
             rclcpp::shutdown();
         }
+        muslisp::env_api_reset();
 #endif
     };
 

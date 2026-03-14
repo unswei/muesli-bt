@@ -3,6 +3,8 @@
 #include "muslisp/value.hpp"
 #include "ros2/extension.hpp"
 
+#include <rclcpp/rclcpp.hpp>
+
 #include <stdexcept>
 
 int main() {
@@ -52,6 +54,9 @@ int main() {
         throw std::runtime_error("unexpected ros2 state schema");
     }
 
+    if (rclcpp::ok()) {
+        rclcpp::shutdown();
+    }
     muslisp::env_api_reset();
     return 0;
 }

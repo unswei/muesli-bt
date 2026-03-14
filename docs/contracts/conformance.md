@@ -81,6 +81,15 @@ cmake --build build/linux-ros2 -j
 ctest --test-dir build/linux-ros2 --output-on-failure
 ```
 
+For the live runner path, start the odometry publisher first, then run:
+
+```bash
+source /opt/ros/humble/setup.bash
+./build/linux-ros2/muslisp_ros2 examples/repl_scripts/ros2-live-odom-twist.lisp
+```
+
+This writes `build/linux-ros2/ros2-live-run.jsonl`. The full topic-publisher recipe is documented in [ros2 backend scope](../integration/ros2-backend-scope.md).
+
 Run the current rosbag-backed `L2` replay corpus locally:
 
 ```bash

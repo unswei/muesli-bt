@@ -246,13 +246,13 @@ value make_twist_map(double vx, double vy, double vz, double wx, double wy, doub
 }
 
 void shutdown_ros2_backend_process_runtime() {
+    if (rclcpp::ok()) {
+        rclcpp::shutdown();
+    }
     try {
         env_api_reset();
     } catch (const std::exception&) {
         // best effort during process shutdown
-    }
-    if (rclcpp::ok()) {
-        rclcpp::shutdown();
     }
 }
 
@@ -296,6 +296,7 @@ public:
 
     ~ros2_env_backend() override {
         if (executor_ && node_) {
+            executor_->cancel();
             executor_->remove_node(node_);
         }
         subscription_.reset();
@@ -617,6 +618,8 @@ private:
 
         rclcpp::NodeOptions options;
         options.automatically_declare_parameters_from_overrides(true);
+        options.start_parameter_services(false);
+        options.start_parameter_event_publisher(false);
         options.append_parameter_override("use_sim_time", use_sim_time_);
         node_ = std::make_shared<rclcpp::Node>(node_name_, options);
         executor_ = std::make_unique<rclcpp::executors::SingleThreadedExecutor>();
