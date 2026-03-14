@@ -10,6 +10,7 @@ Returns the current observation from the attached backend.
 
 - Arguments: none
 - Return: observation map, with required runtime-level fields:
+
   - `obs_schema` (string)
   - `state_schema` when backend state is present
   - `t_ms` (integer)

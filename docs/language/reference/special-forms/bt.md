@@ -39,6 +39,7 @@ Compiles one BT language form (DSL: a small purpose-built language for behaviour
 
 - Authoring-friendly compile form.
 - BT DSL includes:
+
   - memoryless composites: `seq`, `sel`
   - memoryful composites: `mem-seq`, `mem-sel`
   - yielding/reactive composites: `async-seq`, `reactive-seq`, `reactive-sel`

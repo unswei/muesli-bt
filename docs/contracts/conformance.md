@@ -17,14 +17,17 @@ Use this page when:
 ### levels
 
 - `L0` core-only conformance:
+
   - deterministic mock backend
   - no simulator dependency
   - runs on PR/push CI
   - this is where pre-Linux ROS2 contract work belongs: generic `env.*` semantics, schema decisions, and fixture intent
 - `L1` simulator conformance:
+
   - PyBullet/Webots integration checks
   - additional push/PR CI gate for simulator-backed integration checks
 - `L2` ROS 2 conformance:
+
   - rosbag-driven conformance checks
   - runs in push/PR CI and remains available for scheduled or manual re-runs
   - Linux-only
@@ -36,10 +39,12 @@ Use this page when:
 ### required artefacts
 
 - tests:
+
   - `tests/conformance/mock_backend.hpp`
   - `tests/conformance/mock_backend.cpp`
   - `tests/conformance/test_conformance_main.cpp`
 - fixtures:
+
   - `fixtures/<name>/config.json`
   - `fixtures/<name>/seed.json`
   - `fixtures/<name>/events.jsonl`

@@ -11,10 +11,12 @@ Supports single-episode and multi-episode execution.
 ## Arguments And Return
 
 - Arguments:
+
   - `config-map` with required keys `tick_hz`, `max_ticks`
   - `on-tick-fn` callable receiving one argument: observation map
 - Optional config keys: `episode_max`, `step_max`, `steps_per_tick`, `seed`, `realtime`, `safe_action`, `stop_on_success`, `success_predicate`, `log_path`, `observer`
 - Return map includes:
+
   - `status` in `:ok | :stopped | :error | :unsupported`
   - `last_status`
   - `ok`

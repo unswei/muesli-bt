@@ -145,6 +145,7 @@ Uses per-node counter memory.
 - child `failure` -> `failure`
 - child `running` -> `running`
 - child `success` increments counter
+
   - if counter reaches `n`, returns `success`
   - otherwise returns `running`
 
@@ -158,6 +159,7 @@ Uses per-node retry counter.
 - child `success` -> resets counter to 0, returns `success`
 - child `running` -> `running`
 - child `failure` increments counter
+
   - if counter `<= n`, returns `running` (retry next tick)
   - else returns `failure`
 

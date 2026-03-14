@@ -23,6 +23,7 @@ Each tick evaluates from the root and returns one status:
 ## Node Categories
 
 - composites:
+
   - memoryless: `seq`, `sel`
   - memoryful: `mem-seq`, `mem-sel`
   - yielding/reactive: `async-seq`, `reactive-seq`, `reactive-sel`

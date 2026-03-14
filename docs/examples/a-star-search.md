@@ -19,9 +19,11 @@ Step-by-step tutorial:
 - graph search in pure Lisp without [host](../terminology.md#host) callbacks
 - a deliberate non-PQ baseline open-set implementation (vector + best-node scan)
 - mutable container usage:
+
   - `vec.make`, `vec.push!`, `vec.get`, `vec.set!`, `vec.pop!`
   - `map.make`, `map.get`, `map.set!`, `map.has?`, `map.del!`
 - recursive control flow for:
+
   - open-set best-node selection
   - neighbour expansion
   - path reconstruction
@@ -32,6 +34,7 @@ Step-by-step tutorial:
 - Node encoding: integer id `id = x + y * width`.
 - Open set: vector of node ids plus a membership map.
 - Scores:
+
   - `g`: best known cost-from-start
   - `f = g + h`: A* priority score
 - Parent links (`came`) allow goal-to-start backtracking and path reconstruction.

@@ -98,6 +98,7 @@ Contract behaviour:
 
 - enforcement is best-effort
 - decision-point checks occur before:
+
   - planner calls (`planner_call_start`)
   - async start (`vla_submit`)
   - async poll (`vla_poll`)
@@ -107,6 +108,7 @@ Overrun behaviour:
 
 - runtime may overrun due already-started work
 - on overrun runtime emits:
+
   - `budget_warning`
   - `deadline_exceeded`
 - runtime requests async cancellation for active tracked async jobs
@@ -174,6 +176,7 @@ Minimum required runtime events:
 Determinism scope:
 
 - with deterministic mode enabled and identical inputs:
+
   - node status trace matches
   - event ordering and deterministic timestamps match
   - planner outcomes match when backend/seed are deterministic

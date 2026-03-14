@@ -38,6 +38,7 @@ What is implemented today:
 - standard attach path through `(env.attach "ros2")`
 - `env.configure`, `env.info`, `env.observe`, `env.act`, and `env.step` against real ROS transport
 - explicit reset policy:
+
   - default `reset_mode` is `unsupported`
   - `reset_mode="stub"` is retained for deterministic harnesses and tests only
 - Linux ROS-backed tests, installed-package consumer smoke coverage, and live runner validation via `muslisp_ros2`
@@ -374,6 +375,7 @@ Required fields:
 - `action_schema`: `"ros2.action.v1"`
 - `t_ms`: integer timestamp in milliseconds
 - `u`: map with:
+
   - `linear_x`
   - `linear_y`
   - `angular_z`

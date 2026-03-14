@@ -9,6 +9,7 @@ Submits the action for the next control tick.
 ## Arguments And Return
 
 - Arguments: action map
+
   - canonical form uses `action_schema`
   - many backends also require `t_ms`
   - payload shape under `u` is backend/schema specific

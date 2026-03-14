@@ -109,6 +109,7 @@ Notes:
 - `dijkstra-grid-pq.lisp` prints `found`, total cost, path length, and step coordinates.
 - `prm-2d-pq.lisp` uses a fixed seed and prints deterministic summary fields (`seed`, accepted nodes, edge count, `found`, path stats).
 - Step-by-step walkthroughs:
+
   - [A* tutorial](examples/tutorials/a-star-step-by-step.md)
   - [Dijkstra tutorial](examples/tutorials/dijkstra-step-by-step.md)
   - [PRM tutorial](examples/tutorials/prm-step-by-step.md)

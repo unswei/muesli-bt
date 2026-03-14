@@ -9,6 +9,7 @@ Applies backend/runtime options before stepping or loop execution.
 ## Arguments And Return
 
 - Arguments: map of options
+
   - common runtime keys include `tick_hz`, `steps_per_tick`, `seed`, `headless`, `realtime`, `log_path`
   - backend-specific keys are documented per backend
 - Return: `nil`

@@ -263,6 +263,7 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 ### Behaviour tree runtime
 
 - composites:
+
   - memoryless: `seq`, `sel`
   - memoryful: `mem-seq`, `mem-sel`
   - yielding/reactive: `async-seq`, `reactive-seq`, `reactive-sel`
@@ -289,6 +290,7 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 ### Environment capability layer
 
 - canonical backend-agnostic control surface:
+
   - `env.info`, `env.attach`, `env.configure`
   - `env.reset`, `env.observe`, `env.act`, `env.step`
   - `env.run-loop`, `env.debug-draw`
@@ -353,6 +355,7 @@ ctest --test-dir build/dev --output-on-failure
 - `examples/bt/`: compact BT scripts
 - `examples/repl_scripts/`: end-to-end experiments and demos
 - `examples/pybullet_racecar/`: racecar demo package
+
   - `native/`: demo bridge entrypoint that uses canonical `env.api.v1` via the PyBullet integration
 - `tests/`: unit/integration coverage
 - `docs/`: user and internals documentation

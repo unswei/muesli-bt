@@ -10,6 +10,7 @@ Returns environment capability metadata for the fixed `env.*` interface.
 
 - Arguments: none
 - Return: map with fields:
+
   - `api_version` (string, currently `"env.api.v1"`)
   - `attached` (boolean)
   - `backend` (string or `nil`)
