@@ -57,6 +57,18 @@ muslisp::value eval_text(const std::string& source, muslisp::env_ptr env) {
     return muslisp::eval_source(source, env);
 }
 
+void expect_lisp_error_message(const std::string& source,
+                               muslisp::env_ptr env,
+                               const std::string& expected,
+                               const std::string& context) {
+    try {
+        (void)eval_text(source, env);
+        throw std::runtime_error("expected lisp_error for " + context);
+    } catch (const muslisp::lisp_error& e) {
+        check(std::string(e.what()) == expected, context + " error mismatch");
+    }
+}
+
 void reset_bt_runtime_host() {
     bt::runtime_host& host = bt::default_runtime_host();
     host.clear_all();
@@ -416,6 +428,103 @@ void test_and_or_forms() {
 
     value or_short = eval_text("(begin (define y 0) (or 1 (define y 1)) y)", env);
     check(is_integer(or_short) && integer_value(or_short) == 0, "or should short-circuit");
+}
+
+void test_evaluator_tail_position_readiness() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+
+    value begin_effects = eval_text(
+        "(begin "
+        "  (define v (vec.make)) "
+        "  (begin "
+        "    (vec.push! v 1) "
+        "    (vec.push! v 2) "
+        "    99) "
+        "  (write-to-string (list (vec.get v 0) (vec.get v 1) (vec.len v))))",
+        env);
+    check(is_string(begin_effects) && string_value(begin_effects) == "(1 2 2)",
+          "begin should preserve side-effect order and return last value");
+
+    value self_if = eval_text(
+        "(begin "
+        "  (define (countdown-if n) "
+        "    (if (= n 0) "
+        "        0 "
+        "        (countdown-if (- n 1)))) "
+        "  (countdown-if 48))",
+        env);
+    check(is_integer(self_if) && integer_value(self_if) == 0, "bounded self recursion through if failed");
+
+    value self_begin = eval_text(
+        "(begin "
+        "  (define (countdown-begin n) "
+        "    (begin "
+        "      (if (= n 0) "
+        "          0 "
+        "          (countdown-begin (- n 1))))) "
+        "  (countdown-begin 48))",
+        env);
+    check(is_integer(self_begin) && integer_value(self_begin) == 0, "bounded self recursion through begin failed");
+
+    value self_let = eval_text(
+        "(begin "
+        "  (define (countdown-let n) "
+        "    (let ((m n)) "
+        "      (if (= m 0) "
+        "          0 "
+        "          (countdown-let (- m 1))))) "
+        "  (countdown-let 48))",
+        env);
+    check(is_integer(self_let) && integer_value(self_let) == 0, "bounded self recursion through let failed");
+
+    value self_cond = eval_text(
+        "(begin "
+        "  (define (countdown-cond n) "
+        "    (cond "
+        "      ((= n 0) 0) "
+        "      (else (countdown-cond (- n 1))))) "
+        "  (countdown-cond 48))",
+        env);
+    check(is_integer(self_cond) && integer_value(self_cond) == 0, "bounded self recursion through cond failed");
+
+    value mutual = eval_text(
+        "(begin "
+        "  (define (evenish n) "
+        "    (if (= n 0) "
+        "        #t "
+        "        (oddish (- n 1)))) "
+        "  (define (oddish n) "
+        "    (if (= n 0) "
+        "        #f "
+        "        (evenish (- n 1)))) "
+        "  (evenish 48))",
+        env);
+    check(is_boolean(mutual) && boolean_value(mutual), "bounded mutual recursion through closure calls failed");
+}
+
+void test_evaluator_error_messages_stable() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+
+    expect_lisp_error_message("(begin (define (inc x) (+ x 1)) (inc))",
+                              env,
+                              "closure call: expected 1 arguments, got 0",
+                              "closure arity");
+    expect_lisp_error_message("(if #t)", env, "if: expected 2 or 3 arguments", "if arity");
+    expect_lisp_error_message("(let 1 2)", env, "let: expected binding list", "let binding list");
+    expect_lisp_error_message("(cond (else 1) (#t 2))", env, "cond: else clause must be last", "cond else-last");
+    expect_lisp_error_message("(unquote x)", env, "unquote: only valid inside quasiquote", "unquote misuse");
+    expect_lisp_error_message("(quasiquote (unquote-splicing (list 1 2)))",
+                              env,
+                              "unquote-splicing: only valid in list context",
+                              "unquote-splicing list context");
+    expect_lisp_error_message("(quasiquote (a (unquote-splicing 1)))",
+                              env,
+                              "unquote-splicing: expected list value",
+                              "unquote-splicing list value");
 }
 
 void test_bt_authoring_sugar() {
@@ -3490,6 +3599,8 @@ int main() {
         {"quasiquote semantics and errors", test_quasiquote_semantics_and_errors},
         {"let and cond forms", test_let_and_cond_forms},
         {"and/or forms", test_and_or_forms},
+        {"evaluator tail-position readiness", test_evaluator_tail_position_readiness},
+        {"evaluator error messages stable", test_evaluator_error_messages_stable},
         {"bt authoring sugar", test_bt_authoring_sugar},
         {"load/write/save and roundtrip", test_load_write_save_and_roundtrip},
         {"bt dsl save/load roundtrip", test_bt_dsl_save_load_roundtrip},
