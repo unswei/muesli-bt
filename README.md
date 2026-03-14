@@ -93,7 +93,7 @@ Additional runnable commands:
 
 ## ROS2 Release Baseline
 
-The `v0.3.0` release baseline for ROS2 is intentionally narrow:
+The current `v0.3.x` ROS2 release baseline is intentionally narrow:
 
 - supported host: Ubuntu 22.04 + ROS 2 Humble
 - attach path: `(env.attach "ros2")`
@@ -101,6 +101,12 @@ The `v0.3.0` release baseline for ROS2 is intentionally narrow:
 - package export: `muesli_bt::integration_ros2`
 - runner: `muslisp_ros2`
 - reset policy: live runs use `reset_mode="unsupported"`; `stub` remains for tests and harnesses
+
+Release artefact posture:
+
+- `ubuntu-x86_64` archive: generic non-ROS build
+- `ubuntu-22.04-ros2-humble-x86_64` archive: ROS-enabled build with `muesli_bt::integration_ros2` and `muslisp_ros2`
+- the ROS-enabled archive requires a matching ROS 2 Humble runtime on the target host
 
 Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md) for the boundary and live flow, then use [docs/integration/ros2-backend-scope.md](docs/integration/ros2-backend-scope.md) and [docs/contracts/conformance.md](docs/contracts/conformance.md) for the detailed commands and conformance lanes.
 

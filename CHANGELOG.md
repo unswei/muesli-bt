@@ -5,6 +5,16 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-14
+
+### Added
+- Added a separate GitHub release artefact for Ubuntu 22.04 + ROS 2 Humble that includes `muesli_bt::integration_ros2` and `muslisp_ros2`.
+- Added ROS-enabled release-job validation for ROS contract tests, rosbag-backed `L2` replay verification, and ROS consumer smoke.
+
+### Changed
+- Release packaging now distinguishes the generic Ubuntu archive from the ROS-enabled Ubuntu 22.04 + Humble archive.
+- Release docs now state explicitly that the generic Ubuntu archive is non-ROS and that the ROS-enabled archive requires a matching ROS 2 Humble runtime on the target host.
+
 ## [0.3.0] - 2026-03-14
 
 ### Added
