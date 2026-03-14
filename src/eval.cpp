@@ -18,20 +18,25 @@ namespace {
 
 class scoped_env_root {
 public:
-    scoped_env_root(gc& heap, env_ptr env) : heap_(heap), env_(env) {
+    scoped_env_root(gc& heap, env_ptr env) : heap_(heap) { reset(env); }
+
+    ~scoped_env_root() { reset(nullptr); }
+
+    scoped_env_root(const scoped_env_root&) = delete;
+    scoped_env_root& operator=(const scoped_env_root&) = delete;
+
+    void reset(env_ptr env) {
+        if (env_ == env) {
+            return;
+        }
+        if (env_) {
+            heap_.unregister_root_env(env_);
+        }
+        env_ = env;
         if (env_) {
             heap_.register_root_env(env_);
         }
     }
-
-    ~scoped_env_root() {
-        if (env_) {
-            heap_.unregister_root_env(env_);
-        }
-    }
-
-    scoped_env_root(const scoped_env_root&) = delete;
-    scoped_env_root& operator=(const scoped_env_root&) = delete;
 
 private:
     gc& heap_;
@@ -124,16 +129,42 @@ enum class special_form_kind {
     load_form,
 };
 
+struct eval_outcome {
+    value result = nullptr;
+    value next_expr = nullptr;
+    env_ptr next_scope = nullptr;
+    bool has_tail_call = false;
+};
+
+eval_outcome make_eval_result(value result) {
+    eval_outcome outcome;
+    outcome.result = result;
+    return outcome;
+}
+
+eval_outcome make_tail_call(value expr, env_ptr scope) {
+    eval_outcome outcome;
+    outcome.next_expr = expr;
+    outcome.next_scope = scope;
+    outcome.has_tail_call = true;
+    return outcome;
+}
+
 value eval_in_position(value expr, env_ptr scope, eval_position position);
+eval_outcome eval_step_in_position(value expr, env_ptr scope, eval_position position);
 value eval_sequence_in_position(const std::vector<value>& exprs, env_ptr scope, eval_position position);
-value apply_callable_in_position(value fn_value, const std::vector<value>& args, eval_position call_position);
+eval_outcome eval_sequence_step(const std::vector<value>& exprs, env_ptr scope, eval_position position);
+eval_outcome apply_callable_in_position(value fn_value, const std::vector<value>& args, eval_position call_position);
 
 value eval_non_tail(value expr, env_ptr scope) {
     return eval_in_position(expr, scope, eval_position::non_tail);
 }
 
-value eval_tail(value expr, env_ptr scope) {
-    return eval_in_position(expr, scope, eval_position::tail);
+eval_outcome eval_or_bounce(value expr, env_ptr scope, eval_position position) {
+    if (position == eval_position::tail) {
+        return make_tail_call(expr, scope);
+    }
+    return make_eval_result(eval_non_tail(expr, scope));
 }
 
 special_form_kind classify_special_form(value head) {
@@ -349,57 +380,63 @@ value eval_lambda_form(const std::vector<value>& args, env_ptr scope) {
     return make_closure(params, body, scope);
 }
 
-value eval_if_form(const std::vector<value>& args, env_ptr scope, eval_position position) {
+eval_outcome eval_if_form(const std::vector<value>& args, env_ptr scope, eval_position position) {
     if (args.size() != 2 && args.size() != 3) {
         throw lisp_error("if: expected 2 or 3 arguments");
     }
     value test = eval_non_tail(args[0], scope);
     if (is_truthy(test)) {
-        return position == eval_position::tail ? eval_tail(args[1], scope) : eval_non_tail(args[1], scope);
+        return eval_or_bounce(args[1], scope, position);
     }
     if (args.size() == 3) {
-        return position == eval_position::tail ? eval_tail(args[2], scope) : eval_non_tail(args[2], scope);
+        return eval_or_bounce(args[2], scope, position);
     }
-    return make_nil();
+    return make_eval_result(make_nil());
 }
 
-value eval_and_form(const std::vector<value>& args, env_ptr scope, eval_position position) {
+eval_outcome eval_and_form(const std::vector<value>& args, env_ptr scope, eval_position position) {
     gc_root_scope roots(default_gc());
     value last = make_boolean(true);
     roots.add(&last);
+    if (args.empty()) {
+        return make_eval_result(last);
+    }
     for (std::size_t i = 0; i < args.size(); ++i) {
         const bool is_last = i + 1 == args.size();
         if (is_last && position == eval_position::tail) {
-            last = eval_tail(args[i], scope);
+            return make_tail_call(args[i], scope);
         } else {
             last = eval_non_tail(args[i], scope);
         }
         if (!is_truthy(last)) {
-            return last;
+            return make_eval_result(last);
         }
     }
-    return last;
+    return make_eval_result(last);
 }
 
-value eval_or_form(const std::vector<value>& args, env_ptr scope, eval_position position) {
+eval_outcome eval_or_form(const std::vector<value>& args, env_ptr scope, eval_position position) {
     gc_root_scope roots(default_gc());
     value result = make_nil();
     roots.add(&result);
+    if (args.empty()) {
+        return make_eval_result(result);
+    }
     for (std::size_t i = 0; i < args.size(); ++i) {
         const bool is_last = i + 1 == args.size();
         if (is_last && position == eval_position::tail) {
-            result = eval_tail(args[i], scope);
+            return make_tail_call(args[i], scope);
         } else {
             result = eval_non_tail(args[i], scope);
         }
         if (is_truthy(result)) {
-            return result;
+            return make_eval_result(result);
         }
     }
-    return make_nil();
+    return make_eval_result(make_nil());
 }
 
-value eval_let_form(const std::vector<value>& args, env_ptr scope, eval_position position) {
+eval_outcome eval_let_form(const std::vector<value>& args, env_ptr scope, eval_position position) {
     expect_min("let", args, 2);
     value bindings_expr = args[0];
     if (!is_proper_list(bindings_expr)) {
@@ -427,10 +464,10 @@ value eval_let_form(const std::vector<value>& args, env_ptr scope, eval_position
     }
 
     std::vector<value> body(args.begin() + 1, args.end());
-    return eval_sequence_in_position(body, child_scope, position);
+    return eval_sequence_step(body, child_scope, position);
 }
 
-value eval_cond_form(const std::vector<value>& args, env_ptr scope, eval_position position) {
+eval_outcome eval_cond_form(const std::vector<value>& args, env_ptr scope, eval_position position) {
     for (std::size_t i = 0; i < args.size(); ++i) {
         value clause_expr = args[i];
         if (!is_proper_list(clause_expr)) {
@@ -460,14 +497,14 @@ value eval_cond_form(const std::vector<value>& args, env_ptr scope, eval_positio
         }
 
         if (clause.size() == 1) {
-            return is_else ? make_nil() : test_result;
+            return make_eval_result(is_else ? make_nil() : test_result);
         }
 
         std::vector<value> body(clause.begin() + 1, clause.end());
-        return eval_sequence_in_position(body, scope, position);
+        return eval_sequence_step(body, scope, position);
     }
 
-    return make_nil();
+    return make_eval_result(make_nil());
 }
 
 value eval_bt_form(const std::vector<value>& args) {
@@ -491,8 +528,8 @@ value eval_defbt_form(const std::vector<value>& args, env_ptr scope) {
     return compiled;
 }
 
-value eval_begin_form(const std::vector<value>& args, env_ptr scope, eval_position position) {
-    return eval_sequence_in_position(args, scope, position);
+eval_outcome eval_begin_form(const std::vector<value>& args, env_ptr scope, eval_position position) {
+    return eval_sequence_step(args, scope, position);
 }
 
 value eval_load_form(const std::vector<value>& args, env_ptr scope) {
@@ -535,11 +572,14 @@ value eval_load_form(const std::vector<value>& args, env_ptr scope) {
     return last;
 }
 
-value dispatch_special_form(special_form_kind kind, const std::vector<value>& raw_args, env_ptr scope, eval_position position) {
+eval_outcome dispatch_special_form(special_form_kind kind,
+                                   const std::vector<value>& raw_args,
+                                   env_ptr scope,
+                                   eval_position position) {
     switch (kind) {
         case special_form_kind::quote:
             expect_exact("quote", raw_args, 1);
-            return raw_args[0];
+            return make_eval_result(raw_args[0]);
         case special_form_kind::if_form:
             return eval_if_form(raw_args, scope, position);
         case special_form_kind::let_form:
@@ -551,31 +591,31 @@ value dispatch_special_form(special_form_kind kind, const std::vector<value>& ra
         case special_form_kind::cond_form:
             return eval_cond_form(raw_args, scope, position);
         case special_form_kind::define_form:
-            return eval_define_form(raw_args, scope);
+            return make_eval_result(eval_define_form(raw_args, scope));
         case special_form_kind::bt_form:
-            return eval_bt_form(raw_args);
+            return make_eval_result(eval_bt_form(raw_args));
         case special_form_kind::defbt_form:
-            return eval_defbt_form(raw_args, scope);
+            return make_eval_result(eval_defbt_form(raw_args, scope));
         case special_form_kind::quasiquote_form:
             expect_exact("quasiquote", raw_args, 1);
-            return eval_quasiquote(raw_args[0], scope, 1);
+            return make_eval_result(eval_quasiquote(raw_args[0], scope, 1));
         case special_form_kind::unquote_form:
             throw lisp_error("unquote: only valid inside quasiquote");
         case special_form_kind::unquote_splicing_form:
             throw lisp_error("unquote-splicing: only valid inside quasiquote list context");
         case special_form_kind::lambda_form:
-            return eval_lambda_form(raw_args, scope);
+            return make_eval_result(eval_lambda_form(raw_args, scope));
         case special_form_kind::begin_form:
             return eval_begin_form(raw_args, scope, position);
         case special_form_kind::load_form:
-            return eval_load_form(raw_args, scope);
+            return make_eval_result(eval_load_form(raw_args, scope));
         case special_form_kind::none:
             break;
     }
     throw eval_error("eval: unknown special form");
 }
 
-value eval_list_form_in_position(value expr, env_ptr scope, eval_position position) {
+eval_outcome eval_list_form_in_position(value expr, env_ptr scope, eval_position position) {
     gc_root_scope roots(default_gc());
     roots.add(&expr);
 
@@ -603,9 +643,9 @@ value eval_list_form_in_position(value expr, env_ptr scope, eval_position positi
     return apply_callable_in_position(fn, evaluated_args, position);
 }
 
-value apply_callable_in_position(value fn_value, const std::vector<value>& args, [[maybe_unused]] eval_position call_position) {
+eval_outcome apply_callable_in_position(value fn_value, const std::vector<value>& args, eval_position call_position) {
     if (is_primitive(fn_value)) {
-        return primitive_function(fn_value)(args);
+        return make_eval_result(primitive_function(fn_value)(args));
     }
 
     if (is_closure(fn_value)) {
@@ -620,13 +660,16 @@ value apply_callable_in_position(value fn_value, const std::vector<value>& args,
         for (std::size_t i = 0; i < params.size(); ++i) {
             define(call_scope, params[i], args[i]);
         }
-        return eval_sequence_in_position(closure_body(fn_value), call_scope, eval_position::tail);
+        if (call_position == eval_position::tail) {
+            return eval_sequence_step(closure_body(fn_value), call_scope, eval_position::tail);
+        }
+        return make_eval_result(eval_sequence_in_position(closure_body(fn_value), call_scope, eval_position::tail));
     }
 
     throw type_error("attempt to call non-function value");
 }
 
-value eval_in_position(value expr, env_ptr scope, eval_position position) {
+eval_outcome eval_step_in_position(value expr, env_ptr scope, eval_position position) {
     gc_root_scope roots(default_gc());
     roots.add(&expr);
 
@@ -653,9 +696,9 @@ value eval_in_position(value expr, env_ptr scope, eval_position position) {
         case value_type::bt_instance:
         case value_type::image_handle:
         case value_type::blob_handle:
-            return expr;
+            return make_eval_result(expr);
         case value_type::symbol:
-            return lookup(scope, symbol_name(expr));
+            return make_eval_result(lookup(scope, symbol_name(expr)));
         case value_type::cons:
             return eval_list_form_in_position(expr, scope, position);
     }
@@ -663,17 +706,44 @@ value eval_in_position(value expr, env_ptr scope, eval_position position) {
     throw eval_error("eval: unknown value type");
 }
 
-value eval_sequence_in_position(const std::vector<value>& exprs, env_ptr scope, eval_position position) {
+value eval_in_position(value expr, env_ptr scope, eval_position position) {
+    gc_root_scope roots(default_gc());
+    roots.add(&expr);
+    scoped_env_root scope_root(default_gc(), scope);
+
+    while (true) {
+        eval_outcome outcome = eval_step_in_position(expr, scope, position);
+        if (!outcome.has_tail_call) {
+            return outcome.result;
+        }
+
+        expr = outcome.next_expr;
+        scope = outcome.next_scope;
+        scope_root.reset(scope);
+        position = eval_position::tail;
+        default_gc().maybe_collect();
+    }
+}
+
+eval_outcome eval_sequence_step(const std::vector<value>& exprs, env_ptr scope, eval_position position) {
     value last = make_nil();
     for (std::size_t i = 0; i < exprs.size(); ++i) {
         const bool is_last = i + 1 == exprs.size();
         if (is_last && position == eval_position::tail) {
-            last = eval_tail(exprs[i], scope);
+            return make_tail_call(exprs[i], scope);
         } else {
             last = eval_non_tail(exprs[i], scope);
         }
     }
-    return last;
+    return make_eval_result(last);
+}
+
+value eval_sequence_in_position(const std::vector<value>& exprs, env_ptr scope, eval_position position) {
+    eval_outcome outcome = eval_sequence_step(exprs, scope, position);
+    if (outcome.has_tail_call) {
+        return eval_in_position(outcome.next_expr, outcome.next_scope, eval_position::tail);
+    }
+    return outcome.result;
 }
 
 }  // namespace
@@ -687,7 +757,11 @@ value eval_sequence(const std::vector<value>& exprs, env_ptr scope) {
 }
 
 value invoke_callable(value fn_value, const std::vector<value>& args) {
-    return apply_callable_in_position(fn_value, args, eval_position::non_tail);
+    eval_outcome outcome = apply_callable_in_position(fn_value, args, eval_position::non_tail);
+    if (outcome.has_tail_call) {
+        return eval_in_position(outcome.next_expr, outcome.next_scope, eval_position::tail);
+    }
+    return outcome.result;
 }
 
 value eval_source(std::string_view source, env_ptr scope) {

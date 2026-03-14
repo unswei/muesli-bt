@@ -122,14 +122,14 @@ void gc::register_root_env(env_ptr env) {
     if (!env) {
         return;
     }
-    const auto it = std::find(root_envs_.begin(), root_envs_.end(), env);
-    if (it == root_envs_.end()) {
-        root_envs_.push_back(env);
-    }
+    root_envs_.push_back(env);
 }
 
 void gc::unregister_root_env(env_ptr env) {
-    root_envs_.erase(std::remove(root_envs_.begin(), root_envs_.end(), env), root_envs_.end());
+    const auto it = std::find(root_envs_.rbegin(), root_envs_.rend(), env);
+    if (it != root_envs_.rend()) {
+        root_envs_.erase(std::next(it).base());
+    }
 }
 
 gc_stats_snapshot gc::stats() const noexcept {

@@ -504,6 +504,37 @@ void test_evaluator_tail_position_readiness() {
     check(is_boolean(mutual) && boolean_value(mutual), "bounded mutual recursion through closure calls failed");
 }
 
+void test_tail_call_optimisation_smoke() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+
+    value self_tail = eval_text(
+        "(begin "
+        "  (define (countdown-tail n) "
+        "    (if (= n 0) "
+        "        0 "
+        "        (countdown-tail (- n 1)))) "
+        "  (countdown-tail 4096))",
+        env);
+    check(is_integer(self_tail) && integer_value(self_tail) == 0, "tail self recursion should survive a deeper stack");
+
+    value mutual_tail = eval_text(
+        "(begin "
+        "  (define (even-tail n) "
+        "    (if (= n 0) "
+        "        #t "
+        "        (odd-tail (- n 1)))) "
+        "  (define (odd-tail n) "
+        "    (if (= n 0) "
+        "        #f "
+        "        (even-tail (- n 1)))) "
+        "  (even-tail 4096))",
+        env);
+    check(is_boolean(mutual_tail) && boolean_value(mutual_tail),
+          "tail mutual recursion should survive a deeper stack");
+}
+
 void test_evaluator_error_messages_stable() {
     using namespace muslisp;
 
@@ -3600,6 +3631,7 @@ int main() {
         {"let and cond forms", test_let_and_cond_forms},
         {"and/or forms", test_and_or_forms},
         {"evaluator tail-position readiness", test_evaluator_tail_position_readiness},
+        {"tail-call optimisation smoke", test_tail_call_optimisation_smoke},
         {"evaluator error messages stable", test_evaluator_error_messages_stable},
         {"bt authoring sugar", test_bt_authoring_sugar},
         {"load/write/save and roundtrip", test_load_write_save_and_roundtrip},
