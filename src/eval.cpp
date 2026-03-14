@@ -710,7 +710,12 @@ value eval_in_position(value expr, env_ptr scope, eval_position position) {
     gc_root_scope roots(default_gc());
     roots.add(&expr);
     scoped_env_root scope_root(default_gc(), scope);
+    std::size_t tail_bounce_count = 0;
 
+    // Tail calls now bounce through this loop instead of recursing through the
+    // host C++ stack. Env roots must therefore behave like a stack as scopes
+    // come and go, and GC polling needs to stay regular without charging every
+    // single tail hop in deep recursion.
     while (true) {
         eval_outcome outcome = eval_step_in_position(expr, scope, position);
         if (!outcome.has_tail_call) {
@@ -721,7 +726,10 @@ value eval_in_position(value expr, env_ptr scope, eval_position position) {
         scope = outcome.next_scope;
         scope_root.reset(scope);
         position = eval_position::tail;
-        default_gc().maybe_collect();
+        ++tail_bounce_count;
+        if ((tail_bounce_count & 63u) == 0u) {
+            default_gc().maybe_collect();
+        }
     }
 }
 

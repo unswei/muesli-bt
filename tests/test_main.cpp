@@ -577,6 +577,36 @@ void test_tail_call_optimisation_deep_recursion() {
           "tail recursion under allocation pressure should complete");
 }
 
+void test_tail_call_optimisation_and_or() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+
+    value deep_and = eval_text(
+        "(begin "
+        "  (define (countdown-and n) "
+        "    (and #t "
+        "         (if (= n 0) "
+        "             0 "
+        "             (countdown-and (- n 1))))) "
+        "  (countdown-and 20000))",
+        env);
+    check(is_integer(deep_and) && integer_value(deep_and) == 0,
+          "tail recursion through and should complete");
+
+    value deep_or = eval_text(
+        "(begin "
+        "  (define (countdown-or n) "
+        "    (or #f "
+        "        (if (= n 0) "
+        "            0 "
+        "            (countdown-or (- n 1))))) "
+        "  (countdown-or 20000))",
+        env);
+    check(is_integer(deep_or) && integer_value(deep_or) == 0,
+          "tail recursion through or should complete");
+}
+
 void test_gc_env_root_stack_regression() {
     using namespace muslisp;
 
@@ -606,6 +636,30 @@ void test_gc_env_root_stack_regression() {
     value begin_value = eval_text("(begin (define x 2) (define y 7) (+ x y))", env_b);
     check(is_integer(begin_value) && integer_value(begin_value) == 9,
           "global env root should survive repeated begin evaluation after collection");
+}
+
+void test_gc_duplicate_env_roots_are_stack_like() {
+    using namespace muslisp;
+
+    default_gc().collect();
+    const std::size_t baseline = default_gc().stats().live_objects_after_last_gc;
+
+    env_ptr env = make_env();
+    default_gc().register_root_env(env);
+    default_gc().register_root_env(env);
+    default_gc().collect();
+    check(default_gc().stats().live_objects_after_last_gc == baseline + 1,
+          "duplicate env roots should keep one env object live");
+
+    default_gc().unregister_root_env(env);
+    default_gc().collect();
+    check(default_gc().stats().live_objects_after_last_gc == baseline + 1,
+          "unregistering one duplicate env root should keep the env live");
+
+    default_gc().unregister_root_env(env);
+    default_gc().collect();
+    check(default_gc().stats().live_objects_after_last_gc == baseline,
+          "removing the final env root should release the env");
 }
 
 void test_evaluator_error_messages_stable() {
@@ -3706,7 +3760,9 @@ int main() {
         {"evaluator tail-position readiness", test_evaluator_tail_position_readiness},
         {"tail-call optimisation smoke", test_tail_call_optimisation_smoke},
         {"tail-call optimisation deep recursion", test_tail_call_optimisation_deep_recursion},
+        {"tail-call optimisation through and/or", test_tail_call_optimisation_and_or},
         {"gc env root stack regression", test_gc_env_root_stack_regression},
+        {"gc duplicate env roots are stack-like", test_gc_duplicate_env_roots_are_stack_like},
         {"evaluator error messages stable", test_evaluator_error_messages_stable},
         {"bt authoring sugar", test_bt_authoring_sugar},
         {"load/write/save and roundtrip", test_load_write_save_and_roundtrip},
