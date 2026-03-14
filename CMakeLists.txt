@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 project(
   muesli_bt
   VERSION 0.1.0
-  LANGUAGES CXX
+  LANGUAGES C CXX
 )
 
 include(CMakePackageConfigHelpers)
@@ -199,8 +199,13 @@ if (MUESLI_BT_BUILD_INTEGRATION_ROS2)
   target_compile_features(muesli_bt_integration_ros2 PUBLIC cxx_std_20)
 endif ()
 
-add_executable(muslisp src/main.cpp)
+add_executable(muslisp src/main.cpp src/repl_support.cpp)
 target_link_libraries(muslisp PRIVATE muesli_bt_core)
+if (UNIX)
+  target_sources(muslisp PRIVATE third_party/linenoise/linenoise.c)
+  target_include_directories(muslisp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/linenoise)
+  target_compile_definitions(muslisp PRIVATE MUESLI_BT_HAVE_LINENOISE=1)
+endif ()
 
 if (TARGET muesli_bt_integration_ros2)
   add_executable(muslisp_ros2 tools/muslisp_ros2_main.cpp)
@@ -332,7 +337,7 @@ endif ()
 
 enable_testing()
 
-add_executable(muslisp_tests tests/test_main.cpp)
+add_executable(muslisp_tests tests/test_main.cpp src/repl_support.cpp)
 if (MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
   target_link_libraries(muslisp_tests PRIVATE muesli_bt_integration_pybullet)
   target_compile_definitions(muslisp_tests PRIVATE MUESLI_BT_WITH_PYBULLET_INTEGRATION=1)

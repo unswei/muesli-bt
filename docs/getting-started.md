@@ -68,6 +68,12 @@ the Studio contract assets shipped in `${prefix}/share/muesli_bt`.
 
 Exit with `:q`, `:quit`, or `:exit`.
 
+REPL notes:
+
+- Interactive Linux and macOS terminals use a small built-in line editor for current-line editing, history, and wrapped input.
+- Persistent REPL history is stored at `~/.muesli_bt_history`.
+- Use `:clear` to drop a pending multi-line buffer without leaving the REPL.
+
 Quick BT authoring example:
 
 ```lisp

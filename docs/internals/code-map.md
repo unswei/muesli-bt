@@ -38,6 +38,7 @@ Use this page to find where to implement specific changes.
 ### Entry points
 
 - `src/main.cpp` (REPL + script mode)
+- `src/repl_support.cpp` (REPL command/history helpers)
 - `tests/test_main.cpp` (coverage)
 
 ### Demo integration (PyBullet racecar)

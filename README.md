@@ -91,6 +91,8 @@ Additional runnable commands:
 ./build/dev/muslisp
 ```
 
+On interactive Linux and macOS terminals, `muslisp` now uses a small vendored line editor for current-line editing, history, and wrapped multi-line input. Persistent history is stored at `~/.muesli_bt_history`, and `:clear` drops a pending multi-line buffer without leaving the REPL.
+
 ## ROS2 Release Baseline
 
 The current `v0.3.x` ROS2 release baseline is intentionally narrow:

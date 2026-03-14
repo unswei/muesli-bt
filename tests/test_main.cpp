@@ -17,6 +17,7 @@
 #include "bt/runtime_host.hpp"
 #include "bt/trace.hpp"
 #include "../src/compiled_eval.hpp"
+#include "../src/repl_support.hpp"
 #if MUESLI_BT_WITH_PYBULLET_INTEGRATION
 #include "pybullet/extension.hpp"
 #include "pybullet/racecar_demo.hpp"
@@ -140,6 +141,34 @@ std::string lisp_string_literal(const std::string& text) {
     }
     escaped.push_back('"');
     return escaped;
+}
+
+void test_repl_support_commands_and_history_path() {
+    using namespace muslisp::repl_support;
+
+    check(should_exit_repl(":q", true), "repl should exit on :q when buffer is empty");
+    check(should_exit_repl(":quit", true), "repl should exit on :quit when buffer is empty");
+    check(should_exit_repl(":exit", true), "repl should exit on :exit when buffer is empty");
+    check(!should_exit_repl(":q", false), "repl should not exit on :q with a pending buffer");
+    check(!should_exit_repl(":clear", true), "repl should not treat :clear as an exit command");
+    check(is_clear_command(":clear"), "repl should recognise :clear");
+    check(!is_clear_command(":q"), "repl should not treat :q as :clear");
+
+    const auto history_path = history_path_from_home("/tmp/muesli-home");
+    check(history_path.has_value(), "repl history path should exist for a non-empty HOME");
+    check(history_path.value() == std::filesystem::path("/tmp/muesli-home/.muesli_bt_history"),
+          "repl history path should append the fixed history filename");
+    check(!history_path_from_home("").has_value(), "repl history path should be absent for an empty HOME");
+}
+
+void test_repl_support_history_entry_normalisation() {
+    using namespace muslisp::repl_support;
+
+    check(normalise_history_entry("") == "", "empty repl history entry should stay empty");
+    check(normalise_history_entry("(+ 1 2)\n") == "(+ 1 2)", "single-line repl history entry should lose the final newline");
+    check(normalise_history_entry("(begin\n  1\n  2)\n") == "(begin\n  1\n  2)",
+          "multi-line repl history entry should keep internal newlines");
+    check(normalise_history_entry("\n") == "", "blank repl submissions should not be persisted in history");
 }
 
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
@@ -3789,6 +3818,8 @@ void test_ros2_cleanup_with_live_transport_peer() {
 int main() {
     const std::vector<std::pair<std::string, std::function<void()>>> tests = {
         {"reader basics", test_reader_basics},
+        {"repl support commands and history path", test_repl_support_commands_and_history_path},
+        {"repl support history entry normalisation", test_repl_support_history_entry_normalisation},
         {"environment shadowing", test_environment_shadowing},
         {"error hierarchy basics", test_error_hierarchy_basics},
         {"eval special forms and arithmetic", test_eval_special_forms_and_arithmetic},
