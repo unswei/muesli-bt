@@ -5,6 +5,18 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 
 ## [Unreleased]
 
+### Added
+- Added evaluator tail-position tracking coverage for `if`, `begin`, `let`, `cond`, closure calls, and explicit deep-recursion cases through `and` / `or`.
+- Added deep tail-recursion regression coverage for self recursion, mutual recursion, allocation pressure, and GC env-root stack behaviour.
+
+### Changed
+- Reorganised the Lisp evaluator into explicit internal dispatch/apply/sequence seams so tail-position handling is visible without changing the public evaluator API.
+- Lisp tail calls now run through an internal trampoline loop instead of recurring through the host C++ stack on the covered evaluator paths.
+- Tail-bounce GC polling now runs periodically during deep tail recursion instead of on every single bounce.
+
+### Fixed
+- Fixed GC env-root handling so duplicate env roots behave like a stack and temporary evaluator roots no longer unregister long-lived roots accidentally.
+
 ## [0.3.1] - 2026-03-14
 
 ### Added
