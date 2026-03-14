@@ -9,7 +9,7 @@ If you are new to the architecture, read [What Is muesli-bt](getting-oriented/wh
 - C++20 compiler (`clang++` or `g++`)
 - CMake 3.20+
 - Ninja
-- Python 3.11 (single environment for docs + `pybullet`)
+- Python 3.11 for the unified docs + `pybullet` environment (this can be provided by `uv` even if the host system Python is older)
 - `uv` (recommended for Python environment management)
 - Graphviz `dot` (required for rendering architecture/BT diagrams in docs)
 

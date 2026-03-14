@@ -35,7 +35,7 @@ Host obligations:
 Authoritative contract artefacts:
 
 - [runtime contract v1](docs/contracts/runtime-contract-v1.md)
-- [muesli-studio integration contract](docs/contracts/muesli-studio-integration.md)
+- [`muesli-studio`](https://github.com/unswei/muesli-studio) integration contract: [docs/contracts/muesli-studio-integration.md](docs/contracts/muesli-studio-integration.md)
 - [canonical event schema (`mbt.evt.v1`)](schemas/event_log/v1/mbt.evt.v1.schema.json)
 - [deterministic fixtures](tests/fixtures/mbt.evt.v1/) and [fixture bundles](fixtures/)
 
@@ -55,8 +55,9 @@ Runbook and checklist: [conformance levels](docs/contracts/conformance.md).
 OS notes:
 
 - macOS: `brew install cmake ninja python@3.11`
-- Ubuntu/Debian: `sudo apt update && sudo apt install -y cmake ninja-build g++ python3.11 python3.11-venv`
+- Ubuntu/Debian: `sudo apt update && sudo apt install -y cmake ninja-build g++ python3 python3-venv`
 - Core/no-ROS builds are supported on both Linux and macOS. ROS2 stays optional and Linux-only when enabled.
+- For docs + `pybullet`, use `uv` to provision Python `3.11` into `.venv-py311` even on hosts whose system Python is older.
 
 Build:
 
@@ -90,9 +91,22 @@ Additional runnable commands:
 ./build/dev/muslisp
 ```
 
+## ROS2 Release Baseline
+
+The `v0.3.0` release baseline for ROS2 is intentionally narrow:
+
+- supported host: Ubuntu 22.04 + ROS 2 Humble
+- attach path: `(env.attach "ros2")`
+- transport: `nav_msgs/msg/Odometry` in, `geometry_msgs/msg/Twist` out
+- package export: `muesli_bt::integration_ros2`
+- runner: `muslisp_ros2`
+- reset policy: live runs use `reset_mode="unsupported"`; `stub` remains for tests and harnesses
+
+Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md) for the boundary and live flow, then use [docs/integration/ros2-backend-scope.md](docs/integration/ros2-backend-scope.md) and [docs/contracts/conformance.md](docs/contracts/conformance.md) for the detailed commands and conformance lanes.
+
 ## muesli-studio integration
 
-`muesli-studio` is the inspector and tooling consumer for `muesli-bt` runtime data; this contract exists so integration behaviour stays stable and auditable across releases. The canonical runtime contract lives at [docs/contracts/runtime-contract-v1.md](docs/contracts/runtime-contract-v1.md), the Studio integration profile is [docs/contracts/muesli-studio-integration.md](docs/contracts/muesli-studio-integration.md), the authoritative event schema is [schemas/event_log/v1/mbt.evt.v1.schema.json](schemas/event_log/v1/mbt.evt.v1.schema.json), and deterministic fixtures are published under [tests/fixtures/mbt.evt.v1/](tests/fixtures/mbt.evt.v1/) and [fixtures/](fixtures/).
+[`muesli-studio`](https://github.com/unswei/muesli-studio) is the inspector and tooling consumer for `muesli-bt` runtime data. This contract exists so integration behaviour stays stable and auditable across releases. The canonical runtime contract lives at [docs/contracts/runtime-contract-v1.md](docs/contracts/runtime-contract-v1.md), the Studio integration profile is [docs/contracts/muesli-studio-integration.md](docs/contracts/muesli-studio-integration.md), the authoritative event schema is [schemas/event_log/v1/mbt.evt.v1.schema.json](schemas/event_log/v1/mbt.evt.v1.schema.json), and deterministic fixtures are published under [tests/fixtures/mbt.evt.v1/](tests/fixtures/mbt.evt.v1/) and [fixtures/](fixtures/).
 
 ```cmake
 find_package(muesli_bt CONFIG REQUIRED)
@@ -299,6 +313,7 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 - [`plan-action` node integration](docs/planning/plan-action-node.md)
 - [Integration overview](docs/integration/overview.md)
 - [`env.*` integration API](docs/integration/env-api.md)
+- [ROS2 tutorial](docs/integration/ros2-tutorial.md)
 - [VLA integration](docs/bt/vla-integration.md)
 - [VLA nodes reference](docs/bt/vla-nodes.md)
 - [VLA request/response schema](docs/bt/vla-request-response.md)

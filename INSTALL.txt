@@ -40,8 +40,11 @@ Enable Webots integration export:
 If the Webots SDK is not available, the runtime still builds/installs and
 `muesli_bt::integration_webots` is omitted.
 
-Enable ROS2 integration skeleton export:
+Enable ROS2 integration export (validated on Ubuntu 22.04 + ROS 2 Humble):
 - `-DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON`
+
+When enabled, the package exports `muesli_bt::integration_ros2` and builds the
+ROS2-enabled runner `muslisp_ros2`.
 
 3) consume with find_package
 ----------------------------

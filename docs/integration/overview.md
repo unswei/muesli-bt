@@ -10,7 +10,7 @@ muesli-bt logic runs inside a [host](../terminology.md#host) (backend). The back
 : Webots, PyBullet, or another simulator implements `env.observe`, `env.act`, `env.step`.
 
 2. ROS2 backend
-: backend maps ROS2 topics/actions/services into `env.*` and BT callbacks. Scope and phase gates are defined in [ROS2 backend scope](ros2-backend-scope.md).
+: backend maps ROS2 transport into `env.*` while keeping BT/runtime semantics in `muesli-bt`. Start with the [ROS2 tutorial](ros2-tutorial.md), then use [ROS2 backend scope](ros2-backend-scope.md) for the detailed plan and contract surface.
 
 3. Direct hardware backend
 : backend talks directly to drivers/SDKs without ROS.
@@ -29,6 +29,7 @@ This flow is the same whether execution is simulated time or physical robot time
 ## See Also
 
 - [Environment API (`env.*`)](env-api.md)
+- [ROS2 tutorial](ros2-tutorial.md)
 - [Writing A Backend](writing-a-backend.md)
 - [ROS2 Backend Scope](ros2-backend-scope.md)
 - [Sensing And Blackboard](sensing-and-blackboard.md)

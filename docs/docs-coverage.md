@@ -44,6 +44,7 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] BT integration -> [page](bt/robot-integration.md)
 - [x] Integration overview -> [page](integration/overview.md)
 - [x] Integration env API -> [page](integration/env-api.md)
+- [x] Integration ROS2 tutorial -> [page](integration/ros2-tutorial.md)
 - [x] Integration backend writing guide -> [page](integration/writing-a-backend.md)
 - [x] Integration ROS2 backend scope -> [page](integration/ros2-backend-scope.md)
 - [x] Integration sensing + blackboard -> [page](integration/sensing-and-blackboard.md)
