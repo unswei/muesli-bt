@@ -535,6 +535,79 @@ void test_tail_call_optimisation_smoke() {
           "tail mutual recursion should survive a deeper stack");
 }
 
+void test_tail_call_optimisation_deep_recursion() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+
+    value deep_self = eval_text(
+        "(begin "
+        "  (define (countdown-deep n) "
+        "    (if (= n 0) "
+        "        0 "
+        "        (countdown-deep (- n 1)))) "
+        "  (countdown-deep 20000))",
+        env);
+    check(is_integer(deep_self) && integer_value(deep_self) == 0, "deep tail self recursion should complete");
+
+    value deep_mutual = eval_text(
+        "(begin "
+        "  (define (even-deep n) "
+        "    (if (= n 0) "
+        "        #t "
+        "        (odd-deep (- n 1)))) "
+        "  (define (odd-deep n) "
+        "    (if (= n 0) "
+        "        #f "
+        "        (even-deep (- n 1)))) "
+        "  (even-deep 20000))",
+        env);
+    check(is_boolean(deep_mutual) && boolean_value(deep_mutual), "deep tail mutual recursion should complete");
+
+    value alloc_tail = eval_text(
+        "(begin "
+        "  (define (countdown-alloc n) "
+        "    (let ((tmp (list n n n n))) "
+        "      (if (= n 0) "
+        "          0 "
+        "          (countdown-alloc (- n 1))))) "
+        "  (countdown-alloc 6000))",
+        env);
+    check(is_integer(alloc_tail) && integer_value(alloc_tail) == 0,
+          "tail recursion under allocation pressure should complete");
+}
+
+void test_gc_env_root_stack_regression() {
+    using namespace muslisp;
+
+    env_ptr env_a = create_global_env();
+    try {
+        (void)eval_text("missing-symbol", env_a);
+        throw std::runtime_error("expected unbound symbol during env root regression setup");
+    } catch (const lisp_error&) {
+    }
+    try {
+        (void)eval_text("(1 2)", env_a);
+        throw std::runtime_error("expected non-function call during env root regression setup");
+    } catch (const lisp_error&) {
+    }
+
+    env_ptr env_b = create_global_env();
+    check(is_integer(eval_text("(+ 1 2 3 4)", env_b)), "env root regression setup should retain +");
+    default_gc().collect();
+    check(is_integer(eval_text("(* 2 3 4)", env_b)), "env root regression should retain * after collection");
+    default_gc().collect();
+
+    value branch = eval_text("(begin (define x 10) (if (> x 5) x 0))", env_b);
+    check(is_integer(branch) && integer_value(branch) == 10,
+          "global env root should survive nested begin/if evaluation");
+    default_gc().collect();
+
+    value begin_value = eval_text("(begin (define x 2) (define y 7) (+ x y))", env_b);
+    check(is_integer(begin_value) && integer_value(begin_value) == 9,
+          "global env root should survive repeated begin evaluation after collection");
+}
+
 void test_evaluator_error_messages_stable() {
     using namespace muslisp;
 
@@ -3632,6 +3705,8 @@ int main() {
         {"and/or forms", test_and_or_forms},
         {"evaluator tail-position readiness", test_evaluator_tail_position_readiness},
         {"tail-call optimisation smoke", test_tail_call_optimisation_smoke},
+        {"tail-call optimisation deep recursion", test_tail_call_optimisation_deep_recursion},
+        {"gc env root stack regression", test_gc_env_root_stack_regression},
         {"evaluator error messages stable", test_evaluator_error_messages_stable},
         {"bt authoring sugar", test_bt_authoring_sugar},
         {"load/write/save and roundtrip", test_load_write_save_and_roundtrip},
