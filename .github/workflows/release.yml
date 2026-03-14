@@ -165,7 +165,7 @@ jobs:
             muesli-bt-${{ steps.meta.outputs.tag }}-macos-arm64.tar.gz.sha256
           if-no-files-found: error
 
-  build-ubuntu-22.04-ros2-humble:
+  build-ubuntu-2204-ros2-humble:
     name: build-ubuntu-22.04-ros2-humble-x86_64
     runs-on: ubuntu-22.04
 
@@ -197,7 +197,9 @@ jobs:
           sudo add-apt-repository universe
           curl -fsSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
             | sudo gpg --dearmor -o /usr/share/keyrings/ros-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo \"$UBUNTU_CODENAME\") main" \
+          arch="$(dpkg --print-architecture)"
+          codename="$(. /etc/os-release && printf '%s' "$UBUNTU_CODENAME")"
+          echo "deb [arch=${arch} signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu ${codename} main" \
             | sudo tee /etc/apt/sources.list.d/ros2.list >/dev/null
           sudo apt-get update
           sudo apt-get install -y python3-colcon-common-extensions python3-rosdep python3-vcstool ros-dev-tools ros-humble-ros-base
@@ -281,7 +283,7 @@ jobs:
     needs:
       - build-ubuntu
       - build-macos-arm64
-      - build-ubuntu-22.04-ros2-humble
+      - build-ubuntu-2204-ros2-humble
 
     steps:
       - name: Checkout

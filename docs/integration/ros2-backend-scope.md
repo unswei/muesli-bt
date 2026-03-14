@@ -30,6 +30,7 @@ The first Linux transport bring-up is now implemented for:
 - ROS 2 Humble
 - `nav_msgs/msg/Odometry` observation input
 - `geometry_msgs/msg/Twist` action output
+- dedicated GitHub release packaging on Ubuntu 22.04 + Humble for the ROS-enabled artefact path in `v0.3.1`
 
 What is implemented today:
 
@@ -132,77 +133,75 @@ For the in-tree skeleton backend used before Linux bring-up:
 
 ### phased work plan
 
-Phases `0` to `5` are the work that should be completed before Linux/ROS2 transport is available.
+This page now tracks two kinds of ROS work:
 
-`phase 0: lock the integration boundary on paper`
+- completed baseline phases that led to the released `v0.3.x` ROS2 thin-adaptor surface
+- next ROS-focused phases that map onto the broader [roadmap to 1.0](../roadmap-to-1.0.md)
 
-- confirm `env.api.v1` is the only public semantic surface
-- confirm backend name `ros2`
-- confirm ROS2 remains optional and default-off
-- confirm canonical event output stays `mbt.evt.v1`
-- decide the initial reset policy and non-goals list
+`phases 0 to 7: baseline bring-up and release packaging`
 
-Deliverables:
+These phases are complete for the first released ROS2 baseline.
 
-- update this page
-- update [environment api (`env.api.v1`)](env-api.md)
-- update [writing a backend](writing-a-backend.md)
+- phase `0`: lock the integration boundary on paper
+- phase `1`: finalise canonical schemas and config surface
+- phase `2`: strengthen generic backend semantics in core tests
+- phase `3`: define deterministic fixtures before real ROS
+- phase `4`: review packaging and exports
+- phase `5`: draft Linux CI and `L2` job plan
+- phase `6`: implement the real Linux ROS2 backend
+- phase `7`: land `L2` conformance
 
-`phase 1: finalise canonical schemas and config surface`
+Delivered baseline:
 
-- formalise `ros2.obs.v1`
-- formalise `ros2.state.v1`
-- formalise `ros2.action.v1`
-- document required fields, optional fields, units, and examples
-- document action validation and fallback rules
-- document the minimal `env.configure` surface
+- `(env.attach "ros2")` remains the only public attach path
+- `env.info` exposes `backend_version`, `obs_schema`, `state_schema`, `action_schema`, reset policy, and capability metadata
+- the first live transport path is released for `Odometry` in and `Twist` out on Ubuntu 22.04 + Humble
+- Linux ROS-backed tests, rosbag-backed `L2`, install/export coverage, and consumer smoke all exist
+- `v0.3.1` adds a dedicated Ubuntu 22.04 + ROS 2 Humble release artefact for the ROS-enabled package path
 
-`phase 2: strengthen generic backend semantics in core tests`
+`phase 8: v0.4.0 observability parity`
 
-- cover `env.attach`, `env.configure`, `env.info`, `env.observe`, `env.act`, `env.step`, `env.reset`, and `env.run-loop`
-- cover invalid action payloads and safe fallback behaviour
-- cover deadline and reset-policy behaviour
-- keep this coverage in fast non-ROS test lanes
+- emit direct canonical `mbt.evt.v1` logs for ROS-backed runs instead of relying only on run-loop artefact JSONL
+- log and document the ROS time-source policy explicitly (`sim time` vs wall time)
+- provide one documented replay verification command that checks canonical log invariants for ROS-backed runs
 
-`phase 3: define deterministic fixtures before real ROS`
+Exit target:
 
-- define ROS2-shaped scenarios and expected counters/result maps
-- define expected canonical event classes and fixture summaries
-- keep fixture intent transport-agnostic until Linux implementation exists
+- a ROS-backed run emits validated canonical `mbt.evt.v1` output directly
+- replay verification checks event ordering, schema validity, and selected decision invariants
 
-`phase 4: review packaging and exports on macOS`
+`phase 9: v0.5.0 same BT, different IO transport`
 
-- verify `MUESLI_BT_BUILD_INTEGRATION_ROS2` naming
-- verify exported target `muesli_bt::integration_ros2`
-- define failure behaviour when the option is on but ROS2 dependencies are unavailable
-- document consumer attach flow
+- choose one canonical wheeled BT and reuse it across PyBullet, Webots, and ROS2
+- keep differences at attach/config and transport wiring only
+- add scripted checks that compare key behaviour or decision-trace invariants across the transports
 
-`phase 5: draft Linux CI and L2 job plan`
+Exit target:
 
-- choose the first supported distro matrix
-- define bootstrap steps and CMake flags
-- define artefacts and pass/fail conditions
-- keep true ROS2 gating in `L2`, not `L1`
+- the ROS2 thin adaptor is clearly a transport/backend surface, not a ROS-specific semantic fork
 
-`phase 6: implement the real Linux ROS2 backend`
+`phase 10: v0.6.0 host capability bundles at the ROS boundary`
 
-- create the backend state object
-- register the backend in `integrations/ros2/extension.cpp`
-- implement `env.attach`, `env.configure`, `env.info`, `env.observe`, `env.act`, `env.step`, and explicit reset behaviour
-- connect canonical event emission through existing host APIs
+- keep `env.*` as the direct transport surface
+- keep `planner.plan` as the in-runtime bounded decision planner
+- define host capability bundle rules for richer external services such as manipulation, navigation, and perception
+- document that higher-level ROS libraries such as MoveIt and Nav2 belong behind separate host capability contracts rather than inside core semantics
 
-Status:
+Exit target:
 
-- completed for the first `Odometry` / `Twist` transport path on Ubuntu 22.04 + Humble
-- completed for the first automated Linux-only `L2` replay corpus
-- explicit first-milestone reset decision is now locked: real reset stays unsupported, with `stub` reserved for tests and harnesses
-- still open for broader transport coverage and canonical event-stream parity
+- the split between `env.*`, `planner.plan`, and external host capability bundles is explicit in docs and examples
 
-`phase 7: land L2 conformance`
+`phase 11: v0.8.0 ROS-backed Isaac demo`
 
-- add rosbag-backed or equivalent deterministic replay evidence
-- validate counters, result maps, and canonical log behaviour
-- wire the suite into Linux-only `L2`
+- add one current Isaac Sim demo through ROS as a deployability and modern-simulator evidence point
+- keep Isaac outside core semantics and off the critical CI path unless it becomes cheap and reproducible
+
+`phase 12: v0.9.0 manipulation, perception, and MoveIt-backed proof`
+
+- treat MoveIt as the first concrete host capability bundle instance, specifically an arm-motion or goal-execution capability
+- add a usable perception path for the manipulator scenario rather than relying on hidden oracle state
+- preferred target: a bounded Towers of Hanoi arm demo if the simulator, MoveIt path, and perception stack stay reproducible
+- acceptable fallback: a simpler manipulator benchmark with the same host-capability split if Hanoi proves too heavy before `v1.0.0`
 
 ### acceptance criteria
 
