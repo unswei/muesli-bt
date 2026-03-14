@@ -5,6 +5,8 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-14
+
 ### Added
 - Added backend-specific `env.info` metadata support so optional integrations can expose schema ids, capability tags, and backend config without changing core BT semantics.
 - Added stronger generic ROS2 skeleton coverage for configuration validation, reset policy, canonical observation/action shapes, and invalid-action fallback behaviour.

@@ -68,6 +68,7 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] Testing and verification -> [page](testing.md)
 - [x] Changelog -> [page](changelog.md)
 - [x] Release notes index -> [page](releases/index.md)
+- [x] Release notes `v0.3.0` -> [page](releases/v0.3.0.md)
 - [x] Release notes `v0.2.0` -> [page](releases/v0.2.0.md)
 - [x] Release notes `v0.1.0` -> [page](releases/v0.1.0.md)
 - [x] TODO -> [page](todo.md)

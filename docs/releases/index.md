@@ -27,6 +27,7 @@ The changelog stays cumulative. Release notes stay tag-specific.
 
 Available release notes:
 
+- [v0.3.0](v0.3.0.md)
 - [v0.2.0](v0.2.0.md)
 - [v0.1.0](v0.1.0.md)
 
