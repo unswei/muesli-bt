@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <utility>
 
+#include "compiled_eval.hpp"
 #include "muslisp/env.hpp"
 #include "muslisp/error.hpp"
 
@@ -96,6 +97,7 @@ void object::gc_mark_children(gc& heap) {
                 heap.mark_value(expr);
             }
             heap.mark_env(closure_env_data);
+            compiled_closure_mark_children(closure_compiled_data, heap);
             break;
         case value_type::vec:
             for (value elem : vec_data) {
@@ -211,6 +213,7 @@ value make_closure(const std::vector<std::string>& params, const std::vector<val
     out->closure_params_data = params;
     out->closure_body_data = body;
     out->closure_env_data = captured_env;
+    out->closure_compiled_data = try_compile_closure(params, body);
     return out;
 }
 
@@ -451,6 +454,16 @@ const std::vector<value>& closure_body(value v) {
 env_ptr closure_env(value v) {
     require_type(v, value_type::closure, "closure_env");
     return v->closure_env_data;
+}
+
+const std::shared_ptr<compiled_closure>& closure_compiled(value v) {
+    require_type(v, value_type::closure, "closure_compiled");
+    return v->closure_compiled_data;
+}
+
+void set_closure_compiled(value v, std::shared_ptr<compiled_closure> compiled) {
+    require_type(v, value_type::closure, "set_closure_compiled");
+    v->closure_compiled_data = std::move(compiled);
 }
 
 std::int64_t bt_handle(value v) {

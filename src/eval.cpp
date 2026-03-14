@@ -1,5 +1,6 @@
 #include "muslisp/eval.hpp"
 
+#include "compiled_eval.hpp"
 #include <fstream>
 #include <list>
 #include <sstream>
@@ -653,6 +654,10 @@ eval_outcome apply_callable_in_position(value fn_value, const std::vector<value>
         if (params.size() != args.size()) {
             throw lisp_error("closure call: expected " + std::to_string(params.size()) + " arguments, got " +
                              std::to_string(args.size()));
+        }
+
+        if (closure_compiled(fn_value)) {
+            return make_eval_result(execute_compiled_closure(fn_value, args));
         }
 
         env_ptr call_scope = make_env(closure_env(fn_value));

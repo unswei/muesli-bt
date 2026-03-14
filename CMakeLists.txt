@@ -37,6 +37,7 @@ add_library(
   src/bt/trace.cpp
   src/bt/vla.cpp
   src/builtins.cpp
+  src/compiled_eval.cpp
   src/env.cpp
   src/env_api.cpp
   src/env_builtins.cpp

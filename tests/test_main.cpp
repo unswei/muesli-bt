@@ -16,6 +16,7 @@
 #include "bt/logging.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/trace.hpp"
+#include "../src/compiled_eval.hpp"
 #if MUESLI_BT_WITH_PYBULLET_INTEGRATION
 #include "pybullet/extension.hpp"
 #include "pybullet/racecar_demo.hpp"
@@ -575,6 +576,46 @@ void test_tail_call_optimisation_deep_recursion() {
         env);
     check(is_integer(alloc_tail) && integer_value(alloc_tail) == 0,
           "tail recursion under allocation pressure should complete");
+}
+
+void test_compiled_closure_path() {
+    using namespace muslisp;
+
+    env_ptr env = create_global_env();
+    (void)eval_text("(define offset 3)", env);
+
+    value supported = eval_text("(lambda (x) (let ((y (+ x 1))) (if (> y 0) (+ y offset) 0)))", env);
+    check(is_closure(supported), "supported compiled closure test should produce a closure");
+    check(static_cast<bool>(closure_compiled(supported)), "supported closure should compile");
+
+    value supported_result = invoke_callable(supported, {make_integer(4)});
+    check(is_integer(supported_result) && integer_value(supported_result) == 8,
+          "compiled closure should preserve let/local/global semantics");
+
+    value recursive = eval_text(
+        "(begin "
+        "  (define (countdown-vm n) "
+        "    (if (= n 0) "
+        "        0 "
+        "        (countdown-vm (- n 1)))) "
+        "  countdown-vm)",
+        env);
+    check(is_closure(recursive) && static_cast<bool>(closure_compiled(recursive)),
+          "simple recursive closure should compile");
+    value recursive_result = invoke_callable(recursive, {make_integer(5000)});
+    check(is_integer(recursive_result) && integer_value(recursive_result) == 0,
+          "compiled recursive closure should run correctly");
+
+    value unsupported_cond = eval_text("(lambda (x) (cond ((> x 0) x) (else 0)))", env);
+    check(is_closure(unsupported_cond), "unsupported cond test should produce a closure");
+    check(!closure_compiled(unsupported_cond), "unsupported closure should fall back to the evaluator");
+    value unsupported_result = invoke_callable(unsupported_cond, {make_integer(2)});
+    check(is_integer(unsupported_result) && integer_value(unsupported_result) == 2,
+          "unsupported closure fallback should preserve semantics");
+
+    value unsupported_nested = eval_text("(lambda (x) (lambda (y) (+ x y)))", env);
+    check(is_closure(unsupported_nested), "unsupported nested-lambda test should produce a closure");
+    check(!closure_compiled(unsupported_nested), "nested lambda should currently fall back to the evaluator");
 }
 
 void test_tail_call_optimisation_and_or() {
@@ -3760,6 +3801,7 @@ int main() {
         {"evaluator tail-position readiness", test_evaluator_tail_position_readiness},
         {"tail-call optimisation smoke", test_tail_call_optimisation_smoke},
         {"tail-call optimisation deep recursion", test_tail_call_optimisation_deep_recursion},
+        {"compiled closure path", test_compiled_closure_path},
         {"tail-call optimisation through and/or", test_tail_call_optimisation_and_or},
         {"gc env root stack regression", test_gc_env_root_stack_regression},
         {"gc duplicate env roots are stack-like", test_gc_duplicate_env_roots_are_stack_like},

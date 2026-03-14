@@ -13,6 +13,7 @@
 namespace muslisp {
 
 using primitive_fn = std::function<value(const std::vector<value>&)>;
+struct compiled_closure;
 
 enum class value_type {
     nil,
@@ -82,6 +83,7 @@ struct object final : gc_node {
     std::vector<std::string> closure_params_data;
     std::vector<value> closure_body_data;
     env_ptr closure_env_data = nullptr;
+    std::shared_ptr<compiled_closure> closure_compiled_data;
     std::vector<value> vec_data;
     map_storage map_data;
     std::vector<pq_entry> pq_data;
