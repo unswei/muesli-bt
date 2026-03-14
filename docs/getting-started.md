@@ -110,9 +110,9 @@ Notes:
 - `prm-2d-pq.lisp` uses a fixed seed and prints deterministic summary fields (`seed`, accepted nodes, edge count, `found`, path stats).
 - Step-by-step walkthroughs:
 
-  - [A* tutorial](examples/tutorials/a-star-step-by-step.md)
-  - [Dijkstra tutorial](examples/tutorials/dijkstra-step-by-step.md)
-  - [PRM tutorial](examples/tutorials/prm-step-by-step.md)
+    - [A* tutorial](examples/tutorials/a-star-step-by-step.md)
+    - [Dijkstra tutorial](examples/tutorials/dijkstra-step-by-step.md)
+    - [PRM tutorial](examples/tutorials/prm-step-by-step.md)
 
 `(load "path/to/file.lisp")` is also available inside the REPL for runtime loading.
 

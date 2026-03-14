@@ -264,9 +264,10 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 
 - composites:
 
-  - memoryless: `seq`, `sel`
-  - memoryful: `mem-seq`, `mem-sel`
-  - yielding/reactive: `async-seq`, `reactive-seq`, `reactive-sel`
+    - memoryless: `seq`, `sel`
+    - memoryful: `mem-seq`, `mem-sel`
+    - yielding/reactive: `async-seq`, `reactive-seq`, `reactive-sel`
+
 - decorators and leaves: `invert`, `repeat`, `retry`, `cond`, `act`, `succeed`, `fail`, `running`
 - compile/load/save paths (`bt.compile`, `bt.to-dsl`, `bt.save`, `bt.load`, `bt.save-dsl`, `bt.load-dsl`)
 - per-instance blackboard with typed values and write metadata
@@ -291,9 +292,10 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 
 - canonical backend-agnostic control surface:
 
-  - `env.info`, `env.attach`, `env.configure`
-  - `env.reset`, `env.observe`, `env.act`, `env.step`
-  - `env.run-loop`, `env.debug-draw`
+    - `env.info`, `env.attach`, `env.configure`
+    - `env.reset`, `env.observe`, `env.act`, `env.step`
+    - `env.run-loop`, `env.debug-draw`
+
 - backends are registered through explicit integration extensions (no legacy backend-specific Lisp namespaces)
 
 ### Observability and control
@@ -356,7 +358,8 @@ ctest --test-dir build/dev --output-on-failure
 - `examples/repl_scripts/`: end-to-end experiments and demos
 - `examples/pybullet_racecar/`: racecar demo package
 
-  - `native/`: demo bridge entrypoint that uses canonical `env.api.v1` via the PyBullet integration
+    - `native/`: demo bridge entrypoint that uses canonical `env.api.v1` via the PyBullet integration
+
 - `tests/`: unit/integration coverage
 - `docs/`: user and internals documentation
 

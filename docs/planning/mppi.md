@@ -15,8 +15,8 @@ It optimises a horizon action sequence by sampling noise, evaluating rollout cos
 - action dimension/bounds
 - rollout support via either:
 
-  - direct `rollout_cost(state, action_sequence)` (recommended), or
-  - repeated `step` with cheap state cloning
+    - direct `rollout_cost(state, action_sequence)` (recommended), or
+    - repeated `step` with cheap state cloning
 
 ## Request Config Block (`request.mppi`)
 

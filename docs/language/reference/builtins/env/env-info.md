@@ -11,13 +11,13 @@ Returns environment capability metadata for the fixed `env.*` interface.
 - Arguments: none
 - Return: map with fields:
 
-  - `api_version` (string, currently `"env.api.v1"`)
-  - `attached` (boolean)
-  - `backend` (string or `nil`)
-  - `backend_version` (string or `nil`)
-  - `supports` (map of booleans like `reset`, `debug_draw`, `headless`, `realtime_pacing`, `deterministic_seed`)
-  - optional `notes` (string)
-  - optional backend-specific metadata such as schema ids, reset policy, capability tags, or config
+    - `api_version` (string, currently `"env.api.v1"`)
+    - `attached` (boolean)
+    - `backend` (string or `nil`)
+    - `backend_version` (string or `nil`)
+    - `supports` (map of booleans like `reset`, `debug_draw`, `headless`, `realtime_pacing`, `deterministic_seed`)
+    - optional `notes` (string)
+    - optional backend-specific metadata such as schema ids, reset policy, capability tags, or config
 
 ## Errors And Edge Cases
 

@@ -39,8 +39,9 @@ What is implemented today:
 - `env.configure`, `env.info`, `env.observe`, `env.act`, and `env.step` against real ROS transport
 - explicit reset policy:
 
-  - default `reset_mode` is `unsupported`
-  - `reset_mode="stub"` is retained for deterministic harnesses and tests only
+    - default `reset_mode` is `unsupported`
+    - `reset_mode="stub"` is retained for deterministic harnesses and tests only
+
 - Linux ROS-backed tests, installed-package consumer smoke coverage, and live runner validation via `muslisp_ros2`
 - Linux `L2` replay corpus covering nominal replay, clamped actions, invalid-action fallback, and reset-unsupported artefacts
 
@@ -376,9 +377,9 @@ Required fields:
 - `t_ms`: integer timestamp in milliseconds
 - `u`: map with:
 
-  - `linear_x`
-  - `linear_y`
-  - `angular_z`
+    - `linear_x`
+    - `linear_y`
+    - `angular_z`
 
 For the first in-tree implementation, map-based action fields are the public contract. Dense vector actions are out of scope for the initial adapter.
 

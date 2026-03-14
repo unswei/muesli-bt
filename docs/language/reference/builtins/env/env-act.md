@@ -10,9 +10,10 @@ Submits the action for the next control tick.
 
 - Arguments: action map
 
-  - canonical form uses `action_schema`
-  - many backends also require `t_ms`
-  - payload shape under `u` is backend/schema specific
+    - canonical form uses `action_schema`
+    - many backends also require `t_ms`
+    - payload shape under `u` is backend/schema specific
+
 - Return: `nil`
 
 ## Errors And Edge Cases

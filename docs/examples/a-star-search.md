@@ -20,13 +20,15 @@ Step-by-step tutorial:
 - a deliberate non-PQ baseline open-set implementation (vector + best-node scan)
 - mutable container usage:
 
-  - `vec.make`, `vec.push!`, `vec.get`, `vec.set!`, `vec.pop!`
-  - `map.make`, `map.get`, `map.set!`, `map.has?`, `map.del!`
+    - `vec.make`, `vec.push!`, `vec.get`, `vec.set!`, `vec.pop!`
+    - `map.make`, `map.get`, `map.set!`, `map.has?`, `map.del!`
+
 - recursive control flow for:
 
-  - open-set best-node selection
-  - neighbour expansion
-  - path reconstruction
+    - open-set best-node selection
+    - neighbour expansion
+    - path reconstruction
+
 - Manhattan heuristic over a grid
 
 ## Core Ideas In The Script
@@ -35,8 +37,9 @@ Step-by-step tutorial:
 - Open set: vector of node ids plus a membership map.
 - Scores:
 
-  - `g`: best known cost-from-start
-  - `f = g + h`: A* priority score
+    - `g`: best known cost-from-start
+    - `f = g + h`: A* priority score
+
 - Parent links (`came`) allow goal-to-start backtracking and path reconstruction.
 
 ## Source

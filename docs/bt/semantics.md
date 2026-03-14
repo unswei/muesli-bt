@@ -146,8 +146,8 @@ Uses per-node counter memory.
 - child `running` -> `running`
 - child `success` increments counter
 
-  - if counter reaches `n`, returns `success`
-  - otherwise returns `running`
+    - if counter reaches `n`, returns `success`
+    - otherwise returns `running`
 
 `n == 0` returns `success` immediately.
 
@@ -160,8 +160,8 @@ Uses per-node retry counter.
 - child `running` -> `running`
 - child `failure` increments counter
 
-  - if counter `<= n`, returns `running` (retry next tick)
-  - else returns `failure`
+    - if counter `<= n`, returns `running` (retry next tick)
+    - else returns `failure`
 
 ## Leaf Semantics
 
