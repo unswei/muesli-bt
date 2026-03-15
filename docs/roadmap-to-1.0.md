@@ -125,6 +125,11 @@ Exit criteria:
 - docs explain which parts are deterministic, which parts are only bounded, and how to interpret replay failures
 - a tooling consumer can inspect a ROS-backed run through the same canonical log path used for simulator-backed runs
 
+Current status on `main`:
+
+- this milestone scope is now implemented on the rolling branch
+- the remaining work before a `v0.4.0` tag is release hygiene and one clean release-candidate validation pass, not more semantic/runtime design
+
 #### `v0.5.0`: same BT, different IO transport
 
 Focus:

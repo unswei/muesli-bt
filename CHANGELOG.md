@@ -20,6 +20,8 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - ROS-backed `env.run-loop` execution now emits direct canonical `mbt.evt.v1` logs through `event_log_path`, and the ROS `L2` replay/conformance artefacts now treat the canonical event log as the primary evidence stream.
 - Replay tooling now treats simulator fixtures and ROS-backed artefacts through the same canonical log path, using `events.jsonl` per artefact directory and allowing `tools/validate_log.py` to accept either a direct log file or an artefact directory.
 - `env.run-loop` canonical logs now emit `episode_begin`, `episode_end`, and `run_end` so long multi-episode experiments can be summarised from the canonical event stream directly.
+- ROS canonical `run_start` capabilities now carry the explicit ROS time-source policy (`time_source`, `use_sim_time`, `obs_timestamp_source`) through the same log path used for simulator-backed runs.
+- ROS `L2` replay/conformance checks and the Linux artefact verifier now expect the expanded canonical lifecycle (`episode_begin`, `episode_end`, `run_end`) instead of the older shorter event stream.
 - `load` now resolves nested relative paths from the directory of the file that issued the nested `load`, so multi-file Lisp examples work reliably outside the repository root.
 - Reorganised the Lisp evaluator into explicit internal dispatch/apply/sequence seams so tail-position handling is visible without changing the public evaluator API.
 - Lisp tail calls now run through an internal trampoline loop instead of recurring through the host C++ stack on the covered evaluator paths.
@@ -29,6 +31,8 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 
 ### Fixed
 - Fixed GC env-root handling so duplicate env roots behave like a stack and temporary evaluator roots no longer unregister long-lived roots accidentally.
+- Fixed ROS `env.configure` option validation so backend-specific runs accept canonical logging options such as `event_log_path` and `event_log_ring_size`.
+- Fixed the ROS `L2` C++ conformance helper to root decoded canonical event records correctly while parsing larger JSONL streams.
 
 ## [0.3.1] - 2026-03-14
 

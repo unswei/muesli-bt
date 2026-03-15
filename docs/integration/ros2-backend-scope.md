@@ -163,11 +163,15 @@ Delivered baseline:
 
 `phase 8: v0.4.0 observability parity`
 
-- emit direct canonical `mbt.evt.v1` logs for ROS-backed runs and treat them as the primary replay/conformance artefact
-- log and document the ROS time-source policy explicitly (`sim time` vs wall time)
-- provide one documented replay verification command that checks canonical log invariants for ROS-backed runs
+Delivered on `main`:
 
-Exit target:
+- ROS-backed runs now emit direct canonical `mbt.evt.v1` logs through `event_log_path`
+- ROS-backed replay and conformance now treat the canonical event log as the primary artefact
+- the ROS time-source policy is now logged and documented explicitly (`time_source`, `use_sim_time`, `obs_timestamp_source`)
+- `tools/verify_ros2_l2_artifacts.py` is now the documented replay verification command for the ROS `L2` artefact lane
+- long multi-episode runs now emit `episode_begin`, `episode_end`, and `run_end` in the canonical stream
+
+Delivered exit target:
 
 - a ROS-backed run emits validated canonical `mbt.evt.v1` output directly
 - replay verification checks event ordering, schema validity, and selected decision invariants

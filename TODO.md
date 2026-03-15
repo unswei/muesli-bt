@@ -5,11 +5,7 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 
 ## now
 
-- `v0.4.0`: emit direct canonical `mbt.evt.v1` logs for ROS-backed runs instead of relying on run-loop artefact JSONL
-- `v0.4.0`: add explicit canonical event-log assertions and a replay verification command for ROS-backed runs
-- `v0.4.0`: log and document ROS time-source policy (`sim time` vs wall time)
-- `v0.4.0`: make sure tooling and replay consumers can treat ROS-backed runs and simulator runs through the same canonical log path
-- `v0.4.0`: extend observability exports for long-running multi-episode experiments
+- `v0.4.0`: prepare the release-candidate pass and tag once the current canonical ROS replay/logging docs and Linux validation results are committed
 
 ## next
 
