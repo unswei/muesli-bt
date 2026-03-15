@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "bt/ast.hpp"
 #include "bt/blackboard.hpp"
@@ -78,6 +79,7 @@ struct instance {
 
     tree_profile_stats tree_stats{};
     std::unordered_map<node_id, node_profile_stats> node_stats;
+    std::vector<node_id> halt_stack;
 
     trace_buffer trace;
 };

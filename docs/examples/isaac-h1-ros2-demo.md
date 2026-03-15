@@ -33,7 +33,7 @@ This example is intentionally not a MoveIt or perception demo.
 
 The wiring is split into three layers.
 
-1. `muesli-bt` runs [`examples/isaac_h1_ros2_demo/lisp/main.lisp`](../../examples/isaac_h1_ros2_demo/lisp/main.lisp) through `muslisp_ros2`.
+1. `muesli-bt` runs `examples/isaac_h1_ros2_demo/lisp/main.lisp` through `muslisp_ros2`.
 2. The current `ros2` backend observes `/h1_01/odom` and publishes `/h1_01/cmd_vel`.
 3. Isaac Sim publishes odometry, joint state, and IMU data, while NVIDIA's `h1_fullbody_controller` node consumes `cmd_vel` and produces `joint_command`.
 

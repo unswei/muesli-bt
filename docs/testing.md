@@ -112,7 +112,7 @@ Summarise the latest benchmark result set:
 python3 bench/scripts/analyse_results.py
 ```
 
-See [`bench/README.md`](../bench/README.md) for the current catalogue and CLI overrides.
+See the repo-root `bench/README.md` for the current catalogue and CLI overrides.
 
 ## Integration Checks
 

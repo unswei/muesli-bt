@@ -146,6 +146,7 @@ nav:
       - Diagram Workflow: diagrams/diagrams.md
   - Internals:
       - Architecture: internals/architecture.md
+      - Runtime Performance: internals/runtime-performance.md
       - GC: internals/gc.md
       - Code Map: internals/code-map.md
       - Extending: internals/extending.md

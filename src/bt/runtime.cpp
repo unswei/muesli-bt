@@ -47,6 +47,33 @@ event_log* resolve_event_log(tick_context& ctx) {
     return ctx.svc.obs.events;
 }
 
+bool trace_capture_enabled(const tick_context& ctx) {
+    return ctx.inst.trace_enabled;
+}
+
+bool warning_observability_enabled(tick_context& ctx) {
+    return trace_capture_enabled(ctx) || ctx.svc.obs.logger != nullptr || resolve_event_log(ctx) != nullptr;
+}
+
+class halt_stack_scope {
+public:
+    explicit halt_stack_scope(instance& inst) : inst_(inst) {
+        stack_.swap(inst_.halt_stack);
+        stack_.clear();
+    }
+
+    ~halt_stack_scope() {
+        stack_.clear();
+        stack_.swap(inst_.halt_stack);
+    }
+
+    std::vector<node_id>& get() noexcept { return stack_; }
+
+private:
+    instance& inst_;
+    std::vector<node_id> stack_;
+};
+
 void emit_log(tick_context& ctx, log_level level, std::string category, std::string message);
 
 std::optional<double> tick_budget_ms(const tick_context& ctx) {
@@ -1700,6 +1727,9 @@ void remember_reactive_running_child(node_memory& mem, std::size_t child_index) 
 }
 
 void emit_node_halt(tick_context& ctx, node_id halted_node, std::string_view reason) {
+    if (!trace_capture_enabled(ctx)) {
+        return;
+    }
     trace_event ev = make_trace_event(trace_event_kind::node_halt);
     ev.node = halted_node;
     ev.message = std::string(reason);
@@ -1707,6 +1737,9 @@ void emit_node_halt(tick_context& ctx, node_id halted_node, std::string_view rea
 }
 
 void emit_node_preempt(tick_context& ctx, node_id from_node, node_id to_node, std::string_view reason) {
+    if (!trace_capture_enabled(ctx)) {
+        return;
+    }
     trace_event ev = make_trace_event(trace_event_kind::node_preempt);
     ev.node = from_node;
     ev.message = "to_node=" + std::to_string(to_node) + " reason=" + std::string(reason);
@@ -1714,14 +1747,20 @@ void emit_node_preempt(tick_context& ctx, node_id from_node, node_id to_node, st
 }
 
 void emit_unhaltable_warning_once(tick_context& ctx, node_id id, std::string_view message) {
+    if (!warning_observability_enabled(ctx)) {
+        return;
+    }
     if (!ctx.inst.halt_warning_emitted.insert(id).second) {
         return;
     }
-    trace_event ev = make_trace_event(trace_event_kind::warning);
-    ev.node = id;
-    ev.message = std::string(message);
-    emit_trace(ctx, std::move(ev));
-    emit_log(ctx, log_level::warn, "bt", std::string(message));
+    const std::string owned_message(message);
+    if (trace_capture_enabled(ctx)) {
+        trace_event ev = make_trace_event(trace_event_kind::warning);
+        ev.node = id;
+        ev.message = owned_message;
+        emit_trace(ctx, std::move(ev));
+    }
+    emit_log(ctx, log_level::warn, "bt", owned_message);
 }
 
 bool try_cancel_scheduler_leaf(tick_context& ctx, node_memory& mem, std::string_view reason) {
@@ -1752,7 +1791,8 @@ void halt_subtree_impl(tick_context& ctx, node_id root, std::string_view reason)
         return;
     }
 
-    std::vector<node_id> stack;
+    halt_stack_scope stack_scope(ctx.inst);
+    std::vector<node_id>& stack = stack_scope.get();
     stack.push_back(root);
     while (!stack.empty()) {
         const node_id id = stack.back();
@@ -1786,7 +1826,9 @@ void halt_subtree_impl(tick_context& ctx, node_id root, std::string_view reason)
             }
         }
 
-        ctx.inst.memory.erase(id);
+        if (mem_it != ctx.inst.memory.end()) {
+            mem_it->second = node_memory{};
+        }
         for (node_id child : n.children) {
             stack.push_back(child);
         }
