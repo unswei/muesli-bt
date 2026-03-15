@@ -3798,7 +3798,7 @@ void test_ros2_h1_demo_success_path() {
 
     check(std::filesystem::exists(demo_runtime), "expected H1 demo runtime script to exist");
 
-    std::thread publisher([&harness]() {
+    std::jthread publisher([&harness]() {
         if (!harness.wait_for_transport_ready(std::chrono::milliseconds(1500))) {
             return;
         }
@@ -3843,8 +3843,6 @@ void test_ros2_h1_demo_success_path() {
         "  (define demo-success (run-h1-demo demo-cfg)))";
     (void)eval_text(demo_script, env);
 
-    publisher.join();
-
     const std::string status = symbol_name(eval_text("(map.get (map.get demo-success 'result (map.make)) 'status ':none)", env));
     check(status == ":ok", "H1 demo success path should finish with :ok");
     check(integer_value(eval_text("(map.get (map.get demo-success 'runtime (map.make)) 'waypoint_index -1)", env)) == 2,
@@ -3884,7 +3882,7 @@ void test_ros2_h1_demo_timeout_stop() {
 
     check(std::filesystem::exists(demo_runtime), "expected H1 demo runtime script to exist");
 
-    std::thread publisher([&harness]() {
+    std::jthread publisher([&harness]() {
         if (!harness.wait_for_transport_ready(std::chrono::milliseconds(1500))) {
             return;
         }
@@ -3906,8 +3904,6 @@ void test_ros2_h1_demo_timeout_stop() {
         "    (list (make-waypoint \"forward\" 0.40 0.00 0.0))) "
         "  (define demo-timeout (run-h1-demo demo-cfg)))";
     (void)eval_text(demo_script, env);
-
-    publisher.join();
 
     const std::string status = symbol_name(eval_text("(map.get (map.get demo-timeout 'result (map.make)) 'status ':none)", env));
     check(status == ":stopped", "H1 demo timeout path should stop on max_ticks after issuing timeout stop commands");
