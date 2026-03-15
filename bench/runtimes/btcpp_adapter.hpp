@@ -2,17 +2,14 @@
 
 #include <filesystem>
 #include <memory>
-#include <unordered_map>
 
-#include "bt/instance.hpp"
-#include "bt/registry.hpp"
 #include "runtimes/runtime_adapter.hpp"
 
 namespace muesli_bt::bench {
 
-class muesli_adapter final : public runtime_adapter {
+class btcpp_adapter final : public runtime_adapter {
 public:
-    muesli_adapter();
+    btcpp_adapter();
 
     std::string name() const override;
     std::string version() const override;
@@ -35,15 +32,6 @@ private:
     class compiled_tree_impl;
     class instance_impl;
     class lifecycle_case_impl;
-
-    bt::registry* registry() noexcept;
-    const bt::registry* registry() const noexcept;
-    instance_impl& state_for(bt::instance& instance) const;
-    const instance_impl& state_for(const bt::instance& instance) const;
-    void register_callbacks();
-
-    std::unique_ptr<bt::registry> registry_;
-    mutable std::unordered_map<const bt::instance*, instance_impl*> instance_index_;
 };
 
 }  // namespace muesli_bt::bench

@@ -131,6 +131,17 @@ def b1_slope(rows_by_id: dict[str, dict[str, str]], family: str) -> tuple[float,
     return small_latency, large_latency, slope
 
 
+def b5_phase_rows(
+    rows_by_id: dict[str, dict[str, str]], variant: str
+) -> list[tuple[int, dict[str, str]]]:
+    rows: list[tuple[int, dict[str, str]]] = []
+    for size in (31, 255, 1023):
+        row = rows_by_id.get(f"B5-alt-{size}-{variant}-off")
+        if row is not None:
+            rows.append((size, row))
+    return rows
+
+
 def available_rows(rows: Iterable[dict[str, str]], prefix: str) -> list[dict[str, str]]:
     return [row for row in rows if row.get("scenario_id", "").startswith(prefix)]
 
@@ -176,10 +187,13 @@ def print_report(result_dir: Path) -> int:
     print()
 
     print("correctness")
-    print(
-        f"- semantic error runs: {semantic_error_runs} across "
-        f"{semantic_error_scenarios} scenario(s)"
-    )
+    if semantic_error_runs == 0:
+        print("- no semantic-error runs")
+    else:
+        print(
+            f"- semantic-error runs: {semantic_error_runs} across "
+            f"{semantic_error_scenarios} affected scenario(s)"
+        )
     print()
 
     print("baseline and scaling")
@@ -207,6 +221,49 @@ def print_report(result_dir: Path) -> int:
             f"{format_latency_ns(scenario_metric(a2, 'latency_ns_p999_of_runs'))} p99.9, "
             f"ratio {format_ratio(scenario_metric(a2, 'jitter_ratio_p99_over_median_of_runs'))}"
         )
+    print()
+
+    print("compile and instantiation")
+    b5_phase_labels = (
+        ("parse", "parse DSL"),
+        ("compile", "compile BT"),
+        ("inst1", "instantiate 1"),
+        ("inst100", "instantiate 100"),
+        ("loadbin", "load binary"),
+        ("loaddsl", "load DSL"),
+    )
+    printed_b5 = False
+    for variant, label in b5_phase_labels:
+        phase_rows = b5_phase_rows(rows_by_id, variant)
+        if not phase_rows:
+            continue
+        printed_b5 = True
+        if variant == "inst100":
+            total_parts = []
+            per_instance_parts = []
+            for size, row in phase_rows:
+                total_latency = scenario_metric(row, "latency_ns_median_of_medians")
+                if total_latency is None:
+                    continue
+                total_parts.append(f"{size} nodes {format_latency_ns(total_latency)}")
+                per_instance_parts.append(f"{size} nodes {format_latency_ns(total_latency / 100.0)}")
+            if total_parts:
+                print(
+                    f"- {label}: total {', '.join(total_parts)}; "
+                    f"per instance {', '.join(per_instance_parts)}"
+                )
+            continue
+
+        parts = []
+        for size, row in phase_rows:
+            latency = scenario_metric(row, "latency_ns_median_of_medians")
+            if latency is None:
+                continue
+            parts.append(f"{size} nodes {format_latency_ns(latency)}")
+        if parts:
+            print(f"- {label}: {', '.join(parts)}")
+    if not printed_b5:
+        print("- no B5 scenarios present in this result set")
     print()
 
     print("reactive interruption")

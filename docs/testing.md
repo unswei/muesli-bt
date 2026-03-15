@@ -90,6 +90,13 @@ cmake --preset bench-release
 cmake --build --preset bench-release -j
 ```
 
+Build with optional `BehaviorTree.CPP` `4.9.0` comparison support:
+
+```bash
+cmake --preset bench-release-btcpp
+cmake --build --preset bench-release-btcpp -j
+```
+
 List or run scenarios:
 
 ```bash
@@ -97,6 +104,12 @@ List or run scenarios:
 ./build/bench-release/bench/bench run A1-single-leaf-off
 ./build/bench-release/bench/bench run-group B1
 ./build/bench-release/bench/bench run A2-alt-255-jitter-off
+```
+
+Run the comparable subset against `BehaviorTree.CPP`:
+
+```bash
+./build/bench-release-btcpp/bench/bench run-all --runtime btcpp
 ```
 
 The first milestone writes:
@@ -115,6 +128,16 @@ Current harness coverage includes:
 - `B5` parse, compile, load, and instantiate cost
 - `B6` logging overhead
 
+For `BehaviorTree.CPP`, the harness currently covers:
+
+- `A1` single-leaf baseline
+- `A2` scheduler jitter
+- `B1` static tick overhead
+- `B2` reactive interruption
+- `B5` `compile`, `inst1`, `inst100`, and `loaddsl`
+
+`B6`, `B5 parse`, and `B5 loadbin` are intentionally omitted from the cross-runtime run because they are not a fair shared subset.
+
 Run one `B5` phase benchmark:
 
 ```bash
@@ -128,6 +151,9 @@ Summarise the latest benchmark result set:
 ```bash
 python3 bench/scripts/analyse_results.py
 ```
+
+The analysis summary reports `A1`, `A2`, `B1`, `B2`, `B5`, and `B6` when those rows are present.
+That same summary works for the optional `btcpp` result sets; absent groups are reported as absent rather than treated as failures.
 
 See the repo-root `bench/README.md` for the current catalogue and CLI overrides.
 

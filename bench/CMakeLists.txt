@@ -21,6 +21,37 @@ if (DEFINED CMAKE_CXX_FLAGS_${_muesli_bt_bench_build_type_upper})
 endif ()
 string(STRIP "${_muesli_bt_bench_build_flags}" _muesli_bt_bench_build_flags)
 
+set(_muesli_bt_bench_btcpp_version "")
+set(_muesli_bt_bench_btcpp_commit "")
+set(_muesli_bt_bench_with_btcpp 0)
+
+if (MUESLI_BT_BENCH_WITH_BTCPP)
+  include(FetchContent)
+
+  set(_muesli_bt_bench_btcpp_version "4.9.0")
+  set(_muesli_bt_bench_btcpp_commit "3ff6a32ba0497a08519c77a1436e3b81eff1bcd6")
+  set(_muesli_bt_bench_with_btcpp 1)
+
+  set(BTCPP_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+  set(BTCPP_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
+  set(BTCPP_GROOT_INTERFACE OFF CACHE BOOL "" FORCE)
+  set(BTCPP_SQLITE_LOGGING OFF CACHE BOOL "" FORCE)
+  set(USE_VENDORED_CPPZMQ ON CACHE BOOL "" FORCE)
+  set(USE_VENDORED_FLATBUFFERS ON CACHE BOOL "" FORCE)
+  set(USE_VENDORED_MINICORO ON CACHE BOOL "" FORCE)
+  set(USE_VENDORED_MINITRACE ON CACHE BOOL "" FORCE)
+  set(USE_VENDORED_TINYXML2 ON CACHE BOOL "" FORCE)
+
+  FetchContent_Declare(
+    behaviortree_cpp
+    GIT_REPOSITORY https://github.com/BehaviorTree/BehaviorTree.CPP.git
+    GIT_TAG ${_muesli_bt_bench_btcpp_commit}
+    GIT_SHALLOW TRUE
+  )
+  FetchContent_MakeAvailable(behaviortree_cpp)
+endif ()
+
 if (NOT CMAKE_BUILD_TYPE STREQUAL "Release")
   message(WARNING "MUESLI_BT_BUILD_BENCHMARKS is intended for Release builds. Current build type: ${_muesli_bt_bench_build_type}")
 endif ()
@@ -45,7 +76,14 @@ add_library(
   runtimes/muesli_adapter.cpp
 )
 
+if (MUESLI_BT_BENCH_WITH_BTCPP)
+  target_sources(muesli_bt_bench_harness PRIVATE runtimes/btcpp_adapter.cpp)
+endif ()
+
 target_link_libraries(muesli_bt_bench_harness PUBLIC muesli_bt_core)
+if (MUESLI_BT_BENCH_WITH_BTCPP)
+  target_link_libraries(muesli_bt_bench_harness PUBLIC behaviortree_cpp)
+endif ()
 target_include_directories(
   muesli_bt_bench_harness
   PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}"

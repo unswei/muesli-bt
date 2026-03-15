@@ -401,6 +401,11 @@ std::string muesli_adapter::commit() const {
     return MUESLI_BT_BENCH_GIT_COMMIT;
 }
 
+bool muesli_adapter::supports_scenario(const scenario_definition& scenario) const {
+    (void)scenario;
+    return true;
+}
+
 std::unique_ptr<runtime_adapter::compiled_tree> muesli_adapter::compile_tree(const tree_fixture& fixture) {
     bt::definition definition;
     definition.nodes.reserve(fixture.node_count);

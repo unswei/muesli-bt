@@ -43,6 +43,7 @@ Use this page to find where to implement specific changes.
 - `tests/test_main.cpp` (coverage)
 - `bench/main.cpp` (benchmark CLI)
 - `bench/fixtures/source_factory.cpp` (benchmark DSL source generation for `B5`)
+- `bench/runtimes/btcpp_adapter.cpp` (optional `BehaviorTree.CPP` benchmark adapter)
 - `bench/scripts/analyse_results.py` (benchmark result summary)
 - `docs/internals/runtime-performance.md` (benchmark-driven runtime tuning note)
 

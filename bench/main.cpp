@@ -10,9 +10,9 @@ namespace {
 void print_usage() {
     std::cout << "usage:\n"
               << "  bench list\n"
-              << "  bench run <scenario-id> [--output-dir DIR] [--warmup-ms N] [--run-ms N] [--repetitions N] [--seed N]\n"
-              << "  bench run-group <group-id> [--output-dir DIR] [--warmup-ms N] [--run-ms N] [--repetitions N] [--seed N]\n"
-              << "  bench run-all [--output-dir DIR] [--warmup-ms N] [--run-ms N] [--repetitions N] [--seed N]\n";
+              << "  bench run <scenario-id> [--runtime NAME] [--output-dir DIR] [--warmup-ms N] [--run-ms N] [--repetitions N] [--seed N]\n"
+              << "  bench run-group <group-id> [--runtime NAME] [--output-dir DIR] [--warmup-ms N] [--run-ms N] [--repetitions N] [--seed N]\n"
+              << "  bench run-all [--runtime NAME] [--output-dir DIR] [--warmup-ms N] [--run-ms N] [--repetitions N] [--seed N]\n";
 }
 
 std::string require_value(const std::vector<std::string>& args, std::size_t& index, const std::string& option) {

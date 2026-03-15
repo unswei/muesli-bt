@@ -13,7 +13,12 @@ The current milestone covers:
 - `B5` parse, compile, load, and instantiate cost
 - `B6` logging overhead for one static and one reactive scenario
 
-The harness currently runs the native `muesli-bt` runtime through a small adapter layer. The layout leaves room for later `BehaviorTree.CPP` support without mixing benchmark code into `src/` or `tests/`.
+The harness currently supports:
+
+- native `muesli-bt`
+- optional `BehaviorTree.CPP` comparison runs, pinned to `4.9.0`
+
+The comparison runtime is limited to the shared subset for `A1`, `A2`, `B1`, `B2`, and the comparable `B5` phases (`compile`, `inst1`, `inst100`, `loaddsl`). `B6` remains `muesli-bt` only.
 
 ## when to use it
 
@@ -57,11 +62,26 @@ cmake --preset bench-release
 cmake --build --preset bench-release -j
 ```
 
+Build with the optional `BehaviorTree.CPP` adapter:
+
+```bash
+cmake --preset bench-release-btcpp
+cmake --build --preset bench-release-btcpp -j
+```
+
 List scenarios:
 
 ```bash
 ./build/bench-release/bench/bench list
 ```
+
+Run the comparison subset against `BehaviorTree.CPP`:
+
+```bash
+./build/bench-release-btcpp/bench/bench run-all --runtime btcpp
+```
+
+Unsupported scenarios are skipped automatically for the selected runtime. For `btcpp`, that means `B6`, `B5` `parse`, and `B5` `loadbin` are omitted.
 
 The CLI prints one line at the start of the suite and one line at the start of each scenario. These messages are emitted before timing begins.
 
@@ -75,6 +95,12 @@ Run one group:
 
 ```bash
 ./build/bench-release/bench/bench run-group B1
+```
+
+Run one group against `BehaviorTree.CPP`:
+
+```bash
+./build/bench-release-btcpp/bench/bench run-group B1 --runtime btcpp
 ```
 
 Run one compile/load scenario:
@@ -96,6 +122,8 @@ python3 bench/scripts/analyse_results.py bench/results/20260314T234021Z
 ```
 
 If you omit the path, the script picks the latest result directory under `bench/results/`.
+The summary currently covers `A1`, `A2`, `B1`, `B2`, `B5`, and `B6`.
+The same script also summarises `BehaviorTree.CPP` result sets; unsupported groups simply report as absent.
 
 Fast local iteration:
 
@@ -109,6 +137,12 @@ Write results into a fixed output directory:
 
 ```bash
 ./build/bench-release/bench/bench run-group B1 --output-dir bench/results/static-sample
+```
+
+Write a comparison run into a dedicated directory:
+
+```bash
+./build/bench-release-btcpp/bench/bench run-all --runtime btcpp --output-dir bench/results/btcpp-full-run
 ```
 
 The output directory will contain:
@@ -138,10 +172,12 @@ python3 bench/scripts/analyse_results.py
 ## gotchas
 
 - Use the `bench-release` preset. Debug builds distort the numbers.
+- Use `bench-release-btcpp` when you want the optional `BehaviorTree.CPP` adapter. The default `bench-release` preset does not include that runtime.
 - `B1` selector and alternating fixtures force deterministic full traversal with trivial success/failure leaves. This keeps tree size meaningful without changing BT semantics.
 - `A2` writes one row per tick. That file can become large on fast machines.
 - `B5` writes per-phase latency into the same CSV schema as the tick benchmarks. Read those rows as lifecycle operations, not executor ticks.
 - `B6` full-trace rows currently measure capture overhead with deferred serialisation, not forced inline file output.
+- `BehaviorTree.CPP` comparison runs are pinned to release `4.9.0` and the common semantic subset. Do not treat skipped groups as missing data bugs.
 
 ## see also
 

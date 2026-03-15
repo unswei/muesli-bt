@@ -75,11 +75,20 @@ cmake --build --preset bench-release -j
 ./build/bench-release/bench/bench run A1-single-leaf-off
 ```
 
+Optional benchmark harness with `BehaviorTree.CPP` `4.9.0` pinned for comparison:
+
+```bash
+cmake --preset bench-release-btcpp
+cmake --build --preset bench-release-btcpp -j
+./build/bench-release-btcpp/bench/bench run-all --runtime btcpp
+```
+
 The benchmark harness lives under [`bench/README.md`](bench/README.md) and writes CSV outputs into `bench/results/` by default.
 Each benchmark session writes `run_summary.csv`, `aggregate_summary.csv`, and `environment_metadata.csv`.
 Summarise the latest benchmark session with `python3 bench/scripts/analyse_results.py`.
 Current benchmark coverage includes `A1`, `A2`, `B1`, `B2`, `B5`, and `B6`.
 The current `B6` trace path uses deferred event-log serialisation when no file sink is enabled, while still reporting canonical event sizes.
+The optional `btcpp` runtime covers `A1`, `A2`, `B1`, `B2`, and the comparable `B5` phases (`compile`, `inst1`, `inst100`, `loaddsl`). `B6` remains `muesli-bt` only.
 
 Run the visual PyBullet racecar demo:
 

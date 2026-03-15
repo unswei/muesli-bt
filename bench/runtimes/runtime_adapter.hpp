@@ -63,6 +63,7 @@ public:
     virtual std::string name() const = 0;
     virtual std::string version() const = 0;
     virtual std::string commit() const = 0;
+    virtual bool supports_scenario(const scenario_definition& scenario) const = 0;
     virtual std::unique_ptr<compiled_tree> compile_tree(const tree_fixture& fixture) = 0;
     virtual std::unique_ptr<lifecycle_case> new_lifecycle_case(const tree_fixture& fixture,
                                                                const scenario_definition& scenario,

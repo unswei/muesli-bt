@@ -19,6 +19,7 @@ option(MUESLI_BT_BUILD_INTEGRATION_PYBULLET "Build the PyBullet integration libr
 option(MUESLI_BT_BUILD_INTEGRATION_WEBOTS "Build the Webots integration library" ON)
 option(MUESLI_BT_BUILD_INTEGRATION_ROS2 "Build the ROS2 integration library" OFF)
 option(MUESLI_BT_BUILD_BENCHMARKS "Build the optional benchmark harness" OFF)
+option(MUESLI_BT_BENCH_WITH_BTCPP "Build the optional BehaviorTree.CPP benchmark adapter" OFF)
 
 add_library(
   muesli_bt_core

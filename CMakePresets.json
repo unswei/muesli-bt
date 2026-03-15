@@ -52,6 +52,22 @@
         "MUESLI_BT_BUILD_PYTHON_BRIDGE": "OFF",
         "MUESLI_BT_BUILD_WEBOTS_EXAMPLES": "OFF"
       }
+    },
+    {
+      "name": "bench-release-btcpp",
+      "displayName": "Benchmark Release (BT.CPP)",
+      "inherits": "bench-release",
+      "binaryDir": "${sourceDir}/build/bench-release-btcpp",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "MUESLI_BT_BUILD_BENCHMARKS": "ON",
+        "MUESLI_BT_BENCH_WITH_BTCPP": "ON",
+        "MUESLI_BT_BUILD_INTEGRATION_ROS2": "OFF",
+        "MUESLI_BT_BUILD_INTEGRATION_PYBULLET": "OFF",
+        "MUESLI_BT_BUILD_INTEGRATION_WEBOTS": "OFF",
+        "MUESLI_BT_BUILD_PYTHON_BRIDGE": "OFF",
+        "MUESLI_BT_BUILD_WEBOTS_EXAMPLES": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -70,6 +86,10 @@
     {
       "name": "bench-release",
       "configurePreset": "bench-release"
+    },
+    {
+      "name": "bench-release-btcpp",
+      "configurePreset": "bench-release-btcpp"
     }
   ],
   "testPresets": [
@@ -90,6 +110,13 @@
     {
       "name": "bench-release",
       "configurePreset": "bench-release",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "bench-release-btcpp",
+      "configurePreset": "bench-release-btcpp",
       "output": {
         "outputOnFailure": true
       }

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "bench_config.hpp"
 #include "harness/runner.hpp"
 
 namespace {
@@ -157,6 +158,89 @@ void test_b5_lifecycle_benchmarks_run() {
     check(inst100_row.ticks_total == 100u, "B5 inst100 phase should report 100 operations");
 }
 
+#if MUESLI_BT_BENCH_WITH_BTCPP
+void test_btcpp_runner_writes_expected_csv_files() {
+    using namespace muesli_bt::bench;
+
+    const std::filesystem::path output_dir =
+        std::filesystem::temp_directory_path() / "muesli_bt_bench_btcpp_smoke";
+    std::filesystem::remove_all(output_dir);
+
+    run_request request;
+    request.runtime_name = "btcpp";
+    request.output_dir = output_dir;
+    request.scenarios.push_back(*find_scenario("A1-single-leaf-off"));
+    request.warmup_override = std::chrono::milliseconds(5);
+    request.run_override = std::chrono::milliseconds(10);
+    request.repetitions_override = 1u;
+
+    benchmark_runner runner;
+    const run_result result = runner.run(request);
+
+    check(std::filesystem::exists(result.output_dir / "run_summary.csv"), "btcpp run_summary.csv was not written");
+    check(std::filesystem::exists(result.output_dir / "aggregate_summary.csv"),
+          "btcpp aggregate_summary.csv was not written");
+    check(std::filesystem::exists(result.output_dir / "environment_metadata.csv"),
+          "btcpp environment_metadata.csv was not written");
+
+    check(result.run_rows.size() == 1u, "expected one btcpp run row");
+    check(result.run_rows.front().runtime_name == "BehaviorTree.CPP", "unexpected btcpp runtime name");
+    check(result.run_rows.front().latency_ns_median > 0u, "btcpp latency should be recorded");
+
+    const std::string environment_metadata = read_text(result.output_dir / "environment_metadata.csv");
+    check(environment_metadata.find("BehaviorTree.CPP") != std::string::npos,
+          "btcpp environment metadata missing runtime name");
+}
+
+void test_btcpp_reactive_and_b5_benchmarks_run() {
+    using namespace muesli_bt::bench;
+
+    const std::filesystem::path output_dir =
+        std::filesystem::temp_directory_path() / "muesli_bt_bench_btcpp_mix";
+    std::filesystem::remove_all(output_dir);
+
+    run_request request;
+    request.runtime_name = "btcpp";
+    request.output_dir = output_dir;
+    request.scenarios.push_back(*find_scenario("B2-reactive-31-flip20-off"));
+    request.scenarios.push_back(*find_scenario("B5-alt-31-compile-off"));
+    request.warmup_override = std::chrono::milliseconds(5);
+    request.run_override = std::chrono::milliseconds(10);
+    request.repetitions_override = 1u;
+
+    benchmark_runner runner;
+    const run_result result = runner.run(request);
+
+    check(result.run_rows.size() == 2u, "expected btcpp B2+B5 run rows");
+    check(result.aggregate_rows.size() == 2u, "expected btcpp B2+B5 aggregate rows");
+    check(result.run_rows.front().runtime_name == "BehaviorTree.CPP", "btcpp rows should record runtime name");
+    check(result.run_rows.front().semantic_errors == 0u, "btcpp reactive smoke should be semantically clean");
+    check(result.run_rows.back().scenario_id == "B5-alt-31-compile-off", "unexpected btcpp B5 scenario id");
+    check(result.run_rows.back().latency_ns_median > 0u, "btcpp B5 compile latency should be recorded");
+}
+
+void test_btcpp_rejects_unsupported_b6() {
+    using namespace muesli_bt::bench;
+
+    run_request request;
+    request.runtime_name = "btcpp";
+    request.output_dir = std::filesystem::temp_directory_path() / "muesli_bt_bench_btcpp_reject";
+    request.scenarios.push_back(*find_scenario("B6-alt-31-base-fulltrace"));
+    request.warmup_override = std::chrono::milliseconds(5);
+    request.run_override = std::chrono::milliseconds(10);
+    request.repetitions_override = 1u;
+
+    benchmark_runner runner;
+    bool threw = false;
+    try {
+        (void)runner.run(request);
+    } catch (const std::invalid_argument& error) {
+        threw = std::string(error.what()).find("no scenarios supported by runtime btcpp") != std::string::npos;
+    }
+    check(threw, "btcpp should reject unsupported B6 scenarios");
+}
+#endif
+
 }  // namespace
 
 int main() {
@@ -166,5 +250,10 @@ int main() {
     test_jitter_trace_is_written_for_a2();
     test_runner_emits_progress_events();
     test_b5_lifecycle_benchmarks_run();
+#if MUESLI_BT_BENCH_WITH_BTCPP
+    test_btcpp_runner_writes_expected_csv_files();
+    test_btcpp_reactive_and_b5_benchmarks_run();
+    test_btcpp_rejects_unsupported_b6();
+#endif
     return 0;
 }

@@ -10,8 +10,12 @@
 #include "harness/allocation_tracker.hpp"
 #include "harness/metadata.hpp"
 #include "harness/stats.hpp"
+#include "bench_config.hpp"
 #include "fixtures/tree_factory.hpp"
 #include "runtimes/muesli_adapter.hpp"
+#if MUESLI_BT_BENCH_WITH_BTCPP
+#include "runtimes/btcpp_adapter.hpp"
+#endif
 
 namespace muesli_bt::bench {
 namespace {
@@ -152,6 +156,11 @@ std::unique_ptr<runtime_adapter> make_runtime_adapter(const std::string& runtime
     if (runtime_name == "muesli") {
         return std::make_unique<muesli_adapter>();
     }
+#if MUESLI_BT_BENCH_WITH_BTCPP
+    if (runtime_name == "btcpp") {
+        return std::make_unique<btcpp_adapter>();
+    }
+#endif
     throw std::invalid_argument("unsupported benchmark runtime: " + runtime_name);
 }
 
@@ -319,16 +328,22 @@ run_result benchmark_runner::run(const run_request& request) const {
         throw std::invalid_argument("benchmark runner: no scenarios selected");
     }
 
+    std::unique_ptr<runtime_adapter> adapter = make_runtime_adapter(request.runtime_name);
+
     std::vector<scenario_definition> scenarios;
     scenarios.reserve(request.scenarios.size());
     std::chrono::milliseconds total_expected_duration{0};
     for (const scenario_definition& scenario_base : request.scenarios) {
         scenario_definition scenario = apply_overrides(scenario_base, request);
+        if (!adapter->supports_scenario(scenario)) {
+            continue;
+        }
         total_expected_duration += expected_duration_for(scenario);
         scenarios.push_back(std::move(scenario));
     }
-
-    std::unique_ptr<runtime_adapter> adapter = make_runtime_adapter(request.runtime_name);
+    if (scenarios.empty()) {
+        throw std::invalid_argument("benchmark runner: no scenarios supported by runtime " + request.runtime_name);
+    }
     environment_info environment = collect_environment();
     environment.runtime_name = adapter->name();
     environment.runtime_version = adapter->version();

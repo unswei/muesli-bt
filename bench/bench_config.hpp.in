@@ -7,3 +7,6 @@
 #define MUESLI_BT_BENCH_COMPILER_VERSION "@CMAKE_CXX_COMPILER_VERSION@"
 #define MUESLI_BT_BENCH_BUILD_TYPE "@_muesli_bt_bench_build_type@"
 #define MUESLI_BT_BENCH_BUILD_FLAGS "@_muesli_bt_bench_build_flags@"
+#define MUESLI_BT_BENCH_WITH_BTCPP @_muesli_bt_bench_with_btcpp@
+#define MUESLI_BT_BENCH_BTCPP_VERSION "@_muesli_bt_bench_btcpp_version@"
+#define MUESLI_BT_BENCH_BTCPP_COMMIT "@_muesli_bt_bench_btcpp_commit@"
