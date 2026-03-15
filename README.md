@@ -9,6 +9,8 @@ A compact Lisp runtime with an integrated Behaviour Tree engine, bounded-time pl
 
 `muslisp` is the executable. `muesli-bt` is the runtime and project.
 
+On our current shared benchmark subset under matched conditions, muesli-bt shows lower tick latency and much cheaper instantiation than BehaviorTree.CPP 4.9.0.
+
 ## Why muesli-bt
 
 When control loops need to stay responsive, three things matter:
@@ -18,6 +20,12 @@ When control loops need to stay responsive, three things matter:
 - asynchronous model calls that can stream and be cancelled (`vla.submit` / `vla.poll` / `vla.cancel`)
 
 muesli-bt keeps those concerns in one place with explicit runtime semantics and built-in observability.
+
+### Benchmarks (against bt.cpp):
+- ~2.6-2.7x lower per-node traversal cost on the shared static-tree benchmarks
+- ~2.7x lower reactive interruption latency on the tested benchmark contract
+- dramatically cheaper instance creation on the tested subsetc-tree benchmarks
+
 
 ## Runtime Contract In One Minute
 
@@ -86,6 +94,7 @@ cmake --build --preset bench-release-btcpp -j
 The benchmark harness lives under [`bench/README.md`](bench/README.md) and writes CSV outputs into `bench/results/` by default.
 Each benchmark session writes `run_summary.csv`, `aggregate_summary.csv`, and `environment_metadata.csv`.
 Summarise the latest benchmark session with `python3 bench/scripts/analyse_results.py`.
+Compare two benchmark sessions with `python3 bench/scripts/compare_results.py <left-result-dir> <right-result-dir>`.
 Current benchmark coverage includes `A1`, `A2`, `B1`, `B2`, `B5`, and `B6`.
 The current `B6` trace path uses deferred event-log serialisation when no file sink is enabled, while still reporting canonical event sizes.
 The optional `btcpp` runtime covers `A1`, `A2`, `B1`, `B2`, and the comparable `B5` phases (`compile`, `inst1`, `inst100`, `loaddsl`). `B6` remains `muesli-bt` only.
