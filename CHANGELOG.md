@@ -6,6 +6,8 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 ## [Unreleased]
 
 ### Added
+- Added an optional benchmark harness under `bench/` with `A1`, `A2`, `B1`, `B2`, `B5`, and `B6`, CSV output, environment metadata capture, and progress reporting.
+- Added benchmark result analysis and cross-runtime comparison scripts so `muesli-bt` and `BehaviorTree.CPP` runs can be summarised with the same output schema.
 - Added evaluator tail-position tracking coverage for `if`, `begin`, `let`, `cond`, closure calls, and explicit deep-recursion cases through `and` / `or`.
 - Added deep tail-recursion regression coverage for self recursion, mutual recursion, allocation pressure, and GC env-root stack behaviour.
 - Added a first compiled-closure VM path that resolves supported special forms once, lowers params and `let` bindings to local slots, keeps globals/captures as named lookup, and executes supported tail calls through a bytecode-style `tail_call` path.
@@ -13,6 +15,9 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - Added interactive REPL coverage for command/history helpers so exit handling, `:clear`, and persistent-history path rules stay stable.
 
 ### Changed
+- Optimised the reactive interruption path so the current `B2` benchmark cases no longer allocate on the steady-state hot path.
+- Reduced benchmark full-trace logging overhead by switching the benchmark capture path to deferred event-size accounting instead of forced per-event serialisation.
+- `load` now resolves nested relative paths from the directory of the file that issued the nested `load`, so multi-file Lisp examples work reliably outside the repository root.
 - Reorganised the Lisp evaluator into explicit internal dispatch/apply/sequence seams so tail-position handling is visible without changing the public evaluator API.
 - Lisp tail calls now run through an internal trampoline loop instead of recurring through the host C++ stack on the covered evaluator paths.
 - Tail-bounce GC polling now runs periodically during deep tail recursion instead of on every single bounce.

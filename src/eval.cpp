@@ -1,6 +1,7 @@
 #include "muslisp/eval.hpp"
 
 #include "compiled_eval.hpp"
+#include <filesystem>
 #include <fstream>
 #include <list>
 #include <sstream>
@@ -70,6 +71,26 @@ std::string read_text_file(const std::string& path) {
     ss << in.rdbuf();
     return ss.str();
 }
+
+thread_local std::vector<std::filesystem::path> load_base_dirs;
+
+std::filesystem::path resolve_load_path(const std::string& raw_path) {
+    const std::filesystem::path path(raw_path);
+    if (path.is_absolute() || load_base_dirs.empty()) {
+        return path;
+    }
+    return load_base_dirs.back() / path;
+}
+
+class scoped_load_base_dir {
+public:
+    explicit scoped_load_base_dir(const std::filesystem::path& path) { load_base_dirs.push_back(path.parent_path()); }
+
+    ~scoped_load_base_dir() { load_base_dirs.pop_back(); }
+
+    scoped_load_base_dir(const scoped_load_base_dir&) = delete;
+    scoped_load_base_dir& operator=(const scoped_load_base_dir&) = delete;
+};
 
 std::vector<std::string> parse_params(value params_expr) {
     if (!is_proper_list(params_expr)) {
@@ -539,7 +560,8 @@ value eval_load_form(const std::vector<value>& args, env_ptr scope) {
     if (!is_string(path_value)) {
         throw lisp_error("load: expected file path string");
     }
-    const std::string path = string_value(path_value);
+    const std::filesystem::path resolved_path = resolve_load_path(string_value(path_value));
+    const std::string path = resolved_path.string();
 
     std::string source;
     try {
@@ -548,6 +570,7 @@ value eval_load_form(const std::vector<value>& args, env_ptr scope) {
         throw lisp_error("load: " + path + ": " + e.what());
     }
 
+    scoped_load_base_dir load_base_dir(resolved_path);
     std::vector<value> exprs;
     try {
         exprs = read_all(source);

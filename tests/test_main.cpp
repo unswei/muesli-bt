@@ -862,6 +862,29 @@ void test_load_write_save_and_roundtrip() {
     }
 }
 
+void test_load_resolves_nested_relative_paths_from_loaded_file() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    const std::filesystem::path fixture_root = temp_file_path("load_fixture_root", "");
+    const std::filesystem::path scripts_dir = fixture_root / "scripts";
+    const std::filesystem::path lib_dir = fixture_root / "lib";
+    std::filesystem::create_directories(scripts_dir);
+    std::filesystem::create_directories(lib_dir);
+
+    const std::filesystem::path child_path = lib_dir / "child.lisp";
+    const std::filesystem::path main_path = scripts_dir / "main.lisp";
+
+    write_text_file(child_path, "(define nested-load-value 42)\n'ok\n");
+    write_text_file(main_path, "(load \"../lib/child.lisp\")\nnested-load-value\n");
+
+    value loaded_value = eval_text("(load " + lisp_string_literal(main_path.string()) + ")", env);
+    check(integer_value(loaded_value) == 42, "nested load should resolve relative to the loaded file");
+    check(integer_value(eval_text("nested-load-value", env)) == 42, "nested load should define values in the current environment");
+}
+
 void test_bt_dsl_save_load_roundtrip() {
     using namespace muslisp;
 
@@ -4007,6 +4030,7 @@ int main() {
         {"evaluator error messages stable", test_evaluator_error_messages_stable},
         {"bt authoring sugar", test_bt_authoring_sugar},
         {"load/write/save and roundtrip", test_load_write_save_and_roundtrip},
+        {"load resolves nested relative paths", test_load_resolves_nested_relative_paths_from_loaded_file},
         {"bt dsl save/load roundtrip", test_bt_dsl_save_load_roundtrip},
         {"bt export-dot builtin", test_bt_export_dot_builtin},
         {"bt binary save/load roundtrip and validation", test_bt_binary_save_load_roundtrip_and_validation},

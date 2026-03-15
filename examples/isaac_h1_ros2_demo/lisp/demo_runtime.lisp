@@ -1,4 +1,4 @@
-(load "examples/isaac_h1_ros2_demo/lisp/bt_h1_demo.lisp")
+(load "bt_h1_demo.lisp")
 
 (define pi 3.141592653589793)
 (define tau 6.283185307179586)

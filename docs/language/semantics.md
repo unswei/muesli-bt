@@ -181,6 +181,7 @@ Semantics:
 - parses and evaluates forms sequentially in current environment
 - returns final value (or `nil` for empty file)
 - errors include filename context
+- nested relative `load` paths resolve from the directory of the file that issued the nested `load`
 
 ## Environments And Closures
 

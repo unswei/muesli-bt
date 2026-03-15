@@ -32,6 +32,7 @@ Loads and evaluates all forms from a file in current environment.
 ## Notes
 
 - Errors include file path context.
+- If a loaded file calls `load` again with a relative path, that nested path resolves relative to the directory of the file that issued the nested `load`.
 
 ## See Also
 
