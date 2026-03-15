@@ -3870,6 +3870,9 @@ void test_ros2_h1_demo_success_path() {
         "      (make-waypoint \"left\" 0.40 0.30 1.5707963267948966))) "
         "  (define demo-success (run-h1-demo demo-cfg)))";
     (void)eval_text(demo_script, env);
+    if (publisher.joinable()) {
+        publisher.join();
+    }
 
     const std::string status = symbol_name(eval_text("(map.get (map.get demo-success 'result (map.make)) 'status ':none)", env));
     const std::string reason =
@@ -3934,6 +3937,9 @@ void test_ros2_h1_demo_timeout_stop() {
         "    (list (make-waypoint \"forward\" 0.40 0.00 0.0))) "
         "  (define demo-timeout (run-h1-demo demo-cfg)))";
     (void)eval_text(demo_script, env);
+    if (publisher.joinable()) {
+        publisher.join();
+    }
 
     const std::string status = symbol_name(eval_text("(map.get (map.get demo-timeout 'result (map.make)) 'status ':none)", env));
     check(status == ":stopped", "H1 demo timeout path should stop on max_ticks after issuing timeout stop commands");
