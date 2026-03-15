@@ -85,4 +85,4 @@ endif()
 
 The value points to `${prefix}/share/muesli_bt`, which contains:
 - contract: `contracts/muesli-studio-integration.md`
-- schema: `schema/mbt.evt.v1.schema.json`
+- schema: `schemas/event_log/v1/mbt.evt.v1.schema.json`

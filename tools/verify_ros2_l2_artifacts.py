@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify Linux ROS2 L2 artefacts produced by the rosbag conformance suite."""
+"""Verify canonical ROS-backed replay artefacts from the Linux rosbag L2 suite."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ EXPECTED_SCENARIOS = {
             "backend_published_actions": 2,
             "command_count_min": 1,
             "last_command": {"linear_x": 0.25, "linear_y": 0.0, "angular_z": 0.05},
-            "log_lines": 2,
+            "event_log_lines": 5,
             "final_obs_x": 1.6,
             "message": "episode_max reached",
         },
@@ -45,6 +45,12 @@ EXPECTED_SCENARIOS = {
                 "action": {"linear_x": 0.25, "linear_y": 0.0, "angular_z": 0.05},
             },
         ],
+        "event_counts": {"run_start": 1, "tick_begin": 2, "tick_end": 2, "error": 0},
+        "time_policy": {
+            "time_source": "ros_wall_time",
+            "use_sim_time": False,
+            "obs_timestamp_source": "message_header_or_node_clock",
+        },
         "bag_required": True,
     },
     "rosbag-clamped-action-case": {
@@ -56,7 +62,7 @@ EXPECTED_SCENARIOS = {
             "backend_published_actions": 2,
             "command_count_min": 1,
             "last_command": {"linear_x": 1.0, "linear_y": -1.0, "angular_z": 1.0},
-            "log_lines": 2,
+            "event_log_lines": 5,
             "final_obs_x": 0.8,
             "message": "episode_max reached",
         },
@@ -80,6 +86,12 @@ EXPECTED_SCENARIOS = {
                 "action": {"linear_x": 2.5, "linear_y": -2.0, "angular_z": 1.5},
             },
         ],
+        "event_counts": {"run_start": 1, "tick_begin": 2, "tick_end": 2, "error": 0},
+        "time_policy": {
+            "time_source": "ros_wall_time",
+            "use_sim_time": False,
+            "obs_timestamp_source": "message_header_or_node_clock",
+        },
         "bag_required": True,
     },
     "rosbag-invalid-action-fallback-case": {
@@ -91,7 +103,7 @@ EXPECTED_SCENARIOS = {
             "backend_published_actions": 1,
             "command_count_min": 1,
             "last_command": {"linear_x": 0.0, "linear_y": 0.0, "angular_z": 0.0},
-            "log_lines": 1,
+            "event_log_lines": 4,
             "final_obs_x": 0.4,
             "message_contains": "u must be a map",
         },
@@ -108,6 +120,12 @@ EXPECTED_SCENARIOS = {
                 "on_tick_u": 1,
             },
         ],
+        "event_counts": {"run_start": 1, "tick_begin": 1, "tick_end": 1, "error": 1},
+        "time_policy": {
+            "time_source": "ros_wall_time",
+            "use_sim_time": False,
+            "obs_timestamp_source": "message_header_or_node_clock",
+        },
         "bag_required": True,
     },
     "reset-unsupported-case": {
@@ -119,11 +137,17 @@ EXPECTED_SCENARIOS = {
             "backend_published_actions": 0,
             "command_count_min": 0,
             "last_command": {"linear_x": 0.0, "linear_y": 0.0, "angular_z": 0.0},
-            "log_lines": 0,
+            "event_log_lines": 2,
             "final_obs_x": None,
             "message_contains": "episode_max>1 requires env.reset capability",
         },
         "records": [],
+        "event_counts": {"run_start": 1, "tick_begin": 0, "tick_end": 0, "error": 1},
+        "time_policy": {
+            "time_source": "ros_wall_time",
+            "use_sim_time": False,
+            "obs_timestamp_source": "message_header_or_node_clock",
+        },
         "bag_required": False,
     },
 }
@@ -134,7 +158,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--artifact-root",
         default="build/conformance-l2-ros2-humble/ros2_l2_artifacts",
-        help="Path to the ROS2 L2 artefact root.",
+        help="Path to the ROS-backed replay artefact root.",
     )
     parser.add_argument(
         "--scenario",
@@ -190,7 +214,7 @@ def expect_summary(summary: dict[str, Any], expected: dict[str, Any], scenario: 
         int(summary.get("command_count", -1)) >= int(expected["command_count_min"]),
         f"{scenario}: summary command_count below expected minimum",
     )
-    expect(summary.get("log_lines") == expected["log_lines"], f"{scenario}: summary log_lines mismatch")
+    expect(summary.get("event_log_lines") == expected["event_log_lines"], f"{scenario}: summary event_log_lines mismatch")
     if expected.get("final_obs_x") is None:
         expect(summary.get("final_obs_x") is None, f"{scenario}: summary final_obs_x should be null")
     else:
@@ -240,6 +264,33 @@ def expect_common_record(record: dict[str, Any], scenario: str, expected: dict[s
         expect_close(float(u.get(key)), float(value), f"{scenario}: record action.u.{key}")
 
 
+def expect_event_envelope(event: dict[str, Any], scenario: str, expected_type: str, expected_tick: int | None = None) -> None:
+    expect(event.get("schema") == "mbt.evt.v1", f"{scenario}: event schema mismatch")
+    expect(event.get("contract_version") == "1.0.0", f"{scenario}: event contract_version mismatch")
+    expect(event.get("type") == expected_type, f"{scenario}: event type mismatch")
+    expect(isinstance(event.get("seq"), int) and int(event["seq"]) > 0, f"{scenario}: event seq invalid")
+    if expected_tick is not None:
+        expect(event.get("tick") == expected_tick, f"{scenario}: event tick mismatch")
+
+
+def select_events(events: list[dict[str, Any]], event_type: str) -> list[dict[str, Any]]:
+    return [event for event in events if event.get("type") == event_type]
+
+
+def expect_run_start_time_policy(event: dict[str, Any], scenario: str, expected: dict[str, Any]) -> None:
+    expect_event_envelope(event, f"{scenario} run_start", "run_start")
+    data = event.get("data")
+    expect(isinstance(data, dict), f"{scenario}: run_start data missing")
+    capabilities = data.get("capabilities")
+    expect(isinstance(capabilities, dict), f"{scenario}: run_start capabilities missing")
+    expect(capabilities.get("time_source") == expected["time_source"], f"{scenario}: time_source mismatch")
+    expect(capabilities.get("use_sim_time") is expected["use_sim_time"], f"{scenario}: use_sim_time mismatch")
+    expect(
+        capabilities.get("obs_timestamp_source") == expected["obs_timestamp_source"],
+        f"{scenario}: obs_timestamp_source mismatch",
+    )
+
+
 def verify_bag_dir(path: pathlib.Path, scenario: str) -> None:
     expect(path.is_dir(), f"{scenario}: missing odom_bag directory")
     expect((path / "metadata.yaml").is_file(), f"{scenario}: missing bag metadata.yaml")
@@ -256,26 +307,58 @@ def verify_scenario(root: pathlib.Path, scenario: str, expectation: dict[str, An
     expect(isinstance(summary, dict), f"{scenario}: summary is not a JSON object")
     expect_summary(summary, expectation["summary"], scenario)
 
-    log_path = scenario_dir / "run_loop_records.jsonl"
+    event_log_path = scenario_dir / "events.jsonl"
+    expect(event_log_path.is_file(), f"{scenario}: missing events.jsonl")
+    events = load_jsonl(event_log_path)
+    expect(len(events) == expectation["summary"]["event_log_lines"], f"{scenario}: unexpected event log line count")
+    for event_type, expected_count in expectation["event_counts"].items():
+        actual = len(select_events(events, event_type))
+        expect(actual == expected_count, f"{scenario}: unexpected {event_type} count")
+
     expected_records = expectation["records"]
-    if expected_records:
-        expect(log_path.is_file(), f"{scenario}: missing run_loop_records.jsonl")
-        records = load_jsonl(log_path)
-        expect(len(records) == len(expected_records), f"{scenario}: unexpected record count")
-        for idx, (record, expected_record) in enumerate(zip(records, expected_records, strict=True), start=1):
-            expect_common_record(record, f"{scenario} record {idx}", expected_record)
-            if "error_contains" in expected_record:
-                expect(expected_record["error_contains"] in str(record.get("error", "")),
-                       f"{scenario} record {idx}: error mismatch")
-            else:
-                expect("error" not in record, f"{scenario} record {idx}: unexpected error field")
-            if "on_tick_u" in expected_record:
-                on_tick = record.get("on_tick")
-                expect(isinstance(on_tick, dict), f"{scenario} record {idx}: on_tick missing")
-                expect(on_tick.get("u") == expected_record["on_tick_u"],
-                       f"{scenario} record {idx}: on_tick.u mismatch")
-    else:
-        expect(not log_path.exists(), f"{scenario}: unexpected run_loop_records.jsonl")
+    tick_end_events = select_events(events, "tick_end")
+    expect(len(tick_end_events) == len(expected_records), f"{scenario}: unexpected tick_end count")
+    for idx, (event, expected_record) in enumerate(zip(tick_end_events, expected_records, strict=True), start=1):
+        expect_event_envelope(event, f"{scenario} tick_end {idx}", "tick_end", expected_record["tick"])
+        record = event.get("data")
+        expect(isinstance(record, dict), f"{scenario} tick_end {idx}: data missing")
+        expect_common_record(record, f"{scenario} record {idx}", expected_record)
+        if idx < len(expected_records):
+            expect(record.get("status") == "running", f"{scenario} record {idx}: status mismatch")
+        elif summary["status"] == ":error":
+            expect(record.get("status") == "error", f"{scenario} record {idx}: status mismatch")
+        elif summary["status"] == ":ok":
+            expect(record.get("status") == "ok", f"{scenario} record {idx}: status mismatch")
+        else:
+            expect(record.get("status") == "stopped", f"{scenario} record {idx}: status mismatch")
+        if "error_contains" in expected_record:
+            expect(expected_record["error_contains"] in str(record.get("error", "")),
+                   f"{scenario} record {idx}: error mismatch")
+        else:
+            expect("error" not in record, f"{scenario} record {idx}: unexpected error field")
+        if "on_tick_u" in expected_record:
+            on_tick = record.get("on_tick")
+            expect(isinstance(on_tick, dict), f"{scenario} record {idx}: on_tick missing")
+            expect(on_tick.get("u") == expected_record["on_tick_u"],
+                   f"{scenario} record {idx}: on_tick.u mismatch")
+
+    for idx, event in enumerate(select_events(events, "tick_begin"), start=1):
+        expect_event_envelope(event, f"{scenario} tick_begin {idx}", "tick_begin", idx)
+
+    run_start_events = select_events(events, "run_start")
+    for idx, event in enumerate(run_start_events, start=1):
+        expect_run_start_time_policy(event, f"{scenario} run_start {idx}", expectation["time_policy"])
+
+    error_events = select_events(events, "error")
+    if error_events:
+        for idx, event in enumerate(error_events, start=1):
+            expect_event_envelope(event, f"{scenario} error {idx}", "error")
+            data = event.get("data")
+            expect(isinstance(data, dict), f"{scenario} error {idx}: data missing")
+            expect(data.get("severity") == "error", f"{scenario} error {idx}: severity mismatch")
+            if "message_contains" in expectation["summary"]:
+                expect(expectation["summary"]["message_contains"] in str(data.get("message", "")),
+                       f"{scenario} error {idx}: message mismatch")
 
     if expectation["bag_required"]:
         verify_bag_dir(scenario_dir / "odom_bag", scenario)
@@ -307,7 +390,7 @@ def main(argv: list[str]) -> int:
             print(f"error: {exc}", file=sys.stderr)
             return 1
 
-    print("ROS2 L2 artefact verification passed")
+    print("ROS-backed replay artefact verification passed")
     return 0
 
 

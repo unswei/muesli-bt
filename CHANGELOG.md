@@ -17,6 +17,9 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 ### Changed
 - Optimised the reactive interruption path so the current `B2` benchmark cases no longer allocate on the steady-state hot path.
 - Reduced benchmark full-trace logging overhead by switching the benchmark capture path to deferred event-size accounting instead of forced per-event serialisation.
+- ROS-backed `env.run-loop` execution now emits direct canonical `mbt.evt.v1` logs through `event_log_path`, and the ROS `L2` replay/conformance artefacts now treat the canonical event log as the primary evidence stream.
+- Replay tooling now treats simulator fixtures and ROS-backed artefacts through the same canonical log path, using `events.jsonl` per artefact directory and allowing `tools/validate_log.py` to accept either a direct log file or an artefact directory.
+- `env.run-loop` canonical logs now emit `episode_begin`, `episode_end`, and `run_end` so long multi-episode experiments can be summarised from the canonical event stream directly.
 - `load` now resolves nested relative paths from the directory of the file that issued the nested `load`, so multi-file Lisp examples work reliably outside the repository root.
 - Reorganised the Lisp evaluator into explicit internal dispatch/apply/sequence seams so tail-position handling is visible without changing the public evaluator API.
 - Lisp tail calls now run through an internal trampoline loop instead of recurring through the host C++ stack on the covered evaluator paths.
@@ -105,7 +108,7 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - Added multi-episode `env.run-loop` tests for reset-capable and reset-less backends.
 - Added canonical Studio integration contract at `docs/contracts/muesli-studio-integration.md`.
 - Added contracts index at `docs/contracts/README.md`.
-- Added authoritative event schema at `schema/mbt.evt.v1.schema.json` and schema guidance at `schema/README.md`.
+- Added authoritative event schema at `schemas/event_log/v1/mbt.evt.v1.schema.json` and schema guidance under `schemas/`.
 - Added deterministic event fixtures under `tests/fixtures/mbt.evt.v1/`.
 - Added event log validator tool at `tools/validate_event_log.py`.
 - Added deterministic fixture generator at `tools/gen_fixtures_event_log.cpp`.

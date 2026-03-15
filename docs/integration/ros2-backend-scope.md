@@ -49,7 +49,7 @@ What is still intentionally incomplete:
 
 - simulator or robot reset beyond the explicit unsupported/stub policy
 - broader transport coverage beyond the current `Odometry` / `Twist` path
-- canonical `mbt.evt.v1` parity for ROS-backed run-loop observability beyond the current run-loop artefact checks
+- explicit ROS time-source reporting and replay-verification tooling beyond the direct canonical event-log path
 
 ### first supported baseline
 
@@ -163,7 +163,7 @@ Delivered baseline:
 
 `phase 8: v0.4.0 observability parity`
 
-- emit direct canonical `mbt.evt.v1` logs for ROS-backed runs instead of relying only on run-loop artefact JSONL
+- emit direct canonical `mbt.evt.v1` logs for ROS-backed runs and treat them as the primary replay/conformance artefact
 - log and document the ROS time-source policy explicitly (`sim time` vs wall time)
 - provide one documented replay verification command that checks canonical log invariants for ROS-backed runs
 
@@ -236,6 +236,7 @@ Exit target:
 - when reset is unsupported and `episode_max > 1`, the result is `:unsupported`
 - runtime observability remains on canonical `mbt.evt.v1`
 - no ad hoc ROS-only log format is introduced for conformance
+- ROS-backed `L2` evidence verifies canonical `mbt.evt.v1` output first, with any run-loop record JSONL treated as secondary compatibility output only
 
 #### packaging and CI
 
@@ -273,7 +274,7 @@ cmake --build build/linux-ros2 -j
 ```
 
 This command drives the backend through `/robot/odom` and publishes actions to `/robot/cmd_vel`.
-It also writes a run-loop artefact to `build/linux-ros2/ros2-live-run.jsonl`.
+It can also write a canonical event log through `event_log_path`, for example `build/linux-ros2/ros2-live-run/events.jsonl`.
 
 Source used by the canonical live command:
 
@@ -297,9 +298,11 @@ cmake -S . -B build/linux-ros2-l2 -G Ninja \
 cmake --build build/linux-ros2-l2 --target muesli_bt_conformance_l2_rosbag_tests -j
 ctest --test-dir build/linux-ros2-l2 -R muesli_bt_conformance_l2_rosbag_tests --output-on-failure
 python3 tools/verify_ros2_l2_artifacts.py --artifact-root build/linux-ros2-l2/ros2_l2_artifacts
+python3 tools/validate_log.py build/linux-ros2-l2/ros2_l2_artifacts/ros2_h1_success
 ```
 
 This is the current canonical rosbag replay command because it exercises the supported Linux ROS2 transport path and verifies the emitted replay artefacts in one reproducible flow.
+The verifier treats the canonical `mbt.evt.v1` log as the primary replay/conformance artefact.
 
 ### backend identity via `env.info`
 
@@ -408,6 +411,27 @@ The initial documented config keys are:
 - `obs_source`
 - `action_sink`
 - `reset_mode`
+
+### time-source policy
+
+For the current ROS2 backend, the time policy is:
+
+- `use_sim_time=#t` means the ROS node clock follows ROS simulation time
+- `use_sim_time=#f` means the ROS node clock follows ROS wall time
+- observation `t_ms` uses the incoming message header stamp when it is present
+- if a message does not carry a usable header stamp, observation `t_ms` falls back to the ROS node clock
+- canonical event ordering still relies on `seq`, not timestamp fields alone
+
+The backend exposes this policy through `env.info`:
+
+- `time_source`: `ros_sim_time` or `ros_wall_time`
+- `obs_timestamp_source`: `message_header_or_node_clock`
+
+The canonical `run_start` event for `env.run-loop` also records:
+
+- `capabilities.time_source`
+- `capabilities.use_sim_time`
+- `capabilities.obs_timestamp_source`
 
 ## example
 

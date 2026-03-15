@@ -125,6 +125,22 @@ The current supported ROS2 baseline is:
 
 This attaches the backend, binds the supported topics, and exposes the backend identity through `env.info`.
 
+### time-source policy
+
+The ROS2 backend keeps time policy explicit:
+
+- `use_sim_time=#t` means the backend node follows ROS simulation time
+- `use_sim_time=#f` means the backend node follows ROS wall time
+- observation `t_ms` comes from the message header stamp when one is present
+- otherwise observation `t_ms` falls back to the backend node clock
+
+`env.info` reports:
+
+- `time_source`: `ros_sim_time` or `ros_wall_time`
+- `obs_timestamp_source`: `message_header_or_node_clock`
+
+When `env.run-loop` writes a canonical event log, the `run_start` event records the same policy so replay tools can read it from the artefact itself.
+
 ### consumer-side CMake shape
 
 ```cmake
@@ -163,7 +179,7 @@ cmake --build build/linux-ros2 -j
 ./build/linux-ros2/muslisp_ros2 examples/repl_scripts/ros2-live-odom-twist.lisp
 ```
 
-This writes `build/linux-ros2/ros2-live-run.jsonl`.
+This can write a canonical event log such as `build/linux-ros2/ros2-live-run/events.jsonl` when the script configures `event_log_path`.
 
 ## example
 
@@ -179,7 +195,7 @@ What this example demonstrates:
 - stable backend configuration through canonical keys
 - `env.run-loop` using ROS-backed observations
 - action publication through the `cmd_vel` sink
-- run-loop artefact generation without changing core runtime semantics
+- canonical event-log generation without changing core runtime semantics
 
 ## gotchas
 
@@ -187,6 +203,7 @@ What this example demonstrates:
 - For scripted validation, start the odometry publisher before the runner. Otherwise the first tick may fall back safely before transport is ready.
 - Live runs currently use `reset_mode="unsupported"`. Multi-episode loops therefore need a reset-capable harness rather than a live robot/simulator path.
 - Schema ids are version-checked. Stay inside the current `ros2.obs.*.v1`, `ros2.state.*.v1`, and `ros2.action.*.v1` families.
+- Replay tooling should treat canonical event `seq` as the ordering key. Do not infer ordering from timestamps alone.
 - The current adaptor is a transport bridge, not a MoveIt, Nav2, or perception framework.
 
 ## see also

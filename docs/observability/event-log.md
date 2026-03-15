@@ -29,6 +29,9 @@
 ## Event types
 
 - `run_start`
+- `run_end`
+- `episode_begin`
+- `episode_end`
 - `bt_def`
 - `tick_begin`
 - `tick_end`
@@ -67,3 +70,96 @@
 - Blackboard `bb_write.preview` is size-limited (4KB JSON).
 - `seq` is the authoritative ordering key for replay/monitoring.
 - Existing planner/vla metadata is wrapped in canonical events (for example `planner_v1`).
+
+## determinism and bounded behaviour
+
+Tooling consumers should separate three classes of guarantee:
+
+- deterministic with fixed inputs:
+
+  - event envelope shape
+  - event ordering by `seq`
+  - deterministic fixture runs created through deterministic mode
+  - planner outcomes when the planner backend and seed are both deterministic
+
+- bounded but not strictly deterministic:
+
+  - `unix_ms`
+  - wall-clock run duration
+  - ROS observation timing when transport delivery jitter exists
+  - best-effort tick budget and deadline behaviour
+
+- environment-dependent:
+
+  - live ROS transport arrival timing
+  - host scheduling jitter
+  - external simulator pacing
+  - any callback that depends on non-deterministic external state
+
+For replay and inspection, treat `seq` as the only strict ordering key.
+Treat `tick` as the BT tick index within a run.
+Treat `unix_ms` and observation `t_ms` as descriptive timing fields, not as the primary replay ordering mechanism.
+
+## shared artefact path
+
+Simulator-backed runs and ROS-backed runs should be exposed to tooling through the same canonical artefact shape:
+
+- one artefact directory per run or scenario
+- canonical event log at `events.jsonl`
+
+Examples:
+
+- `fixtures/determinism-replay-case/events.jsonl`
+- `build/linux-ros2-l2/ros2_l2_artifacts/ros2_h1_success/events.jsonl`
+
+This lets a consumer use the same validation and replay entry point for both classes of run:
+
+```bash
+python3 tools/validate_log.py fixtures/determinism-replay-case
+python3 tools/validate_log.py build/linux-ros2-l2/ros2_l2_artifacts/ros2_h1_success
+```
+
+## interpreting replay failures
+
+When replay or validation fails, classify the failure before assuming a runtime bug:
+
+- schema failure:
+
+  - the event line is malformed or does not satisfy `mbt.evt.v1`
+  - usually indicates logger or serialisation drift
+
+- ordering failure:
+
+  - `seq` is missing, repeated, or out of order
+  - indicates a broken event stream contract
+
+- invariant failure:
+
+  - expected event counts, status transitions, or policy fields do not match
+  - usually indicates behavioural drift in the runtime or backend integration
+
+- timing-only difference:
+
+  - `unix_ms` or observation times differ while `seq`, event types, and decision payloads still match
+  - usually indicates bounded-but-not-deterministic timing variance, not semantic drift
+
+- transport-context difference:
+
+  - ROS runs may differ in arrival timing or pacing while still remaining conformant
+  - if the canonical decisions and event ordering remain valid, treat this as transport variance first
+
+For ROS-backed runs, inspect `run_start.data.capabilities` before drawing conclusions:
+
+- `time_source`
+- `use_sim_time`
+- `obs_timestamp_source`
+
+Those fields explain whether timestamp differences came from ROS wall time, ROS simulation time, or message-header timestamps.
+
+For long-running multi-episode experiments, prefer the summary anchors in the canonical stream:
+
+- `episode_begin`
+- `episode_end`
+- `run_end`
+
+These events let consumers compute per-episode and per-run summaries from `events.jsonl` without depending on a separate export format.

@@ -210,6 +210,14 @@ std::int64_t stamp_to_ms(const builtin_interfaces::msg::Time& stamp) {
     return static_cast<std::int64_t>(stamp.sec) * 1000LL + static_cast<std::int64_t>(stamp.nanosec / 1000000U);
 }
 
+std::string ros_time_source_name(bool use_sim_time) {
+    return use_sim_time ? "ros_sim_time" : "ros_wall_time";
+}
+
+constexpr std::string_view ros_obs_timestamp_source_name() noexcept {
+    return "message_header_or_node_clock";
+}
+
 double yaw_from_quaternion(double qx, double qy, double qz, double qw) {
     const double siny_cosp = 2.0 * (qw * qz + qx * qy);
     const double cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz);
@@ -343,6 +351,8 @@ public:
         map_set_symbol(out, "action_topic", make_string(action_topic_));
         map_set_symbol(out, "node_name", make_string(node_name_));
         map_set_symbol(out, "ros_distro", make_string(ros_distro_));
+        map_set_symbol(out, "time_source", make_string(ros_time_source_name(use_sim_time_)));
+        map_set_symbol(out, "obs_timestamp_source", make_string(std::string(ros_obs_timestamp_source_name())));
         map_set_symbol(out, "received_samples", make_integer(static_cast<std::int64_t>(observation_generation_)));
         map_set_symbol(out, "published_actions", make_integer(published_action_count_));
 
@@ -350,6 +360,8 @@ public:
         map_set_symbol(config, "observe_timeout_ms", make_integer(observe_timeout_ms_));
         map_set_symbol(config, "step_timeout_ms", make_integer(step_timeout_ms_));
         map_set_symbol(config, "use_sim_time", make_boolean(use_sim_time_));
+        map_set_symbol(config, "time_source", make_string(ros_time_source_name(use_sim_time_)));
+        map_set_symbol(config, "obs_timestamp_source", make_string(std::string(ros_obs_timestamp_source_name())));
         map_set_symbol(config, "require_fresh_obs", make_boolean(require_fresh_obs_));
         map_set_symbol(config, "action_clamp", make_string(action_clamp_));
         map_set_symbol(config, "topic_ns", make_string(topic_ns_));

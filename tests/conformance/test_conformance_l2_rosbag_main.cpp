@@ -151,7 +151,7 @@ struct odom_sample {
 struct scenario_paths {
     std::filesystem::path scenario_dir;
     std::filesystem::path bag_dir;
-    std::filesystem::path log_path;
+    std::filesystem::path event_log_path;
     std::filesystem::path summary_path;
 };
 
@@ -165,7 +165,7 @@ struct scenario_summary {
     std::int64_t backend_published_actions = 0;
     std::size_t command_count = 0;
     geometry_msgs::msg::Twist last_command{};
-    std::size_t log_lines = 0;
+    std::size_t event_log_lines = 0;
     std::optional<double> final_obs_x{};
 };
 
@@ -317,7 +317,7 @@ scenario_paths prepare_scenario(const std::string& name) {
     return {
         .scenario_dir = scenario_dir,
         .bag_dir = scenario_dir / "odom_bag",
-        .log_path = scenario_dir / "run_loop_records.jsonl",
+        .event_log_path = scenario_dir / "events.jsonl",
         .summary_path = scenario_dir / "summary.json",
     };
 }
@@ -339,7 +339,7 @@ void write_summary(const std::filesystem::path& summary_path, const scenario_sum
         << "    \"linear_y\": " << summary.last_command.linear.y << ",\n"
         << "    \"angular_z\": " << summary.last_command.angular.z << "\n"
         << "  },\n"
-        << "  \"log_lines\": " << summary.log_lines << ",\n";
+        << "  \"event_log_lines\": " << summary.event_log_lines << ",\n";
     if (summary.final_obs_x.has_value()) {
         out << "  \"final_obs_x\": " << *summary.final_obs_x << "\n";
     } else {
@@ -363,6 +363,15 @@ std::optional<muslisp::value> map_lookup_text_key(muslisp::value map_obj, const 
 
 muslisp::value decode_json_text(const std::string& text, muslisp::env_ptr env) {
     return eval_text("(json.decode " + lisp_string_literal(text) + ")", env);
+}
+
+std::vector<muslisp::value> decode_json_lines(const std::vector<std::string>& lines, muslisp::env_ptr env) {
+    std::vector<muslisp::value> decoded;
+    decoded.reserve(lines.size());
+    for (const std::string& line : lines) {
+        decoded.push_back(decode_json_text(line, env));
+    }
+    return decoded;
 }
 
 double number_value_checked(muslisp::value v, const std::string& where) {
@@ -419,6 +428,46 @@ bool require_bool_field(muslisp::value map_obj, const std::string& key, const st
         throw std::runtime_error(where + ": missing boolean field '" + key + "'");
     }
     return muslisp::boolean_value(*result);
+}
+
+muslisp::value require_event_data(muslisp::value event_obj, const std::string& where) {
+    return require_map_field(event_obj, "data", where);
+}
+
+void verify_canonical_event_envelope(muslisp::value event_obj,
+                                     const std::string& expected_type,
+                                     const std::string& where,
+                                     std::optional<std::int64_t> expected_tick = std::nullopt) {
+    check(require_text_field(event_obj, "schema", where) == "mbt.evt.v1", where + ": schema mismatch");
+    check(require_text_field(event_obj, "contract_version", where) == "1.0.0", where + ": contract_version mismatch");
+    check(require_text_field(event_obj, "type", where) == expected_type, where + ": type mismatch");
+    check(require_int_field(event_obj, "seq", where) > 0, where + ": seq should be positive");
+    if (expected_tick.has_value()) {
+        check(require_int_field(event_obj, "tick", where) == *expected_tick, where + ": tick mismatch");
+    }
+}
+
+std::vector<muslisp::value> select_events_by_type(const std::vector<muslisp::value>& events, const std::string& type) {
+    std::vector<muslisp::value> filtered;
+    for (muslisp::value event_obj : events) {
+        if (require_text_field(event_obj, "type", "event") == type) {
+            filtered.push_back(event_obj);
+        }
+    }
+    return filtered;
+}
+
+void verify_run_start_time_policy(muslisp::value event_obj, const std::string& where) {
+    verify_canonical_event_envelope(event_obj, "run_start", where);
+    const muslisp::value data = require_event_data(event_obj, where);
+    const muslisp::value caps = require_map_field(data, "capabilities", where + ".data");
+    check(require_text_field(caps, "time_source", where + ".data.capabilities") == "ros_wall_time",
+          where + ": time_source mismatch");
+    check(!require_bool_field(caps, "use_sim_time", where + ".data.capabilities"),
+          where + ": use_sim_time mismatch");
+    check(require_text_field(caps, "obs_timestamp_source", where + ".data.capabilities") ==
+              "message_header_or_node_clock",
+          where + ": obs_timestamp_source mismatch");
 }
 
 void verify_common_record_shape(muslisp::value record,
@@ -521,8 +570,8 @@ void test_ros2_rosbag_replay_conformance() {
         "        (map.set! cfg 'realtime #t) "
         "        (map.set! cfg 'safe_action safe) "
         "        (map.set! cfg 'schema_version \"ros2.l2.v1\") "
-        "        (map.set! cfg 'log_path " +
-        lisp_string_literal(paths.log_path.string()) +
+        "        (map.set! cfg 'event_log_path " +
+        lisp_string_literal(paths.event_log_path.string()) +
         ") "
         "        cfg) "
         "      (lambda (obs) "
@@ -570,12 +619,28 @@ void test_ros2_rosbag_replay_conformance() {
     check_close(command.linear.y, 0.0, 1e-6, "ros2 rosbag replay: linear.y mismatch");
     check_close(command.angular.z, 0.05, 1e-6, "ros2 rosbag replay: angular.z mismatch");
 
-    const auto lines = read_non_empty_lines(paths.log_path);
-    check(lines.size() == 2, "ros2 rosbag replay: expected two run-loop records");
-    const value record1 = decode_json_text(lines[0], env);
-    const value record2 = decode_json_text(lines[1], env);
+    const auto lines = read_non_empty_lines(paths.event_log_path);
+    check(lines.size() == 5, "ros2 rosbag replay: expected five canonical events");
+    const auto events = decode_json_lines(lines, env);
+    const auto run_start_events = select_events_by_type(events, "run_start");
+    check(run_start_events.size() == 1, "ros2 rosbag replay: expected one run_start event");
+    verify_run_start_time_policy(run_start_events[0], "ros2 rosbag replay run_start");
+    const auto tick_begin_events = select_events_by_type(events, "tick_begin");
+    const auto tick_end_events = select_events_by_type(events, "tick_end");
+    check(tick_begin_events.size() == 2, "ros2 rosbag replay: expected two tick_begin events");
+    check(tick_end_events.size() == 2, "ros2 rosbag replay: expected two tick_end events");
+    verify_canonical_event_envelope(tick_begin_events[0], "tick_begin", "ros2 rosbag replay tick_begin1", 1);
+    verify_canonical_event_envelope(tick_begin_events[1], "tick_begin", "ros2 rosbag replay tick_begin2", 2);
+    verify_canonical_event_envelope(tick_end_events[0], "tick_end", "ros2 rosbag replay tick_end1", 1);
+    verify_canonical_event_envelope(tick_end_events[1], "tick_end", "ros2 rosbag replay tick_end2", 2);
+    const value record1 = require_event_data(tick_end_events[0], "ros2 rosbag replay tick_end1");
+    const value record2 = require_event_data(tick_end_events[1], "ros2 rosbag replay tick_end2");
     verify_common_record_shape(record1, "ros2.l2.v1", 1, 1'700'000'000'000LL, false, false);
     verify_common_record_shape(record2, "ros2.l2.v1", 2, 1'700'000'000'040LL, false, false);
+    check(require_text_field(record1, "status", "ros2 rosbag replay record1") == "running",
+          "ros2 rosbag replay: record1 status mismatch");
+    check(require_text_field(record2, "status", "ros2 rosbag replay record2") == "stopped",
+          "ros2 rosbag replay: record2 status mismatch");
     verify_pose_x(record1, 0.2, "ros2 rosbag replay record1");
     verify_pose_x(record2, 1.6, "ros2 rosbag replay record2");
     verify_action_components(require_map_field(record1, "action", "ros2 rosbag replay record1"), 0.25, 0.0, 0.05,
@@ -597,7 +662,7 @@ void test_ros2_rosbag_replay_conformance() {
             .backend_published_actions = backend_published_actions,
             .command_count = harness.command_count(),
             .last_command = command,
-            .log_lines = lines.size(),
+            .event_log_lines = lines.size(),
             .final_obs_x = final_obs_x,
         });
     check(std::filesystem::exists(paths.summary_path), "ros2 rosbag replay: missing summary artefact");
@@ -639,8 +704,8 @@ void test_ros2_rosbag_clamp_conformance() {
         "        (map.set! cfg 'realtime #t) "
         "        (map.set! cfg 'safe_action safe) "
         "        (map.set! cfg 'schema_version \"ros2.l2.clamp.v1\") "
-        "        (map.set! cfg 'log_path " +
-        lisp_string_literal(paths.log_path.string()) +
+        "        (map.set! cfg 'event_log_path " +
+        lisp_string_literal(paths.event_log_path.string()) +
         ") "
         "        cfg) "
         "      (lambda (obs) "
@@ -688,12 +753,28 @@ void test_ros2_rosbag_clamp_conformance() {
     check_close(command.linear.y, -1.0, 1e-6, "ros2 rosbag clamp: linear.y should be clamped");
     check_close(command.angular.z, 1.0, 1e-6, "ros2 rosbag clamp: angular.z should be clamped");
 
-    const auto lines = read_non_empty_lines(paths.log_path);
-    check(lines.size() == 2, "ros2 rosbag clamp: expected two run-loop records");
-    const value record1 = decode_json_text(lines[0], env);
-    const value record2 = decode_json_text(lines[1], env);
+    const auto lines = read_non_empty_lines(paths.event_log_path);
+    check(lines.size() == 5, "ros2 rosbag clamp: expected five canonical events");
+    const auto events = decode_json_lines(lines, env);
+    const auto run_start_events = select_events_by_type(events, "run_start");
+    check(run_start_events.size() == 1, "ros2 rosbag clamp: expected one run_start event");
+    verify_run_start_time_policy(run_start_events[0], "ros2 rosbag clamp run_start");
+    const auto tick_begin_events = select_events_by_type(events, "tick_begin");
+    const auto tick_end_events = select_events_by_type(events, "tick_end");
+    check(tick_begin_events.size() == 2, "ros2 rosbag clamp: expected two tick_begin events");
+    check(tick_end_events.size() == 2, "ros2 rosbag clamp: expected two tick_end events");
+    verify_canonical_event_envelope(tick_begin_events[0], "tick_begin", "ros2 rosbag clamp tick_begin1", 1);
+    verify_canonical_event_envelope(tick_begin_events[1], "tick_begin", "ros2 rosbag clamp tick_begin2", 2);
+    verify_canonical_event_envelope(tick_end_events[0], "tick_end", "ros2 rosbag clamp tick_end1", 1);
+    verify_canonical_event_envelope(tick_end_events[1], "tick_end", "ros2 rosbag clamp tick_end2", 2);
+    const value record1 = require_event_data(tick_end_events[0], "ros2 rosbag clamp tick_end1");
+    const value record2 = require_event_data(tick_end_events[1], "ros2 rosbag clamp tick_end2");
     verify_common_record_shape(record1, "ros2.l2.clamp.v1", 1, 1'700'000'100'000LL, false, false);
     verify_common_record_shape(record2, "ros2.l2.clamp.v1", 2, 1'700'000'100'040LL, false, false);
+    check(require_text_field(record1, "status", "ros2 rosbag clamp record1") == "running",
+          "ros2 rosbag clamp: record1 status mismatch");
+    check(require_text_field(record2, "status", "ros2 rosbag clamp record2") == "stopped",
+          "ros2 rosbag clamp: record2 status mismatch");
     verify_pose_x(record1, -0.4, "ros2 rosbag clamp record1");
     verify_pose_x(record2, 0.8, "ros2 rosbag clamp record2");
     verify_action_components(require_map_field(record1, "action", "ros2 rosbag clamp record1"), 2.5, -2.0, 1.5,
@@ -715,7 +796,7 @@ void test_ros2_rosbag_clamp_conformance() {
             .backend_published_actions = backend_published_actions,
             .command_count = harness.command_count(),
             .last_command = command,
-            .log_lines = lines.size(),
+            .event_log_lines = lines.size(),
             .final_obs_x = final_obs_x,
         });
     check(std::filesystem::exists(paths.summary_path), "ros2 rosbag clamp: missing summary artefact");
@@ -757,8 +838,8 @@ void test_ros2_rosbag_invalid_action_fallback_conformance() {
         "        (map.set! cfg 'realtime #t) "
         "        (map.set! cfg 'safe_action safe) "
         "        (map.set! cfg 'schema_version \"ros2.l2.invalid.v1\") "
-        "        (map.set! cfg 'log_path " +
-        lisp_string_literal(paths.log_path.string()) +
+        "        (map.set! cfg 'event_log_path " +
+        lisp_string_literal(paths.event_log_path.string()) +
         ") "
         "        cfg) "
         "      (lambda (obs) "
@@ -804,10 +885,25 @@ void test_ros2_rosbag_invalid_action_fallback_conformance() {
     check_close(command.linear.y, 0.0, 1e-6, "ros2 rosbag invalid-action: safe linear.y mismatch");
     check_close(command.angular.z, 0.0, 1e-6, "ros2 rosbag invalid-action: safe angular.z mismatch");
 
-    const auto lines = read_non_empty_lines(paths.log_path);
-    check(lines.size() == 1, "ros2 rosbag invalid-action: expected one run-loop record");
-    const value record = decode_json_text(lines[0], env);
+    const auto lines = read_non_empty_lines(paths.event_log_path);
+    check(lines.size() == 4, "ros2 rosbag invalid-action: expected four canonical events");
+    const auto events = decode_json_lines(lines, env);
+    const auto run_start_events = select_events_by_type(events, "run_start");
+    check(run_start_events.size() == 1, "ros2 rosbag invalid-action: expected one run_start event");
+    verify_run_start_time_policy(run_start_events[0], "ros2 rosbag invalid-action run_start");
+    const auto tick_begin_events = select_events_by_type(events, "tick_begin");
+    const auto tick_end_events = select_events_by_type(events, "tick_end");
+    const auto error_events = select_events_by_type(events, "error");
+    check(tick_begin_events.size() == 1, "ros2 rosbag invalid-action: expected one tick_begin event");
+    check(tick_end_events.size() == 1, "ros2 rosbag invalid-action: expected one tick_end event");
+    check(error_events.size() == 1, "ros2 rosbag invalid-action: expected one error event");
+    verify_canonical_event_envelope(tick_begin_events[0], "tick_begin", "ros2 rosbag invalid-action tick_begin", 1);
+    verify_canonical_event_envelope(tick_end_events[0], "tick_end", "ros2 rosbag invalid-action tick_end", 1);
+    verify_canonical_event_envelope(error_events[0], "error", "ros2 rosbag invalid-action error");
+    const value record = require_event_data(tick_end_events[0], "ros2 rosbag invalid-action tick_end");
     verify_common_record_shape(record, "ros2.l2.invalid.v1", 1, 1'700'000'200'000LL, true, false);
+    check(require_text_field(record, "status", "ros2 rosbag invalid-action record") == "error",
+          "ros2 rosbag invalid-action: record status mismatch");
     verify_pose_x(record, 0.4, "ros2 rosbag invalid-action record");
     verify_action_components(require_map_field(record, "action", "ros2 rosbag invalid-action record"), 0.0, 0.0, 0.0,
                              "ros2 rosbag invalid-action record action");
@@ -833,7 +929,7 @@ void test_ros2_rosbag_invalid_action_fallback_conformance() {
             .backend_published_actions = backend_published_actions,
             .command_count = harness.command_count(),
             .last_command = command,
-            .log_lines = lines.size(),
+            .event_log_lines = lines.size(),
             .final_obs_x = final_obs_x,
         });
     check(std::filesystem::exists(paths.summary_path), "ros2 rosbag invalid-action: missing summary artefact");
@@ -861,8 +957,8 @@ void test_ros2_reset_unsupported_policy_artifact() {
         "        (map.set! cfg 'max_ticks 1) "
         "        (map.set! cfg 'episode_max 2) "
         "        (map.set! cfg 'schema_version \"ros2.l2.reset-policy.v1\") "
-        "        (map.set! cfg 'log_path " +
-        lisp_string_literal(paths.log_path.string()) +
+        "        (map.set! cfg 'event_log_path " +
+        lisp_string_literal(paths.event_log_path.string()) +
         ") "
         "        cfg) "
         "      (lambda (obs) #t))) "
@@ -884,7 +980,15 @@ void test_ros2_reset_unsupported_policy_artifact() {
     const std::int64_t backend_published_actions =
         integer_value(eval_text("(map.get (env.info) 'published_actions -1)", env));
     check(backend_published_actions == 0, "ros2 reset policy artefact: backend should not publish actions");
-    check(!std::filesystem::exists(paths.log_path), "ros2 reset policy artefact: unexpected log file");
+    const auto lines = read_non_empty_lines(paths.event_log_path);
+    check(lines.size() == 2, "ros2 reset policy artefact: expected two canonical events");
+    const auto events = decode_json_lines(lines, env);
+    const auto run_start_events = select_events_by_type(events, "run_start");
+    const auto error_events = select_events_by_type(events, "error");
+    check(run_start_events.size() == 1, "ros2 reset policy artefact: expected one run_start event");
+    verify_run_start_time_policy(run_start_events[0], "ros2 reset policy run_start");
+    check(error_events.size() == 1, "ros2 reset policy artefact: expected one error event");
+    verify_canonical_event_envelope(error_events[0], "error", "ros2 reset policy error");
 
     write_summary(
         paths.summary_path,
@@ -898,7 +1002,7 @@ void test_ros2_reset_unsupported_policy_artifact() {
             .backend_published_actions = backend_published_actions,
             .command_count = 0,
             .last_command = geometry_msgs::msg::Twist{},
-            .log_lines = 0,
+            .event_log_lines = lines.size(),
             .final_obs_x = std::nullopt,
         });
     check(std::filesystem::exists(paths.summary_path), "ros2 reset policy artefact: missing summary artefact");

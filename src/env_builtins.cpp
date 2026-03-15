@@ -1,5 +1,6 @@
 #include "muslisp/env_builtins.hpp"
 
+#include <atomic>
 #include <algorithm>
 #include <chrono>
 #include <cmath>
@@ -13,6 +14,8 @@
 #include <utility>
 #include <vector>
 
+#include "bt/runtime_host.hpp"
+#include "muesli_bt/contract/events.hpp"
 #include "muslisp/env_api.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/eval.hpp"
@@ -34,6 +37,8 @@ struct env_runtime_state {
     bool headless = false;
     std::optional<std::int64_t> seed{};
     std::string log_path{};
+    std::string event_log_path{};
+    std::int64_t event_log_ring_size = -1;
     std::int64_t episode = 0;
     std::int64_t step = 0;
     std::chrono::steady_clock::time_point time_origin = std::chrono::steady_clock::now();
@@ -183,6 +188,21 @@ void apply_common_runtime_options(value opts_map, const std::string& where) {
             throw lisp_error(where + " :log_path: expected string");
         }
         state.log_path = string_value(*log_path);
+    }
+
+    if (const auto event_log_path = map_lookup_option(opts_map, "event_log_path")) {
+        if (!is_string(*event_log_path)) {
+            throw lisp_error(where + " :event_log_path: expected string");
+        }
+        state.event_log_path = string_value(*event_log_path);
+    }
+
+    if (const auto event_log_ring_size = map_lookup_option(opts_map, "event_log_ring_size")) {
+        const std::int64_t ring_size = require_int(*event_log_ring_size, where + " :event_log_ring_size");
+        if (ring_size < 0) {
+            throw lisp_error(where + " :event_log_ring_size: expected >= 0");
+        }
+        state.event_log_ring_size = ring_size;
     }
 }
 
@@ -400,6 +420,99 @@ void append_jsonl(const std::string& path, value record) {
     }
 }
 
+std::string make_env_run_event_run_id(const std::string& backend_name) {
+    static std::atomic<std::uint64_t> next_suffix{1};
+    const std::uint64_t suffix = next_suffix.fetch_add(1, std::memory_order_relaxed);
+    const auto unix_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                             std::chrono::system_clock::now().time_since_epoch())
+                             .count();
+    std::ostringstream out;
+    out << "env-run-" << backend_name << '-' << unix_ms << '-' << suffix;
+    return out.str();
+}
+
+std::string event_capabilities_json(const std::string& backend_name,
+                                    value backend_info,
+                                    bool reset_supported,
+                                    bool realtime) {
+    value caps = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&caps);
+    roots.add(&backend_info);
+
+    map_set_symbol(caps, "reset", make_boolean(reset_supported));
+    map_set_symbol(caps, "backend", make_string(backend_name));
+    map_set_symbol(caps, "realtime", make_boolean(realtime));
+
+    if (is_map(backend_info)) {
+        if (const auto use_sim_time = map_lookup_option(backend_info, "use_sim_time")) {
+            map_set_symbol(caps, "use_sim_time", *use_sim_time);
+        }
+        if (const auto time_source = map_lookup_option(backend_info, "time_source")) {
+            map_set_symbol(caps, "time_source", *time_source);
+        }
+        if (const auto obs_timestamp_source = map_lookup_option(backend_info, "obs_timestamp_source")) {
+            map_set_symbol(caps, "obs_timestamp_source", *obs_timestamp_source);
+        }
+    }
+
+    return value_to_json(caps);
+}
+
+class scoped_env_run_event_log {
+public:
+    scoped_env_run_event_log(const std::string& backend_name,
+                             value backend_info,
+                             bool reset_supported,
+                             bool realtime,
+                             std::int64_t tick_hz,
+                             const std::optional<std::string>& event_log_path,
+                             const std::optional<std::size_t>& ring_capacity)
+        : events_(bt::default_runtime_host().events()),
+          saved_enabled_(events_.enabled()),
+          saved_file_enabled_(events_.file_enabled()),
+          saved_flush_on_tick_end_(events_.flush_on_tick_end()),
+          saved_ring_capacity_(events_.ring_capacity()),
+          saved_path_(events_.path()),
+          saved_run_id_(events_.run_id()),
+          saved_tick_hz_(events_.tick_hz()) {
+        if (ring_capacity.has_value()) {
+            events_.set_ring_capacity(*ring_capacity);
+        }
+        if (event_log_path.has_value()) {
+            events_.set_path(*event_log_path);
+            events_.set_file_enabled(true);
+        }
+        events_.set_enabled(true);
+        events_.set_flush_on_tick_end(true);
+        events_.set_tick_hz(static_cast<double>(tick_hz));
+        events_.set_run_id(make_env_run_event_run_id(backend_name));
+        events_.ensure_run_started("", event_capabilities_json(backend_name, backend_info, reset_supported, realtime));
+    }
+
+    ~scoped_env_run_event_log() {
+        events_.set_tick_hz(saved_tick_hz_);
+        events_.set_run_id(saved_run_id_);
+        events_.set_path(saved_path_);
+        events_.set_ring_capacity(saved_ring_capacity_);
+        events_.set_flush_on_tick_end(saved_flush_on_tick_end_);
+        events_.set_file_enabled(saved_file_enabled_);
+        events_.set_enabled(saved_enabled_);
+    }
+
+    bt::event_log& get() noexcept { return events_; }
+
+private:
+    bt::event_log& events_;
+    bool saved_enabled_;
+    bool saved_file_enabled_;
+    bool saved_flush_on_tick_end_;
+    std::size_t saved_ring_capacity_;
+    std::string saved_path_;
+    std::string saved_run_id_;
+    double saved_tick_hz_;
+};
+
 value invoke_callable_unary(value fn, value arg, const std::string& where) {
     if (!is_callable(fn)) {
         throw lisp_error(where + ": expected callable");
@@ -463,6 +576,149 @@ value build_tick_record(std::int64_t tick_index,
         map_set_symbol(record, "error", make_string(error_reason));
     }
     return record;
+}
+
+value make_canonical_tick_data(std::int64_t tick_index,
+                               value obs,
+                               value action,
+                               value on_tick_result,
+                               std::optional<std::string> schema_version,
+                               double tick_budget_ms,
+                               double tick_time_ms,
+                               bool used_fallback,
+                               bool overrun,
+                               const std::string& status_text,
+                               const std::string& error_reason) {
+    value record = build_tick_record(tick_index,
+                                     obs,
+                                     action,
+                                     on_tick_result,
+                                     std::move(schema_version),
+                                     tick_budget_ms,
+                                     tick_time_ms,
+                                     used_fallback,
+                                     overrun,
+                                     error_reason);
+    map_set_symbol(record, "status", make_string(status_text));
+    return record;
+}
+
+void emit_canonical_tick_begin(bt::event_log& events,
+                               std::int64_t tick_index,
+                               value obs,
+                               std::optional<std::string> schema_version,
+                               double tick_budget_ms) {
+    value data = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&data);
+    roots.add(&obs);
+
+    map_set_symbol(data, "obs", obs);
+    map_set_symbol(data, "tick_budget_ms", make_float(tick_budget_ms));
+    if (const auto t_ms = map_lookup_option(obs, "t_ms")) {
+        map_set_symbol(data, "obs_t_ms", *t_ms);
+    }
+    if (schema_version.has_value()) {
+        map_set_symbol(data, "schema_version", make_string(*schema_version));
+    }
+    (void)events.emit(muesli_bt::contract::kEventTickBegin, static_cast<std::uint64_t>(tick_index), value_to_json(data));
+}
+
+void emit_canonical_tick_end(bt::event_log& events,
+                             std::int64_t tick_index,
+                             value obs,
+                             value action,
+                             value on_tick_result,
+                             std::optional<std::string> schema_version,
+                             double tick_budget_ms,
+                             double tick_time_ms,
+                             bool used_fallback,
+                             bool overrun,
+                             const std::string& status_text,
+                             const std::string& error_reason) {
+    value data = make_canonical_tick_data(tick_index,
+                                          obs,
+                                          action,
+                                          on_tick_result,
+                                          std::move(schema_version),
+                                          tick_budget_ms,
+                                          tick_time_ms,
+                                          used_fallback,
+                                          overrun,
+                                          status_text,
+                                          error_reason);
+    gc_root_scope roots(default_gc());
+    roots.add(&data);
+    (void)events.emit(muesli_bt::contract::kEventTickEnd, static_cast<std::uint64_t>(tick_index), value_to_json(data));
+}
+
+void emit_canonical_error(bt::event_log& events,
+                          const std::string& component,
+                          const std::string& message,
+                          std::optional<std::uint64_t> tick = std::nullopt) {
+    std::ostringstream data;
+    data << "{\"severity\":\"error\",\"component\":\"" << json_escape(component)
+         << "\",\"message\":\"" << json_escape(message) << "\"}";
+    (void)events.emit("error", tick, data.str());
+}
+
+void emit_canonical_episode_begin(bt::event_log& events,
+                                  std::int64_t episode_index,
+                                  std::int64_t episode_max,
+                                  std::int64_t step_max,
+                                  std::int64_t steps_total_before_episode) {
+    value data = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&data);
+    map_set_symbol(data, "episode", make_integer(episode_index));
+    map_set_symbol(data, "episode_max", make_integer(episode_max));
+    map_set_symbol(data, "step_max", make_integer(step_max));
+    map_set_symbol(data, "steps_total_before_episode", make_integer(steps_total_before_episode));
+    (void)events.emit(muesli_bt::contract::kEventEpisodeBegin, std::nullopt, value_to_json(data));
+}
+
+void emit_canonical_episode_end(bt::event_log& events,
+                                std::int64_t episode_index,
+                                std::int64_t episode_steps,
+                                std::int64_t steps_total,
+                                std::int64_t fallback_count,
+                                std::int64_t overrun_count,
+                                const std::string& status_text,
+                                const std::string& reason,
+                                std::optional<std::uint64_t> tick = std::nullopt) {
+    value data = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&data);
+    map_set_symbol(data, "episode", make_integer(episode_index));
+    map_set_symbol(data, "episode_steps", make_integer(episode_steps));
+    map_set_symbol(data, "steps_total", make_integer(steps_total));
+    map_set_symbol(data, "fallback_count", make_integer(fallback_count));
+    map_set_symbol(data, "overrun_count", make_integer(overrun_count));
+    map_set_symbol(data, "status", make_string(status_text));
+    map_set_symbol(data, "reason", make_string(reason));
+    (void)events.emit(muesli_bt::contract::kEventEpisodeEnd, tick, value_to_json(data));
+}
+
+void emit_canonical_run_end(bt::event_log& events,
+                            const std::string& status_text,
+                            const std::string& reason,
+                            std::int64_t episodes_completed,
+                            std::int64_t steps_total,
+                            std::int64_t last_episode_steps,
+                            std::int64_t fallback_count,
+                            std::int64_t overrun_count,
+                            std::optional<std::uint64_t> tick = std::nullopt) {
+    value data = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&data);
+    map_set_symbol(data, "status", make_string(status_text));
+    map_set_symbol(data, "reason", make_string(reason));
+    map_set_symbol(data, "episodes_completed", make_integer(episodes_completed));
+    map_set_symbol(data, "steps_total", make_integer(steps_total));
+    map_set_symbol(data, "last_episode_steps", make_integer(last_episode_steps));
+    map_set_symbol(data, "fallback_count", make_integer(fallback_count));
+    map_set_symbol(data, "overrun_count", make_integer(overrun_count));
+    (void)events.emit(muesli_bt::contract::kEventRunEnd, tick, value_to_json(data));
 }
 
 void emit_record(value observer_fn, bool has_observer, const std::string& log_path, value record) {
@@ -693,6 +949,7 @@ value builtin_env_run_loop(const std::vector<value>& args) {
     }
 
     const std::shared_ptr<env_backend> backend = attached_backend_or_throw();
+    const std::string backend_name = env_api_attached_backend_name();
 
     value config = args[0];
     value on_tick_fn = args[1];
@@ -809,13 +1066,40 @@ value builtin_env_run_loop(const std::vector<value>& args) {
         runtime_state().steps_per_tick = parsed;
     }
 
+    std::optional<std::string> event_log_path{};
+    if (const auto path_opt = map_lookup_option(config, "event_log_path")) {
+        if (!is_string(*path_opt)) {
+            throw lisp_error("env.run-loop :event_log_path: expected string");
+        }
+        event_log_path = string_value(*path_opt);
+    } else if (!runtime_state().event_log_path.empty()) {
+        event_log_path = runtime_state().event_log_path;
+    }
+
+    std::optional<std::size_t> event_log_ring_size{};
+    if (const auto ring_opt = map_lookup_option(config, "event_log_ring_size")) {
+        const std::int64_t parsed = require_int(*ring_opt, "env.run-loop :event_log_ring_size");
+        if (parsed < 0) {
+            throw lisp_error("env.run-loop :event_log_ring_size: expected >= 0");
+        }
+        event_log_ring_size = static_cast<std::size_t>(parsed);
+    } else if (runtime_state().event_log_ring_size >= 0) {
+        event_log_ring_size = static_cast<std::size_t>(runtime_state().event_log_ring_size);
+    }
+
     try {
         backend->configure(config);
     } catch (const std::exception& e) {
         throw lisp_error(std::string("env.run-loop: ") + e.what());
     }
 
+    value backend_info = backend->info();
+    roots.add(&backend_info);
+
     const bool backend_supports_reset = backend->supports().reset;
+    scoped_env_run_event_log canonical_events_scope(
+        backend_name, backend_info, backend_supports_reset, realtime, tick_hz, event_log_path, event_log_ring_size);
+    bt::event_log& canonical_events = canonical_events_scope.get();
     std::optional<std::int64_t> seed{};
     if (const auto seed_opt = map_lookup_option(config, "seed")) {
         seed = require_int(*seed_opt, "env.run-loop :seed");
@@ -856,8 +1140,27 @@ value builtin_env_run_loop(const std::vector<value>& args) {
         return out;
     };
 
+    auto finish_run = [&](const std::string& status_symbol, const std::string& reason) {
+        std::string status_text = status_symbol;
+        if (!status_text.empty() && status_text.front() == ':') {
+            status_text.erase(status_text.begin());
+        }
+        emit_canonical_run_end(canonical_events,
+                               status_text,
+                               reason,
+                               episodes_completed,
+                               steps_total,
+                               last_episode_steps,
+                               fallback_count,
+                               overrun_count,
+                               steps_total > 0 ? std::optional<std::uint64_t>(static_cast<std::uint64_t>(steps_total))
+                                               : std::nullopt);
+        return make_result(status_symbol, reason);
+    };
+
     if (episode_max > 1 && !backend_supports_reset) {
-        return make_result(":unsupported", "episode_max>1 requires env.reset capability");
+        emit_canonical_error(canonical_events, "env.run-loop", "episode_max>1 requires env.reset capability");
+        return finish_run(":unsupported", "episode_max>1 requires env.reset capability");
     }
 
     for (std::int64_t episode_index = 0; episode_index < episode_max; ++episode_index) {
@@ -869,6 +1172,7 @@ value builtin_env_run_loop(const std::vector<value>& args) {
             try {
                 obs = backend->reset(seed);
             } catch (const std::exception& e) {
+                emit_canonical_error(canonical_events, "env.run-loop", std::string("reset failed: ") + e.what());
                 throw lisp_error(std::string("env.run-loop: reset failed: ") + e.what());
             }
             env_runtime_state& state = runtime_state();
@@ -880,6 +1184,8 @@ value builtin_env_run_loop(const std::vector<value>& args) {
             final_obs = obs;
         }
 
+        emit_canonical_episode_begin(canonical_events, episode_index + 1, episode_max, step_max, steps_total);
+
         for (std::int64_t k = 0; k < step_max; ++k) {
             bool used_fallback = false;
             bool overrun = false;
@@ -890,6 +1196,8 @@ value builtin_env_run_loop(const std::vector<value>& args) {
                 obs = backend->observe();
                 enrich_observation(obs);
                 final_obs = obs;
+                const double tick_budget_ms = 1000.0 / static_cast<double>(tick_hz);
+                emit_canonical_tick_begin(canonical_events, steps_total + 1, obs, tick_schema, tick_budget_ms);
 
                 on_tick_result = invoke_callable_unary(on_tick_fn, obs, "env.run-loop on_tick");
                 if (is_map(on_tick_result)) {
@@ -938,7 +1246,6 @@ value builtin_env_run_loop(const std::vector<value>& args) {
                 const auto tick_finished = std::chrono::steady_clock::now();
                 const double tick_time_ms =
                     std::chrono::duration<double, std::milli>(tick_finished - tick_started).count();
-                const double tick_budget_ms = 1000.0 / static_cast<double>(tick_hz);
 
                 tick_record = build_tick_record(steps_total,
                                                 obs,
@@ -952,12 +1259,6 @@ value builtin_env_run_loop(const std::vector<value>& args) {
                                                 {});
                 emit_record(observer_fn, has_observer, log_path, tick_record);
 
-                if (!can_continue) {
-                    episodes_completed = episode_index + 1;
-                    last_episode_steps = episode_steps;
-                    return make_result(":stopped", "backend step returned false");
-                }
-
                 bool success = false;
                 if (has_success_predicate) {
                     success = is_truthy(invoke_callable_unary(success_predicate, obs, "env.run-loop success_predicate"));
@@ -965,10 +1266,54 @@ value builtin_env_run_loop(const std::vector<value>& args) {
                     success = obs_done(obs) || on_tick_result_indicates_success(on_tick_result);
                 }
 
+                std::string tick_status = "running";
+                if (!can_continue) {
+                    tick_status = "stopped";
+                } else if (stop_on_success && success) {
+                    tick_status = "ok";
+                }
+
+                emit_canonical_tick_end(canonical_events,
+                                        steps_total,
+                                        obs,
+                                        chosen_action,
+                                        on_tick_result,
+                                        tick_schema,
+                                        tick_budget_ms,
+                                        tick_time_ms,
+                                        used_fallback,
+                                        overrun,
+                                        tick_status,
+                                        {});
+
+                if (!can_continue) {
+                    episodes_completed = episode_index + 1;
+                    last_episode_steps = episode_steps;
+                    emit_canonical_episode_end(canonical_events,
+                                               episode_index + 1,
+                                               episode_steps,
+                                               steps_total,
+                                               fallback_count,
+                                               overrun_count,
+                                               "stopped",
+                                               "backend step returned false",
+                                               static_cast<std::uint64_t>(steps_total));
+                    return finish_run(":stopped", "backend step returned false");
+                }
+
                 if (stop_on_success && success) {
                     episodes_completed = episode_index + 1;
                     last_episode_steps = episode_steps;
-                    return make_result(":ok", "success predicate satisfied");
+                    emit_canonical_episode_end(canonical_events,
+                                               episode_index + 1,
+                                               episode_steps,
+                                               steps_total,
+                                               fallback_count,
+                                               overrun_count,
+                                               "ok",
+                                               "success predicate satisfied",
+                                               static_cast<std::uint64_t>(steps_total));
+                    return finish_run(":ok", "success predicate satisfied");
                 }
             } catch (const std::exception& e) {
                 std::string error_reason = e.what();
@@ -1014,17 +1359,52 @@ value builtin_env_run_loop(const std::vector<value>& args) {
                                                 overrun,
                                                 error_reason);
                 emit_record(observer_fn, has_observer, log_path, tick_record);
+                emit_canonical_tick_end(canonical_events,
+                                        steps_total,
+                                        final_obs,
+                                        safety_action,
+                                        on_tick_result,
+                                        tick_schema,
+                                        tick_budget_ms,
+                                        tick_time_ms,
+                                        true,
+                                        overrun,
+                                        "error",
+                                        error_reason);
+                emit_canonical_error(canonical_events,
+                                     "env.run-loop",
+                                     error_reason,
+                                     static_cast<std::uint64_t>(steps_total));
                 episodes_completed = episode_index + 1;
                 last_episode_steps = episode_steps;
-                return make_result(":error", error_reason);
+                emit_canonical_episode_end(canonical_events,
+                                           episode_index + 1,
+                                           episode_steps,
+                                           steps_total,
+                                           fallback_count,
+                                           overrun_count,
+                                           "error",
+                                           error_reason,
+                                           static_cast<std::uint64_t>(steps_total));
+                return finish_run(":error", error_reason);
             }
         }
 
         ++episodes_completed;
         last_episode_steps = episode_steps;
+        emit_canonical_episode_end(canonical_events,
+                                   episode_index + 1,
+                                   episode_steps,
+                                   steps_total,
+                                   fallback_count,
+                                   overrun_count,
+                                   "boundary_reached",
+                                   "step_max reached",
+                                   steps_total > 0 ? std::optional<std::uint64_t>(static_cast<std::uint64_t>(steps_total))
+                                                   : std::nullopt);
     }
 
-    return make_result(":stopped", "episode_max reached");
+    return finish_run(":stopped", "episode_max reached");
 }
 
 }  // namespace

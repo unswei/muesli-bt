@@ -11,6 +11,7 @@ from typing import Iterable
 
 
 DEFAULT_SCHEMA = pathlib.Path("schemas/event_log/v1/mbt.evt.v1.schema.json")
+DEFAULT_EVENT_LOG_NAME = "events.jsonl"
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -20,7 +21,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=str(DEFAULT_SCHEMA),
         help=f"Path to JSON Schema file (default: {DEFAULT_SCHEMA}).",
     )
-    parser.add_argument("logs", nargs="+", help="One or more JSONL log files.")
+    parser.add_argument(
+        "logs",
+        nargs="+",
+        help="One or more JSONL log files, or artefact directories containing events.jsonl.",
+    )
     return parser.parse_args(argv)
 
 
@@ -38,6 +43,13 @@ def iter_lines(path: pathlib.Path) -> Iterable[tuple[int, str]]:
             if not text:
                 continue
             yield idx, text
+
+
+def resolve_log_path(path_arg: str) -> pathlib.Path:
+    path = pathlib.Path(path_arg)
+    if path.is_dir():
+        return path / DEFAULT_EVENT_LOG_NAME
+    return path
 
 
 def main(argv: list[str]) -> int:
@@ -67,7 +79,7 @@ def main(argv: list[str]) -> int:
 
     had_error = False
     for log_arg in args.logs:
-        log_path = pathlib.Path(log_arg)
+        log_path = resolve_log_path(log_arg)
         if not log_path.is_file():
             print(f"error: log file not found: {log_path}", file=sys.stderr)
             had_error = True

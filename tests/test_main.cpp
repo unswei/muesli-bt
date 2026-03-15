@@ -3262,6 +3262,83 @@ void test_env_run_loop_multi_episode_reset_false() {
           "unsupported run-loop message should mention reset requirement");
 }
 
+void test_env_run_loop_multi_episode_canonical_summary_events() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    auto backend = std::make_shared<test_loop_backend>(true, 1000);
+    env_ptr env = create_env_with_test_loop_backend(backend);
+
+    (void)eval_text("(env.attach \"loop-test\")", env);
+    (void)eval_text(
+        "(define on-tick-loop-events "
+        "  (lambda (obs) "
+        "    (begin "
+        "      (define a (map.make)) "
+        "      (map.set! a 'action_schema \"test.loop.action.v1\") "
+        "      (map.set! a 'u (list 0.0)) "
+        "      a)))",
+        env);
+
+    const std::filesystem::path event_log_path = temp_file_path("env_runloop_multi_episode", ".jsonl");
+    const std::string event_log_lisp = lisp_string_literal(event_log_path.string());
+
+    (void)eval_text(
+        "(env.run-loop "
+        "  (begin "
+        "    (define cfg (map.make)) "
+        "    (map.set! cfg 'tick_hz 1000) "
+        "    (map.set! cfg 'max_ticks 99) "
+        "    (map.set! cfg 'step_max 2) "
+        "    (map.set! cfg 'episode_max 3) "
+        "    (map.set! cfg 'stop_on_success #f) "
+        "    (map.set! cfg 'event_log_path " +
+            event_log_lisp +
+            ") "
+            "    cfg) "
+            "  on-tick-loop-events)",
+        env);
+
+    std::ifstream in(event_log_path);
+    check(in.good(), "expected env.run-loop multi-episode canonical event log to exist");
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty()) {
+            lines.push_back(line);
+        }
+    }
+
+    auto count_type = [&](std::string_view type) {
+        std::size_t count = 0;
+        const std::string needle = "\"type\":\"" + std::string(type) + "\"";
+        for (const std::string& item : lines) {
+            if (item.find(needle) != std::string::npos) {
+                ++count;
+            }
+        }
+        return count;
+    };
+
+    check(count_type("run_start") == 1, "multi-episode canonical log should emit one run_start");
+    check(count_type("episode_begin") == 3, "multi-episode canonical log should emit three episode_begin events");
+    check(count_type("tick_begin") == 6, "multi-episode canonical log should emit six tick_begin events");
+    check(count_type("tick_end") == 6, "multi-episode canonical log should emit six tick_end events");
+    check(count_type("episode_end") == 3, "multi-episode canonical log should emit three episode_end events");
+    check(count_type("run_end") == 1, "multi-episode canonical log should emit one run_end");
+
+    const std::string& last = lines.back();
+    check(last.find("\"type\":\"run_end\"") != std::string::npos, "last event should be run_end");
+    check(last.find("\"episodes_completed\":3") != std::string::npos, "run_end should record episodes_completed");
+    check(last.find("\"steps_total\":6") != std::string::npos, "run_end should record steps_total");
+    check(last.find("\"last_episode_steps\":2") != std::string::npos, "run_end should record last_episode_steps");
+    check(last.find("\"status\":\"stopped\"") != std::string::npos, "run_end should record final status");
+    check(last.find("\"reason\":\"episode_max reached\"") != std::string::npos, "run_end should record final reason");
+
+    std::error_code ec;
+    std::filesystem::remove(event_log_path, ec);
+}
+
 void test_env_core_interface_unattached() {
     using namespace muslisp;
 
@@ -3447,6 +3524,75 @@ void test_env_run_loop_log_record_shape() {
 
     bt::clear_racecar_demo_state();
 }
+
+void test_env_run_loop_emits_canonical_event_log() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    bt::runtime_host& host = bt::default_runtime_host();
+    bt::install_racecar_demo_callbacks(host);
+    env_ptr env = create_env_with_pybullet_extension();
+
+    auto adapter = std::make_shared<mock_racecar_adapter>();
+    bt::set_racecar_sim_adapter(adapter);
+
+    (void)eval_text("(env.attach \"pybullet\")", env);
+
+    const std::filesystem::path event_log_path = temp_file_path("env_runloop_events", ".jsonl");
+    const std::string event_log_lisp = lisp_string_literal(event_log_path.string());
+
+    (void)eval_text(
+        "(define on-tick-canonical "
+        "  (lambda (obs) "
+        "    (begin "
+        "      (define a (map.make)) "
+        "      (map.set! a 'action_schema \"racecar.action.v1\") "
+        "      (map.set! a 'u (list 0.0 0.1)) "
+        "      a)))",
+        env);
+
+    const std::string run_expr =
+        "(define run-result-canonical "
+        "  (env.run-loop "
+        "    (begin "
+        "      (define cfg (map.make)) "
+        "      (define safe (map.make)) "
+        "      (map.set! safe 'action_schema \"racecar.action.v1\") "
+        "      (map.set! safe 'u (list 0.0 0.0)) "
+        "      (map.set! cfg 'tick_hz 1000) "
+        "      (map.set! cfg 'max_ticks 1) "
+        "      (map.set! cfg 'realtime #f) "
+        "      (map.set! cfg 'safe_action safe) "
+        "      (map.set! cfg 'schema_version \"racecar.loop.v1\") "
+        "      (map.set! cfg 'event_log_path " +
+        event_log_lisp +
+        ") "
+        "      cfg) "
+        "    on-tick-canonical))";
+    (void)eval_text(run_expr, env);
+
+    std::ifstream in(event_log_path);
+    check(in.good(), "expected env.run-loop canonical event log to exist");
+    std::vector<std::string> lines;
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty()) {
+            lines.push_back(line);
+        }
+    }
+    check(lines.size() == 3, "expected run_start + tick_begin + tick_end canonical events");
+    check(lines[0].find("\"schema\":\"mbt.evt.v1\"") != std::string::npos, "run_start line should use canonical schema");
+    check(lines[0].find("\"type\":\"run_start\"") != std::string::npos, "first canonical event should be run_start");
+    check(lines[1].find("\"type\":\"tick_begin\"") != std::string::npos, "second canonical event should be tick_begin");
+    check(lines[2].find("\"type\":\"tick_end\"") != std::string::npos, "third canonical event should be tick_end");
+    check(lines[2].find("\"schema_version\":\"racecar.loop.v1\"") != std::string::npos,
+          "tick_end canonical event should include schema_version");
+
+    std::error_code ec;
+    std::filesystem::remove(event_log_path, ec);
+
+    bt::clear_racecar_demo_state();
+}
 #endif
 
 void test_pybullet_backend_absent_in_core_env() {
@@ -3538,6 +3684,15 @@ void test_env_generic_ros2_backend_contract() {
           "ros2 env.info obs_topic mismatch");
     check(string_value(eval_text("(map.get (env.info) 'action_topic \"\")", env)) == "/robot/cmd_vel",
           "ros2 env.info action_topic mismatch");
+    check(string_value(eval_text("(map.get (env.info) 'time_source \"\")", env)) == "ros_wall_time",
+          "ros2 env.info time_source mismatch");
+    check(string_value(eval_text("(map.get (env.info) 'obs_timestamp_source \"\")", env)) == "message_header_or_node_clock",
+          "ros2 env.info obs_timestamp_source mismatch");
+    check(!boolean_value(eval_text("(map.get (map.get (env.info) 'config (map.make)) 'use_sim_time #t)", env)),
+          "ros2 env.info config use_sim_time mismatch");
+    check(string_value(eval_text("(map.get (map.get (env.info) 'config (map.make)) 'time_source \"\")", env)) ==
+              "ros_wall_time",
+          "ros2 env.info config time_source mismatch");
 
     (void)eval_text("(define obs0 (env.reset 42))", env);
     value obs0 = eval_text("obs0", env);
@@ -3627,6 +3782,7 @@ void test_env_generic_ros2_backend_contract() {
         "      (map.set! cfg 'tick_hz 1000) "
         "      (map.set! cfg 'max_ticks 2) "
         "      (map.set! cfg 'safe_action safe) "
+        "      (map.set! cfg 'event_log_path \"logs/ros2_test_run.mbt.evt.v1.jsonl\") "
         "      cfg) "
         "    on-tick-ros2))",
         env);
@@ -3638,6 +3794,30 @@ void test_env_generic_ros2_backend_contract() {
           "ros2 env.run-loop episodes mismatch");
     check(harness.wait_for_command_count(3, std::chrono::milliseconds(250)),
           "ros2 env.run-loop should publish actions through cmd_vel");
+    value ros2_events = eval_text("(events.dump 8)", env);
+    check(is_proper_list(ros2_events), "events.dump should return list after ros2 run-loop");
+    const auto ros2_event_rows = vector_from_list(ros2_events);
+    bool saw_run_start = false;
+    bool saw_time_source = false;
+    bool saw_obs_timestamp_source = false;
+    for (value row : ros2_event_rows) {
+        if (!is_string(row)) {
+            continue;
+        }
+        const std::string text = string_value(row);
+        if (text.find("\"type\":\"run_start\"") != std::string::npos) {
+            saw_run_start = true;
+            if (text.find("\"time_source\":\"ros_wall_time\"") != std::string::npos) {
+                saw_time_source = true;
+            }
+            if (text.find("\"obs_timestamp_source\":\"message_header_or_node_clock\"") != std::string::npos) {
+                saw_obs_timestamp_source = true;
+            }
+        }
+    }
+    check(saw_run_start, "ros2 env.run-loop should emit canonical run_start");
+    check(saw_time_source, "ros2 env.run-loop run_start should record time_source");
+    check(saw_obs_timestamp_source, "ros2 env.run-loop run_start should record obs_timestamp_source");
 }
 
 void test_ros2_backend_config_validation_and_reset_policy() {
@@ -4081,6 +4261,8 @@ int main() {
         {"env core interface unattached", test_env_core_interface_unattached},
         {"env run-loop multi-episode reset=true", test_env_run_loop_multi_episode_reset_true},
         {"env run-loop multi-episode reset=false", test_env_run_loop_multi_episode_reset_false},
+        {"env run-loop multi-episode canonical summary events",
+         test_env_run_loop_multi_episode_canonical_summary_events},
         {"event log deterministic mode + canonical serialisation", test_event_log_deterministic_mode_and_canonical_serialisation},
         {"event log capture stats without serialised sink", test_event_log_capture_stats_without_serialised_sink},
         {"runtime host deterministic test mode", test_runtime_host_deterministic_test_mode},
@@ -4089,6 +4271,7 @@ int main() {
 #if MUESLI_BT_WITH_PYBULLET_INTEGRATION
         {"env generic pybullet backend contract", test_env_generic_pybullet_backend_contract},
         {"env run-loop log record shape", test_env_run_loop_log_record_shape},
+        {"env run-loop canonical event log", test_env_run_loop_emits_canonical_event_log},
         {"pybullet backend present with extension", test_pybullet_backend_present_with_extension},
         {"racecar run-loop contract", test_racecar_loop_contract},
         {"racecar run-loop error safe-action", test_racecar_loop_error_safe_action},

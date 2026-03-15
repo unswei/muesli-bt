@@ -468,7 +468,6 @@ install(
   DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/contracts
 )
 
-install(FILES schema/mbt.evt.v1.schema.json DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/schema)
 install(FILES schemas/event_log/v1/mbt.evt.v1.schema.json
         DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/schemas/event_log/v1
 )

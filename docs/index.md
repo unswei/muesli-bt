@@ -30,7 +30,7 @@ If you are building tooling around runtime data, start with:
 cmake --preset dev
 cmake --build --preset dev -j
 ctest --preset dev -R muesli_bt_conformance_tests --output-on-failure
-python3 tools/validate_log.py --schema schemas/event_log/v1/mbt.evt.v1.schema.json tests/fixtures/mbt.evt.v1/*.jsonl
+python3 tools/validate_log.py --schema schemas/event_log/v1/mbt.evt.v1.schema.json tests/fixtures/mbt.evt.v1/*
 ```
 
 ## demos

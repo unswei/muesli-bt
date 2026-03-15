@@ -7,6 +7,9 @@ namespace muesli_bt::contract {
 inline constexpr std::string_view kSchemaName = "mbt.evt.v1";
 
 inline constexpr std::string_view kEventRunStart = "run_start";
+inline constexpr std::string_view kEventRunEnd = "run_end";
+inline constexpr std::string_view kEventEpisodeBegin = "episode_begin";
+inline constexpr std::string_view kEventEpisodeEnd = "episode_end";
 inline constexpr std::string_view kEventBtDef = "bt_def";
 inline constexpr std::string_view kEventTickBegin = "tick_begin";
 inline constexpr std::string_view kEventTickEnd = "tick_end";

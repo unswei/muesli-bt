@@ -62,7 +62,7 @@ or:
 Validate and verify fixtures:
 
 ```bash
-python3 tools/validate_log.py --schema schemas/event_log/v1/mbt.evt.v1.schema.json tests/fixtures/mbt.evt.v1/*.jsonl
+python3 tools/validate_log.py --schema schemas/event_log/v1/mbt.evt.v1.schema.json tests/fixtures/mbt.evt.v1/*
 python3 tools/fixtures/verify_fixture.py
 ```
 
@@ -70,6 +70,24 @@ Verify docs snippet freshness against `examples/**` source files:
 
 ```bash
 python3 scripts/check_docs_snippet_freshness.py
+```
+
+Verify ROS-backed replay artefacts from the canonical event log:
+
+```bash
+python3 tools/verify_ros2_l2_artifacts.py \
+  --artifact-root build/linux-ros2-l2/ros2_l2_artifacts
+python3 tools/validate_log.py build/linux-ros2-l2/ros2_l2_artifacts/ros2_h1_success
+```
+
+This tool is mainly for CI, release verification, replay/conformance checks, and regression diagnosis.
+It is not part of the normal robot control path.
+
+The same canonical consumer path also applies to simulator-backed and fixture-backed runs:
+
+```bash
+python3 tools/validate_log.py fixtures/determinism-replay-case
+python3 tools/validate_log.py build/linux-ros2-l2/ros2_l2_artifacts/ros2_h1_success
 ```
 
 ## Deterministic BT Tests
@@ -80,6 +98,14 @@ For deterministic BT tests:
 - isolate one semantic rule per test
 - avoid reliance on wall-clock timing where possible
 - when async behaviour is needed, bound wait loops tightly
+
+For replay expectations:
+
+- treat `seq` as the strict ordering key
+- treat `tick` as the BT execution index
+- treat `unix_ms` and ROS observation timestamps as bounded timing metadata, not as the primary correctness oracle
+- treat timestamp-only drift differently from event-order or decision-payload drift
+- for long multi-episode runs, inspect `episode_end` and `run_end` first before drilling down into every `tick_end`
 
 ## benchmark suite
 

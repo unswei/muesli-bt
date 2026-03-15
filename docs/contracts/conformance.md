@@ -54,6 +54,10 @@ Use this page when:
     - `fixtures/<name>/expected_metrics.json`
     - `fixtures/<name>/manifest.json`
 
+ROS-backed `L2` artefacts follow the same canonical log naming:
+
+- `ros2_l2_artifacts/<scenario>/events.jsonl`
+
 ## api / syntax
 
 Run L0 locally:
@@ -96,7 +100,7 @@ source /opt/ros/humble/setup.bash
 ./build/linux-ros2/muslisp_ros2 examples/repl_scripts/ros2-live-odom-twist.lisp
 ```
 
-This writes `build/linux-ros2/ros2-live-run.jsonl`. The full topic-publisher recipe is documented in [ros2 backend scope](../integration/ros2-backend-scope.md).
+This can write a canonical event log such as `build/linux-ros2/ros2-live-run/events.jsonl` when the script configures `event_log_path`. The full topic-publisher recipe is documented in [ros2 backend scope](../integration/ros2-backend-scope.md).
 
 Run the current rosbag-backed `L2` replay corpus locally:
 
@@ -112,6 +116,22 @@ cmake -S . -B build/linux-ros2-l2 -G Ninja \
 cmake --build build/linux-ros2-l2 --target muesli_bt_conformance_l2_rosbag_tests -j
 ctest --test-dir build/linux-ros2-l2 -R muesli_bt_conformance_l2_rosbag_tests --output-on-failure
 python3 tools/verify_ros2_l2_artifacts.py --artifact-root build/linux-ros2-l2/ros2_l2_artifacts
+python3 tools/validate_log.py build/linux-ros2-l2/ros2_l2_artifacts/ros2_h1_success
+```
+
+This verifier is the supported ROS-backed replay/conformance check for the current `L2` lane.
+It validates canonical `mbt.evt.v1` output first, together with the scenario summaries produced by the rosbag suite.
+
+For tooling consumers, the important part is that simulator-backed runs and ROS-backed runs now expose the same canonical artefact path:
+
+- artefact directory
+- `events.jsonl`
+
+That means a validator or replay consumer can inspect both with the same entry point:
+
+```bash
+python3 tools/validate_log.py fixtures/determinism-replay-case
+python3 tools/validate_log.py build/linux-ros2-l2/ros2_l2_artifacts/ros2_h1_success
 ```
 
 Verify install/export plus the ROS2 consumer smoke:
@@ -171,6 +191,8 @@ Published pre-Linux ROS2 surrogate bundles:
 - The first Linux milestone keeps real reset unsupported; `reset_mode="stub"` remains reserved for deterministic harnesses and tests.
 - L2 failures now block ordinary CI for Linux ROS2 changes, so keep replay scenarios deterministic and narrowly scoped.
 - Deterministic fixtures are provenance-controlled; edit through update tooling only.
+- Deterministic replay claims apply to fixed-input fixture runs and deterministic harness lanes. Live ROS timing remains only bounded, not fully deterministic.
+- When replay verification fails, check `seq` ordering and event invariants first. Treat timestamp-only drift as a timing/context issue unless decision payloads also diverge.
 
 ## see also
 

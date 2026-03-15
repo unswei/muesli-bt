@@ -10,7 +10,7 @@ Applies backend/runtime options before stepping or loop execution.
 
 - Arguments: map of options
 
-    - common runtime keys include `tick_hz`, `steps_per_tick`, `seed`, `headless`, `realtime`, `log_path`
+    - common runtime keys include `tick_hz`, `steps_per_tick`, `seed`, `headless`, `realtime`, `log_path`, `event_log_path`, `event_log_ring_size`
     - backend-specific keys are documented per backend
 
 - Return: `nil`
@@ -48,6 +48,7 @@ Applies backend/runtime options before stepping or loop execution.
 ## Notes
 
 - Keep runtime-generic keys and backend-specific keys explicit in docs.
+- `event_log_path` sets the default canonical `mbt.evt.v1` output path used by `env.run-loop`. Prefer an artefact directory layout ending in `events.jsonl`.
 - ROS2 bring-up config is documented in the integration docs and rejects malformed or unknown backend-specific keys.
 
 ## See Also

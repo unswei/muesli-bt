@@ -15,7 +15,7 @@ Supports single-episode and multi-episode execution.
     - `config-map` with required keys `tick_hz`, `max_ticks`
     - `on-tick-fn` callable receiving one argument: observation map
 
-- Optional config keys: `episode_max`, `step_max`, `steps_per_tick`, `seed`, `realtime`, `safe_action`, `stop_on_success`, `success_predicate`, `log_path`, `observer`
+- Optional config keys: `episode_max`, `step_max`, `steps_per_tick`, `seed`, `realtime`, `safe_action`, `stop_on_success`, `success_predicate`, `log_path`, `event_log_path`, `event_log_ring_size`, `observer`
 - Return map includes:
 
     - `status` in `:ok | :stopped | :error | :unsupported`
@@ -45,6 +45,14 @@ Supports single-episode and multi-episode execution.
 - missing required config keys
 - invalid config types
 - `on_tick` returns no usable action and no `safe_action` is configured
+
+## Logging
+
+- `log_path` writes the legacy per-tick run-loop record JSONL.
+- `event_log_path` writes canonical `mbt.evt.v1` events directly from `env.run-loop`.
+- `event_log_ring_size` controls the in-memory canonical event ring while the run is active.
+- For ROS-backed replay and conformance work, prefer `event_log_path` as the primary artefact.
+- For long-running multi-episode experiments, `event_log_path` also emits `episode_begin`, `episode_end`, and `run_end` summary events.
 
 ## Examples
 
@@ -113,6 +121,7 @@ Use `observer` when you want per-tick analytics without changing `on_tick` retur
   (map.set! cfg 'safe_action safe)
   (map.set! cfg 'observer observer)
   (map.set! cfg 'log_path "logs/run-loop-observer.jsonl")
+  (map.set! cfg 'event_log_path "logs/run-loop-observer/events.jsonl")
 
   (define result
     (env.run-loop
@@ -171,6 +180,8 @@ Use `observer` when you want per-tick analytics without changing `on_tick` retur
 - On runtime error, one safety action + one step is attempted before returning `:error`.
 - `fallback_count` tracks ticks where a fallback or safety action was actually used.
 - `stop_on_success` controls whether success ends the run early or continues until `episode_max`/`step_max`.
+- `event_log_path` is the canonical observability path. Prefer an artefact directory layout such as `.../events.jsonl` so simulator and ROS-backed runs use the same consumer path. Keep `log_path` only when you still need the per-tick run-loop record stream.
+- For long experiments, read `episode_end` and `run_end` first to build summaries, then inspect `tick_end` payloads only when you need drill-down detail.
 
 ## See Also
 

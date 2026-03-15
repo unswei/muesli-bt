@@ -24,6 +24,7 @@
   (map.set! run-cfg 'step_max 10)
   (map.set! run-cfg 'safe_action safe)
   (map.set! run-cfg 'log_path "build/linux-ros2/ros2-live-run.jsonl")
+  (map.set! run-cfg 'event_log_path "build/linux-ros2/ros2-live-run/events.jsonl")
 
   (define result
     (env.run-loop

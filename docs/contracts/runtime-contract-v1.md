@@ -169,6 +169,8 @@ Envelope guarantees:
 
 Minimum required runtime events:
 
+- run lifecycle: `run_start`, `run_end`
+- multi-episode loop lifecycle when applicable: `episode_begin`, `episode_end`
 - tick: `tick_begin`, `tick_end`
 - node: `node_enter`, `node_exit` (`node_status` retained for compatibility)
 - async: submit/poll/cancel/result plus cancel/drop events
@@ -182,6 +184,13 @@ Determinism scope:
     - node status trace matches
     - event ordering and deterministic timestamps match
     - planner outcomes match when backend/seed are deterministic
+
+Bounded-but-not-strictly-deterministic scope:
+
+- `unix_ms`
+- live ROS observation timing
+- wall-clock duration of long experiments
+- best-effort budget and overrun timing
 
 Code anchors:
 
