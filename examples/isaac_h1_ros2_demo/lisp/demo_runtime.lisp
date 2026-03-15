@@ -263,10 +263,11 @@
           (define has-sample (map.get flags 'has_sample #f))
           (define fresh-obs (map.get flags 'fresh_obs #f))
           (define t-ms (map.get obs 't_ms 0))
+          (define now-ms (time.now-ms))
           (define yaw (list-ref state-vec 2))
 
           (if fresh-obs
-              (map.set! runtime 'last_fresh_t_ms t-ms)
+              (map.set! runtime 'last_fresh_t_ms now-ms)
               nil)
 
           (map.set! runtime 'x (map.get pose 'x 0.0))
@@ -283,8 +284,8 @@
           (define heading-error (wrap-angle (- target-heading yaw)))
           (define stale-ms
             (if (= (map.get runtime 'last_fresh_t_ms 0) 0)
-                t-ms
-                (- t-ms (map.get runtime 'last_fresh_t_ms 0))))
+                now-ms
+                (- now-ms (map.get runtime 'last_fresh_t_ms 0))))
           (define initialising
             (or (< (map.get runtime 'tick_index 0) (map.get cfg 'stand_ticks 12))
                 (bool-not has-sample)))

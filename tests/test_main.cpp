@@ -3943,8 +3943,9 @@ void test_ros2_h1_demo_timeout_stop() {
 
     const std::string status = symbol_name(eval_text("(map.get (map.get demo-timeout 'result (map.make)) 'status ':none)", env));
     check(status == ":stopped", "H1 demo timeout path should stop on max_ticks after issuing timeout stop commands");
-    check(string_value(eval_text("(map.get (map.get demo-timeout 'runtime (map.make)) 'last_branch_name \"\")", env)) == "timeout_stop",
-          "H1 demo timeout path should end on timeout_stop");
+    const std::string branch_name =
+        string_value(eval_text("(map.get (map.get demo-timeout 'runtime (map.make)) 'last_branch_name \"\")", env));
+    check(branch_name == "timeout_stop", "H1 demo timeout path should end on timeout_stop (got " + branch_name + ")");
     check(harness.wait_for_command_count(1, std::chrono::milliseconds(250)),
           "H1 demo timeout path should publish a stop command");
     const auto last_command = harness.last_command();
