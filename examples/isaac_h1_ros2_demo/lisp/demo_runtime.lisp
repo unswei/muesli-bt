@@ -13,6 +13,9 @@
       0
       (+ 1 (list-len (cdr xs)))))
 
+(define (bool-not x)
+  (if x #f #t))
+
 (define (make-waypoint name x y heading)
   (begin
     (define wp (map.make))
@@ -284,14 +287,14 @@
                 (- t-ms (map.get runtime 'last_fresh_t_ms 0))))
           (define initialising
             (or (< (map.get runtime 'tick_index 0) (map.get cfg 'stand_ticks 12))
-                (not has-sample)))
+                (bool-not has-sample)))
           (define timeout-active
             (and has-sample
                  (> stale-ms (map.get cfg 'obs_timeout_ms 600))))
           (define need-turn
-            (and (not initialising)
-                 (not timeout-active)
-                 (not mission-complete)
+            (and (bool-not initialising)
+                 (bool-not timeout-active)
+                 (bool-not mission-complete)
                  (> (abs heading-error) (map.get cfg 'turn_tol 0.18))))
 
           (define act-stop stop-command)
@@ -333,7 +336,7 @@
                                    target
                                    heading-error
                                    stale-ms
-                                   (and has-sample (not timeout-active))))
+                                   (and has-sample (bool-not timeout-active))))
           (map.set! out 'done mission-complete)
           out)))
 
