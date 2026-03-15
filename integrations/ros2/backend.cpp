@@ -388,6 +388,8 @@ public:
             "headless",
             "realtime",
             "log_path",
+            "event_log_path",
+            "event_log_ring_size",
             "safe_action",
             "stop_on_success",
             "success_predicate",

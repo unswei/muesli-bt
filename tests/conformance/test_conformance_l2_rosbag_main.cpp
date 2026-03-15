@@ -368,8 +368,10 @@ muslisp::value decode_json_text(const std::string& text, muslisp::env_ptr env) {
 std::vector<muslisp::value> decode_json_lines(const std::vector<std::string>& lines, muslisp::env_ptr env) {
     std::vector<muslisp::value> decoded;
     decoded.reserve(lines.size());
+    muslisp::gc_root_scope roots(muslisp::default_gc());
     for (const std::string& line : lines) {
         decoded.push_back(decode_json_text(line, env));
+        roots.add(&decoded.back());
     }
     return decoded;
 }
@@ -620,27 +622,45 @@ void test_ros2_rosbag_replay_conformance() {
     check_close(command.angular.z, 0.05, 1e-6, "ros2 rosbag replay: angular.z mismatch");
 
     const auto lines = read_non_empty_lines(paths.event_log_path);
-    check(lines.size() == 5, "ros2 rosbag replay: expected five canonical events");
+    check(lines.size() == 8, "ros2 rosbag replay: expected eight canonical events");
     const auto events = decode_json_lines(lines, env);
     const auto run_start_events = select_events_by_type(events, "run_start");
+    const auto episode_begin_events = select_events_by_type(events, "episode_begin");
     check(run_start_events.size() == 1, "ros2 rosbag replay: expected one run_start event");
+    check(episode_begin_events.size() == 1, "ros2 rosbag replay: expected one episode_begin event");
     verify_run_start_time_policy(run_start_events[0], "ros2 rosbag replay run_start");
     const auto tick_begin_events = select_events_by_type(events, "tick_begin");
     const auto tick_end_events = select_events_by_type(events, "tick_end");
+    const auto episode_end_events = select_events_by_type(events, "episode_end");
+    const auto run_end_events = select_events_by_type(events, "run_end");
     check(tick_begin_events.size() == 2, "ros2 rosbag replay: expected two tick_begin events");
     check(tick_end_events.size() == 2, "ros2 rosbag replay: expected two tick_end events");
+    check(episode_end_events.size() == 1, "ros2 rosbag replay: expected one episode_end event");
+    check(run_end_events.size() == 1, "ros2 rosbag replay: expected one run_end event");
     verify_canonical_event_envelope(tick_begin_events[0], "tick_begin", "ros2 rosbag replay tick_begin1", 1);
     verify_canonical_event_envelope(tick_begin_events[1], "tick_begin", "ros2 rosbag replay tick_begin2", 2);
     verify_canonical_event_envelope(tick_end_events[0], "tick_end", "ros2 rosbag replay tick_end1", 1);
     verify_canonical_event_envelope(tick_end_events[1], "tick_end", "ros2 rosbag replay tick_end2", 2);
+    verify_canonical_event_envelope(episode_end_events[0], "episode_end", "ros2 rosbag replay episode_end", 2);
+    verify_canonical_event_envelope(run_end_events[0], "run_end", "ros2 rosbag replay run_end", 2);
     const value record1 = require_event_data(tick_end_events[0], "ros2 rosbag replay tick_end1");
     const value record2 = require_event_data(tick_end_events[1], "ros2 rosbag replay tick_end2");
+    const value episode_end = require_event_data(episode_end_events[0], "ros2 rosbag replay episode_end");
+    const value run_end = require_event_data(run_end_events[0], "ros2 rosbag replay run_end");
     verify_common_record_shape(record1, "ros2.l2.v1", 1, 1'700'000'000'000LL, false, false);
     verify_common_record_shape(record2, "ros2.l2.v1", 2, 1'700'000'000'040LL, false, false);
     check(require_text_field(record1, "status", "ros2 rosbag replay record1") == "running",
           "ros2 rosbag replay: record1 status mismatch");
-    check(require_text_field(record2, "status", "ros2 rosbag replay record2") == "stopped",
+    check(require_text_field(record2, "status", "ros2 rosbag replay record2") == "running",
           "ros2 rosbag replay: record2 status mismatch");
+    check(require_text_field(episode_end, "status", "ros2 rosbag replay episode_end") == "boundary_reached",
+          "ros2 rosbag replay: episode_end status mismatch");
+    check(require_text_field(episode_end, "reason", "ros2 rosbag replay episode_end") == "step_max reached",
+          "ros2 rosbag replay: episode_end reason mismatch");
+    check(require_text_field(run_end, "status", "ros2 rosbag replay run_end") == "stopped",
+          "ros2 rosbag replay: run_end status mismatch");
+    check(require_text_field(run_end, "reason", "ros2 rosbag replay run_end") == "episode_max reached",
+          "ros2 rosbag replay: run_end reason mismatch");
     verify_pose_x(record1, 0.2, "ros2 rosbag replay record1");
     verify_pose_x(record2, 1.6, "ros2 rosbag replay record2");
     verify_action_components(require_map_field(record1, "action", "ros2 rosbag replay record1"), 0.25, 0.0, 0.05,
@@ -754,27 +774,45 @@ void test_ros2_rosbag_clamp_conformance() {
     check_close(command.angular.z, 1.0, 1e-6, "ros2 rosbag clamp: angular.z should be clamped");
 
     const auto lines = read_non_empty_lines(paths.event_log_path);
-    check(lines.size() == 5, "ros2 rosbag clamp: expected five canonical events");
+    check(lines.size() == 8, "ros2 rosbag clamp: expected eight canonical events");
     const auto events = decode_json_lines(lines, env);
     const auto run_start_events = select_events_by_type(events, "run_start");
+    const auto episode_begin_events = select_events_by_type(events, "episode_begin");
     check(run_start_events.size() == 1, "ros2 rosbag clamp: expected one run_start event");
+    check(episode_begin_events.size() == 1, "ros2 rosbag clamp: expected one episode_begin event");
     verify_run_start_time_policy(run_start_events[0], "ros2 rosbag clamp run_start");
     const auto tick_begin_events = select_events_by_type(events, "tick_begin");
     const auto tick_end_events = select_events_by_type(events, "tick_end");
+    const auto episode_end_events = select_events_by_type(events, "episode_end");
+    const auto run_end_events = select_events_by_type(events, "run_end");
     check(tick_begin_events.size() == 2, "ros2 rosbag clamp: expected two tick_begin events");
     check(tick_end_events.size() == 2, "ros2 rosbag clamp: expected two tick_end events");
+    check(episode_end_events.size() == 1, "ros2 rosbag clamp: expected one episode_end event");
+    check(run_end_events.size() == 1, "ros2 rosbag clamp: expected one run_end event");
     verify_canonical_event_envelope(tick_begin_events[0], "tick_begin", "ros2 rosbag clamp tick_begin1", 1);
     verify_canonical_event_envelope(tick_begin_events[1], "tick_begin", "ros2 rosbag clamp tick_begin2", 2);
     verify_canonical_event_envelope(tick_end_events[0], "tick_end", "ros2 rosbag clamp tick_end1", 1);
     verify_canonical_event_envelope(tick_end_events[1], "tick_end", "ros2 rosbag clamp tick_end2", 2);
+    verify_canonical_event_envelope(episode_end_events[0], "episode_end", "ros2 rosbag clamp episode_end", 2);
+    verify_canonical_event_envelope(run_end_events[0], "run_end", "ros2 rosbag clamp run_end", 2);
     const value record1 = require_event_data(tick_end_events[0], "ros2 rosbag clamp tick_end1");
     const value record2 = require_event_data(tick_end_events[1], "ros2 rosbag clamp tick_end2");
+    const value episode_end = require_event_data(episode_end_events[0], "ros2 rosbag clamp episode_end");
+    const value run_end = require_event_data(run_end_events[0], "ros2 rosbag clamp run_end");
     verify_common_record_shape(record1, "ros2.l2.clamp.v1", 1, 1'700'000'100'000LL, false, false);
     verify_common_record_shape(record2, "ros2.l2.clamp.v1", 2, 1'700'000'100'040LL, false, false);
     check(require_text_field(record1, "status", "ros2 rosbag clamp record1") == "running",
           "ros2 rosbag clamp: record1 status mismatch");
-    check(require_text_field(record2, "status", "ros2 rosbag clamp record2") == "stopped",
+    check(require_text_field(record2, "status", "ros2 rosbag clamp record2") == "running",
           "ros2 rosbag clamp: record2 status mismatch");
+    check(require_text_field(episode_end, "status", "ros2 rosbag clamp episode_end") == "boundary_reached",
+          "ros2 rosbag clamp: episode_end status mismatch");
+    check(require_text_field(episode_end, "reason", "ros2 rosbag clamp episode_end") == "step_max reached",
+          "ros2 rosbag clamp: episode_end reason mismatch");
+    check(require_text_field(run_end, "status", "ros2 rosbag clamp run_end") == "stopped",
+          "ros2 rosbag clamp: run_end status mismatch");
+    check(require_text_field(run_end, "reason", "ros2 rosbag clamp run_end") == "episode_max reached",
+          "ros2 rosbag clamp: run_end reason mismatch");
     verify_pose_x(record1, -0.4, "ros2 rosbag clamp record1");
     verify_pose_x(record2, 0.8, "ros2 rosbag clamp record2");
     verify_action_components(require_map_field(record1, "action", "ros2 rosbag clamp record1"), 2.5, -2.0, 1.5,
@@ -886,24 +924,38 @@ void test_ros2_rosbag_invalid_action_fallback_conformance() {
     check_close(command.angular.z, 0.0, 1e-6, "ros2 rosbag invalid-action: safe angular.z mismatch");
 
     const auto lines = read_non_empty_lines(paths.event_log_path);
-    check(lines.size() == 4, "ros2 rosbag invalid-action: expected four canonical events");
+    check(lines.size() == 7, "ros2 rosbag invalid-action: expected seven canonical events");
     const auto events = decode_json_lines(lines, env);
     const auto run_start_events = select_events_by_type(events, "run_start");
+    const auto episode_begin_events = select_events_by_type(events, "episode_begin");
     check(run_start_events.size() == 1, "ros2 rosbag invalid-action: expected one run_start event");
+    check(episode_begin_events.size() == 1, "ros2 rosbag invalid-action: expected one episode_begin event");
     verify_run_start_time_policy(run_start_events[0], "ros2 rosbag invalid-action run_start");
     const auto tick_begin_events = select_events_by_type(events, "tick_begin");
     const auto tick_end_events = select_events_by_type(events, "tick_end");
     const auto error_events = select_events_by_type(events, "error");
+    const auto episode_end_events = select_events_by_type(events, "episode_end");
+    const auto run_end_events = select_events_by_type(events, "run_end");
     check(tick_begin_events.size() == 1, "ros2 rosbag invalid-action: expected one tick_begin event");
     check(tick_end_events.size() == 1, "ros2 rosbag invalid-action: expected one tick_end event");
     check(error_events.size() == 1, "ros2 rosbag invalid-action: expected one error event");
+    check(episode_end_events.size() == 1, "ros2 rosbag invalid-action: expected one episode_end event");
+    check(run_end_events.size() == 1, "ros2 rosbag invalid-action: expected one run_end event");
     verify_canonical_event_envelope(tick_begin_events[0], "tick_begin", "ros2 rosbag invalid-action tick_begin", 1);
     verify_canonical_event_envelope(tick_end_events[0], "tick_end", "ros2 rosbag invalid-action tick_end", 1);
     verify_canonical_event_envelope(error_events[0], "error", "ros2 rosbag invalid-action error");
+    verify_canonical_event_envelope(episode_end_events[0], "episode_end", "ros2 rosbag invalid-action episode_end", 1);
+    verify_canonical_event_envelope(run_end_events[0], "run_end", "ros2 rosbag invalid-action run_end", 1);
     const value record = require_event_data(tick_end_events[0], "ros2 rosbag invalid-action tick_end");
+    const value episode_end = require_event_data(episode_end_events[0], "ros2 rosbag invalid-action episode_end");
+    const value run_end = require_event_data(run_end_events[0], "ros2 rosbag invalid-action run_end");
     verify_common_record_shape(record, "ros2.l2.invalid.v1", 1, 1'700'000'200'000LL, true, false);
     check(require_text_field(record, "status", "ros2 rosbag invalid-action record") == "error",
           "ros2 rosbag invalid-action: record status mismatch");
+    check(require_text_field(episode_end, "status", "ros2 rosbag invalid-action episode_end") == "error",
+          "ros2 rosbag invalid-action: episode_end status mismatch");
+    check(require_text_field(run_end, "status", "ros2 rosbag invalid-action run_end") == "error",
+          "ros2 rosbag invalid-action: run_end status mismatch");
     verify_pose_x(record, 0.4, "ros2 rosbag invalid-action record");
     verify_action_components(require_map_field(record, "action", "ros2 rosbag invalid-action record"), 0.0, 0.0, 0.0,
                              "ros2 rosbag invalid-action record action");
@@ -981,14 +1033,17 @@ void test_ros2_reset_unsupported_policy_artifact() {
         integer_value(eval_text("(map.get (env.info) 'published_actions -1)", env));
     check(backend_published_actions == 0, "ros2 reset policy artefact: backend should not publish actions");
     const auto lines = read_non_empty_lines(paths.event_log_path);
-    check(lines.size() == 2, "ros2 reset policy artefact: expected two canonical events");
+    check(lines.size() == 3, "ros2 reset policy artefact: expected three canonical events");
     const auto events = decode_json_lines(lines, env);
     const auto run_start_events = select_events_by_type(events, "run_start");
     const auto error_events = select_events_by_type(events, "error");
+    const auto run_end_events = select_events_by_type(events, "run_end");
     check(run_start_events.size() == 1, "ros2 reset policy artefact: expected one run_start event");
     verify_run_start_time_policy(run_start_events[0], "ros2 reset policy run_start");
     check(error_events.size() == 1, "ros2 reset policy artefact: expected one error event");
+    check(run_end_events.size() == 1, "ros2 reset policy artefact: expected one run_end event");
     verify_canonical_event_envelope(error_events[0], "error", "ros2 reset policy error");
+    verify_canonical_event_envelope(run_end_events[0], "run_end", "ros2 reset policy run_end");
 
     write_summary(
         paths.summary_path,

@@ -21,7 +21,7 @@ EXPECTED_SCENARIOS = {
             "backend_published_actions": 2,
             "command_count_min": 1,
             "last_command": {"linear_x": 0.25, "linear_y": 0.0, "angular_z": 0.05},
-            "event_log_lines": 5,
+            "event_log_lines": 8,
             "final_obs_x": 1.6,
             "message": "episode_max reached",
         },
@@ -45,7 +45,15 @@ EXPECTED_SCENARIOS = {
                 "action": {"linear_x": 0.25, "linear_y": 0.0, "angular_z": 0.05},
             },
         ],
-        "event_counts": {"run_start": 1, "tick_begin": 2, "tick_end": 2, "error": 0},
+        "event_counts": {
+            "run_start": 1,
+            "episode_begin": 1,
+            "tick_begin": 2,
+            "tick_end": 2,
+            "episode_end": 1,
+            "run_end": 1,
+            "error": 0,
+        },
         "time_policy": {
             "time_source": "ros_wall_time",
             "use_sim_time": False,
@@ -62,7 +70,7 @@ EXPECTED_SCENARIOS = {
             "backend_published_actions": 2,
             "command_count_min": 1,
             "last_command": {"linear_x": 1.0, "linear_y": -1.0, "angular_z": 1.0},
-            "event_log_lines": 5,
+            "event_log_lines": 8,
             "final_obs_x": 0.8,
             "message": "episode_max reached",
         },
@@ -86,7 +94,15 @@ EXPECTED_SCENARIOS = {
                 "action": {"linear_x": 2.5, "linear_y": -2.0, "angular_z": 1.5},
             },
         ],
-        "event_counts": {"run_start": 1, "tick_begin": 2, "tick_end": 2, "error": 0},
+        "event_counts": {
+            "run_start": 1,
+            "episode_begin": 1,
+            "tick_begin": 2,
+            "tick_end": 2,
+            "episode_end": 1,
+            "run_end": 1,
+            "error": 0,
+        },
         "time_policy": {
             "time_source": "ros_wall_time",
             "use_sim_time": False,
@@ -103,7 +119,7 @@ EXPECTED_SCENARIOS = {
             "backend_published_actions": 1,
             "command_count_min": 1,
             "last_command": {"linear_x": 0.0, "linear_y": 0.0, "angular_z": 0.0},
-            "event_log_lines": 4,
+            "event_log_lines": 7,
             "final_obs_x": 0.4,
             "message_contains": "u must be a map",
         },
@@ -120,7 +136,15 @@ EXPECTED_SCENARIOS = {
                 "on_tick_u": 1,
             },
         ],
-        "event_counts": {"run_start": 1, "tick_begin": 1, "tick_end": 1, "error": 1},
+        "event_counts": {
+            "run_start": 1,
+            "episode_begin": 1,
+            "tick_begin": 1,
+            "tick_end": 1,
+            "episode_end": 1,
+            "run_end": 1,
+            "error": 1,
+        },
         "time_policy": {
             "time_source": "ros_wall_time",
             "use_sim_time": False,
@@ -137,12 +161,12 @@ EXPECTED_SCENARIOS = {
             "backend_published_actions": 0,
             "command_count_min": 0,
             "last_command": {"linear_x": 0.0, "linear_y": 0.0, "angular_z": 0.0},
-            "event_log_lines": 2,
+            "event_log_lines": 3,
             "final_obs_x": None,
             "message_contains": "episode_max>1 requires env.reset capability",
         },
         "records": [],
-        "event_counts": {"run_start": 1, "tick_begin": 0, "tick_end": 0, "error": 1},
+        "event_counts": {"run_start": 1, "tick_begin": 0, "tick_end": 0, "run_end": 1, "error": 1},
         "time_policy": {
             "time_source": "ros_wall_time",
             "use_sim_time": False,
@@ -329,6 +353,8 @@ def verify_scenario(root: pathlib.Path, scenario: str, expectation: dict[str, An
             expect(record.get("status") == "error", f"{scenario} record {idx}: status mismatch")
         elif summary["status"] == ":ok":
             expect(record.get("status") == "ok", f"{scenario} record {idx}: status mismatch")
+        elif expectation["event_counts"].get("episode_end", 0) > 0:
+            expect(record.get("status") == "running", f"{scenario} record {idx}: status mismatch")
         else:
             expect(record.get("status") == "stopped", f"{scenario} record {idx}: status mismatch")
         if "error_contains" in expected_record:
@@ -348,6 +374,26 @@ def verify_scenario(root: pathlib.Path, scenario: str, expectation: dict[str, An
     run_start_events = select_events(events, "run_start")
     for idx, event in enumerate(run_start_events, start=1):
         expect_run_start_time_policy(event, f"{scenario} run_start {idx}", expectation["time_policy"])
+
+    for idx, event in enumerate(select_events(events, "episode_begin"), start=1):
+        expect_event_envelope(event, f"{scenario} episode_begin {idx}", "episode_begin")
+
+    for idx, event in enumerate(select_events(events, "episode_end"), start=1):
+        expect_event_envelope(event, f"{scenario} episode_end {idx}", "episode_end")
+
+    run_end_events = select_events(events, "run_end")
+    if run_end_events:
+        run_end = run_end_events[-1]
+        expect_event_envelope(run_end, f"{scenario} run_end", "run_end")
+        data = run_end.get("data")
+        expect(isinstance(data, dict), f"{scenario}: run_end data missing")
+        expected_status = str(summary["status"]).lstrip(":")
+        expect(data.get("status") == expected_status, f"{scenario}: run_end status mismatch")
+        if "message" in expectation["summary"]:
+            expect(data.get("reason") == expectation["summary"]["message"], f"{scenario}: run_end reason mismatch")
+        if "message_contains" in expectation["summary"]:
+            expect(expectation["summary"]["message_contains"] in str(data.get("reason", "")),
+                   f"{scenario}: run_end reason mismatch")
 
     error_events = select_events(events, "error")
     if error_events:

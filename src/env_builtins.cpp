@@ -436,23 +436,40 @@ std::string event_capabilities_json(const std::string& backend_name,
                                     bool reset_supported,
                                     bool realtime) {
     value caps = make_map();
+    value backend_config = make_nil();
     gc_root_scope roots(default_gc());
     roots.add(&caps);
     roots.add(&backend_info);
+    roots.add(&backend_config);
 
     map_set_symbol(caps, "reset", make_boolean(reset_supported));
     map_set_symbol(caps, "backend", make_string(backend_name));
     map_set_symbol(caps, "realtime", make_boolean(realtime));
 
     if (is_map(backend_info)) {
+        if (const auto config = map_lookup_option(backend_info, "config")) {
+            backend_config = *config;
+        }
         if (const auto use_sim_time = map_lookup_option(backend_info, "use_sim_time")) {
             map_set_symbol(caps, "use_sim_time", *use_sim_time);
+        } else if (is_map(backend_config)) {
+            if (const auto use_sim_time = map_lookup_option(backend_config, "use_sim_time")) {
+                map_set_symbol(caps, "use_sim_time", *use_sim_time);
+            }
         }
         if (const auto time_source = map_lookup_option(backend_info, "time_source")) {
             map_set_symbol(caps, "time_source", *time_source);
+        } else if (is_map(backend_config)) {
+            if (const auto time_source = map_lookup_option(backend_config, "time_source")) {
+                map_set_symbol(caps, "time_source", *time_source);
+            }
         }
         if (const auto obs_timestamp_source = map_lookup_option(backend_info, "obs_timestamp_source")) {
             map_set_symbol(caps, "obs_timestamp_source", *obs_timestamp_source);
+        } else if (is_map(backend_config)) {
+            if (const auto obs_timestamp_source = map_lookup_option(backend_config, "obs_timestamp_source")) {
+                map_set_symbol(caps, "obs_timestamp_source", *obs_timestamp_source);
+            }
         }
     }
 
