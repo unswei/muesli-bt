@@ -81,6 +81,39 @@ For deterministic BT tests:
 - avoid reliance on wall-clock timing where possible
 - when async behaviour is needed, bound wait loops tightly
 
+## benchmark suite
+
+The optional benchmark harness lives under `bench/` and is built with the `bench-release` preset:
+
+```bash
+cmake --preset bench-release
+cmake --build --preset bench-release -j
+```
+
+List or run scenarios:
+
+```bash
+./build/bench-release/bench/bench list
+./build/bench-release/bench/bench run A1-single-leaf-off
+./build/bench-release/bench/bench run-group B1
+./build/bench-release/bench/bench run A2-alt-255-jitter-off
+```
+
+The first milestone writes:
+
+- `run_summary.csv`
+- `aggregate_summary.csv`
+- `environment_metadata.csv`
+- `jitter_trace.csv` for the `A2` scheduler jitter run
+
+Summarise the latest benchmark result set:
+
+```bash
+python3 bench/scripts/analyse_results.py
+```
+
+See [`bench/README.md`](../bench/README.md) for the current catalogue and CLI overrides.
+
 ## Integration Checks
 
 Recommended integration checks before merging:

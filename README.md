@@ -66,6 +66,19 @@ cmake --preset dev
 cmake --build --preset dev -j
 ```
 
+Optional benchmark harness:
+
+```bash
+cmake --preset bench-release
+cmake --build --preset bench-release -j
+./build/bench-release/bench/bench list
+./build/bench-release/bench/bench run A1-single-leaf-off
+```
+
+The benchmark harness lives under [`bench/README.md`](bench/README.md) and writes CSV outputs into `bench/results/` by default.
+Each benchmark session writes `run_summary.csv`, `aggregate_summary.csv`, and `environment_metadata.csv`.
+Summarise the latest benchmark session with `python3 bench/scripts/analyse_results.py`.
+
 Run the visual PyBullet racecar demo:
 
 ```bash
@@ -197,6 +210,20 @@ Then use that same environment for docs:
 - `make demo-setup`: installs pinned demo deps and builds `muesli_bt_bridge`.
 - `make demo-run MODE=bt_planner`: runs the racecar demo through the bridge/runtime path.
 - `make verify-install`: runs a deterministic BT smoke run, writes `logs/verify-install.mbt.evt.v1.jsonl`, and validates it against `mbt.evt.v1`.
+
+## Benchmark Harness
+
+The benchmark harness is optional and separated from the main runtime tree under `bench/`.
+
+Current first-milestone coverage:
+
+- `A1` single-leaf baseline
+- `A2` scheduler jitter trace
+- `B1` static tick overhead
+- `B2` reactive interruption
+- `B6` logging overhead
+
+Use the `bench-release` preset for meaningful numbers, then run the generated `bench` executable from `build/bench-release/bench/`.
 
 ## Isaac Sim H1 Hero Demo
 

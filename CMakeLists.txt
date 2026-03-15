@@ -18,6 +18,7 @@ option(MUESLI_BT_BUILD_WEBOTS_EXAMPLES "Build the Webots e-puck example controll
 option(MUESLI_BT_BUILD_INTEGRATION_PYBULLET "Build the PyBullet integration library" ON)
 option(MUESLI_BT_BUILD_INTEGRATION_WEBOTS "Build the Webots integration library" ON)
 option(MUESLI_BT_BUILD_INTEGRATION_ROS2 "Build the ROS2 integration library" OFF)
+option(MUESLI_BT_BUILD_BENCHMARKS "Build the optional benchmark harness" OFF)
 
 add_library(
   muesli_bt_core
@@ -386,6 +387,10 @@ if (TARGET muesli_bt_integration_ros2)
     muesli_bt_conformance_l2_rosbag_tests
     PROPERTIES ENVIRONMENT "MUESLI_BT_L2_ARTIFACT_DIR=${CMAKE_BINARY_DIR}/ros2_l2_artifacts"
   )
+endif ()
+
+if (MUESLI_BT_BUILD_BENCHMARKS)
+  add_subdirectory(bench)
 endif ()
 
 install(

@@ -37,6 +37,21 @@
         "MUESLI_BT_BUILD_PYTHON_BRIDGE": "OFF",
         "MUESLI_BT_BUILD_WEBOTS_EXAMPLES": "OFF"
       }
+    },
+    {
+      "name": "bench-release",
+      "displayName": "Benchmark Release",
+      "inherits": "release",
+      "binaryDir": "${sourceDir}/build/bench-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "MUESLI_BT_BUILD_BENCHMARKS": "ON",
+        "MUESLI_BT_BUILD_INTEGRATION_ROS2": "OFF",
+        "MUESLI_BT_BUILD_INTEGRATION_PYBULLET": "OFF",
+        "MUESLI_BT_BUILD_INTEGRATION_WEBOTS": "OFF",
+        "MUESLI_BT_BUILD_PYTHON_BRIDGE": "OFF",
+        "MUESLI_BT_BUILD_WEBOTS_EXAMPLES": "OFF"
+      }
     }
   ],
   "buildPresets": [
@@ -51,6 +66,10 @@
     {
       "name": "core-only",
       "configurePreset": "core-only"
+    },
+    {
+      "name": "bench-release",
+      "configurePreset": "bench-release"
     }
   ],
   "testPresets": [
@@ -64,6 +83,13 @@
     {
       "name": "core-only",
       "configurePreset": "core-only",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "bench-release",
+      "configurePreset": "bench-release",
       "output": {
         "outputOnFailure": true
       }

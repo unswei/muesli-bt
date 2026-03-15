@@ -1,0 +1,9 @@
+#pragma once
+
+#define MUESLI_BT_BENCH_SOURCE_DIR "@CMAKE_SOURCE_DIR@"
+#define MUESLI_BT_BENCH_PROJECT_VERSION "@PROJECT_VERSION@"
+#define MUESLI_BT_BENCH_GIT_COMMIT "@_muesli_bt_bench_git_commit@"
+#define MUESLI_BT_BENCH_COMPILER_ID "@CMAKE_CXX_COMPILER_ID@"
+#define MUESLI_BT_BENCH_COMPILER_VERSION "@CMAKE_CXX_COMPILER_VERSION@"
+#define MUESLI_BT_BENCH_BUILD_TYPE "@_muesli_bt_bench_build_type@"
+#define MUESLI_BT_BENCH_BUILD_FLAGS "@_muesli_bt_bench_build_flags@"

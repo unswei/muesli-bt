@@ -38,6 +38,7 @@ compile_commands.json
 # logs and misc
 *.log
 /logs/
+/bench/results/
 /planner-records.jsonl
 /vla-records.jsonl
 .DS_Store

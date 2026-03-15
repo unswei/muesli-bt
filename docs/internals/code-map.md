@@ -6,6 +6,7 @@ Use this page to find where to implement specific changes.
 
 - `include/` public headers
 - `src/` implementation
+- `bench/` optional benchmark harness
 - `examples/` runnable Lisp and demo packages
 - `tests/` test binary sources
 - `.github/workflows/` CI jobs
@@ -40,6 +41,8 @@ Use this page to find where to implement specific changes.
 - `src/main.cpp` (REPL + script mode)
 - `src/repl_support.cpp` (REPL command/history helpers)
 - `tests/test_main.cpp` (coverage)
+- `bench/main.cpp` (benchmark CLI)
+- `bench/scripts/analyse_results.py` (benchmark result summary)
 
 ### Demo integration (PyBullet racecar)
 
@@ -57,3 +60,5 @@ Use this page to find where to implement specific changes.
 - add [host](../terminology.md#host) wrappers/services: `include/bt/instance.hpp`, `include/bt/runtime_host.hpp`, `src/bt/runtime_host.cpp`, tests
 - add capability/VLA job service: `include/bt/vla.hpp`, `src/bt/vla.cpp`, `src/builtins.cpp`, tests
 - add `env.*` backend adapter plumbing: `include/muslisp/env_api.hpp`, `src/env_api.cpp`, `src/env_builtins.cpp`, backend extension files
+- add or change benchmark scenarios: `bench/harness/scenario.cpp`, `bench/fixtures/`, `bench/runtimes/`, `bench/README.md`
+- change benchmark result interpretation: `bench/scripts/analyse_results.py`, `bench/tests/data/analysis_sample/`
