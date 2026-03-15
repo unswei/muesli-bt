@@ -10,6 +10,7 @@ The current milestone covers:
 - `A2` scheduler jitter on `alt-255`
 - `B1` static tick overhead
 - `B2` reactive interruption
+- `B5` parse, compile, load, and instantiate cost
 - `B6` logging overhead for one static and one reactive scenario
 
 The harness currently runs the native `muesli-bt` runtime through a small adapter layer. The layout leaves room for later `BehaviorTree.CPP` support without mixing benchmark code into `src/` or `tests/`.
@@ -27,7 +28,10 @@ Typical uses:
 
 ## how it works
 
-The harness builds tree fixtures directly against the C++ runtime API, not through the Lisp parser, so the first milestone isolates executor behaviour cleanly.
+The harness uses two execution paths:
+
+- `A1`, `A2`, `B1`, `B2`, and `B6` build tree fixtures directly against the C++ runtime API so executor cost is isolated cleanly
+- `B5` generates DSL source from the same fixtures so parse, compile, load, and instantiation phases can be measured separately
 
 Each run:
 
@@ -71,6 +75,12 @@ Run one group:
 ./build/bench-release/bench/bench run-group B1
 ```
 
+Run one compile/load scenario:
+
+```bash
+./build/bench-release/bench/bench run B5-alt-255-compile-off
+```
+
 Run the jitter benchmark:
 
 ```bash
@@ -106,6 +116,17 @@ The output directory will contain:
 - `environment_metadata.csv`
 - `jitter_trace.csv` when the selected scenarios include `A2`
 
+For `B5`, the latency columns record one phase execution per repetition:
+
+- `parse`: DSL text to parsed Lisp form
+- `compile`: parsed Lisp form to `bt::definition`
+- `inst1`: one `bt::instance`
+- `inst100`: one hundred `bt::instance` objects from one compiled definition
+- `loadbin`: load a pre-saved binary definition
+- `loaddsl`: read DSL text from file and compile it
+
+For `B5`, `ticks_total` and `ticks_per_second` should be read as operations and operations per second rather than BT ticks.
+
 For a quick human-readable summary of those CSV files:
 
 ```bash
@@ -117,6 +138,7 @@ python3 bench/scripts/analyse_results.py
 - Use the `bench-release` preset. Debug builds distort the numbers.
 - `B1` selector and alternating fixtures force deterministic full traversal with trivial success/failure leaves. This keeps tree size meaningful without changing BT semantics.
 - `A2` writes one row per tick. That file can become large on fast machines.
+- `B5` writes per-phase latency into the same CSV schema as the tick benchmarks. Read those rows as lifecycle operations, not executor ticks.
 
 ## see also
 

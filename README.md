@@ -78,6 +78,7 @@ cmake --build --preset bench-release -j
 The benchmark harness lives under [`bench/README.md`](bench/README.md) and writes CSV outputs into `bench/results/` by default.
 Each benchmark session writes `run_summary.csv`, `aggregate_summary.csv`, and `environment_metadata.csv`.
 Summarise the latest benchmark session with `python3 bench/scripts/analyse_results.py`.
+Current benchmark coverage includes `A1`, `A2`, `B1`, `B2`, `B5`, and `B6`.
 
 Run the visual PyBullet racecar demo:
 
@@ -221,6 +222,7 @@ Current first-milestone coverage:
 - `A2` scheduler jitter trace
 - `B1` static tick overhead
 - `B2` reactive interruption
+- `B5` parse, compile, load, and instantiate cost
 - `B6` logging overhead
 
 Use the `bench-release` preset for meaningful numbers, then run the generated `bench` executable from `build/bench-release/bench/`.

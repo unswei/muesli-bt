@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <memory>
 #include <unordered_map>
 
@@ -17,6 +18,9 @@ public:
     std::string version() const override;
     std::string commit() const override;
     std::unique_ptr<compiled_tree> compile_tree(const tree_fixture& fixture) override;
+    std::unique_ptr<lifecycle_case> new_lifecycle_case(const tree_fixture& fixture,
+                                                       const scenario_definition& scenario,
+                                                       const std::filesystem::path& scratch_dir) override;
     std::unique_ptr<instance_handle> new_instance(const compiled_tree& compiled,
                                                   const scenario_definition& scenario) override;
     void prepare_for_timed_run(instance_handle& instance,
@@ -29,6 +33,7 @@ public:
 private:
     class compiled_tree_impl;
     class instance_impl;
+    class lifecycle_case_impl;
 
     bt::registry* registry() noexcept;
     const bt::registry* registry() const noexcept;

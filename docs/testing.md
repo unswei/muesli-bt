@@ -106,6 +106,21 @@ The first milestone writes:
 - `environment_metadata.csv`
 - `jitter_trace.csv` for the `A2` scheduler jitter run
 
+Current harness coverage includes:
+
+- `A1` single-leaf baseline
+- `A2` scheduler jitter
+- `B1` static tick overhead
+- `B2` reactive interruption
+- `B5` parse, compile, load, and instantiate cost
+- `B6` logging overhead
+
+Run one `B5` phase benchmark:
+
+```bash
+./build/bench-release/bench/bench run B5-alt-255-compile-off
+```
+
 Summarise the latest benchmark result set:
 
 ```bash

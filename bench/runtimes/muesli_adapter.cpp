@@ -1,19 +1,30 @@
 #include "runtimes/muesli_adapter.hpp"
 
+#include <array>
 #include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
 
 #include "bench_config.hpp"
 #include "bt/ast.hpp"
+#include "bt/compiler.hpp"
 #include "bt/event_log.hpp"
 #include "bt/instance.hpp"
 #include "bt/registry.hpp"
 #include "bt/runtime.hpp"
+#include "bt/serialisation.hpp"
 #include "bt/status.hpp"
+#include "fixtures/source_factory.hpp"
 #include "fixtures/schedules.hpp"
+#include "harness/allocation_tracker.hpp"
+#include "muslisp/gc.hpp"
+#include "muslisp/reader.hpp"
 
 namespace muesli_bt::bench {
 namespace {
@@ -60,6 +71,37 @@ std::size_t estimate_interrupt_capacity(const scenario_definition& scenario, std
             return estimated_tick_count / 8u + 8u;
     }
     return 0u;
+}
+
+class allocation_measure_scope {
+public:
+    allocation_measure_scope() {
+        allocation_tracker::reset();
+        allocation_tracker::set_enabled(true);
+    }
+
+    ~allocation_measure_scope() {
+        allocation_tracker::set_enabled(false);
+    }
+};
+
+std::string read_text_file(const std::filesystem::path& path) {
+    std::ifstream in(path);
+    if (!in) {
+        throw std::runtime_error("muesli adapter: failed to open file for reading: " + path.string());
+    }
+    return std::string(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+}
+
+void write_text_file(const std::filesystem::path& path, std::string_view text) {
+    std::ofstream out(path);
+    if (!out) {
+        throw std::runtime_error("muesli adapter: failed to open file for writing: " + path.string());
+    }
+    out << text;
+    if (!out) {
+        throw std::runtime_error("muesli adapter: failed to write file: " + path.string());
+    }
 }
 
 }  // namespace
@@ -173,6 +215,175 @@ public:
     std::size_t repetition_index = 0u;
 };
 
+class muesli_adapter::lifecycle_case_impl final : public runtime_adapter::lifecycle_case {
+public:
+    lifecycle_case_impl(const tree_fixture& fixture,
+                        scenario_definition scenario,
+                        std::filesystem::path scratch_dir)
+        : scenario_(std::move(scenario)),
+          scratch_dir_(std::move(scratch_dir)),
+          source_(make_fixture_dsl(fixture)) {
+        std::filesystem::create_directories(scratch_dir_);
+        prepare_inputs();
+    }
+
+    ~lifecycle_case_impl() override {
+        if (parsed_form_rooted_) {
+            muslisp::default_gc().remove_root_slot(&parsed_form_);
+        }
+    }
+
+    void prime() override {
+        (void)run_once();
+    }
+
+    lifecycle_sample run_once() override {
+        switch (scenario_.lifecycle) {
+            case lifecycle_phase::parse_text:
+                return parse_text_once();
+            case lifecycle_phase::compile_definition:
+                return compile_definition_once();
+            case lifecycle_phase::instantiate_one:
+                return instantiate_one_once();
+            case lifecycle_phase::instantiate_hundred:
+                return instantiate_hundred_once();
+            case lifecycle_phase::load_binary:
+                return load_binary_once();
+            case lifecycle_phase::load_dsl:
+                return load_dsl_once();
+            case lifecycle_phase::none:
+                break;
+        }
+        throw std::invalid_argument("muesli adapter: unsupported lifecycle phase");
+    }
+
+private:
+    template <typename Fn>
+    lifecycle_sample measure_phase(std::size_t operations_total, Fn&& fn) {
+        allocation_measure_scope allocation_scope;
+        const auto started = std::chrono::steady_clock::now();
+        fn();
+        const auto finished = std::chrono::steady_clock::now();
+        const auto allocations = allocation_tracker::read();
+
+        lifecycle_sample sample;
+        sample.duration_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(finished - started).count());
+        sample.operations_total = operations_total;
+        sample.alloc_count_total = allocations.allocation_count;
+        sample.alloc_bytes_total = allocations.allocation_bytes;
+        return sample;
+    }
+
+    void ensure_parsed_form() {
+        if (parsed_form_rooted_) {
+            return;
+        }
+        parsed_form_ = muslisp::read_one(source_);
+        muslisp::default_gc().add_root_slot(&parsed_form_);
+        parsed_form_rooted_ = true;
+    }
+
+    void ensure_compiled_definition() {
+        if (compiled_definition_) {
+            return;
+        }
+        const muslisp::value parsed = muslisp::read_one(source_);
+        compiled_definition_ = std::make_unique<bt::definition>(bt::compile_definition(parsed));
+        muslisp::default_gc().collect();
+    }
+
+    void prepare_inputs() {
+        switch (scenario_.lifecycle) {
+            case lifecycle_phase::parse_text:
+                return;
+            case lifecycle_phase::compile_definition:
+                ensure_parsed_form();
+                return;
+            case lifecycle_phase::instantiate_one:
+            case lifecycle_phase::instantiate_hundred:
+                ensure_compiled_definition();
+                return;
+            case lifecycle_phase::load_binary:
+                ensure_compiled_definition();
+                binary_path_ = scratch_dir_ / "definition.mbtbin";
+                bt::save_definition_binary(*compiled_definition_, binary_path_.string());
+                return;
+            case lifecycle_phase::load_dsl:
+                dsl_path_ = scratch_dir_ / "definition.lisp";
+                write_text_file(dsl_path_, source_);
+                return;
+            case lifecycle_phase::none:
+                break;
+        }
+        throw std::invalid_argument("muesli adapter: missing lifecycle phase");
+    }
+
+    lifecycle_sample parse_text_once() {
+        muslisp::default_gc().collect();
+        lifecycle_sample sample = measure_phase(1u, [this] {
+            const muslisp::value parsed = muslisp::read_one(source_);
+            sink_ = parsed == nullptr ? 0u : 1u;
+        });
+        muslisp::default_gc().collect();
+        return sample;
+    }
+
+    lifecycle_sample compile_definition_once() {
+        return measure_phase(1u, [this] {
+            bt::definition compiled = bt::compile_definition(parsed_form_);
+            sink_ = compiled.nodes.size();
+        });
+    }
+
+    lifecycle_sample instantiate_one_once() {
+        return measure_phase(1u, [this] {
+            std::optional<bt::instance> instance;
+            instance.emplace(compiled_definition_.get(), 0u);
+            sink_ = instance->halt_stack.capacity();
+        });
+    }
+
+    lifecycle_sample instantiate_hundred_once() {
+        return measure_phase(100u, [this] {
+            std::array<std::optional<bt::instance>, 100u> instances;
+            for (auto& instance : instances) {
+                instance.emplace(compiled_definition_.get(), 0u);
+            }
+            sink_ = instances.back()->halt_stack.capacity();
+        });
+    }
+
+    lifecycle_sample load_binary_once() {
+        return measure_phase(1u, [this] {
+            bt::definition definition = bt::load_definition_binary(binary_path_.string());
+            sink_ = definition.nodes.size();
+        });
+    }
+
+    lifecycle_sample load_dsl_once() {
+        muslisp::default_gc().collect();
+        lifecycle_sample sample = measure_phase(1u, [this] {
+            const std::string source = read_text_file(dsl_path_);
+            const muslisp::value parsed = muslisp::read_one(source);
+            bt::definition definition = bt::compile_definition(parsed);
+            sink_ = definition.nodes.size();
+        });
+        muslisp::default_gc().collect();
+        return sample;
+    }
+
+    scenario_definition scenario_;
+    std::filesystem::path scratch_dir_;
+    std::string source_;
+    std::unique_ptr<bt::definition> compiled_definition_;
+    muslisp::value parsed_form_ = nullptr;
+    bool parsed_form_rooted_ = false;
+    std::filesystem::path binary_path_;
+    std::filesystem::path dsl_path_;
+    volatile std::size_t sink_ = 0u;
+};
+
 muesli_adapter::muesli_adapter() : registry_(std::make_unique<bt::registry>()) {
     register_callbacks();
 }
@@ -209,6 +420,13 @@ std::unique_ptr<runtime_adapter::compiled_tree> muesli_adapter::compile_tree(con
 
     definition.root = append_node(append_node, fixture.root);
     return std::make_unique<compiled_tree_impl>(std::move(definition));
+}
+
+std::unique_ptr<runtime_adapter::lifecycle_case> muesli_adapter::new_lifecycle_case(
+    const tree_fixture& fixture,
+    const scenario_definition& scenario,
+    const std::filesystem::path& scratch_dir) {
+    return std::make_unique<lifecycle_case_impl>(fixture, scenario, scratch_dir);
 }
 
 std::unique_ptr<runtime_adapter::instance_handle> muesli_adapter::new_instance(const runtime_adapter::compiled_tree& compiled,

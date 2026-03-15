@@ -25,6 +25,7 @@ void test_catalogue_contains_new_benchmarks() {
 
     check(find_scenario("A1-single-leaf-off") != nullptr, "missing A1 baseline scenario");
     check(find_scenario("A2-alt-255-jitter-off") != nullptr, "missing A2 jitter scenario");
+    check(find_scenario("B5-alt-31-compile-off") != nullptr, "missing B5 compile scenario");
     check(find_scenario("B6-reactive-31-flip20-fulltrace") != nullptr, "missing B6 logging scenario");
 }
 
@@ -126,6 +127,36 @@ void test_runner_emits_progress_events() {
     check(!events[1].started_at_local_minute.empty(), "scenario progress timestamp missing");
 }
 
+void test_b5_lifecycle_benchmarks_run() {
+    using namespace muesli_bt::bench;
+
+    const std::filesystem::path output_dir =
+        std::filesystem::temp_directory_path() / "muesli_bt_bench_b5_smoke";
+    std::filesystem::remove_all(output_dir);
+
+    run_request request;
+    request.output_dir = output_dir;
+    request.scenarios.push_back(*find_scenario("B5-alt-31-compile-off"));
+    request.scenarios.push_back(*find_scenario("B5-alt-31-inst100-off"));
+    request.repetitions_override = 1u;
+
+    benchmark_runner runner;
+    const run_result result = runner.run(request);
+
+    check(result.run_rows.size() == 2u, "expected two B5 run rows");
+    check(result.aggregate_rows.size() == 2u, "expected two B5 aggregate rows");
+
+    const run_summary_row& compile_row = result.run_rows.front();
+    check(compile_row.scenario_id == "B5-alt-31-compile-off", "unexpected B5 compile scenario id");
+    check(compile_row.latency_ns_median > 0u, "B5 compile latency should be recorded");
+    check(compile_row.ticks_total == 1u, "B5 compile phase should report one operation");
+
+    const run_summary_row& inst100_row = result.run_rows.back();
+    check(inst100_row.scenario_id == "B5-alt-31-inst100-off", "unexpected B5 inst100 scenario id");
+    check(inst100_row.latency_ns_median > 0u, "B5 inst100 latency should be recorded");
+    check(inst100_row.ticks_total == 100u, "B5 inst100 phase should report 100 operations");
+}
+
 }  // namespace
 
 int main() {
@@ -134,5 +165,6 @@ int main() {
     test_fulltrace_mode_emits_log_bytes();
     test_jitter_trace_is_written_for_a2();
     test_runner_emits_progress_events();
+    test_b5_lifecycle_benchmarks_run();
     return 0;
 }

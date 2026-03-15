@@ -15,7 +15,18 @@ inline constexpr std::string_view kBenchmarkSuiteVersion = "0.1.0-m1";
 enum class benchmark_kind {
     single_leaf,
     static_tick,
-    reactive_interrupt
+    reactive_interrupt,
+    compile_lifecycle
+};
+
+enum class lifecycle_phase {
+    none,
+    parse_text,
+    compile_definition,
+    instantiate_one,
+    instantiate_hundred,
+    load_binary,
+    load_dsl
 };
 
 enum class tree_family {
@@ -53,6 +64,7 @@ struct scenario_definition {
     std::size_t tree_size_nodes = 0;
     logging_mode logging = logging_mode::off;
     schedule_kind schedule = schedule_kind::none;
+    lifecycle_phase lifecycle = lifecycle_phase::none;
     std::string variant;
     timing_config timing{};
     std::uint64_t seed = 20260315ull;
@@ -60,6 +72,7 @@ struct scenario_definition {
 };
 
 std::string_view benchmark_kind_name(benchmark_kind kind) noexcept;
+std::string_view lifecycle_phase_name(lifecycle_phase phase) noexcept;
 std::string_view tree_family_name(tree_family family) noexcept;
 std::string_view logging_mode_name(logging_mode mode) noexcept;
 std::string_view schedule_kind_name(schedule_kind kind) noexcept;

@@ -40,6 +40,7 @@ add_library(
   harness/scenario.cpp
   harness/stats.cpp
   fixtures/schedules.cpp
+  fixtures/source_factory.cpp
   fixtures/tree_factory.cpp
   runtimes/muesli_adapter.cpp
 )

@@ -33,6 +33,11 @@ scenario_definition apply_overrides(scenario_definition scenario, const run_requ
 }
 
 std::chrono::milliseconds expected_duration_for(const scenario_definition& scenario) {
+    if (scenario.kind == benchmark_kind::compile_lifecycle) {
+        return std::max(std::chrono::milliseconds(1000),
+                        std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::milliseconds(10) * scenario.timing.repetitions));
+    }
     const auto per_repetition = scenario.timing.warmup + scenario.timing.run;
     return std::chrono::duration_cast<std::chrono::milliseconds>(per_repetition * scenario.timing.repetitions);
 }
@@ -117,6 +122,24 @@ std::string scenario_description(const scenario_definition& scenario) {
                 }
                 return "reactive interruption (" + std::to_string(scenario.tree_size_nodes) + ", " + schedule_text + ")";
             }
+            if (scenario.group_id == "B5") {
+                switch (scenario.lifecycle) {
+                    case lifecycle_phase::parse_text:
+                        return "parse DSL (" + std::to_string(scenario.tree_size_nodes) + " nodes)";
+                    case lifecycle_phase::compile_definition:
+                        return "compile BT (" + std::to_string(scenario.tree_size_nodes) + " nodes)";
+                    case lifecycle_phase::instantiate_one:
+                        return "instantiate 1 (" + std::to_string(scenario.tree_size_nodes) + " nodes)";
+                    case lifecycle_phase::instantiate_hundred:
+                        return "instantiate 100 (" + std::to_string(scenario.tree_size_nodes) + " nodes)";
+                    case lifecycle_phase::load_binary:
+                        return "load binary (" + std::to_string(scenario.tree_size_nodes) + " nodes)";
+                    case lifecycle_phase::load_dsl:
+                        return "load DSL (" + std::to_string(scenario.tree_size_nodes) + " nodes)";
+                    case lifecycle_phase::none:
+                        break;
+                }
+            }
             if (scenario.group_id == "B6") {
                 return scenario.kind == benchmark_kind::reactive_interrupt ? "reactive logging trace" : "static logging trace";
             }
@@ -144,6 +167,46 @@ std::size_t estimate_timed_ticks(std::size_t warmup_ticks,
     const double ticks_per_second = static_cast<double>(warmup_ticks) / warmup_seconds;
     const double estimate = ticks_per_second * run_seconds * 1.5;
     return static_cast<std::size_t>(estimate) + 128u;
+}
+
+run_summary_row make_base_run_row(const environment_info& environment,
+                                  const runtime_adapter& adapter,
+                                  const scenario_definition& scenario,
+                                  const tree_fixture& fixture,
+                                  std::size_t repetition) {
+    run_summary_row row;
+    row.schema_version = std::string(kSchemaVersion);
+    row.benchmark_suite_version = std::string(kBenchmarkSuiteVersion);
+    row.timestamp_utc = timestamp_utc_now();
+    row.machine_id = environment.machine_id;
+    row.hostname = environment.hostname;
+    row.os_name = environment.os_name;
+    row.os_version = environment.os_version;
+    row.kernel_version = environment.kernel_version;
+    row.cpu_model = environment.cpu_model;
+    row.physical_cores = environment.physical_cores;
+    row.logical_cores = environment.logical_cores;
+    row.compiler_name = environment.compiler_name;
+    row.compiler_version = environment.compiler_version;
+    row.build_type = environment.build_type;
+    row.build_flags = environment.build_flags;
+    row.runtime_name = adapter.name();
+    row.runtime_version = adapter.version();
+    row.runtime_commit = adapter.commit();
+    row.harness_commit = environment.harness_commit;
+    row.scenario_id = scenario.scenario_id;
+    row.group_id = scenario.group_id;
+    row.tree_family = std::string(tree_family_name(scenario.family));
+    row.tree_size_nodes = fixture.node_count;
+    row.leaf_count = fixture.leaf_count;
+    row.async_leaf_count = fixture.async_leaf_count;
+    row.blackboard_mode = "";
+    row.payload_class = "";
+    row.logging_mode = std::string(logging_mode_name(scenario.logging));
+    row.repetition_index = repetition;
+    row.seed = scenario.seed;
+    row.replay_bytes_total = std::nullopt;
+    return row;
 }
 
 aggregate_summary_row build_aggregate_row(const environment_info& environment,
@@ -305,9 +368,50 @@ run_result benchmark_runner::run(const run_request& request) const {
             });
         }
         const tree_fixture fixture = make_fixture(scenario);
-        std::unique_ptr<runtime_adapter::compiled_tree> compiled = adapter->compile_tree(fixture);
         std::vector<run_summary_row> scenario_rows;
         scenario_rows.reserve(scenario.timing.repetitions);
+
+        if (scenario.kind == benchmark_kind::compile_lifecycle) {
+            const std::filesystem::path scratch_dir = result.output_dir / ".scratch" / scenario.scenario_id;
+            std::unique_ptr<runtime_adapter::lifecycle_case> lifecycle =
+                adapter->new_lifecycle_case(fixture, scenario, scratch_dir);
+            lifecycle->prime();
+
+            for (std::size_t repetition = 0; repetition < scenario.timing.repetitions; ++repetition) {
+                const lifecycle_sample sample = lifecycle->run_once();
+                const double run_seconds = static_cast<double>(sample.duration_ns) / 1'000'000'000.0;
+                const double throughput =
+                    run_seconds > 0.0 ? static_cast<double>(sample.operations_total) / run_seconds : 0.0;
+
+                run_summary_row row = make_base_run_row(environment, *adapter, scenario, fixture, repetition);
+                row.warmup_seconds = 0.0;
+                row.run_seconds = run_seconds;
+                row.ticks_total = static_cast<std::uint64_t>(sample.operations_total);
+                row.ticks_per_second = throughput;
+                row.latency_ns_median = sample.duration_ns;
+                row.latency_ns_p95 = sample.duration_ns;
+                row.latency_ns_p99 = sample.duration_ns;
+                row.latency_ns_p999 = sample.duration_ns;
+                row.latency_ns_max = sample.duration_ns;
+                row.jitter_ratio_p99_over_median = sample.duration_ns == 0u ? 0.0 : 1.0;
+                row.alloc_count_total = sample.alloc_count_total;
+                row.alloc_bytes_total = sample.alloc_bytes_total;
+                row.rss_bytes_peak = peak_rss_bytes();
+                row.log_events_total = 0u;
+                row.log_bytes_total = 0u;
+                row.semantic_errors = sample.semantic_errors;
+                row.notes = sample.notes;
+
+                scenario_rows.push_back(row);
+                result.run_rows.push_back(row);
+            }
+
+            std::filesystem::remove_all(scratch_dir);
+            result.aggregate_rows.push_back(build_aggregate_row(environment, scenario, scenario_rows));
+            continue;
+        }
+
+        std::unique_ptr<runtime_adapter::compiled_tree> compiled = adapter->compile_tree(fixture);
 
         for (std::size_t repetition = 0; repetition < scenario.timing.repetitions; ++repetition) {
             std::unique_ptr<runtime_adapter::instance_handle> instance = adapter->new_instance(*compiled, scenario);
@@ -360,37 +464,7 @@ run_result benchmark_runner::run(const run_request& request) const {
                 writer.append_jitter_trace(result.output_dir, scenario.scenario_id, repetition, latencies_ns);
             }
 
-            run_summary_row row;
-            row.schema_version = std::string(kSchemaVersion);
-            row.benchmark_suite_version = std::string(kBenchmarkSuiteVersion);
-            row.timestamp_utc = timestamp_utc_now();
-            row.machine_id = environment.machine_id;
-            row.hostname = environment.hostname;
-            row.os_name = environment.os_name;
-            row.os_version = environment.os_version;
-            row.kernel_version = environment.kernel_version;
-            row.cpu_model = environment.cpu_model;
-            row.physical_cores = environment.physical_cores;
-            row.logical_cores = environment.logical_cores;
-            row.compiler_name = environment.compiler_name;
-            row.compiler_version = environment.compiler_version;
-            row.build_type = environment.build_type;
-            row.build_flags = environment.build_flags;
-            row.runtime_name = adapter->name();
-            row.runtime_version = adapter->version();
-            row.runtime_commit = adapter->commit();
-            row.harness_commit = environment.harness_commit;
-            row.scenario_id = scenario.scenario_id;
-            row.group_id = scenario.group_id;
-            row.tree_family = std::string(tree_family_name(scenario.family));
-            row.tree_size_nodes = fixture.node_count;
-            row.leaf_count = fixture.leaf_count;
-            row.async_leaf_count = fixture.async_leaf_count;
-            row.blackboard_mode = "";
-            row.payload_class = "";
-            row.logging_mode = std::string(logging_mode_name(scenario.logging));
-            row.repetition_index = repetition;
-            row.seed = scenario.seed;
+            run_summary_row row = make_base_run_row(environment, *adapter, scenario, fixture, repetition);
             row.warmup_seconds = warmup_seconds;
             row.run_seconds = run_seconds;
             row.ticks_total = ticks_total;
@@ -413,7 +487,6 @@ run_result benchmark_runner::run(const run_request& request) const {
             row.rss_bytes_peak = peak_rss_bytes();
             row.log_events_total = counters.log_events_total;
             row.log_bytes_total = counters.log_bytes_total;
-            row.replay_bytes_total = std::nullopt;
             row.semantic_errors = counters.semantic_errors;
             if (scenario.group_id == "A2" && latency.median != 0u && latency.p99 >= latency.median * 5u) {
                 row.notes = "p99 exceeded 5x median";

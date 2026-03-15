@@ -51,10 +51,31 @@ scenario_definition make_reactive_scenario(std::string scenario_id,
     };
 }
 
+scenario_definition make_lifecycle_scenario(std::string scenario_id,
+                                            std::size_t tree_size_nodes,
+                                            lifecycle_phase lifecycle,
+                                            std::string variant,
+                                            timing_config timing) {
+    return scenario_definition{
+        .scenario_id = std::move(scenario_id),
+        .group_id = "B5",
+        .kind = benchmark_kind::compile_lifecycle,
+        .family = tree_family::alt,
+        .tree_size_nodes = tree_size_nodes,
+        .logging = logging_mode::off,
+        .schedule = schedule_kind::none,
+        .lifecycle = lifecycle,
+        .variant = std::move(variant),
+        .timing = timing,
+        .seed = 20260315ull,
+        .capture_tick_trace = false,
+    };
+}
+
 const std::vector<scenario_definition>& scenario_catalogue() {
     static const std::vector<scenario_definition> catalogue = [] {
         std::vector<scenario_definition> scenarios;
-        scenarios.reserve(20);
+        scenarios.reserve(40);
 
         scenarios.push_back(
             make_static_scenario("A1-single-leaf-off", "A1", tree_family::single_leaf, 1, logging_mode::off, "base"));
@@ -112,6 +133,34 @@ const std::vector<scenario_definition>& scenario_catalogue() {
                                                        "bursty"));
         }
 
+        timing_config lifecycle_timing;
+        lifecycle_timing.warmup = std::chrono::milliseconds::zero();
+        lifecycle_timing.run = std::chrono::milliseconds::zero();
+        lifecycle_timing.repetitions = 100u;
+        for (const std::size_t size : {31u, 255u, 1023u}) {
+            scenarios.push_back(make_lifecycle_scenario(
+                "B5-alt-" + std::to_string(size) + "-parse-off", size, lifecycle_phase::parse_text, "parse", lifecycle_timing));
+            scenarios.push_back(make_lifecycle_scenario("B5-alt-" + std::to_string(size) + "-compile-off",
+                                                        size,
+                                                        lifecycle_phase::compile_definition,
+                                                        "compile",
+                                                        lifecycle_timing));
+            scenarios.push_back(make_lifecycle_scenario("B5-alt-" + std::to_string(size) + "-inst1-off",
+                                                        size,
+                                                        lifecycle_phase::instantiate_one,
+                                                        "inst1",
+                                                        lifecycle_timing));
+            scenarios.push_back(make_lifecycle_scenario("B5-alt-" + std::to_string(size) + "-inst100-off",
+                                                        size,
+                                                        lifecycle_phase::instantiate_hundred,
+                                                        "inst100",
+                                                        lifecycle_timing));
+            scenarios.push_back(make_lifecycle_scenario(
+                "B5-alt-" + std::to_string(size) + "-loadbin-off", size, lifecycle_phase::load_binary, "loadbin", lifecycle_timing));
+            scenarios.push_back(make_lifecycle_scenario(
+                "B5-alt-" + std::to_string(size) + "-loaddsl-off", size, lifecycle_phase::load_dsl, "loaddsl", lifecycle_timing));
+        }
+
         scenarios.push_back(
             make_static_scenario("B6-alt-31-base-fulltrace", "B6", tree_family::alt, 31, logging_mode::fulltrace, "base"));
         scenarios.push_back(make_reactive_scenario(
@@ -139,6 +188,28 @@ std::string_view benchmark_kind_name(benchmark_kind kind) noexcept {
             return "static_tick";
         case benchmark_kind::reactive_interrupt:
             return "reactive_interrupt";
+        case benchmark_kind::compile_lifecycle:
+            return "compile_lifecycle";
+    }
+    return "unknown";
+}
+
+std::string_view lifecycle_phase_name(lifecycle_phase phase) noexcept {
+    switch (phase) {
+        case lifecycle_phase::none:
+            return "";
+        case lifecycle_phase::parse_text:
+            return "parse";
+        case lifecycle_phase::compile_definition:
+            return "compile";
+        case lifecycle_phase::instantiate_one:
+            return "inst1";
+        case lifecycle_phase::instantiate_hundred:
+            return "inst100";
+        case lifecycle_phase::load_binary:
+            return "loadbin";
+        case lifecycle_phase::load_dsl:
+            return "loaddsl";
     }
     return "unknown";
 }
