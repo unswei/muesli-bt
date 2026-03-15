@@ -2711,6 +2711,24 @@ void test_event_log_deterministic_mode_and_canonical_serialisation() {
     check(ring == callback_lines, "event ring and callback lines should match canonical serialisation");
 }
 
+void test_event_log_capture_stats_without_serialised_sink() {
+    bt::event_log events(0);
+    events.set_run_id("stats-run");
+    events.set_deterministic_time(1735689602000, 5);
+    events.set_capture_stats_enabled(true);
+
+    const std::string payload = "{\"node_id\":7}";
+    const std::uint64_t seq = events.emit("node_enter", 4, payload);
+    check(seq == 1, "capture stats path should still advance event sequence");
+
+    const bt::event_log_stats stats = events.capture_stats();
+    check(stats.event_count == 1, "capture stats should count emitted events");
+    const std::size_t expected_size =
+        bt::event_log::serialise_event_line("node_enter", "stats-run", 1735689602000, 1, 4, payload).size();
+    check(stats.byte_count == expected_size, "capture stats should match canonical serialised line size");
+    check(events.snapshot().empty(), "zero-capacity ring should not retain canonical lines");
+}
+
 void test_runtime_host_deterministic_test_mode() {
     bt::runtime_host host;
     host.enable_deterministic_test_mode(4242, "deterministic-host", 1735689601000, 7);
@@ -4030,6 +4048,7 @@ int main() {
         {"env run-loop multi-episode reset=true", test_env_run_loop_multi_episode_reset_true},
         {"env run-loop multi-episode reset=false", test_env_run_loop_multi_episode_reset_false},
         {"event log deterministic mode + canonical serialisation", test_event_log_deterministic_mode_and_canonical_serialisation},
+        {"event log capture stats without serialised sink", test_event_log_capture_stats_without_serialised_sink},
         {"runtime host deterministic test mode", test_runtime_host_deterministic_test_mode},
         {"pybullet backend absent in core env", test_pybullet_backend_absent_in_core_env},
         {"ros2 backend absent in core env", test_ros2_backend_absent_in_core_env},

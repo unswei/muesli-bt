@@ -41,6 +41,8 @@ Each run:
 - writes `run_summary.csv`, `aggregate_summary.csv`, and `environment_metadata.csv`
 - writes `jitter_trace.csv` for `A2`
 
+For `B6`, the current harness records full-trace capture with deferred JSONL serialisation when no file or ring sink is enabled. `log_bytes_total` still reports the canonical `mbt.evt.v1` line size that would be emitted.
+
 `schema_version=2` adds two latency interpretation columns:
 
 - `latency_ns_p999`
@@ -139,6 +141,7 @@ python3 bench/scripts/analyse_results.py
 - `B1` selector and alternating fixtures force deterministic full traversal with trivial success/failure leaves. This keeps tree size meaningful without changing BT semantics.
 - `A2` writes one row per tick. That file can become large on fast machines.
 - `B5` writes per-phase latency into the same CSV schema as the tick benchmarks. Read those rows as lifecycle operations, not executor ticks.
+- `B6` full-trace rows currently measure capture overhead with deferred serialisation, not forced inline file output.
 
 ## see also
 

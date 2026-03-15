@@ -79,6 +79,7 @@ The benchmark harness lives under [`bench/README.md`](bench/README.md) and write
 Each benchmark session writes `run_summary.csv`, `aggregate_summary.csv`, and `environment_metadata.csv`.
 Summarise the latest benchmark session with `python3 bench/scripts/analyse_results.py`.
 Current benchmark coverage includes `A1`, `A2`, `B1`, `B2`, `B5`, and `B6`.
+The current `B6` trace path uses deferred event-log serialisation when no file sink is enabled, while still reporting canonical event sizes.
 
 Run the visual PyBullet racecar demo:
 

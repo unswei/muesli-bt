@@ -13,6 +13,11 @@
 
 namespace bt {
 
+struct event_log_stats {
+    std::uint64_t event_count = 0;
+    std::uint64_t byte_count = 0;
+};
+
 class event_log {
 public:
     using line_listener = std::function<void(const std::string&)>;
@@ -55,8 +60,18 @@ public:
     void set_deterministic_time(std::int64_t start_unix_ms, std::int64_t step_ms = 1) noexcept;
     void clear_deterministic_time() noexcept;
     [[nodiscard]] bool deterministic_time_enabled() const noexcept;
+    void set_capture_stats_enabled(bool enabled) noexcept;
+    [[nodiscard]] bool capture_stats_enabled() const noexcept;
+    void clear_capture_stats() noexcept;
+    [[nodiscard]] event_log_stats capture_stats() const noexcept;
     [[nodiscard]] static std::string_view runtime_contract_version() noexcept;
     [[nodiscard]] static std::string_view runtime_contract_id() noexcept;
+    [[nodiscard]] static std::size_t serialise_event_line_size(std::string_view type,
+                                                               std::string_view run_id,
+                                                               std::int64_t unix_ms,
+                                                               std::uint64_t seq,
+                                                               std::optional<std::uint64_t> tick,
+                                                               std::string_view data_json);
 
     [[nodiscard]] static std::string serialise_event_line(std::string_view type,
                                                           std::string_view run_id,
@@ -105,6 +120,9 @@ private:
     bool deterministic_time_enabled_ = false;
     std::int64_t deterministic_unix_ms_ = 0;
     std::int64_t deterministic_step_ms_ = 1;
+    bool capture_stats_enabled_ = false;
+    std::uint64_t captured_event_count_ = 0;
+    std::uint64_t captured_byte_count_ = 0;
 
     bool snapshot_bb_requested_ = false;
     bool snapshot_bb_full_ = false;

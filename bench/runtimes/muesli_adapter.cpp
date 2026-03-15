@@ -138,6 +138,7 @@ public:
 
         event_log.set_ring_capacity(0u);
         event_log.set_enabled(scenario.logging == logging_mode::fulltrace);
+        event_log.set_capture_stats_enabled(scenario.logging == logging_mode::fulltrace);
         event_log.set_file_enabled(false);
         event_log.set_flush_on_tick_end(false);
         event_log.set_git_sha(MUESLI_BT_BENCH_GIT_COMMIT);
@@ -453,6 +454,8 @@ void muesli_adapter::prepare_for_timed_run(runtime_adapter::instance_handle& ins
 
     typed.event_log.clear_ring();
     typed.event_log.set_enabled(typed.scenario.logging == logging_mode::fulltrace);
+    typed.event_log.set_capture_stats_enabled(typed.scenario.logging == logging_mode::fulltrace);
+    typed.event_log.clear_capture_stats();
     typed.event_log.clear_line_listener();
 
     (void)bt::tick(typed.runtime_instance, *registry(), typed.services);
@@ -460,10 +463,6 @@ void muesli_adapter::prepare_for_timed_run(runtime_adapter::instance_handle& ins
     typed.runtime_instance.tick_index = 0u;
     typed.clear_measurement_counters_only();
     typed.event_log.set_run_id(typed.scenario.scenario_id + "-rep-" + std::to_string(repetition_index));
-    typed.event_log.set_line_listener([state = &typed](const std::string& line) {
-        ++state->counters.log_events_total;
-        state->counters.log_bytes_total += static_cast<std::uint64_t>(line.size() + 1u);
-    });
 }
 
 run_status muesli_adapter::tick(runtime_adapter::instance_handle& instance) {
@@ -497,6 +496,11 @@ run_counters muesli_adapter::read_counters(const runtime_adapter::instance_handl
     const auto& typed = dynamic_cast<const instance_impl&>(instance);
     run_counters out = typed.counters;
     out.live_async_action = typed.async_running;
+    if (typed.scenario.logging == logging_mode::fulltrace) {
+        const bt::event_log_stats stats = typed.event_log.capture_stats();
+        out.log_events_total = stats.event_count;
+        out.log_bytes_total = stats.byte_count;
+    }
     return out;
 }
 

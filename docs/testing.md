@@ -121,6 +121,8 @@ Run one `B5` phase benchmark:
 ./build/bench-release/bench/bench run B5-alt-255-compile-off
 ```
 
+The current `B6` full-trace benchmark path uses deferred event-log serialisation when no file sink is enabled. The reported `log_bytes_total` still reflects canonical `mbt.evt.v1` line size.
+
 Summarise the latest benchmark result set:
 
 ```bash

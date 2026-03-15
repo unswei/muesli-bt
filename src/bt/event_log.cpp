@@ -1,5 +1,6 @@
 #include "bt/event_log.hpp"
 
+#include <charconv>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -25,6 +26,70 @@ std::uint64_t fnv1a_64(std::string_view text) noexcept {
         hash *= 1099511628211ull;
     }
     return hash;
+}
+
+void append_json_escaped(std::string& out, std::string_view text) {
+    for (const char c : text) {
+        switch (c) {
+            case '\\':
+                out += "\\\\";
+                break;
+            case '"':
+                out += "\\\"";
+                break;
+            case '\n':
+                out += "\\n";
+                break;
+            case '\r':
+                out += "\\r";
+                break;
+            case '\t':
+                out += "\\t";
+                break;
+            default:
+                out.push_back(c);
+                break;
+        }
+    }
+}
+
+std::size_t escaped_json_size(std::string_view text) noexcept {
+    std::size_t size = 0;
+    for (const char c : text) {
+        switch (c) {
+            case '\\':
+            case '"':
+            case '\n':
+            case '\r':
+            case '\t':
+                size += 2u;
+                break;
+            default:
+                size += 1u;
+                break;
+        }
+    }
+    return size;
+}
+
+template <typename Integer>
+void append_integer(std::string& out, Integer value) {
+    char buffer[32];
+    const auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), value);
+    if (ec != std::errc{}) {
+        throw std::runtime_error("event_log: failed to format integer");
+    }
+    out.append(buffer, ptr);
+}
+
+template <typename Integer>
+std::size_t integer_length(Integer value) noexcept {
+    char buffer[32];
+    const auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), value);
+    if (ec != std::errc{}) {
+        return 0u;
+    }
+    return static_cast<std::size_t>(ptr - buffer);
 }
 
 }  // namespace
@@ -203,6 +268,8 @@ void event_log::emit_bt_def(const definition& def) {
 std::uint64_t event_log::emit(std::string_view type, std::optional<std::uint64_t> tick, std::string_view data_json) {
     bool file_enabled = false;
     bool flush_on_tick_end = true;
+    bool capture_stats_enabled = false;
+    bool needs_serialised_line = false;
     std::uint64_t seq = 0;
     std::string run_id;
     std::int64_t unix_ms = 0;
@@ -215,6 +282,7 @@ std::uint64_t event_log::emit(std::string_view type, std::optional<std::uint64_t
         }
         file_enabled = file_enabled_;
         flush_on_tick_end = flush_on_tick_end_;
+        capture_stats_enabled = capture_stats_enabled_;
         run_id = run_id_;
         if (deterministic_time_enabled_) {
             unix_ms = deterministic_unix_ms_;
@@ -223,13 +291,30 @@ std::uint64_t event_log::emit(std::string_view type, std::optional<std::uint64_t
             unix_ms = unix_ms_now();
         }
         listener = line_listener_;
+        needs_serialised_line = file_enabled || ring_capacity_ != 0u || static_cast<bool>(listener);
     }
 
-    const std::string line = serialise_event_line(type, run_id, unix_ms, seq, tick, data_json);
-    append_ring_line(line);
-    if (file_enabled) {
-        const bool flush_now = !flush_on_tick_end || type == "tick_end";
-        append_file_line(line, flush_now);
+    std::string line;
+    std::size_t serialised_size = 0u;
+    if (needs_serialised_line) {
+        line = serialise_event_line(type, run_id, unix_ms, seq, tick, data_json);
+        serialised_size = line.size();
+    } else if (capture_stats_enabled) {
+        serialised_size = serialise_event_line_size(type, run_id, unix_ms, seq, tick, data_json);
+    }
+
+    if (capture_stats_enabled) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        ++captured_event_count_;
+        captured_byte_count_ += static_cast<std::uint64_t>(serialised_size);
+    }
+
+    if (needs_serialised_line) {
+        append_ring_line(line);
+        if (file_enabled) {
+            const bool flush_now = !flush_on_tick_end || type == "tick_end";
+            append_file_line(line, flush_now);
+        }
     }
     if (listener) {
         listener(line);
@@ -271,6 +356,30 @@ bool event_log::deterministic_time_enabled() const noexcept {
     return deterministic_time_enabled_;
 }
 
+void event_log::set_capture_stats_enabled(bool enabled) noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    capture_stats_enabled_ = enabled;
+}
+
+bool event_log::capture_stats_enabled() const noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return capture_stats_enabled_;
+}
+
+void event_log::clear_capture_stats() noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    captured_event_count_ = 0u;
+    captured_byte_count_ = 0u;
+}
+
+event_log_stats event_log::capture_stats() const noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return event_log_stats{
+        .event_count = captured_event_count_,
+        .byte_count = captured_byte_count_,
+    };
+}
+
 std::string_view event_log::runtime_contract_version() noexcept {
     return muesli_bt::contract::kRuntimeContractVersion;
 }
@@ -279,24 +388,60 @@ std::string_view event_log::runtime_contract_id() noexcept {
     return muesli_bt::contract::kRuntimeContractId;
 }
 
+std::size_t event_log::serialise_event_line_size(std::string_view type,
+                                                 std::string_view run_id,
+                                                 std::int64_t unix_ms,
+                                                 std::uint64_t seq,
+                                                 std::optional<std::uint64_t> tick,
+                                                 std::string_view data_json) {
+    std::size_t size = 0u;
+    size += sizeof("{\"schema\":\"mbt.evt.v1\",\"contract_version\":\"") - 1u;
+    size += escaped_json_size(runtime_contract_version());
+    size += sizeof("\",\"type\":\"") - 1u;
+    size += escaped_json_size(type);
+    size += sizeof("\",\"run_id\":\"") - 1u;
+    size += escaped_json_size(run_id);
+    size += sizeof("\",\"unix_ms\":") - 1u;
+    size += integer_length(unix_ms);
+    size += sizeof(",\"seq\":") - 1u;
+    size += integer_length(seq);
+    if (tick.has_value()) {
+        size += sizeof(",\"tick\":") - 1u;
+        size += integer_length(*tick);
+    }
+    size += sizeof(",\"data\":") - 1u;
+    size += data_json.size();
+    size += 1u;  // closing brace
+    return size;
+}
+
 std::string event_log::serialise_event_line(std::string_view type,
                                             std::string_view run_id,
                                             std::int64_t unix_ms,
                                             std::uint64_t seq,
                                             std::optional<std::uint64_t> tick,
                                             std::string_view data_json) {
-    std::ostringstream out;
-    out << "{\"schema\":\"mbt.evt.v1\","
-        << "\"contract_version\":\"" << json_escape(runtime_contract_version()) << "\","
-        << "\"type\":\"" << json_escape(type) << "\","
-        << "\"run_id\":\"" << json_escape(run_id) << "\","
-        << "\"unix_ms\":" << unix_ms << ','
-        << "\"seq\":" << seq;
+    std::string out;
+    out.reserve(serialise_event_line_size(type, run_id, unix_ms, seq, tick, data_json));
+
+    out += "{\"schema\":\"mbt.evt.v1\",\"contract_version\":\"";
+    append_json_escaped(out, runtime_contract_version());
+    out += "\",\"type\":\"";
+    append_json_escaped(out, type);
+    out += "\",\"run_id\":\"";
+    append_json_escaped(out, run_id);
+    out += "\",\"unix_ms\":";
+    append_integer(out, unix_ms);
+    out += ",\"seq\":";
+    append_integer(out, seq);
     if (tick.has_value()) {
-        out << ",\"tick\":" << *tick;
+        out += ",\"tick\":";
+        append_integer(out, *tick);
     }
-    out << ",\"data\":" << data_json << '}';
-    return out.str();
+    out += ",\"data\":";
+    out.append(data_json);
+    out.push_back('}');
+    return out;
 }
 
 std::vector<std::string> event_log::snapshot(std::size_t max_count) const {
