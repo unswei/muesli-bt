@@ -118,12 +118,20 @@ Run the jitter benchmark:
 Summarise a completed benchmark session:
 
 ```bash
-python3 bench/scripts/analyse_results.py bench/results/20260314T234021Z
+python3 bench/scripts/analyse_results.py bench/results/my-run
 ```
 
 If you omit the path, the script picks the latest result directory under `bench/results/`.
 The summary currently covers `A1`, `A2`, `B1`, `B2`, `B5`, and `B6`.
 The same script also summarises `BehaviorTree.CPP` result sets; unsupported groups simply report as absent.
+
+Compare two completed result sets directly:
+
+```bash
+python3 bench/scripts/compare_results.py \
+  bench/results/muesli-run \
+  bench/results/btcpp-run
+```
 
 Fast local iteration:
 
@@ -142,7 +150,7 @@ Write results into a fixed output directory:
 Write a comparison run into a dedicated directory:
 
 ```bash
-./build/bench-release-btcpp/bench/bench run-all --runtime btcpp --output-dir bench/results/btcpp-full-run
+./build/bench-release-btcpp/bench/bench run-all --runtime btcpp --output-dir bench/results/btcpp-run
 ```
 
 The output directory will contain:
@@ -169,6 +177,14 @@ For a quick human-readable summary of those CSV files:
 python3 bench/scripts/analyse_results.py
 ```
 
+For a direct cross-runtime ratio summary:
+
+```bash
+python3 bench/scripts/compare_results.py \
+  bench/results/muesli-run \
+  bench/results/btcpp-run
+```
+
 ## gotchas
 
 - Use the `bench-release` preset. Debug builds distort the numbers.
@@ -178,6 +194,7 @@ python3 bench/scripts/analyse_results.py
 - `B5` writes per-phase latency into the same CSV schema as the tick benchmarks. Read those rows as lifecycle operations, not executor ticks.
 - `B6` full-trace rows currently measure capture overhead with deferred serialisation, not forced inline file output.
 - `BehaviorTree.CPP` comparison runs are pinned to release `4.9.0` and the common semantic subset. Do not treat skipped groups as missing data bugs.
+- `compare_results.py` assumes both result sets were collected under meaningfully similar machine and build settings. It prints a warning when the recorded environment metadata differ.
 
 ## see also
 

@@ -155,6 +155,16 @@ python3 bench/scripts/analyse_results.py
 The analysis summary reports `A1`, `A2`, `B1`, `B2`, `B5`, and `B6` when those rows are present.
 That same summary works for the optional `btcpp` result sets; absent groups are reported as absent rather than treated as failures.
 
+Compare two benchmark result sets directly:
+
+```bash
+python3 bench/scripts/compare_results.py \
+  bench/results/muesli-run \
+  bench/results/btcpp-run
+```
+
+The comparison script checks the recorded environment metadata first and warns when the two runs were collected under different machine or build settings.
+
 See the repo-root `bench/README.md` for the current catalogue and CLI overrides.
 
 ## Integration Checks

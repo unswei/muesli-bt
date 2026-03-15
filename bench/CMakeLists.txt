@@ -114,4 +114,12 @@ if (Python3_Interpreter_FOUND)
             "${CMAKE_CURRENT_SOURCE_DIR}/scripts/analyse_results.py"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/data/analysis_sample"
   )
+  add_test(
+    NAME muesli_bt_bench_compare_smoke
+    COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_compare_results.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/scripts/compare_results.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/data/analysis_sample"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/data/btcpp_sample"
+  )
 endif ()
