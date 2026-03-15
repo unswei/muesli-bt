@@ -3821,8 +3821,8 @@ void test_ros2_h1_demo_success_path() {
 
     check(std::filesystem::exists(demo_runtime), "expected H1 demo runtime script to exist");
 
-    std::jthread publisher([&harness]() {
-        if (!harness.wait_for_transport_ready(std::chrono::milliseconds(1500))) {
+    std::jthread publisher([&harness](std::stop_token stop_token) {
+        if (!harness.wait_for_transport_ready(std::chrono::milliseconds(3000))) {
             return;
         }
         const std::vector<std::vector<double>> samples = {
@@ -3841,7 +3841,12 @@ void test_ros2_h1_demo_success_path() {
             {0.40, 0.30, 1.57},
         };
         for (const auto& sample : samples) {
-            harness.publish_odom(sample[0], sample[1], sample[2], 0.0, 0.0, 0.0);
+            for (int repeat = 0; repeat < 3; ++repeat) {
+                if (stop_token.stop_requested()) {
+                    return;
+                }
+                harness.publish_odom(sample[0], sample[1], sample[2], 0.0, 0.0, 0.0);
+            }
         }
     });
 
@@ -3867,7 +3872,9 @@ void test_ros2_h1_demo_success_path() {
     (void)eval_text(demo_script, env);
 
     const std::string status = symbol_name(eval_text("(map.get (map.get demo-success 'result (map.make)) 'status ':none)", env));
-    check(status == ":ok", "H1 demo success path should finish with :ok");
+    const std::string reason =
+        string_value(eval_text("(map.get (map.get demo-success 'result (map.make)) 'reason \"\")", env));
+    check(status == ":ok", "H1 demo success path should finish with :ok (got " + status + ": " + reason + ")");
     check(integer_value(eval_text("(map.get (map.get demo-success 'runtime (map.make)) 'waypoint_index -1)", env)) == 2,
           "H1 demo success path should complete both waypoints");
     check(string_value(eval_text("(map.get (map.get demo-success 'runtime (map.make)) 'last_branch_name \"\")", env)) == "goal_stop",
@@ -3906,7 +3913,7 @@ void test_ros2_h1_demo_timeout_stop() {
     check(std::filesystem::exists(demo_runtime), "expected H1 demo runtime script to exist");
 
     std::jthread publisher([&harness]() {
-        if (!harness.wait_for_transport_ready(std::chrono::milliseconds(1500))) {
+        if (!harness.wait_for_transport_ready(std::chrono::milliseconds(3000))) {
             return;
         }
         harness.publish_odom(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
