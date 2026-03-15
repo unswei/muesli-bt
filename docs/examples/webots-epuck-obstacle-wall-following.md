@@ -1,6 +1,6 @@
 # Webots: e-puck Obstacle Avoidance + Wall Following
 
-![Webots e-puck obstacle scene](../assets/demos/webots-epuck-obstacle/hero.png)
+![Webots e-puck obstacle scene](../assets/demos/webots-epuck-obstacle/scene.png)
 
 _Scene preview from the obstacle arena world and initial e-puck pose._
 

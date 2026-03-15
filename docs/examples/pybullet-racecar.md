@@ -1,6 +1,6 @@
 # PyBullet: Racecar
 
-![PyBullet racecar scene](../assets/demos/pybullet-racecar/hero.png)
+![PyBullet racecar scene](../assets/demos/pybullet-racecar/scene.png)
 
 _Scene preview of the racecar environment used by the demo._
 

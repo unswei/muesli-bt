@@ -1,15 +1,15 @@
-# Isaac Sim / ROS2: H1 hero full source
+# Isaac Sim / ROS2: H1 demo full source
 
-## `bt_h1_hero.lisp`
+## `bt_h1_demo.lisp`
 
 ```lisp
---8<-- "examples/isaac_h1_ros2_hero/lisp/bt_h1_hero.lisp"
+--8<-- "examples/isaac_h1_ros2_demo/lisp/bt_h1_demo.lisp"
 ```
 
-## `hero_runtime.lisp`
+## `demo_runtime.lisp`
 
 ```lisp
---8<-- "examples/isaac_h1_ros2_hero/lisp/hero_runtime.lisp"
+--8<-- "examples/isaac_h1_ros2_demo/lisp/demo_runtime.lisp"
 ```
 
 ## walkthrough
@@ -22,5 +22,5 @@
 ## topic contract
 
 ```yaml
---8<-- "examples/isaac_h1_ros2_hero/isaac/topic_contract.yaml"
+--8<-- "examples/isaac_h1_ros2_demo/isaac/topic_contract.yaml"
 ```

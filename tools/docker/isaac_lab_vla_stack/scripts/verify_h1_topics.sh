@@ -26,13 +26,13 @@ while (( SECONDS < deadline )); do
   done
 
   if (( ${#missing[@]} == 0 )); then
-    echo "All H1 hero topics are present under ${TOPIC_NS}"
+    echo "All H1 demo topics are present under ${TOPIC_NS}"
     exit 0
   fi
 
   sleep 1
 done
 
-echo "Timed out waiting for required H1 hero topics:" >&2
+echo "Timed out waiting for required H1 demo topics:" >&2
 printf '  %s\n' "${missing[@]}" >&2
 exit 1

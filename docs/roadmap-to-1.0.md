@@ -59,30 +59,34 @@ Already shipped in `v0.2.0`:
 - `L0` and `L1` conformance lanes
 - release packaging for source, Ubuntu `x86_64`, and macOS `arm64`
 
-Already present on `main` after `v0.2.0`:
+Already shipped across `v0.3.0` and `v0.3.1`:
 
 - first Linux ROS2 transport path on Ubuntu 22.04 + Humble
 - real `Odometry` input and `Twist` output transport binding
 - installed-package ROS2 consumer smoke coverage
 - first rosbag-backed `L2` replay corpus and artefact verification
+- ordinary CI gating for the rosbag-backed `L2` lane
+- a ROS-enabled Ubuntu 22.04 + Humble release artefact path alongside the generic Ubuntu archive
 
-This means the remaining path to `v1.0.0` is not “add ROS2 somehow”. The remaining path is:
+This means the remaining path to `v1.0.0` is not “add ROS2 somehow”.
+The thin adaptor baseline is now real enough that the next question is how to exploit it without widening the semantic surface.
 
-- stabilise the thin ROS2 adaptor as a supported release surface
-- close replay and observability gaps
-- prove “same BT, different IO transport” on one flagship behaviour
+The remaining path is:
+
+- close replay and observability gaps so ROS-backed runs are first-class contract artefacts
+- prove “same BT, different IO transport” on one flagship behaviour as paper-facing evidence
 - define host capability bundles for richer external services without bloating `env.*` or `planner.plan`
 - finish paper-facing evaluation and release hygiene
 
 ### milestone plan
 
-#### `v0.3.0`: ROS2 thin adaptor baseline
+#### `v0.3.x`: ROS2 thin adaptor baseline landed
 
 Focus:
 
-- release the current ROS2 thin adaptor work that is already on `main`
+- treat the thin ROS2 adaptor as a released baseline rather than a speculative milestone
 - keep the supported transport small and explicit
-- document one canonical live ROS2 run and one canonical rosbag replay run
+- avoid reopening this scope except for concrete contract bugs or consumer-driven gaps
 
 Scope:
 
@@ -91,14 +95,12 @@ Scope:
 - supported attach path: `(env.attach "ros2")`
 - explicit reset policy: `unsupported` for real runs, `stub` only for deterministic harnesses and tests
 
-Exit criteria:
+Delivered in the `v0.3.x` release family:
 
-- clean checkout configure/build succeeds with `MUESLI_BT_BUILD_INTEGRATION_ROS2=ON` on the supported Linux/ROS2 baseline
-- `env.info` exposes stable `obs_schema`, `state_schema`, `action_schema`, reset policy, and capability metadata
-- installed consumer smoke coverage passes for the ROS2 package export
-- rosbag-backed `L2` replay lane passes in CI and validates produced artefacts structurally
-- docs show one canonical live ROS2 command and one canonical rosbag replay command
-- docs state the first supported distro, message path, reset policy, and non-goals explicitly
+- `v0.3.0` established the released thin-adaptor baseline, live ROS2 example path, rosbag-backed `L2`, and installed consumer smoke coverage
+- `v0.3.1` added the dedicated ROS-enabled Ubuntu 22.04 + Humble release artefact path
+- the first supported distro, message path, reset policy, and non-goals are now explicit in docs and release notes
+- further work should move to observability parity, cross-transport evidence, or concrete consumer fixes rather than broadening the baseline transport casually
 
 #### `v0.4.0`: replay and observability parity
 
@@ -106,12 +108,14 @@ Focus:
 
 - make ROS-backed runs first-class citizens of the canonical observability story
 - tighten replay verification from “artefact exists” to “log invariants are validated”
+- strengthen the paper claim that simulator and ROS-backed runs share one inspection and replay surface
 
 Scope:
 
 - direct canonical `mbt.evt.v1` output for ROS-backed runs
 - explicit time-source policy for ROS-backed runs (`sim time` vs wall time) and logging of that choice
 - minimal replay verification CLI or equivalent command that checks invariants from a canonical event log
+- tooling-facing parity so inspector and replay consumers can treat ROS-backed and simulator-backed runs the same way
 
 Exit criteria:
 
@@ -119,18 +123,21 @@ Exit criteria:
 - rosbag replay can be checked with one documented verification command
 - replay verification covers at least event ordering, schema validity, and selected decision invariants
 - docs explain which parts are deterministic, which parts are only bounded, and how to interpret replay failures
+- a tooling consumer can inspect a ROS-backed run through the same canonical log path used for simulator-backed runs
 
 #### `v0.5.0`: same BT, different IO transport
 
 Focus:
 
 - prove that muesli-bt semantics stay stable while the transport changes
+- turn that result into one of the core paper evidence points, not just an integration smoke test
 
 Scope:
 
 - choose one canonical wheeled behaviour as the cross-transport flagship
 - run the same high-level BT through PyBullet, Webots, and ROS2 with adapter-only differences
 - document the common BT source and the transport-specific attach/config layer separately
+- define a small set of scripted comparison checks for key behaviour, action, or decision-trace invariants across the three transports
 
 Exit criteria:
 
@@ -138,6 +145,7 @@ Exit criteria:
 - docs point all three backends at the same BT logic, with only backend wiring changed
 - at least one scripted check compares key metrics or decision-trace invariants across the three transports
 - the ROS2 story is now clearly “same BT, different IO transport”, not “special ROS-only behaviour”
+- the cross-transport comparison is strong enough to support a paper-facing claim about stable semantics across transport changes
 
 #### `v0.6.0`: host capability bundles and planner boundary stabilisation
 
@@ -153,7 +161,7 @@ Scope:
 - keep `env.*` as the direct transport surface
 - keep `planner.plan` as the in-runtime bounded decision planner
 - document that higher-level ROS libraries such as MoveIt and Nav2 belong behind separate host capability contracts
-- define the first target capability family for manipulation, but keep the public contract generic rather than MoveIt-named
+- define the first target capability families for manipulation and perception, but keep the public contracts generic rather than MoveIt-named or detector-named
 - freeze the user-facing planner request/result contract for the paper baseline
 - expand planner conformance evidence under simulator and ROS-backed replay where it is cheap and reproducible
 - keep planner time-budget behaviour explicit in docs and logs
@@ -161,7 +169,7 @@ Scope:
 Exit criteria:
 
 - capability bundle registration and naming rules are documented without changing BT or Lisp semantics
-- at least one external capability contract is specified at the host level without hard-coding ROS library names into core semantics
+- at least one manipulation contract and one perception contract are specified at the host level without hard-coding ROS library names into core semantics
 - the split between `env.*`, `planner.plan`, and external host capabilities is explicit in docs and examples
 - planner request/result docs match released behaviour and fixtures
 - planner logs and canonical events cover the paper-critical success, timeout, and fallback paths
@@ -222,6 +230,7 @@ Scope:
 - preferred candidate: Towers of Hanoi with a simulated robot arm
 - treat MoveIt as the first concrete instance of a host capability bundle, specifically an arm-motion or goal-execution capability
 - add a usable perception path for disc and peg state rather than relying on hidden oracle state in the paper-facing demo
+- likely first concrete perception adapter, if it stays the lightest reproducible path: a YOLO-compatible detector feeding a scene-state normaliser rather than exposing raw detections directly to BT logic
 - choose the simulator based on reproducibility, MoveIt compatibility, and usable perception first
 - prefer Isaac Sim for the manipulator/Hanoi path if it gives the cleanest ROS + perception + manipulation story without breaking reproducibility
 - use Webots + ROS only if it stays thin and repeatable enough; otherwise use the most reproducible MoveIt-friendly simulator
@@ -232,6 +241,7 @@ Exit criteria:
 - two distinct scenarios exist with clear rationale
 - one non-wheeled scenario uses explicit host capability bundle boundaries for transport, manipulation, and perception
 - preferred outcome: a simulated arm solves a bounded Towers of Hanoi task with MoveIt-backed motion and usable perception
+- perception output is normalised into a stable scene-state layer before BT logic consumes it
 - acceptable fallback: if Hanoi proves too heavy for the `1.0` paper path, replace it with a simpler manipulator benchmark and record why Hanoi was deferred
 - evaluation scripts and result collection are reproducible from the tagged codebase
 - at least one baseline comparison and one ROS-backed row or slice exist in the evaluation outputs

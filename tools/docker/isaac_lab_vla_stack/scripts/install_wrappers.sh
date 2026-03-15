@@ -119,10 +119,10 @@ set -euo pipefail
 exec /tmp/stack-scripts/run_h1_policy.sh "\$@"
 EOF
 
-cat > /usr/local/bin/isaac-h1-hero <<EOF
+cat > /usr/local/bin/isaac-h1-demo <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-exec /tmp/stack-scripts/run_h1_hero_demo.sh "\$@"
+exec /tmp/stack-scripts/run_h1_demo.sh "\$@"
 EOF
 
 cat > /usr/local/bin/isaac-sim-state <<EOF
@@ -150,7 +150,7 @@ chmod +x \
   /usr/local/bin/enter-openpi \
   /usr/local/bin/install-isaac-h1-policy \
   /usr/local/bin/isaac-h1-policy \
-  /usr/local/bin/isaac-h1-hero \
+  /usr/local/bin/isaac-h1-demo \
   /usr/local/bin/isaac-sim-state \
   /usr/local/bin/verify-isaac-h1-topics
 
@@ -172,6 +172,6 @@ alias smolvla-shell="enter-smolvla"
 alias openpi-shell="enter-openpi"
 alias h1-policy-install="install-isaac-h1-policy"
 alias h1-policy="isaac-h1-policy"
-alias h1-hero="isaac-h1-hero"
+alias h1-demo="isaac-h1-demo"
 alias isaac-state="isaac-sim-state"
 EOF

@@ -20,9 +20,10 @@ For the release-oriented path from the current baseline to `v1.0.0`, see [roadma
 
 - richer [host](terminology.md#host) service adapters for production robotics systems
 - host capability bundles for richer external services such as manipulation, navigation, and perception
+- observability parity and cross-transport evidence for the existing ROS2 thin adaptor
 - a current Isaac Sim demo through ROS before `v1.0.0`
 - additional VLA backends beyond stub/replay capability adapters
-- dedicated ROS2 adapter surface and packaging
+- consumer-driven expansion of the thin ROS2 adaptor only after parity and evidence needs are clear
 - external telemetry/export integrations
 
 ## Tooling

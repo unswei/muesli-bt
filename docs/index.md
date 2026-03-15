@@ -37,7 +37,7 @@ python3 tools/validate_log.py --schema schemas/event_log/v1/mbt.evt.v1.schema.js
 
 | PyBullet racecar | Webots e-puck line | Webots e-puck obstacle |
 | --- | --- | --- |
-| [![PyBullet racecar scene preview](assets/demos/pybullet-racecar/hero.png)](examples/pybullet-racecar.md) | [![Webots e-puck line scene preview](assets/demos/webots-epuck-line/hero.png)](examples/webots-epuck-line-following.md) | [![Webots e-puck obstacle scene preview](assets/demos/webots-epuck-obstacle/hero.png)](examples/webots-epuck-obstacle-wall-following.md) |
+| [![PyBullet racecar scene preview](assets/demos/pybullet-racecar/scene.png)](examples/pybullet-racecar.md) | [![Webots e-puck line scene preview](assets/demos/webots-epuck-line/scene.png)](examples/webots-epuck-line-following.md) | [![Webots e-puck obstacle scene preview](assets/demos/webots-epuck-obstacle/scene.png)](examples/webots-epuck-obstacle-wall-following.md) |
 
 Scene previews and runtime snapshots are included on each demo page, with exact run commands and log inspection steps.
 

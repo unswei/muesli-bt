@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_ROOT=/workspace/muesli-bt
 BUILD_DIR=${MUESLI_BT_ROS2_BUILD_DIR:-${REPO_ROOT}/build/linux-ros2}
 BUILD_TYPE=${MUESLI_BT_ROS2_BUILD_TYPE:-Debug}
-SCRIPT_PATH=${MUESLI_BT_H1_DEMO_SCRIPT:-${REPO_ROOT}/examples/isaac_h1_ros2_hero/lisp/main.lisp}
+SCRIPT_PATH=${MUESLI_BT_H1_DEMO_SCRIPT:-${REPO_ROOT}/examples/isaac_h1_ros2_demo/lisp/main.lisp}
 
 set +u
 source /opt/ros/humble/setup.bash

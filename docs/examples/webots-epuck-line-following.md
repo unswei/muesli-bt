@@ -1,6 +1,6 @@
 # Webots: e-puck Line Following
 
-![Webots e-puck line scene](../assets/demos/webots-epuck-line/hero.png)
+![Webots e-puck line scene](../assets/demos/webots-epuck-line/scene.png)
 
 _Scene preview from the line-follow world and initial e-puck pose._
 

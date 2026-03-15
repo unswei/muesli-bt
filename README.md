@@ -225,13 +225,13 @@ Current first-milestone coverage:
 
 Use the `bench-release` preset for meaningful numbers, then run the generated `bench` executable from `build/bench-release/bench/`.
 
-## Isaac Sim H1 Hero Demo
+## Isaac Sim H1 Demo
 
-For a Linux/NVIDIA showcase that keeps the current ROS2 thin adaptor intact, use the checked-in H1 locomotion hero demo:
+For a Linux/NVIDIA showcase that keeps the current ROS2 thin adaptor intact, use the checked-in H1 locomotion demo:
 
-- Lisp demo assets: `examples/isaac_h1_ros2_hero/`
+- Lisp demo assets: `examples/isaac_h1_ros2_demo/`
 - container/tooling helpers: `tools/docker/isaac_lab_vla_stack/`
-- docs page: `docs/examples/isaac-h1-ros2-hero.md`
+- docs page: `docs/examples/isaac-h1-ros2-demo.md`
 
 This path keeps `muesli-bt` on the released `Odometry` -> `Twist` ROS2 surface while Isaac Sim and NVIDIA's H1 controller own the low-level humanoid policy loop.
 

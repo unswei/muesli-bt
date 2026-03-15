@@ -63,8 +63,8 @@ Useful wrapper commands:
 - `enter-isaaclab`: open an interactive shell with the Isaac Lab runtime environment activated
 - `install-isaac-h1-policy`: clone/build NVIDIA's official H1 ROS2 policy workspace
 - `isaac-h1-policy`: launch `h1_fullbody_controller` from the official ROS2 workspace
-- `verify-isaac-h1-topics`: wait for the checked-in H1 hero-demo ROS topics
-- `isaac-h1-hero`: build `muslisp_ros2` and run the checked-in H1 hero demo
+- `verify-isaac-h1-topics`: wait for the checked-in H1 demo ROS topics
+- `isaac-h1-demo`: build `muslisp_ros2` and run the checked-in H1 demo
 - `isaac-sim-state`: query or change Isaac Sim state through ROS 2 simulation-control services
 - `smolvla-python`: run Python inside the SmolVLA environment
 - `smolvla-policy-server`: start LeRobot's async policy server
@@ -170,9 +170,9 @@ Run some quick checks:
 ./tools/docker/isaac_lab_vla_stack/run.sh openpi-python -c "import openpi; print(openpi.__file__)"
 ```
 
-## H1 hero demo flow
+## H1 demo flow
 
-The repository now includes a ROS-backed H1 locomotion hero demo that keeps `muesli-bt` on the current `Odometry` -> `Twist` contract surface.
+The repository now includes a ROS-backed H1 locomotion demo that keeps `muesli-bt` on the current `Odometry` -> `Twist` contract surface.
 
 Bootstrap the official H1 policy workspace inside the container:
 
@@ -186,22 +186,22 @@ Inside the container, launch the H1 policy node:
 isaac-h1-policy
 ```
 
-Once Isaac Sim is publishing the required `/h1_01/*` topics, verify them and run the hero demo:
+Once Isaac Sim is publishing the required `/h1_01/*` topics, verify them and run the demo:
 
 ```bash
 verify-isaac-h1-topics
 isaac-sim-state play
-isaac-h1-hero
+isaac-h1-demo
 ```
 
-The hero demo writes:
+The demo writes:
 
-- `logs/isaac_h1_hero.run-loop.jsonl`
-- `logs/isaac_h1_hero.mbt.evt.v1.jsonl`
+- `logs/isaac_h1_demo.run-loop.jsonl`
+- `logs/isaac_h1_demo.mbt.evt.v1.jsonl`
 
 The topic contract checked into the repository is:
 
-- `examples/isaac_h1_ros2_hero/isaac/topic_contract.yaml`
+- `examples/isaac_h1_ros2_demo/isaac/topic_contract.yaml`
 
 The run script mounts this repository at `/workspace/muesli-bt` and persists caches under `~/.cache/muesli-bt/isaac-lab-vla/`. The Isaac Lab runtime install is persisted under `~/.cache/muesli-bt/isaac-lab-vla/isaaclab-runtime/`, so `install-isaacsim` is normally a one-time setup per host cache.
 

@@ -1,6 +1,6 @@
-demo: isaac_h1_ros2_hero.v1
+demo: isaac_h1_ros2_demo.v1
 description: >
-  Topic and simulator contract for the H1 locomotion hero demo that keeps
+  Topic and simulator contract for the H1 locomotion demo that keeps
   muesli-bt on the existing ROS 2 Odometry-to-Twist transport surface.
 
 ros2:

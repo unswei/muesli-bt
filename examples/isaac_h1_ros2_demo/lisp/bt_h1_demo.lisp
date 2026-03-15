@@ -1,4 +1,4 @@
-(defbt h1-hero-tree
+(defbt h1-demo-tree
   (sel
     (seq
       (cond bb-truthy timeout_active)

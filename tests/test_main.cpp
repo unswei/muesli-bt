@@ -3766,7 +3766,7 @@ void test_ros2_backend_invalid_action_fallback() {
     check_close(safe_command.angular.z, 0.0, 1e-6, "ros2 safe fallback angular.z mismatch");
 }
 
-void test_ros2_h1_hero_demo_success_path() {
+void test_ros2_h1_demo_success_path() {
     using namespace muslisp;
 
     reset_bt_runtime_host();
@@ -3774,11 +3774,11 @@ void test_ros2_h1_hero_demo_success_path() {
     test_support::ros2_test_harness harness("/h1_01");
 
     const std::filesystem::path repo_root = find_repo_root();
-    const std::filesystem::path hero_runtime = repo_root / "examples/isaac_h1_ros2_hero/lisp/hero_runtime.lisp";
-    const std::filesystem::path run_log = temp_file_path("isaac_h1_hero_run", ".jsonl");
-    const std::filesystem::path event_log = temp_file_path("isaac_h1_hero_events", ".jsonl");
+    const std::filesystem::path demo_runtime = repo_root / "examples/isaac_h1_ros2_demo/lisp/demo_runtime.lisp";
+    const std::filesystem::path run_log = temp_file_path("isaac_h1_demo_run", ".jsonl");
+    const std::filesystem::path event_log = temp_file_path("isaac_h1_demo_events", ".jsonl");
 
-    check(std::filesystem::exists(hero_runtime), "expected H1 hero runtime script to exist");
+    check(std::filesystem::exists(demo_runtime), "expected H1 demo runtime script to exist");
 
     std::thread publisher([&harness]() {
         if (!harness.wait_for_transport_ready(std::chrono::milliseconds(1500))) {
@@ -3804,55 +3804,55 @@ void test_ros2_h1_hero_demo_success_path() {
         }
     });
 
-    const std::string hero_script =
+    const std::string demo_script =
         "(begin "
-        "  (load " + lisp_string_literal(hero_runtime.string()) + ") "
-        "  (define hero-cfg (make-default-h1-hero-config)) "
-        "  (map.set! hero-cfg 'topic_ns \"/h1_01\") "
-        "  (map.set! hero-cfg 'max_ticks 80) "
-        "  (map.set! hero-cfg 'step_max 80) "
-        "  (map.set! hero-cfg 'stand_ticks 1) "
-        "  (map.set! hero-cfg 'obs_timeout_ms 500) "
-        "  (map.set! hero-cfg 'goal_tol 0.10) "
-        "  (map.set! hero-cfg 'turn_tol 0.12) "
-        "  (map.set! hero-cfg 'walk_speed 0.25) "
-        "  (map.set! hero-cfg 'log_path " + lisp_string_literal(run_log.string()) + ") "
-        "  (map.set! hero-cfg 'event_log_path " + lisp_string_literal(event_log.string()) + ") "
-        "  (map.set! hero-cfg 'waypoints "
+        "  (load " + lisp_string_literal(demo_runtime.string()) + ") "
+        "  (define demo-cfg (make-default-h1-demo-config)) "
+        "  (map.set! demo-cfg 'topic_ns \"/h1_01\") "
+        "  (map.set! demo-cfg 'max_ticks 80) "
+        "  (map.set! demo-cfg 'step_max 80) "
+        "  (map.set! demo-cfg 'stand_ticks 1) "
+        "  (map.set! demo-cfg 'obs_timeout_ms 500) "
+        "  (map.set! demo-cfg 'goal_tol 0.10) "
+        "  (map.set! demo-cfg 'turn_tol 0.12) "
+        "  (map.set! demo-cfg 'walk_speed 0.25) "
+        "  (map.set! demo-cfg 'log_path " + lisp_string_literal(run_log.string()) + ") "
+        "  (map.set! demo-cfg 'event_log_path " + lisp_string_literal(event_log.string()) + ") "
+        "  (map.set! demo-cfg 'waypoints "
         "    (list "
         "      (make-waypoint \"forward\" 0.40 0.00 0.0) "
         "      (make-waypoint \"left\" 0.40 0.30 1.5707963267948966))) "
-        "  (define hero-success (run-h1-hero-demo hero-cfg)))";
-    (void)eval_text(hero_script, env);
+        "  (define demo-success (run-h1-demo demo-cfg)))";
+    (void)eval_text(demo_script, env);
 
     publisher.join();
 
-    const std::string status = symbol_name(eval_text("(map.get (map.get hero-success 'result (map.make)) 'status ':none)", env));
-    check(status == ":ok", "H1 hero success path should finish with :ok");
-    check(integer_value(eval_text("(map.get (map.get hero-success 'runtime (map.make)) 'waypoint_index -1)", env)) == 2,
-          "H1 hero success path should complete both waypoints");
-    check(string_value(eval_text("(map.get (map.get hero-success 'runtime (map.make)) 'last_branch_name \"\")", env)) == "goal_stop",
-          "H1 hero success path should end on goal_stop");
+    const std::string status = symbol_name(eval_text("(map.get (map.get demo-success 'result (map.make)) 'status ':none)", env));
+    check(status == ":ok", "H1 demo success path should finish with :ok");
+    check(integer_value(eval_text("(map.get (map.get demo-success 'runtime (map.make)) 'waypoint_index -1)", env)) == 2,
+          "H1 demo success path should complete both waypoints");
+    check(string_value(eval_text("(map.get (map.get demo-success 'runtime (map.make)) 'last_branch_name \"\")", env)) == "goal_stop",
+          "H1 demo success path should end on goal_stop");
     check(harness.wait_for_command_count(1, std::chrono::milliseconds(250)),
-          "H1 hero success path should publish at least one command");
+          "H1 demo success path should publish at least one command");
     const auto last_command = harness.last_command();
-    check_close(last_command.linear.x, 0.0, 1e-6, "H1 hero success path should end with zero forward velocity");
-    check_close(last_command.angular.z, 0.0, 1e-6, "H1 hero success path should end with zero angular velocity");
+    check_close(last_command.linear.x, 0.0, 1e-6, "H1 demo success path should end with zero forward velocity");
+    check_close(last_command.angular.z, 0.0, 1e-6, "H1 demo success path should end with zero angular velocity");
 
     std::ifstream run_in(run_log);
-    check(run_in.good(), "expected H1 hero run-loop log to exist");
+    check(run_in.good(), "expected H1 demo run-loop log to exist");
     std::string run_line;
     std::getline(run_in, run_line);
-    check(!run_line.empty(), "expected H1 hero run-loop log to contain at least one line");
+    check(!run_line.empty(), "expected H1 demo run-loop log to contain at least one line");
 
     std::ifstream event_in(event_log);
-    check(event_in.good(), "expected H1 hero event log to exist");
+    check(event_in.good(), "expected H1 demo event log to exist");
     std::string event_contents((std::istreambuf_iterator<char>(event_in)), std::istreambuf_iterator<char>());
     check(event_contents.find("\"schema\":\"mbt.evt.v1\"") != std::string::npos,
-          "expected H1 hero event log to contain canonical event records");
+          "expected H1 demo event log to contain canonical event records");
 }
 
-void test_ros2_h1_hero_demo_timeout_stop() {
+void test_ros2_h1_demo_timeout_stop() {
     using namespace muslisp;
 
     reset_bt_runtime_host();
@@ -3860,11 +3860,11 @@ void test_ros2_h1_hero_demo_timeout_stop() {
     test_support::ros2_test_harness harness("/h1_01");
 
     const std::filesystem::path repo_root = find_repo_root();
-    const std::filesystem::path hero_runtime = repo_root / "examples/isaac_h1_ros2_hero/lisp/hero_runtime.lisp";
-    const std::filesystem::path run_log = temp_file_path("isaac_h1_hero_timeout_run", ".jsonl");
-    const std::filesystem::path event_log = temp_file_path("isaac_h1_hero_timeout_events", ".jsonl");
+    const std::filesystem::path demo_runtime = repo_root / "examples/isaac_h1_ros2_demo/lisp/demo_runtime.lisp";
+    const std::filesystem::path run_log = temp_file_path("isaac_h1_demo_timeout_run", ".jsonl");
+    const std::filesystem::path event_log = temp_file_path("isaac_h1_demo_timeout_events", ".jsonl");
 
-    check(std::filesystem::exists(hero_runtime), "expected H1 hero runtime script to exist");
+    check(std::filesystem::exists(demo_runtime), "expected H1 demo runtime script to exist");
 
     std::thread publisher([&harness]() {
         if (!harness.wait_for_transport_ready(std::chrono::milliseconds(1500))) {
@@ -3873,36 +3873,36 @@ void test_ros2_h1_hero_demo_timeout_stop() {
         harness.publish_odom(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
     });
 
-    const std::string hero_script =
+    const std::string demo_script =
         "(begin "
-        "  (load " + lisp_string_literal(hero_runtime.string()) + ") "
-        "  (define hero-cfg (make-default-h1-hero-config)) "
-        "  (map.set! hero-cfg 'topic_ns \"/h1_01\") "
-        "  (map.set! hero-cfg 'max_ticks 4) "
-        "  (map.set! hero-cfg 'step_max 4) "
-        "  (map.set! hero-cfg 'stand_ticks 0) "
-        "  (map.set! hero-cfg 'obs_timeout_ms 10) "
-        "  (map.set! hero-cfg 'log_path " + lisp_string_literal(run_log.string()) + ") "
-        "  (map.set! hero-cfg 'event_log_path " + lisp_string_literal(event_log.string()) + ") "
-        "  (map.set! hero-cfg 'waypoints "
+        "  (load " + lisp_string_literal(demo_runtime.string()) + ") "
+        "  (define demo-cfg (make-default-h1-demo-config)) "
+        "  (map.set! demo-cfg 'topic_ns \"/h1_01\") "
+        "  (map.set! demo-cfg 'max_ticks 4) "
+        "  (map.set! demo-cfg 'step_max 4) "
+        "  (map.set! demo-cfg 'stand_ticks 0) "
+        "  (map.set! demo-cfg 'obs_timeout_ms 10) "
+        "  (map.set! demo-cfg 'log_path " + lisp_string_literal(run_log.string()) + ") "
+        "  (map.set! demo-cfg 'event_log_path " + lisp_string_literal(event_log.string()) + ") "
+        "  (map.set! demo-cfg 'waypoints "
         "    (list (make-waypoint \"forward\" 0.40 0.00 0.0))) "
-        "  (define hero-timeout (run-h1-hero-demo hero-cfg)))";
-    (void)eval_text(hero_script, env);
+        "  (define demo-timeout (run-h1-demo demo-cfg)))";
+    (void)eval_text(demo_script, env);
 
     publisher.join();
 
-    const std::string status = symbol_name(eval_text("(map.get (map.get hero-timeout 'result (map.make)) 'status ':none)", env));
-    check(status == ":stopped", "H1 hero timeout path should stop on max_ticks after issuing timeout stop commands");
-    check(string_value(eval_text("(map.get (map.get hero-timeout 'runtime (map.make)) 'last_branch_name \"\")", env)) == "timeout_stop",
-          "H1 hero timeout path should end on timeout_stop");
+    const std::string status = symbol_name(eval_text("(map.get (map.get demo-timeout 'result (map.make)) 'status ':none)", env));
+    check(status == ":stopped", "H1 demo timeout path should stop on max_ticks after issuing timeout stop commands");
+    check(string_value(eval_text("(map.get (map.get demo-timeout 'runtime (map.make)) 'last_branch_name \"\")", env)) == "timeout_stop",
+          "H1 demo timeout path should end on timeout_stop");
     check(harness.wait_for_command_count(1, std::chrono::milliseconds(250)),
-          "H1 hero timeout path should publish a stop command");
+          "H1 demo timeout path should publish a stop command");
     const auto last_command = harness.last_command();
-    check_close(last_command.linear.x, 0.0, 1e-6, "H1 hero timeout path should hold zero forward velocity");
-    check_close(last_command.angular.z, 0.0, 1e-6, "H1 hero timeout path should hold zero angular velocity");
+    check_close(last_command.linear.x, 0.0, 1e-6, "H1 demo timeout path should hold zero forward velocity");
+    check_close(last_command.angular.z, 0.0, 1e-6, "H1 demo timeout path should hold zero angular velocity");
 
     std::ifstream run_in(run_log);
-    check(run_in.good(), "expected H1 hero timeout run-loop log to exist");
+    check(run_in.good(), "expected H1 demo timeout run-loop log to exist");
 }
 
 void test_ros2_backend_present_with_extension() {
@@ -4045,8 +4045,8 @@ int main() {
         {"env generic ros2 backend contract", test_env_generic_ros2_backend_contract},
         {"ros2 backend config validation and reset policy", test_ros2_backend_config_validation_and_reset_policy},
         {"ros2 backend invalid action fallback", test_ros2_backend_invalid_action_fallback},
-        {"ros2 H1 hero demo success path", test_ros2_h1_hero_demo_success_path},
-        {"ros2 H1 hero demo timeout stop", test_ros2_h1_hero_demo_timeout_stop},
+        {"ros2 H1 demo success path", test_ros2_h1_demo_success_path},
+        {"ros2 H1 demo timeout stop", test_ros2_h1_demo_timeout_stop},
         {"ros2 backend present with extension", test_ros2_backend_present_with_extension},
         {"ros2 cleanup with live transport peer", test_ros2_cleanup_with_live_transport_peer},
 #endif

@@ -1,4 +1,4 @@
-(load "examples/isaac_h1_ros2_hero/lisp/bt_h1_hero.lisp")
+(load "examples/isaac_h1_ros2_demo/lisp/bt_h1_demo.lisp")
 
 (define pi 3.141592653589793)
 (define tau 6.283185307179586)
@@ -28,7 +28,7 @@
     (make-waypoint "left-corner" 0.80 0.50 (/ pi 2.0))
     (make-waypoint "return-lane" 0.30 0.50 pi)))
 
-(define (make-default-h1-hero-config)
+(define (make-default-h1-demo-config)
   (begin
     (define cfg (map.make))
     (map.set! cfg 'topic_ns "/h1_01")
@@ -43,10 +43,10 @@
     (map.set! cfg 'state_schema "ros2.state.v1")
     (map.set! cfg 'action_schema "ros2.action.v1")
     (map.set! cfg 'reset_mode "unsupported")
-    (map.set! cfg 'log_path "logs/isaac_h1_hero.run-loop.jsonl")
-    (map.set! cfg 'event_log_path "logs/isaac_h1_hero.mbt.evt.v1.jsonl")
+    (map.set! cfg 'log_path "logs/isaac_h1_demo.run-loop.jsonl")
+    (map.set! cfg 'event_log_path "logs/isaac_h1_demo.mbt.evt.v1.jsonl")
     (map.set! cfg 'event_log_ring_size 512)
-    (map.set! cfg 'schema_version "isaac_h1_hero.v1")
+    (map.set! cfg 'schema_version "isaac_h1_ros2_demo.v1")
     (map.set! cfg 'stand_ticks 12)
     (map.set! cfg 'obs_timeout_ms 600)
     (map.set! cfg 'turn_tol 0.18)
@@ -190,28 +190,28 @@
         (map.set! summary 'heading (map.get wp 'heading 0.0))
         summary)))
 
-(define (make-hero-map runtime cfg wp heading-error stale-ms obs-ready)
+(define (make-demo-map runtime cfg wp heading-error stale-ms obs-ready)
   (begin
-    (define hero (map.make))
-    (map.set! hero 'obs_ready obs-ready)
-    (map.set! hero 'branch (map.get runtime 'last_branch_name "boot"))
-    (map.set! hero 'waypoint_index (map.get runtime 'waypoint_index 0))
-    (map.set! hero 'waypoint_total (waypoint-count cfg))
-    (map.set! hero 'target (waypoint-summary wp))
-    (map.set! hero 'pose_x (map.get runtime 'x 0.0))
-    (map.set! hero 'pose_y (map.get runtime 'y 0.0))
-    (map.set! hero 'yaw (map.get runtime 'yaw 0.0))
-    (map.set! hero 'heading_error heading-error)
-    (map.set! hero 'stale_ms stale-ms)
+    (define demo (map.make))
+    (map.set! demo 'obs_ready obs-ready)
+    (map.set! demo 'branch (map.get runtime 'last_branch_name "boot"))
+    (map.set! demo 'waypoint_index (map.get runtime 'waypoint_index 0))
+    (map.set! demo 'waypoint_total (waypoint-count cfg))
+    (map.set! demo 'target (waypoint-summary wp))
+    (map.set! demo 'pose_x (map.get runtime 'x 0.0))
+    (map.set! demo 'pose_y (map.get runtime 'y 0.0))
+    (map.set! demo 'yaw (map.get runtime 'yaw 0.0))
+    (map.set! demo 'heading_error heading-error)
+    (map.set! demo 'stale_ms stale-ms)
     (if (null? wp)
-        (map.set! hero 'distance2 0.0)
-        (map.set! hero 'distance2
+        (map.set! demo 'distance2 0.0)
+        (map.set! demo 'distance2
                   (waypoint-distance2 wp
                                       (map.get runtime 'x 0.0)
                                       (map.get runtime 'y 0.0))))
-    hero))
+    demo))
 
-(define (run-h1-hero-demo demo-cfg)
+(define (run-h1-demo demo-cfg)
   (begin
     (define cfg demo-cfg)
 
@@ -230,10 +230,10 @@
     (env.configure backend-cfg)
 
     (events.enable #t)
-    (events.set-path (map.get cfg 'event_log_path "logs/isaac_h1_hero.mbt.evt.v1.jsonl"))
+    (events.set-path (map.get cfg 'event_log_path "logs/isaac_h1_demo.mbt.evt.v1.jsonl"))
     (events.set-ring-size (map.get cfg 'event_log_ring_size 512))
 
-    (define inst (bt.new-instance h1-hero-tree))
+    (define inst (bt.new-instance h1-demo-tree))
     (define runtime (make-runtime-state cfg))
     (define action-schema (map.get cfg 'action_schema "ros2.action.v1"))
     (define stop-command (make-command 0.0 0.0 0.0))
@@ -244,8 +244,8 @@
     (map.set! run-cfg 'max_ticks (map.get cfg 'max_ticks 240))
     (map.set! run-cfg 'step_max (map.get cfg 'step_max (map.get cfg 'max_ticks 240)))
     (map.set! run-cfg 'safe_action safe-action)
-    (map.set! run-cfg 'log_path (map.get cfg 'log_path "logs/isaac_h1_hero.run-loop.jsonl"))
-    (map.set! run-cfg 'schema_version (map.get cfg 'schema_version "isaac_h1_hero.v1"))
+    (map.set! run-cfg 'log_path (map.get cfg 'log_path "logs/isaac_h1_demo.run-loop.jsonl"))
+    (map.set! run-cfg 'schema_version (map.get cfg 'schema_version "isaac_h1_ros2_demo.v1"))
     (map.set! run-cfg 'stop_on_success (map.get cfg 'stop_on_success #t))
 
     (define on-tick
@@ -324,11 +324,11 @@
           (define action-vec (bt.blackboard.get inst 'action_vec stop-command))
 
           (define out (map.make))
-          (map.set! out 'schema_version (map.get cfg 'schema_version "isaac_h1_hero.v1"))
+          (map.set! out 'schema_version (map.get cfg 'schema_version "isaac_h1_ros2_demo.v1"))
           (map.set! out 'action (make-action-map action-schema t-ms action-vec))
           (map.set! out 'bt (make-bt-map branch-id))
-          (map.set! out 'hero
-                    (make-hero-map runtime
+          (map.set! out 'demo
+                    (make-demo-map runtime
                                    cfg
                                    target
                                    heading-error

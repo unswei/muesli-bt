@@ -21,7 +21,7 @@ Most examples follow the same pattern:
 
 ## Isaac Sim / ROS2
 
-- [H1 locomotion hero demo](isaac-h1-ros2-hero.md)
+- [H1 locomotion demo](isaac-h1-ros2-demo.md)
 
 ## More Scripted Examples
 
