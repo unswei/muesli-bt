@@ -129,8 +129,18 @@ void event_log::set_path(std::string path) {
     if (path.empty()) {
         throw std::invalid_argument("events.set-path: path must not be empty");
     }
-    std::lock_guard<std::mutex> lock(mutex_);
-    path_ = std::move(path);
+    std::string updated_path;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        path_ = std::move(path);
+        updated_path = path_;
+    }
+    std::lock_guard<std::mutex> file_lock(file_mutex_);
+    if (file_stream_.is_open() && open_path_ != updated_path) {
+        file_stream_.flush();
+        file_stream_.close();
+        open_path_.clear();
+    }
 }
 
 const std::string& event_log::path() const noexcept {
@@ -138,8 +148,18 @@ const std::string& event_log::path() const noexcept {
 }
 
 void event_log::set_file_enabled(bool enabled) noexcept {
-    std::lock_guard<std::mutex> lock(mutex_);
-    file_enabled_ = enabled;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        file_enabled_ = enabled;
+    }
+    if (!enabled) {
+        std::lock_guard<std::mutex> file_lock(file_mutex_);
+        if (file_stream_.is_open()) {
+            file_stream_.flush();
+            file_stream_.close();
+        }
+        open_path_.clear();
+    }
 }
 
 bool event_log::file_enabled() const noexcept {
@@ -155,6 +175,16 @@ void event_log::set_flush_on_tick_end(bool enabled) noexcept {
 bool event_log::flush_on_tick_end() const noexcept {
     std::lock_guard<std::mutex> lock(mutex_);
     return flush_on_tick_end_;
+}
+
+void event_log::set_flush_each_message(bool enabled) noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    flush_each_message_ = enabled;
+}
+
+bool event_log::flush_each_message() const noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return flush_each_message_;
 }
 
 void event_log::set_run_id(std::string run_id) {
@@ -268,6 +298,7 @@ void event_log::emit_bt_def(const definition& def) {
 std::uint64_t event_log::emit(std::string_view type, std::optional<std::uint64_t> tick, std::string_view data_json) {
     bool file_enabled = false;
     bool flush_on_tick_end = true;
+    bool flush_each_message = false;
     bool capture_stats_enabled = false;
     bool needs_serialised_line = false;
     std::uint64_t seq = 0;
@@ -282,6 +313,7 @@ std::uint64_t event_log::emit(std::string_view type, std::optional<std::uint64_t
         }
         file_enabled = file_enabled_;
         flush_on_tick_end = flush_on_tick_end_;
+        flush_each_message = flush_each_message_;
         capture_stats_enabled = capture_stats_enabled_;
         run_id = run_id_;
         if (deterministic_time_enabled_) {
@@ -312,7 +344,7 @@ std::uint64_t event_log::emit(std::string_view type, std::optional<std::uint64_t
     if (needs_serialised_line) {
         append_ring_line(line);
         if (file_enabled) {
-            const bool flush_now = !flush_on_tick_end || type == "tick_end";
+            const bool flush_now = flush_each_message || !flush_on_tick_end || type == "tick_end";
             append_file_line(line, flush_now);
         }
     }
@@ -531,17 +563,35 @@ void event_log::append_file_line(const std::string& line, bool flush_now) {
         path = path_;
     }
     std::lock_guard<std::mutex> file_lock(file_mutex_);
-    std::filesystem::path fs_path(path);
-    if (fs_path.has_parent_path()) {
-        std::filesystem::create_directories(fs_path.parent_path());
+    if (!file_stream_.is_open() || open_path_ != path) {
+        if (file_stream_.is_open()) {
+            file_stream_.flush();
+            file_stream_.close();
+        }
+        std::filesystem::path fs_path(path);
+        if (fs_path.has_parent_path()) {
+            std::filesystem::create_directories(fs_path.parent_path());
+        }
+        file_stream_.open(path, std::ios::app);
+        if (!file_stream_) {
+            file_stream_.close();
+            open_path_.clear();
+            return;
+        }
+        open_path_ = path;
     }
-    std::ofstream out(path, std::ios::app);
-    if (!out) {
+    file_stream_ << line << '\n';
+    if (!file_stream_) {
+        file_stream_.close();
+        open_path_.clear();
         return;
     }
-    out << line << '\n';
     if (flush_now) {
-        out.flush();
+        file_stream_.flush();
+        if (!file_stream_) {
+            file_stream_.close();
+            open_path_.clear();
+        }
     }
 }
 

@@ -11,6 +11,7 @@ Use the canonical event APIs:
 
 - `(events.enable #t/#f)`
 - `(events.set-path "logs/run.jsonl")`
+- `(events.set-flush-each-message #t/#f)`
 - `(events.dump [n])`
 
 See [Canonical Event Log](event-log.md).

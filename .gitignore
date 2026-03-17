@@ -64,3 +64,6 @@ examples/**/logs/*
 !examples/**/logs/.gitkeep
 examples/**/out/*
 !examples/**/out/.gitkeep
+
+
+__pycache__/

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <fstream>
 #include <functional>
 #include <mutex>
 #include <optional>
@@ -38,6 +39,8 @@ public:
 
     void set_flush_on_tick_end(bool enabled) noexcept;
     [[nodiscard]] bool flush_on_tick_end() const noexcept;
+    void set_flush_each_message(bool enabled) noexcept;
+    [[nodiscard]] bool flush_each_message() const noexcept;
 
     void set_run_id(std::string run_id);
     [[nodiscard]] std::string run_id() const;
@@ -100,12 +103,14 @@ private:
     bool enabled_ = true;
     bool file_enabled_ = false;
     bool flush_on_tick_end_ = true;
+    bool flush_each_message_ = false;
     bool run_started_ = false;
 
     std::size_t ring_capacity_ = 4096;
     std::vector<std::string> ring_;
 
     std::string path_ = "logs/run.jsonl";
+    std::string open_path_{};
     std::string run_id_ = "run-0";
     std::uint64_t seq_ = 0;
     double tick_hz_ = 50.0;
@@ -123,6 +128,7 @@ private:
     bool capture_stats_enabled_ = false;
     std::uint64_t captured_event_count_ = 0;
     std::uint64_t captured_byte_count_ = 0;
+    std::ofstream file_stream_{};
 
     bool snapshot_bb_requested_ = false;
     bool snapshot_bb_full_ = false;

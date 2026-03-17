@@ -39,6 +39,7 @@ struct env_runtime_state {
     std::string log_path{};
     std::string event_log_path{};
     std::int64_t event_log_ring_size = -1;
+    bool event_log_flush_each_message = false;
     std::int64_t episode = 0;
     std::int64_t step = 0;
     std::chrono::steady_clock::time_point time_origin = std::chrono::steady_clock::now();
@@ -203,6 +204,11 @@ void apply_common_runtime_options(value opts_map, const std::string& where) {
             throw lisp_error(where + " :event_log_ring_size: expected >= 0");
         }
         state.event_log_ring_size = ring_size;
+    }
+
+    if (const auto event_log_flush_each_message = map_lookup_option(opts_map, "event_log_flush_each_message")) {
+        state.event_log_flush_each_message =
+            require_bool(*event_log_flush_each_message, where + " :event_log_flush_each_message");
     }
 }
 
@@ -484,11 +490,13 @@ public:
                              bool realtime,
                              std::int64_t tick_hz,
                              const std::optional<std::string>& event_log_path,
-                             const std::optional<std::size_t>& ring_capacity)
+                             const std::optional<std::size_t>& ring_capacity,
+                             bool flush_each_message)
         : events_(bt::default_runtime_host().events()),
           saved_enabled_(events_.enabled()),
           saved_file_enabled_(events_.file_enabled()),
           saved_flush_on_tick_end_(events_.flush_on_tick_end()),
+          saved_flush_each_message_(events_.flush_each_message()),
           saved_ring_capacity_(events_.ring_capacity()),
           saved_path_(events_.path()),
           saved_run_id_(events_.run_id()),
@@ -502,6 +510,7 @@ public:
         }
         events_.set_enabled(true);
         events_.set_flush_on_tick_end(true);
+        events_.set_flush_each_message(flush_each_message);
         events_.set_tick_hz(static_cast<double>(tick_hz));
         events_.set_run_id(make_env_run_event_run_id(backend_name));
         events_.ensure_run_started("", event_capabilities_json(backend_name, backend_info, reset_supported, realtime));
@@ -513,6 +522,7 @@ public:
         events_.set_path(saved_path_);
         events_.set_ring_capacity(saved_ring_capacity_);
         events_.set_flush_on_tick_end(saved_flush_on_tick_end_);
+        events_.set_flush_each_message(saved_flush_each_message_);
         events_.set_file_enabled(saved_file_enabled_);
         events_.set_enabled(saved_enabled_);
     }
@@ -524,6 +534,7 @@ private:
     bool saved_enabled_;
     bool saved_file_enabled_;
     bool saved_flush_on_tick_end_;
+    bool saved_flush_each_message_;
     std::size_t saved_ring_capacity_;
     std::string saved_path_;
     std::string saved_run_id_;
@@ -1104,6 +1115,12 @@ value builtin_env_run_loop(const std::vector<value>& args) {
         event_log_ring_size = static_cast<std::size_t>(runtime_state().event_log_ring_size);
     }
 
+    bool event_log_flush_each_message = runtime_state().event_log_flush_each_message;
+    if (const auto flush_opt = map_lookup_option(config, "event_log_flush_each_message")) {
+        event_log_flush_each_message =
+            require_bool(*flush_opt, "env.run-loop :event_log_flush_each_message");
+    }
+
     try {
         backend->configure(config);
     } catch (const std::exception& e) {
@@ -1115,7 +1132,14 @@ value builtin_env_run_loop(const std::vector<value>& args) {
 
     const bool backend_supports_reset = backend->supports().reset;
     scoped_env_run_event_log canonical_events_scope(
-        backend_name, backend_info, backend_supports_reset, realtime, tick_hz, event_log_path, event_log_ring_size);
+        backend_name,
+        backend_info,
+        backend_supports_reset,
+        realtime,
+        tick_hz,
+        event_log_path,
+        event_log_ring_size,
+        event_log_flush_each_message);
     bt::event_log& canonical_events = canonical_events_scope.get();
     std::optional<std::int64_t> seed{};
     if (const auto seed_opt = map_lookup_option(config, "seed")) {

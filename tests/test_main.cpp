@@ -2609,6 +2609,8 @@ void test_canonical_event_stream_builtins() {
     env_ptr env = create_global_env();
 
     check(is_nil(eval_text("(events.enable #t)", env)), "events.enable should return nil");
+    check(is_nil(eval_text("(events.set-flush-each-message #t)", env)),
+          "events.set-flush-each-message should return nil");
     check(is_nil(eval_text("(events.set-ring-size 256)", env)), "events.set-ring-size should return nil");
 
     (void)eval_text("(define tree (bt.compile '(seq (act bb-put-int foo 42) (cond bb-has foo))))", env);
@@ -2750,6 +2752,63 @@ void test_event_log_capture_stats_without_serialised_sink() {
         bt::event_log::serialise_event_line("node_enter", "stats-run", 1735689602000, 1, 4, payload).size();
     check(stats.byte_count == expected_size, "capture stats should match canonical serialised line size");
     check(events.snapshot().empty(), "zero-capacity ring should not retain canonical lines");
+}
+
+void test_event_log_file_sink_reuses_stream_and_reopens_on_path_change() {
+    const std::filesystem::path first_path = temp_file_path("event_log_first", ".jsonl");
+    const std::filesystem::path second_path = temp_file_path("event_log_second", ".jsonl");
+
+    bt::event_log events(0);
+    events.set_run_id("file-run");
+    events.set_deterministic_time(1735689603000, 1);
+    events.set_path(first_path.string());
+    events.set_file_enabled(true);
+    events.set_flush_on_tick_end(false);
+    events.set_flush_each_message(true);
+
+    (void)events.emit("tick_begin", 1, "{\"status\":\"one\"}");
+    {
+        std::ifstream in(first_path);
+        check(in.good(), "expected flushed event log file to exist after first write");
+        std::string first_line;
+        std::getline(in, first_line);
+        check(first_line.find("\"status\":\"one\"") != std::string::npos,
+              "flush-each-message should make the first event visible immediately");
+    }
+    (void)events.emit("tick_end", 1, "{\"status\":\"two\"}");
+
+    events.set_path(second_path.string());
+    (void)events.emit("tick_end", 2, "{\"status\":\"three\"}");
+    events.set_file_enabled(false);
+    (void)events.emit("tick_end", 3, "{\"status\":\"four\"}");
+
+    auto read_lines = [](const std::filesystem::path& path) {
+        std::ifstream in(path);
+        check(in.good(), "expected event log file to exist: " + path.string());
+        std::vector<std::string> lines;
+        std::string line;
+        while (std::getline(in, line)) {
+            if (!line.empty()) {
+                lines.push_back(line);
+            }
+        }
+        return lines;
+    };
+
+    const auto first_lines = read_lines(first_path);
+    const auto second_lines = read_lines(second_path);
+
+    check(first_lines.size() == 2, "first event log file should contain two events");
+    check(second_lines.size() == 1, "second event log file should contain one event");
+    check(first_lines[0].find("\"status\":\"one\"") != std::string::npos, "first file first event mismatch");
+    check(first_lines[1].find("\"status\":\"two\"") != std::string::npos, "first file second event mismatch");
+    check(second_lines[0].find("\"status\":\"three\"") != std::string::npos, "second file event mismatch");
+    check(second_lines[0].find("\"status\":\"four\"") == std::string::npos,
+          "disabled file logging should not append further events");
+
+    std::error_code ec;
+    std::filesystem::remove(first_path, ec);
+    std::filesystem::remove(second_path, ec);
 }
 
 void test_runtime_host_deterministic_test_mode() {
@@ -3580,12 +3639,18 @@ void test_env_run_loop_emits_canonical_event_log() {
             lines.push_back(line);
         }
     }
-    check(lines.size() == 3, "expected run_start + tick_begin + tick_end canonical events");
+    check(lines.size() == 6,
+          "expected run_start + episode_begin + tick_begin + tick_end + episode_end + run_end canonical events");
     check(lines[0].find("\"schema\":\"mbt.evt.v1\"") != std::string::npos, "run_start line should use canonical schema");
     check(lines[0].find("\"type\":\"run_start\"") != std::string::npos, "first canonical event should be run_start");
-    check(lines[1].find("\"type\":\"tick_begin\"") != std::string::npos, "second canonical event should be tick_begin");
-    check(lines[2].find("\"type\":\"tick_end\"") != std::string::npos, "third canonical event should be tick_end");
-    check(lines[2].find("\"schema_version\":\"racecar.loop.v1\"") != std::string::npos,
+    check(lines[1].find("\"type\":\"episode_begin\"") != std::string::npos,
+          "second canonical event should be episode_begin");
+    check(lines[2].find("\"type\":\"tick_begin\"") != std::string::npos, "third canonical event should be tick_begin");
+    check(lines[3].find("\"type\":\"tick_end\"") != std::string::npos, "fourth canonical event should be tick_end");
+    check(lines[4].find("\"type\":\"episode_end\"") != std::string::npos,
+          "fifth canonical event should be episode_end");
+    check(lines[5].find("\"type\":\"run_end\"") != std::string::npos, "sixth canonical event should be run_end");
+    check(lines[3].find("\"schema_version\":\"racecar.loop.v1\"") != std::string::npos,
           "tick_end canonical event should include schema_version");
 
     std::error_code ec;
@@ -4265,6 +4330,7 @@ int main() {
          test_env_run_loop_multi_episode_canonical_summary_events},
         {"event log deterministic mode + canonical serialisation", test_event_log_deterministic_mode_and_canonical_serialisation},
         {"event log capture stats without serialised sink", test_event_log_capture_stats_without_serialised_sink},
+        {"event log file sink reuses stream and reopens on path change", test_event_log_file_sink_reuses_stream_and_reopens_on_path_change},
         {"runtime host deterministic test mode", test_runtime_host_deterministic_test_mode},
         {"pybullet backend absent in core env", test_pybullet_backend_absent_in_core_env},
         {"ros2 backend absent in core env", test_ros2_backend_absent_in_core_env},

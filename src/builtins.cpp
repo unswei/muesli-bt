@@ -2189,6 +2189,15 @@ value builtin_events_set_ring_size(const std::vector<value>& args) {
     return make_nil();
 }
 
+value builtin_events_set_flush_each_message(const std::vector<value>& args) {
+    require_arity("events.set-flush-each-message", args, 1);
+    if (!is_boolean(args[0])) {
+        throw lisp_error("events.set-flush-each-message: expected boolean");
+    }
+    bt::default_runtime_host().events().set_flush_each_message(boolean_value(args[0]));
+    return make_nil();
+}
+
 value builtin_events_dump(const std::vector<value>& args) {
     if (args.size() > 1) {
         throw lisp_error("events.dump: expected 0 or 1 arguments");
@@ -2867,6 +2876,7 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "events.enable", builtin_events_enable);
     bind_primitive(global_env, "events.set-path", builtin_events_set_path);
     bind_primitive(global_env, "events.set-ring-size", builtin_events_set_ring_size);
+    bind_primitive(global_env, "events.set-flush-each-message", builtin_events_set_flush_each_message);
     bind_primitive(global_env, "events.dump", builtin_events_dump);
     bind_primitive(global_env, "events.snapshot-bb", builtin_events_snapshot_bb);
     install_env_capability_builtins(global_env);

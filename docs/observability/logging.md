@@ -6,6 +6,7 @@ Use the event stream APIs:
 
 - `(events.enable #t/#f)`
 - `(events.set-path "logs/run.jsonl")`
+- `(events.set-flush-each-message #t/#f)`
 - `(events.set-ring-size n)`
 - `(events.dump [n])`
 - `(events.snapshot-bb [#t])`

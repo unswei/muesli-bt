@@ -15,7 +15,7 @@ Supports single-episode and multi-episode execution.
     - `config-map` with required keys `tick_hz`, `max_ticks`
     - `on-tick-fn` callable receiving one argument: observation map
 
-- Optional config keys: `episode_max`, `step_max`, `steps_per_tick`, `seed`, `realtime`, `safe_action`, `stop_on_success`, `success_predicate`, `log_path`, `event_log_path`, `event_log_ring_size`, `observer`
+- Optional config keys: `episode_max`, `step_max`, `steps_per_tick`, `seed`, `realtime`, `safe_action`, `stop_on_success`, `success_predicate`, `log_path`, `event_log_path`, `event_log_ring_size`, `event_log_flush_each_message`, `observer`
 - Return map includes:
 
     - `status` in `:ok | :stopped | :error | :unsupported`
@@ -51,6 +51,7 @@ Supports single-episode and multi-episode execution.
 - `log_path` writes the legacy per-tick run-loop record JSONL.
 - `event_log_path` writes canonical `mbt.evt.v1` events directly from `env.run-loop`.
 - `event_log_ring_size` controls the in-memory canonical event ring while the run is active.
+- `event_log_flush_each_message` flushes the canonical event file sink after every emitted event when set to `#t`. The default is buffered (`#f`).
 - For ROS-backed replay and conformance work, prefer `event_log_path` as the primary artefact.
 - For long-running multi-episode experiments, `event_log_path` also emits `episode_begin`, `episode_end`, and `run_end` summary events.
 

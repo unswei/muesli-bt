@@ -9,6 +9,7 @@ Payload shape:
 Use event stream controls for file/ring output:
 
 - `(events.set-path "logs/run.jsonl")`
+- `(events.set-flush-each-message #t/#f)`
 - `(events.enable #t)`
 - `(events.dump [n])`
 

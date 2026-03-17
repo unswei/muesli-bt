@@ -390,6 +390,7 @@ public:
             "log_path",
             "event_log_path",
             "event_log_ring_size",
+            "event_log_flush_each_message",
             "safe_action",
             "stop_on_success",
             "success_predicate",

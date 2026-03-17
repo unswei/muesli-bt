@@ -104,6 +104,7 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 ### Event stream
 
 - [`events.enable`](builtins/events/events-enable.md)
+- [`events.set-flush-each-message`](builtins/events/events-set-flush-each-message.md)
 - [`events.set-path`](builtins/events/events-set-path.md)
 - [`events.set-ring-size`](builtins/events/events-set-ring-size.md)
 - [`events.dump`](builtins/events/events-dump.md)
