@@ -26,3 +26,19 @@ Studio pinning matrix:
 - [deterministic fixtures (`tests/fixtures/mbt.evt.v1/`)](https://github.com/unswei/muesli-bt/tree/main/tests/fixtures/mbt.evt.v1)
 - [contract fixture bundles (`fixtures/`)](https://github.com/unswei/muesli-bt/tree/main/fixtures)
 - [event log validation tool (`tools/validate_log.py`)](https://github.com/unswei/muesli-bt/blob/main/tools/validate_log.py)
+- [trace validation tool (`tools/validate_trace.py`)](https://github.com/unswei/muesli-bt/blob/main/tools/validate_trace.py)
+
+## validations
+
+Use both validators when checking canonical runtime traces:
+
+- schema validation: [`tools/validate_log.py`](https://github.com/unswei/muesli-bt/blob/main/tools/validate_log.py)
+- trace-level validation: [`tools/validate_trace.py`](https://github.com/unswei/muesli-bt/blob/main/tools/validate_trace.py)
+
+Schema validation checks whether each `mbt.evt.v1` JSONL record is individually well-formed.
+Trace validation checks cross-event runtime-contract properties such as `seq` ordering, completed tick delimitation, terminal `node_exit` uniqueness, deadline/cancellation evidence, and deterministic replay comparison after normalisation.
+
+```bash
+python3 tools/validate_log.py fixtures/determinism-replay-case
+python3 tools/validate_trace.py check fixtures/determinism-replay-case
+```

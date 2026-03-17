@@ -1,0 +1,29 @@
+[validator]
+tolerate_incomplete_tail = false
+
+[normalisation]
+ignore_event_types = [
+  "run_start",
+  "run_end",
+  "episode_begin",
+  "episode_end",
+  "bt_def",
+]
+drop_fields = [
+  "seq",
+  "unix_ms",
+  "run_id",
+  "data.tick_ms",
+  "data.dur_ms",
+  "data.time_used_ms",
+  "data.tick_elapsed_ms",
+  "data.remaining_ms",
+  "data.threshold_ms",
+  "data.obs_t_ms",
+  "data.budget.tick_time_ms",
+  "data.budget.tick_elapsed_ms",
+  "data.git_sha",
+  "data.host",
+  "data.capabilities",
+]
+

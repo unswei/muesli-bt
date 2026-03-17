@@ -390,6 +390,14 @@ if (TARGET muesli_bt_integration_ros2)
   )
 endif ()
 
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if (Python3_Interpreter_FOUND)
+  add_test(
+    NAME muesli_bt_trace_validator_smoke
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_validate_trace.py"
+  )
+endif ()
+
 if (MUESLI_BT_BUILD_BENCHMARKS)
   add_subdirectory(bench)
 endif ()

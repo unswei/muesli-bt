@@ -63,6 +63,7 @@ Validate and verify fixtures:
 
 ```bash
 python3 tools/validate_log.py --schema schemas/event_log/v1/mbt.evt.v1.schema.json tests/fixtures/mbt.evt.v1/*
+python3 tools/validate_trace.py check fixtures/determinism-replay-case
 python3 tools/fixtures/verify_fixture.py
 ```
 
@@ -87,8 +88,16 @@ The same canonical consumer path also applies to simulator-backed and fixture-ba
 
 ```bash
 python3 tools/validate_log.py fixtures/determinism-replay-case
+python3 tools/validate_trace.py check fixtures/determinism-replay-case
+python3 tools/validate_trace.py compare \
+  fixtures/determinism-replay-case/events.jsonl \
+  fixtures/determinism-replay-case/events.jsonl \
+  --profile deterministic
 python3 tools/validate_log.py build/linux-ros2-l2/ros2_l2_artifacts/ros2_h1_success
 ```
+
+`tools/validate_log.py` checks per-record schema conformance only.
+`tools/validate_trace.py` checks cross-event properties such as `seq` ordering, completed tick delimitation, terminal `node_exit` uniqueness, `deadline_exceeded` evidence for over-budget ticks, async lifecycle ordering, and deterministic replay comparison after configured normalisation.
 
 ## Deterministic BT Tests
 

@@ -54,6 +54,7 @@
 
 - `(events.enable #t/#f)`
 - `(events.set-path "logs/run.jsonl")`
+- `(events.set-flush-each-message #t/#f)`
 - `(events.set-ring-size n)`
 - `(events.dump [n])` -> list of JSON strings
 - `(events.snapshot-bb [#t])` -> request snapshot at next tick boundary
@@ -70,6 +71,39 @@
 - Blackboard `bb_write.preview` is size-limited (4KB JSON).
 - `seq` is the authoritative ordering key for replay/monitoring.
 - Existing planner/vla metadata is wrapped in canonical events (for example `planner_v1`).
+- File-backed event output is buffered by default. Enable `(events.set-flush-each-message #t)` when durability after each emitted event matters more than throughput.
+
+## validation
+
+Use two validators together:
+
+- `tools/validate_log.py`: per-record JSON and schema validation
+- `tools/validate_trace.py`: cross-event trace validation and replay comparison
+
+Current trace-level checks include:
+
+- `seq` ordering and duplicate detection
+- completed tick delimitation with `tick_begin` / `tick_end`
+- duplicate terminal `node_exit` detection
+- over-budget tick evidence via `deadline_exceeded`
+- async cancellation evidence after deadline overrun
+- async lifecycle ordering checks such as cancel acknowledgement before request or terminal async events before submit
+
+Examples:
+
+```bash
+python3 tools/validate_log.py fixtures/determinism-replay-case
+python3 tools/validate_trace.py check fixtures/determinism-replay-case
+python3 tools/validate_trace.py compare \
+  fixtures/determinism-replay-case/events.jsonl \
+  fixtures/determinism-replay-case/events.jsonl \
+  --profile deterministic
+```
+
+Example normalisation configs live under:
+
+- `tools/trace_validator/deterministic.toml`
+- `tools/trace_validator/cross_backend.toml`
 
 ## determinism and bounded behaviour
 

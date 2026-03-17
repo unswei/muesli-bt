@@ -47,6 +47,11 @@ Authoritative contract artefacts:
 - [canonical event schema (`mbt.evt.v1`)](schemas/event_log/v1/mbt.evt.v1.schema.json)
 - [deterministic fixtures](tests/fixtures/mbt.evt.v1/) and [fixture bundles](fixtures/)
 
+Validation tools:
+
+- schema validation: [`tools/validate_log.py`](tools/validate_log.py)
+- trace-level validation and replay comparison: [`tools/validate_trace.py`](tools/validate_trace.py)
+
 ## Conformance Levels
 
 Conformance is layered so reviewers can separate core runtime semantics from heavier integration checks:
@@ -57,6 +62,7 @@ Conformance is layered so reviewers can separate core runtime semantics from hea
 - Generic `env.*` contract coverage in `muslisp_tests` includes both PyBullet and ROS2 backends.
 
 Runbook and checklist: [conformance levels](docs/contracts/conformance.md).
+Validation overview: [contracts index](docs/contracts/README.md#validations).
 
 ## From Zero To Verified Demo
 

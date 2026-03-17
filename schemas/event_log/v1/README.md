@@ -13,3 +13,9 @@ python3 tools/validate_log.py \
   --schema schemas/event_log/v1/mbt.evt.v1.schema.json \
   tests/fixtures/mbt.evt.v1/*.jsonl
 ```
+
+For cross-event validation over a complete run trace, use:
+
+```bash
+python3 tools/validate_trace.py check fixtures/determinism-replay-case
+```

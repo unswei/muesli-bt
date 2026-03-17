@@ -117,6 +117,7 @@ cmake --build build/linux-ros2-l2 --target muesli_bt_conformance_l2_rosbag_tests
 ctest --test-dir build/linux-ros2-l2 -R muesli_bt_conformance_l2_rosbag_tests --output-on-failure
 python3 tools/verify_ros2_l2_artifacts.py --artifact-root build/linux-ros2-l2/ros2_l2_artifacts
 python3 tools/validate_log.py build/linux-ros2-l2/ros2_l2_artifacts/ros2_h1_success
+python3 tools/validate_trace.py check build/linux-ros2-l2/ros2_l2_artifacts/ros2_h1_success
 ```
 
 This verifier is the supported ROS-backed replay/conformance check for the current `L2` lane.
@@ -131,7 +132,12 @@ That means a validator or replay consumer can inspect both with the same entry p
 
 ```bash
 python3 tools/validate_log.py fixtures/determinism-replay-case
+python3 tools/validate_trace.py check fixtures/determinism-replay-case
 python3 tools/validate_log.py build/linux-ros2-l2/ros2_l2_artifacts/ros2_h1_success
+python3 tools/validate_trace.py compare \
+  fixtures/determinism-replay-case/events.jsonl \
+  fixtures/determinism-replay-case/events.jsonl \
+  --profile deterministic
 ```
 
 Verify install/export plus the ROS2 consumer smoke:

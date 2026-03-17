@@ -13,6 +13,8 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - Added a first compiled-closure VM path that resolves supported special forms once, lowers params and `let` bindings to local slots, keeps globals/captures as named lookup, and executes supported tail calls through a bytecode-style `tail_call` path.
 - Added regression coverage that distinguishes compiled closures from interpreter fallbacks, so supported closures compile and unsupported forms keep the existing evaluator path.
 - Added interactive REPL coverage for command/history helpers so exit handling, `:clear`, and persistent-history path rules stay stable.
+- Added a separate trace-level validator (`tools/validate_trace.py`) for `mbt.evt.v1` logs, covering cross-event checks such as `seq` ordering, completed tick delimitation, terminal `node_exit` uniqueness, deadline/cancellation evidence, async lifecycle ordering, deterministic comparison, batch reporting, and tolerant incomplete-tail handling.
+- Added trace-validator smoke coverage plus example normalisation configs for deterministic replay and cross-backend comparison.
 
 ### Changed
 - Optimised the reactive interruption path so the current `B2` benchmark cases no longer allocate on the steady-state hot path.
@@ -28,6 +30,7 @@ Earlier development happened during rapid prototyping and was not recorded as a 
 - Tail-bounce GC polling now runs periodically during deep tail recursion instead of on every single bounce.
 - Supported closure bodies now use a compiled execution path when they fit the first VM subset; unsupported closure bodies continue to run through the existing tree-walking evaluator.
 - `muslisp` now uses a vendored `linenoise` REPL on interactive Linux and macOS terminals, with editable current lines, persistent history at `~/.muesli_bt_history`, wrapped input, and `:clear` for pending multi-line buffers.
+- Validation docs now distinguish per-record schema validation from trace-level validation, and the main README, contracts README, and schema READMEs now point to both validator entry points.
 
 ### Fixed
 - Fixed GC env-root handling so duplicate env roots behave like a stack and temporary evaluator roots no longer unregister long-lived roots accidentally.
