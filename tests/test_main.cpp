@@ -4164,7 +4164,9 @@ void test_ros2_h1_demo_timeout_stop() {
         if (!harness.wait_for_transport_ready(std::chrono::milliseconds(3000))) {
             return;
         }
-        harness.publish_odom(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+        for (int repeat = 0; repeat < 3; ++repeat) {
+            harness.publish_odom(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+        }
     });
 
     const std::string demo_script =
@@ -4173,9 +4175,9 @@ void test_ros2_h1_demo_timeout_stop() {
         "  (define demo-cfg (make-default-h1-demo-config)) "
         "  (map.set! demo-cfg 'topic_ns \"/h1_01\") "
         "  (map.set! demo-cfg 'realtime #t) "
-        "  (map.set! demo-cfg 'tick_hz 50) "
-        "  (map.set! demo-cfg 'max_ticks 4) "
-        "  (map.set! demo-cfg 'step_max 4) "
+        "  (map.set! demo-cfg 'tick_hz 20) "
+        "  (map.set! demo-cfg 'max_ticks 8) "
+        "  (map.set! demo-cfg 'step_max 8) "
         "  (map.set! demo-cfg 'stand_ticks 0) "
         "  (map.set! demo-cfg 'obs_timeout_ms 10) "
         "  (map.set! demo-cfg 'log_path " + lisp_string_literal(run_log.string()) + ") "
