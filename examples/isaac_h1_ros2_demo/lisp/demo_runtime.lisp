@@ -37,6 +37,7 @@
     (map.set! cfg 'topic_ns "/h1_01")
     (map.set! cfg 'control_hz 200)
     (map.set! cfg 'tick_hz 20)
+    (map.set! cfg 'realtime #f)
     (map.set! cfg 'max_ticks 240)
     (map.set! cfg 'step_max 240)
     (map.set! cfg 'obs_source "odom")
@@ -225,6 +226,7 @@
     (map.set! backend-cfg 'topic_ns (map.get cfg 'topic_ns "/h1_01"))
     (map.set! backend-cfg 'obs_source (map.get cfg 'obs_source "odom"))
     (map.set! backend-cfg 'action_sink (map.get cfg 'action_sink "cmd_vel"))
+    (map.set! backend-cfg 'realtime (map.get cfg 'realtime #f))
     (map.set! backend-cfg 'backend_version (map.get cfg 'backend_version "ros2.transport.v1"))
     (map.set! backend-cfg 'obs_schema (map.get cfg 'obs_schema "ros2.obs.v1"))
     (map.set! backend-cfg 'state_schema (map.get cfg 'state_schema "ros2.state.v1"))
@@ -244,6 +246,7 @@
 
     (define run-cfg (map.make))
     (map.set! run-cfg 'tick_hz (map.get cfg 'tick_hz 20))
+    (map.set! run-cfg 'realtime (map.get cfg 'realtime #f))
     (map.set! run-cfg 'max_ticks (map.get cfg 'max_ticks 240))
     (map.set! run-cfg 'step_max (map.get cfg 'step_max (map.get cfg 'max_ticks 240)))
     (map.set! run-cfg 'safe_action safe-action)

@@ -4172,6 +4172,8 @@ void test_ros2_h1_demo_timeout_stop() {
         "  (load " + lisp_string_literal(demo_runtime.string()) + ") "
         "  (define demo-cfg (make-default-h1-demo-config)) "
         "  (map.set! demo-cfg 'topic_ns \"/h1_01\") "
+        "  (map.set! demo-cfg 'realtime #t) "
+        "  (map.set! demo-cfg 'tick_hz 50) "
         "  (map.set! demo-cfg 'max_ticks 4) "
         "  (map.set! demo-cfg 'step_max 4) "
         "  (map.set! demo-cfg 'stand_ticks 0) "
