@@ -1,9 +1,10 @@
 # Changelog
 
-This changelog starts on March 2, 2026 and tracks changes forward from this point.
-Earlier development happened during rapid prototyping and was not recorded as a structured changelog.
+muesli-bt
 
 ## [Unreleased]
+
+## [0.4.0] - 2026-03-21
 
 ### Added
 - Added an optional benchmark harness under `bench/` with `A1`, `A2`, `B1`, `B2`, `B5`, and `B6`, CSV output, environment metadata capture, and progress reporting.

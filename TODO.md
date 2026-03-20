@@ -5,16 +5,16 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 
 ## now
 
-- `v0.4.0`: prepare the release-candidate pass and tag once the current canonical ROS replay/logging docs and Linux validation results are committed
+- `v0.5.0`: choose one canonical wheeled BT and reuse it across PyBullet, Webots, and ROS2 with adapter-only differences
+- `v0.5.0`: publish an improved integration tutorial that walks one supported backend path from attach/config through canonical log validation
 
 ## next
 
-- `v0.5.0`: choose one canonical wheeled BT and reuse it across PyBullet, Webots, and ROS2 with adapter-only differences
 - `v0.5.0`: add scripted invariant checks that compare key behaviour or decision traces across simulator and ROS-backed runs
 - `v0.5.0`: treat the cross-transport invariant checks as paper evidence, not just integration smoke
 - `v0.5.0`: publish end-to-end ROS2 consumer docs/examples for the supported path
 - `v0.5.0`: deepen ROS2 `L2` evidence only when there is a concrete new transport path or failure mode to cover
-- `v0.5.0`: update GitHub Actions workflow dependencies off Node 20 before the June 2, 2026 GitHub cutoff
+- `v0.5.0`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
 
 ## later
 

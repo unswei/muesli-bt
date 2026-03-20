@@ -18,6 +18,7 @@ Use this page to find where to implement specific changes.
 - `include/muslisp/value.hpp`
 - `src/reader.cpp`
 - `src/eval.cpp`
+- `src/compiled_eval.cpp`
 - `src/builtins.cpp`
 - `src/env_builtins.cpp`
 - `src/env_api.cpp`
@@ -58,6 +59,7 @@ Use this page to find where to implement specific changes.
 ## Where Do I Change X?
 
 - add Lisp builtin: `src/builtins.cpp` (general builtins) or `src/env_builtins.cpp` (`env.*` capability interface)
+- change compiled-closure execution or the current VM subset: `src/compiled_eval.cpp`, `src/eval.cpp`, `include/muslisp/value.hpp`, tests
 - add BT language (DSL: a small purpose-built language for behaviour trees) node/decorator: `include/bt/ast.hpp`, `src/bt/compiler.cpp`, `src/bt/runtime.cpp`, tests
 - add blackboard value type: `include/bt/blackboard.hpp`, `src/bt/blackboard.cpp`, dump/trace paths, tests
 - add trace field/event: `include/bt/trace.hpp`, `src/bt/runtime.cpp`, dump helpers, tests

@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -74,7 +74,7 @@ jobs:
           sha256sum "$archive" > "${archive}.sha256"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-ubuntu-x86_64
           path: |
@@ -88,7 +88,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -157,7 +157,7 @@ jobs:
           shasum -a 256 "$archive" > "${archive}.sha256"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-macos-arm64
           path: |
@@ -171,7 +171,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -269,7 +269,7 @@ jobs:
           sha256sum "$archive" > "${archive}.sha256"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-ubuntu-22.04-ros2-humble-x86_64
           path: |
@@ -287,7 +287,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -305,7 +305,7 @@ jobs:
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
@@ -316,21 +316,39 @@ jobs:
           cat dist/*.sha256 > dist/SHA256SUMS.txt
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          generate_release_notes: true
-          append_body: true
-          body: |
-            Binary artefacts are attached for:
-            - Ubuntu x86_64 (generic, non-ROS)
-            - Ubuntu 22.04 x86_64 with ROS 2 Humble support
-            - macOS arm64 (Apple Silicon only)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.meta.outputs.tag }}"
 
-            The ROS-enabled Ubuntu artefact requires a matching ROS 2 Humble runtime on the target host.
-
-            GitHub auto-attaches source code archives (`.zip` and `.tar.gz`) for this tag.
-          files: |
+          assets=(
             dist/*.tar.gz
             dist/*.sha256
             dist/SHA256SUMS.txt
+          )
+          for asset in "${assets[@]}"; do
+            test -f "$asset"
+          done
+
+          notes_file="$(mktemp)"
+          cat >"$notes_file" <<'EOF'
+          Binary artefacts are attached for:
+          - Ubuntu x86_64 (generic, non-ROS)
+          - Ubuntu 22.04 x86_64 with ROS 2 Humble support
+          - macOS arm64 (Apple Silicon only)
+
+          The ROS-enabled Ubuntu artefact requires a matching ROS 2 Humble runtime on the target host.
+
+          GitHub auto-attaches source code archives (`.zip` and `.tar.gz`) for this tag.
+          EOF
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "release ${tag} already exists; refreshing attached assets only"
+            gh release upload "$tag" "${assets[@]}" --clobber
+          else
+            gh release create "$tag" "${assets[@]}" \
+              --verify-tag \
+              --generate-notes \
+              --notes-file "$notes_file"
+          fi
