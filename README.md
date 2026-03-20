@@ -24,7 +24,7 @@ muesli-bt keeps those concerns in one place with explicit runtime semantics and 
 ### Benchmarks (against bt.cpp):
 - ~2.6-2.7x lower per-node traversal cost on the shared static-tree benchmarks
 - ~2.7x lower reactive interruption latency on the tested benchmark contract
-- dramatically cheaper instance creation on the tested subsetc-tree benchmarks
+- dramatically cheaper instance creation on the tested shared-subset tree benchmarks
 
 
 ## Runtime Contract In One Minute
@@ -111,7 +111,7 @@ On interactive Linux and macOS terminals, `muslisp` now uses a small vendored li
 
 ## ROS2 Release Baseline
 
-The current `v0.3.x` ROS2 release baseline is intentionally narrow:
+The current `v0.4.x` ROS2 release baseline is intentionally narrow:
 
 - supported host: Ubuntu 22.04 + ROS 2 Humble
 - attach path: `(env.attach "ros2")`
@@ -119,6 +119,9 @@ The current `v0.3.x` ROS2 release baseline is intentionally narrow:
 - package export: `muesli_bt::integration_ros2`
 - runner: `muslisp_ros2`
 - reset policy: live runs use `reset_mode="unsupported"`; `stub` remains for tests and harnesses
+- canonical logging path: `event_log_path` writes direct `mbt.evt.v1` JSONL to `events.jsonl`-style artefact paths
+- canonical lifecycle summary: long runs emit `episode_begin`, `episode_end`, and `run_end`
+- ROS timing metadata: `run_start.data.capabilities` records `time_source`, `use_sim_time`, and `obs_timestamp_source`
 
 Release artefact posture:
 

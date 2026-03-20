@@ -125,10 +125,11 @@ Exit criteria:
 - docs explain which parts are deterministic, which parts are only bounded, and how to interpret replay failures
 - a tooling consumer can inspect a ROS-backed run through the same canonical log path used for simulator-backed runs
 
-Current status on `main`:
+Released in `v0.4.0`:
 
-- this milestone scope is now implemented on the rolling branch
-- the remaining work before a `v0.4.0` tag is release hygiene and one clean release-candidate validation pass, not more semantic/runtime design
+- ROS-backed runs now emit validated canonical `mbt.evt.v1` logs directly
+- replay verification now has a documented trace-level validator path
+- ROS-backed and simulator-backed runs now share the same canonical `events.jsonl` artefact shape for tooling consumers
 
 #### `v0.5.0`: same BT, different IO transport
 
@@ -142,12 +143,14 @@ Scope:
 - choose one canonical wheeled behaviour as the cross-transport flagship
 - run the same high-level BT through PyBullet, Webots, and ROS2 with adapter-only differences
 - document the common BT source and the transport-specific attach/config layer separately
+- publish an improved integration tutorial that walks one supported backend path from attach/config through canonical log validation
 - define a small set of scripted comparison checks for key behaviour, action, or decision-trace invariants across the three transports
 
 Exit criteria:
 
 - one flagship behaviour has a shared BT definition that is reused across simulator and ROS-backed runs
 - docs point all three backends at the same BT logic, with only backend wiring changed
+- one integration tutorial shows the supported backend flow end-to-end, including canonical log validation
 - at least one scripted check compares key metrics or decision-trace invariants across the three transports
 - the ROS2 story is now clearly “same BT, different IO transport”, not “special ROS-only behaviour”
 - the cross-transport comparison is strong enough to support a paper-facing claim about stable semantics across transport changes
