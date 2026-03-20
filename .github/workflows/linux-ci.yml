@@ -424,7 +424,6 @@ jobs:
           test -f build/install-root/share/muesli_bt/contracts/runtime-contract-v1.md
           test -f build/install-root/share/muesli_bt/contracts/compatibility.md
           test -f build/install-root/share/muesli_bt/contracts/conformance.md
-          test -f build/install-root/share/muesli_bt/schema/mbt.evt.v1.schema.json
           test -f build/install-root/share/muesli_bt/schemas/event_log/v1/mbt.evt.v1.schema.json
           grep -q "set(muesli_bt_SHARE_DIR " build/install-root/lib/cmake/muesli_bt/muesli_btConfig.cmake
           grep -q "muesli_bt::integration_ros2" build/install-root/lib/cmake/muesli_bt/muesli_btTargets.cmake
