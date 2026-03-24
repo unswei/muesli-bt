@@ -24,7 +24,7 @@ muesli-bt keeps those concerns in one place with explicit runtime semantics and 
 ### Benchmarks (against BehaviorTree.CPP 4.9.0)
 - 2.59-2.75x lower per-node traversal cost on the shared 255-node traversal benchmarks
 - 2.27x lower worst-case reactive interruption latency on the shared reactive benchmark
-- 9.82-13.51x faster single-instance creation, and 33.31-38.82x faster batched instantiation, on the shared 31/255/1023-node instantiation benchmarks
+- approx 10x faster single-instance creation, and around 35x faster batched instantiation, on node instantiation benchmarks
 
 See [`bench/README.md`](bench/README.md) for the harness, scope, and comparison workflow.
 
