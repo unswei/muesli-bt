@@ -9,7 +9,7 @@ A compact Lisp runtime with an integrated Behaviour Tree engine, bounded-time pl
 
 `muslisp` is the executable. `muesli-bt` is the runtime and project.
 
-On our current shared benchmark subset under matched conditions, muesli-bt shows lower tick latency and much cheaper instantiation than BehaviorTree.CPP 4.9.0.
+On the shared benchmark subset under matched conditions, muesli-bt shows lower tick latency and faster BT compilation and instantiation than BehaviorTree.CPP 4.9.0.
 
 ## Why muesli-bt
 
@@ -21,10 +21,12 @@ When control loops need to stay responsive, three things matter:
 
 muesli-bt keeps those concerns in one place with explicit runtime semantics and built-in observability.
 
-### Benchmarks (against bt.cpp):
-- ~2.6-2.7x lower per-node traversal cost on the shared static-tree benchmarks
-- ~2.7x lower reactive interruption latency on the tested benchmark contract
-- dramatically cheaper instance creation on the tested shared-subset tree benchmarks
+### Benchmarks (against BehaviorTree.CPP 4.9.0)
+- 2.59-2.75x lower per-node traversal cost on the shared 255-node traversal benchmarks
+- 2.27x lower worst-case reactive interruption latency on the shared reactive benchmark
+- 9.82-13.51x faster single-instance creation, and 33.31-38.82x faster batched instantiation, on the shared 31/255/1023-node instantiation benchmarks
+
+See [`bench/README.md`](bench/README.md) for the harness, scope, and comparison workflow.
 
 
 ## Runtime Contract In One Minute
@@ -71,7 +73,7 @@ OS notes:
 - macOS: `brew install cmake ninja python@3.11`
 - Ubuntu/Debian: `sudo apt update && sudo apt install -y cmake ninja-build g++ python3 python3-venv`
 - Core/no-ROS builds are supported on both Linux and macOS. ROS2 stays optional and Linux-only when enabled.
-- For docs + `pybullet`, use `uv` to provision Python `3.11` into `.venv-py311` even on hosts whose system Python is older.
+- For docs + `pybullet`, use `uv` with Python `3.11`.
 
 Build:
 
@@ -131,9 +133,9 @@ Release artefact posture:
 
 Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md) for the boundary and live flow, then use [docs/integration/ros2-backend-scope.md](docs/integration/ros2-backend-scope.md) and [docs/contracts/conformance.md](docs/contracts/conformance.md) for the detailed commands and conformance lanes.
 
-## muesli-studio integration
+## package and tooling integration
 
-[`muesli-studio`](https://github.com/unswei/muesli-studio) is the inspector and tooling consumer for `muesli-bt` runtime data. This contract exists so integration behaviour stays stable and auditable across releases. The canonical runtime contract lives at [docs/contracts/runtime-contract-v1.md](docs/contracts/runtime-contract-v1.md), the Studio integration profile is [docs/contracts/muesli-studio-integration.md](docs/contracts/muesli-studio-integration.md), the authoritative event schema is [schemas/event_log/v1/mbt.evt.v1.schema.json](schemas/event_log/v1/mbt.evt.v1.schema.json), and deterministic fixtures are published under [tests/fixtures/mbt.evt.v1/](tests/fixtures/mbt.evt.v1/) and [fixtures/](fixtures/).
+`muesli-bt` installs a CMake package for runtime consumers and tooling such as [`muesli-studio`](https://github.com/unswei/muesli-studio). Start with the [runtime contract](docs/contracts/runtime-contract-v1.md), the [tooling integration profile](docs/contracts/muesli-studio-integration.md), and the [package consumption guide](docs/getting-started-consume.md).
 
 ```cmake
 find_package(muesli_bt CONFIG REQUIRED)
@@ -144,48 +146,17 @@ target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime)
 
 muesli_btConfig.cmake also defines `muesli_bt_SHARE_DIR`, which points to the installed contract and schema assets under `${prefix}/share/muesli_bt`.
 
-If installed with `-DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=ON`, the package also exports `muesli_bt::integration_pybullet`:
+Optional integration targets may also be exported when enabled at build time:
 
-```cmake
-find_package(muesli_bt CONFIG REQUIRED)
+- `muesli_bt::integration_pybullet`
+- `muesli_bt::integration_webots`
+- `muesli_bt::integration_ros2`
 
-add_executable(mbt_inspector ...)
-target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_pybullet)
-```
+The detailed target matrix, contract assets, and consumer guidance live in:
 
-If installed with `-DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=ON` and Webots SDK is available, the package exports `muesli_bt::integration_webots`:
-
-```cmake
-find_package(muesli_bt CONFIG REQUIRED)
-
-add_executable(mbt_inspector ...)
-target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_webots)
-```
-
-The legacy `bt::integrations::webots::install_callbacks(...)` hook remains available as a compatibility shim, but new consumers do not need it.
-
-If installed with `-DMUESLI_BT_BUILD_INTEGRATION_ROS2=ON`, the package exports the first Linux ROS2 transport target `muesli_bt::integration_ros2`:
-
-```cmake
-find_package(muesli_bt CONFIG REQUIRED)
-
-add_executable(mbt_inspector ...)
-target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_ros2)
-```
-
-Downstream consumers can probe optional integration targets safely:
-
-```cmake
-if(TARGET muesli_bt::integration_webots)
-  target_link_libraries(mbt_inspector PRIVATE muesli_bt::integration_webots)
-endif()
-
-if(TARGET muesli_bt::integration_ros2)
-  target_link_libraries(mbt_inspector PRIVATE muesli_bt::integration_ros2)
-endif()
-```
-
-muesli-studio pins to tagged muesli-bt releases; a scheduled CI job may test against `main`.
+- [docs/getting-started-consume.md](docs/getting-started-consume.md)
+- [docs/contracts/README.md](docs/contracts/README.md)
+- [docs/contracts/muesli-studio-integration.md](docs/contracts/muesli-studio-integration.md)
 
 ## Unified Python Environment (Docs + PyBullet)
 

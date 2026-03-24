@@ -11,7 +11,7 @@ This page is release-oriented. The shorter [Roadmap](limitations-roadmap.md) pag
 Use this page when you:
 
 - decide whether a change belongs before or after `v1.0.0`
-- scope release work for `v0.3.0+`
+- scope release work for `v0.5.0+`
 - review whether ROS2 work is staying thin and bounded
 - check what evidence is still missing for a paper-ready release
 
@@ -68,68 +68,45 @@ Already shipped across `v0.3.0` and `v0.3.1`:
 - ordinary CI gating for the rosbag-backed `L2` lane
 - a ROS-enabled Ubuntu 22.04 + Humble release artefact path alongside the generic Ubuntu archive
 
-This means the remaining path to `v1.0.0` is not “add ROS2 somehow”.
-The thin adaptor baseline is now real enough that the next question is how to exploit it without widening the semantic surface.
+Already shipped in `v0.4.0`:
+
+- direct canonical `mbt.evt.v1` output for ROS-backed runs
+- trace-level replay validation alongside per-record schema validation
+- explicit canonical lifecycle anchors for longer runs (`episode_begin`, `episode_end`, `run_end`)
+- explicit ROS timing metadata in canonical logs (`time_source`, `use_sim_time`, `obs_timestamp_source`)
+- one shared `events.jsonl` artefact shape for simulator-backed and ROS-backed runs
+
+The repository also now includes a checked-in benchmark harness and a documented Isaac Sim / ROS2 H1 showcase path.
+Those help evidence gathering, but they do not replace the remaining release gates for `v1.0.0`.
+
+This means the remaining path to `v1.0.0` is not “add ROS2 somehow” or “make replay work somehow”.
+The thin adaptor and observability baseline are already real enough that the next question is how to exploit them without widening the semantic surface.
 
 The remaining path is:
 
-- close replay and observability gaps so ROS-backed runs are first-class contract artefacts
 - prove “same BT, different IO transport” on one flagship behaviour as paper-facing evidence
 - define host capability bundles for richer external services without bloating `env.*` or `planner.plan`
+- finish the async and cancellation correctness story for released runtime semantics
+- keep the existing Isaac showcase as supporting evidence rather than a second semantic surface
 - finish paper-facing evaluation and release hygiene
 
 ### milestone plan
 
-#### `v0.3.x`: ROS2 thin adaptor baseline landed
+#### completed milestones
 
-Focus:
+`v0.3.x`: ROS2 thin adaptor baseline landed
 
-- treat the thin ROS2 adaptor as a released baseline rather than a speculative milestone
-- keep the supported transport small and explicit
-- avoid reopening this scope except for concrete contract bugs or consumer-driven gaps
+- released the first Ubuntu 22.04 + ROS 2 Humble transport path
+- kept the public transport surface intentionally narrow: `(env.attach "ros2")`, `Odometry` in, `Twist` out
+- established rosbag-backed `L2`, install/export coverage, and a ROS-enabled release artefact path
 
-Scope:
+`v0.4.0`: replay and observability parity landed
 
-- supported platform: Ubuntu 22.04 + ROS 2 Humble
-- supported transport: `nav_msgs/msg/Odometry` in, `geometry_msgs/msg/Twist` out
-- supported attach path: `(env.attach "ros2")`
-- explicit reset policy: `unsupported` for real runs, `stub` only for deterministic harnesses and tests
+- released direct canonical event-log output for ROS-backed runs
+- released trace-level replay validation and one shared canonical artefact layout across simulator and ROS-backed runs
+- documented canonical lifecycle anchors and ROS timing metadata in the released log surface
 
-Delivered in the `v0.3.x` release family:
-
-- `v0.3.0` established the released thin-adaptor baseline, live ROS2 example path, rosbag-backed `L2`, and installed consumer smoke coverage
-- `v0.3.1` added the dedicated ROS-enabled Ubuntu 22.04 + Humble release artefact path
-- the first supported distro, message path, reset policy, and non-goals are now explicit in docs and release notes
-- further work should move to observability parity, cross-transport evidence, or concrete consumer fixes rather than broadening the baseline transport casually
-
-#### `v0.4.0`: replay and observability parity
-
-Focus:
-
-- make ROS-backed runs first-class citizens of the canonical observability story
-- tighten replay verification from “artefact exists” to “log invariants are validated”
-- strengthen the paper claim that simulator and ROS-backed runs share one inspection and replay surface
-
-Scope:
-
-- direct canonical `mbt.evt.v1` output for ROS-backed runs
-- explicit time-source policy for ROS-backed runs (`sim time` vs wall time) and logging of that choice
-- minimal replay verification CLI or equivalent command that checks invariants from a canonical event log
-- tooling-facing parity so inspector and replay consumers can treat ROS-backed and simulator-backed runs the same way
-
-Exit criteria:
-
-- a ROS-backed run emits a validated canonical `mbt.evt.v1` log directly
-- rosbag replay can be checked with one documented verification command
-- replay verification covers at least event ordering, schema validity, and selected decision invariants
-- docs explain which parts are deterministic, which parts are only bounded, and how to interpret replay failures
-- a tooling consumer can inspect a ROS-backed run through the same canonical log path used for simulator-backed runs
-
-Released in `v0.4.0`:
-
-- ROS-backed runs now emit validated canonical `mbt.evt.v1` logs directly
-- replay verification now has a documented trace-level validator path
-- ROS-backed and simulator-backed runs now share the same canonical `events.jsonl` artefact shape for tooling consumers
+Further work should now move to cross-transport evidence, host-boundary definition, correctness hardening, or concrete consumer fixes rather than casually broadening the baseline transport.
 
 #### `v0.5.0`: same BT, different IO transport
 
@@ -206,14 +183,14 @@ Exit criteria:
 Focus:
 
 - make the paper-facing primary demo strong enough for both evaluation and presentation
-- add one current Isaac Sim demo before `v1.0.0` without changing core semantics
+- keep the supporting Isaac evidence current without turning it into a second primary track
 
 Scope:
 
 - Webots remains the visual flagship
 - PyBullet remains the fast CI and development harness
 - ROS-backed execution of the same wheeled behaviour becomes a deployability check
-- add one ROS-backed Isaac Sim demo as a modern-simulator evidence point before the paper release
+- keep the existing Isaac Sim / ROS2 H1 showcase as a modern-simulator evidence point
 - treat Isaac as a ROS-integrated simulator host, not as a new semantic surface inside `muesli-bt`
 - keep Isaac off the critical CI path unless it becomes cheap and reproducible enough to maintain
 
@@ -222,7 +199,7 @@ Exit criteria:
 - docs, scripts, and assets support one clear flagship demo flow
 - the wheeled demo has reproducible commands, expected outputs, and canonical log inspection steps
 - one ROS-backed run of the flagship behaviour is documented and repeatable on the supported baseline
-- one current Isaac Sim demo exists and is documented as a pre-1.0 ROS-backed deployability demo
+- the existing Isaac demo remains documented as a supporting ROS-backed deployability showcase
 - the Isaac demo reuses existing BT semantics and canonical logging expectations rather than introducing simulator-specific semantics
 
 #### `v0.9.0`: second scenario and evaluation hardening
@@ -284,9 +261,9 @@ This roadmap also uses the following release terms:
 
 ## example
 
-Example interpretation for `v0.3.0`:
+Example interpretation for `v0.5.0`:
 
-If the ROS2 adaptor builds and the rosbag lane passes, but the run still does not emit direct canonical `mbt.evt.v1` output, the work is good enough for `v0.3.0` but not yet good enough for `v0.4.0`.
+If PyBullet, Webots, and ROS2 all run the flagship scenario, but each backend still needs its own BT source file, the work is not yet good enough for `v0.5.0`.
 
 Example interpretation for `v1.0.0`:
 

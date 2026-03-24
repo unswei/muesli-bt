@@ -197,9 +197,9 @@ Exit target:
 
 - the split between `env.*`, `planner.plan`, and external host capability bundles is explicit in docs and examples
 
-`phase 11: v0.8.0 ROS-backed Isaac demo`
+`phase 11: v0.8.0 ROS-backed Isaac evidence packaging`
 
-- add one current Isaac Sim demo through ROS as a deployability and modern-simulator evidence point
+- keep the existing Isaac Sim / ROS2 H1 demo documented as a deployability and modern-simulator evidence point
 - keep Isaac outside core semantics and off the critical CI path unless it becomes cheap and reproducible
 
 `phase 12: v0.9.0 manipulation, perception, and MoveIt-backed proof`
