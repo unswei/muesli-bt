@@ -21,6 +21,7 @@ This directory contains runnable muesli-bt examples.
 - `repl_scripts/ros2-flagship-goal.lisp`: shared-flagship ROS2 wrapper that derives the cross-transport contract from odometry plus fixed scenario geometry.
 - `repl_scripts/ros2_flagship_test_publisher.py`: simple ROS2 odometry publisher for exercising the flagship wrapper against a deterministic straight-line goal trajectory.
 - `isaac_h1_ros2_demo/`: ROS2 H1 locomotion demo assets, including the checked-in Lisp BT, runtime wrapper, and Isaac topic contract.
+- `isaac_wheeled_ros2_demo/`: topic contract and runbook assets for the planned Isaac-backed wheeled flagship showcase.
 - `pybullet_racecar/`: PyBullet racecar showcase, including the shared `bt_flagship` cross-transport mode.
 - `../integrations/pybullet/`: shared C++ integration plumbing used by the PyBullet racecar demo.
 

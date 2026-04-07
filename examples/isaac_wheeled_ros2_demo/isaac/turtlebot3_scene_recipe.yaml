@@ -1,0 +1,81 @@
+recipe: turtlebot3_burger_flagship_scene.v1
+description: >
+  Concrete Isaac Sim scene recipe for the first wheeled muesli-bt showcase.
+  This recipe keeps the public control surface on ROS 2 Odometry in and Twist
+  out while using a TurtleBot3 Burger inside Isaac Sim.
+
+isaac_sim:
+  stage:
+    environment_usd: Isaac/Environments/Simple_Room/simple_room.usd
+    robot:
+      name: turtlebot3_burger
+      import_type: urdf
+      import_source: turtlebot3/turtlebot3_description/urdf/turtlebot3_burger.urdf
+      prim_path: /World/turtlebot3_burger
+      initial_pose:
+        position_m: [0.0, 0.0, 0.0]
+        yaw_rad: 0.0
+  articulation:
+    wheel_drive:
+      stiffness: 0.0
+      damping: 10000000.0
+  omnigraph:
+    required_nodes:
+      - On Playback Tick
+      - ROS2 Context
+      - ROS2 Subscribe Twist
+      - Break 3-Vector
+      - Differential Controller
+      - Articulation Controller
+      - Isaac Read Simulation Time
+      - Isaac Compute Odometry
+      - ROS2 Publish Odometry
+      - ROS2 Publish Raw Transform Tree
+      - ROS2 Publish Transform Tree
+    controller:
+      max_linear_speed_mps: 0.22
+      max_angular_speed_rps: 1.0
+      wheel_distance_m: 0.16
+      wheel_radius_m: 0.025
+  ros2:
+    namespace: /robot
+    topics:
+      cmd_vel: /robot/cmd_vel
+      odom: /robot/odom
+      tf: /tf
+    frames:
+      odom: odom
+      base: base_link
+
+scene_layout:
+  goal_marker:
+    shape: cylinder
+    colour: green
+    position_m: [2.5, 0.8, 0.0]
+  obstacles:
+    - name: crate_a
+      position_m: [0.9, 0.25, 0.0]
+      size_m: [0.35, 0.35, 0.35]
+    - name: crate_b
+      position_m: [1.6, -0.45, 0.0]
+      size_m: [0.45, 0.45, 0.45]
+    - name: crate_c
+      position_m: [2.0, 0.15, 0.0]
+      size_m: [0.35, 0.35, 0.35]
+  capture_camera:
+    name: website_camera
+    type: third_person_static
+    position_m: [4.2, -3.6, 2.4]
+    look_at_m: [1.6, 0.2, 0.35]
+
+run_expectations:
+  behaviour_story:
+    - initial direct-goal advance
+    - obstacle-driven avoidance or replanning
+    - recovered progress toward the goal
+    - stop near the goal marker
+  capture_outputs:
+    - 10 to 20 second website clip
+    - one high-resolution screenshot
+    - run-loop JSONL log
+    - canonical mbt.evt.v1 log

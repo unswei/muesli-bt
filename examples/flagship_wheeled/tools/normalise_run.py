@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
         description="Normalise a backend-specific flagship run into the shared comparison shape."
     )
     parser.add_argument("input", help="Backend-specific JSONL log artefact.")
-    parser.add_argument("--backend", required=True, choices=("webots", "pybullet"))
+    parser.add_argument("--backend", required=True, choices=("webots", "pybullet", "ros2"))
     parser.add_argument("--output", help="Optional JSON output path. Defaults to stdout.")
     return parser.parse_args()
 
@@ -150,6 +150,26 @@ def normalise_webots_record(record: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def normalise_ros2_record(record: Dict[str, Any]) -> Dict[str, Any]:
+    obs = record.get("obs") if isinstance(record.get("obs"), dict) else {}
+    on_tick = record.get("on_tick") if isinstance(record.get("on_tick"), dict) else {}
+    planner = record.get("planner") if isinstance(record.get("planner"), dict) else on_tick.get("planner")
+    planner_used = bool(isinstance(planner, dict) and planner.get("used"))
+    bt = record.get("bt") if isinstance(record.get("bt"), dict) else on_tick.get("bt")
+    shared_action = maybe_shared_action(on_tick.get("shared_action"))
+    return {
+        "tick_index": safe_int(record.get("tick"), default=0),
+        "time_s": safe_float(record.get("t_ms")) / 1000.0,
+        "goal_dist": safe_float(on_tick.get("goal_dist"), default=math.inf),
+        "goal_reached": bool(on_tick.get("done")),
+        "collision_imminent": bool(obs.get("collision_imminent")),
+        "branch": branch_from_webots({"bt": bt}),
+        "active_path": bt.get("active_path", []) if isinstance(bt, dict) else [],
+        "shared_action": shared_action,
+        "planner_used": planner_used,
+    }
+
+
 def normalise_records(rows: Iterable[Dict[str, Any]], backend: str) -> List[Dict[str, Any]]:
     out: List[Dict[str, Any]] = []
     for record in rows:
@@ -157,6 +177,8 @@ def normalise_records(rows: Iterable[Dict[str, Any]], backend: str) -> List[Dict
             out.append(normalise_pybullet_record(record))
         elif backend == "webots":
             out.append(normalise_webots_record(record))
+        elif backend == "ros2":
+            out.append(normalise_ros2_record(record))
         else:
             raise ValueError(f"backend not yet supported: {backend}")
     return out

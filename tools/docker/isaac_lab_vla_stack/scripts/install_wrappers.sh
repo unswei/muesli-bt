@@ -137,6 +137,18 @@ set -euo pipefail
 exec /tmp/stack-scripts/verify_h1_topics.sh "\$@"
 EOF
 
+cat > /usr/local/bin/isaac-wheeled-demo <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+exec /tmp/stack-scripts/run_wheeled_demo.sh "\$@"
+EOF
+
+cat > /usr/local/bin/verify-isaac-wheeled-topics <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+exec /tmp/stack-scripts/verify_wheeled_topics.sh "\$@"
+EOF
+
 chmod +x \
   /usr/local/bin/with-isaaclab-env \
   /usr/local/bin/install-isaacsim \
@@ -152,7 +164,9 @@ chmod +x \
   /usr/local/bin/isaac-h1-policy \
   /usr/local/bin/isaac-h1-demo \
   /usr/local/bin/isaac-sim-state \
-  /usr/local/bin/verify-isaac-h1-topics
+  /usr/local/bin/verify-isaac-h1-topics \
+  /usr/local/bin/isaac-wheeled-demo \
+  /usr/local/bin/verify-isaac-wheeled-topics
 
 cat >> /root/.bashrc <<EOF
 
@@ -173,5 +187,7 @@ alias openpi-shell="enter-openpi"
 alias h1-policy-install="install-isaac-h1-policy"
 alias h1-policy="isaac-h1-policy"
 alias h1-demo="isaac-h1-demo"
+alias wheeled-demo="isaac-wheeled-demo"
+alias wheeled-topics="verify-isaac-wheeled-topics"
 alias isaac-state="isaac-sim-state"
 EOF

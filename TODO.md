@@ -13,6 +13,7 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 - `v0.5.0`: add scripted invariant checks that compare key behaviour or decision traces across simulator and ROS-backed runs
 - `v0.5.0`: treat the cross-transport invariant checks as paper evidence, not just integration smoke
 - `v0.5.0`: publish end-to-end ROS2 consumer docs/examples for the supported path
+- `v0.5.0`: stand up one Isaac Sim wheeled ROS-backed showcase that reuses `ros2-flagship-goal.lisp`, and capture a short website-ready video plus one screenshot
 - `v0.5.0`: deepen ROS2 `L2` evidence only when there is a concrete new transport path or failure mode to cover
 - `v0.5.0`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
 

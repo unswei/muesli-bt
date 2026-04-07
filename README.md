@@ -213,6 +213,17 @@ For a Linux/NVIDIA showcase that keeps the current ROS2 thin adaptor intact, use
 
 This path keeps `muesli-bt` on the released `Odometry` -> `Twist` ROS2 surface while Isaac Sim and NVIDIA's H1 controller own the low-level humanoid policy loop.
 
+## Isaac Sim Wheeled Showcase
+
+For the website-facing wheeled Isaac path, the preferred direction is a small differential-drive robot in Isaac Sim using the same ROS 2 boundary:
+
+- input: `nav_msgs/msg/Odometry`
+- output: `geometry_msgs/msg/Twist`
+- runtime entrypoint: `examples/repl_scripts/ros2-flagship-goal.lisp`
+- docs page: `docs/examples/isaac-wheeled-ros2-showcase.md`
+
+This keeps the Isaac showcase aligned with the `v0.5` flagship story and gives a clean path to a short website video plus reproducible setup notes.
+
 ## VLA Integration Status
 
 VLA support in this repository is currently **stub integration + contract hooks**.

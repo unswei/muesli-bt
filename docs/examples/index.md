@@ -27,6 +27,7 @@ Most examples follow the same pattern:
 ## Isaac Sim / ROS2
 
 - [H1 locomotion demo](isaac-h1-ros2-demo.md)
+- [wheeled flagship showcase](isaac-wheeled-ros2-showcase.md)
 
 ## More Scripted Examples
 

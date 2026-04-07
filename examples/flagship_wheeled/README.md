@@ -13,8 +13,9 @@ Current status:
 
 - shared BT and helper files are checked in
 - Webots and PyBullet flagship wrappers now run
+- ROS2 flagship normalisation is supported by the shared tooling
 - normalisation and comparison tooling is available under `tools/`
-- ROS2 wrapper is still a scaffold
+- ROS2 wrapper remains a thin host-side derivation over the released `Odometry` -> `Twist` surface
 
 Planned backend wrappers:
 
@@ -42,6 +43,11 @@ python3 examples/flagship_wheeled/tools/normalise_run.py \
   --backend webots \
   --output examples/flagship_wheeled/out/webots_flagship.json \
   examples/webots_epuck_goal/logs/flagship_goal.jsonl
+
+python3 examples/flagship_wheeled/tools/normalise_run.py \
+  --backend ros2 \
+  --output examples/flagship_wheeled/out/ros2_flagship.json \
+  build/linux-ros2/ros2-flagship-goal.jsonl
 ```
 
 Then compare the normalised runs:

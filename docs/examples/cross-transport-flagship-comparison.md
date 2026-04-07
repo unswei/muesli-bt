@@ -13,8 +13,7 @@ The current tooling supports:
 
 - PyBullet flagship logs
 - Webots flagship logs
-
-ROS2 is still pending.
+- ROS2 flagship logs
 
 The concrete collection protocol now lives in [cross-transport comparison protocol](../integration/cross-transport-comparison-protocol.md).
 
@@ -23,8 +22,9 @@ The concrete collection protocol now lives in [cross-transport comparison protoc
 Use this page when you want to:
 
 - check whether the Webots and PyBullet flagship runs follow the same branch pattern
+- include the ROS2 flagship wrapper in the same backend-neutral summary flow
 - compare goal distance and shared action traces
-- produce one backend-neutral summary before adding ROS2 to the same comparison set
+- produce one backend-neutral summary across the currently supported flagship wrappers
 
 ## How It Works
 
@@ -84,6 +84,15 @@ python3 examples/flagship_wheeled/tools/normalise_run.py \
   examples/webots_epuck_goal/logs/flagship_goal.jsonl
 ```
 
+Normalise a ROS2 flagship run:
+
+```bash
+python3 examples/flagship_wheeled/tools/normalise_run.py \
+  --backend ros2 \
+  --output examples/flagship_wheeled/out/ros2_flagship.json \
+  build/linux-ros2/ros2-flagship-goal.jsonl
+```
+
 Compare the two normalised runs:
 
 ```bash
@@ -120,6 +129,7 @@ The exact values will vary with scenario duration and controller pacing.
 ## Gotchas
 
 - Compare flagship logs only. Older `bt_planner` or non-flagship Webots logs do not expose the same shared command trace.
+- For ROS2, normalisation support is available, but the fixed `320`-tick protocol still centres on the PyBullet and Webots portability pair.
 - Use runs with similar scenario setup and duration. The scripts do not infer scenario equivalence for you.
 - For the current protocol, use `--max-ticks 320` on the comparison step.
 - The first input to `compare_runs.py` is the baseline.

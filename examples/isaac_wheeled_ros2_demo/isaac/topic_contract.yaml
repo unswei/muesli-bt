@@ -1,0 +1,71 @@
+demo: isaac_wheeled_ros2_flagship.v1
+description: >
+  Topic and simulator contract for the Isaac-backed wheeled flagship showcase.
+  This path keeps muesli-bt on the released ROS 2 Odometry-to-Twist transport
+  surface while Isaac Sim owns the robot, scene, camera, and ROS bridge.
+
+ros2:
+  namespace: /robot
+  backend:
+    attach: ros2
+    backend_version: ros2.transport.v1
+    obs_source: odom
+    action_sink: cmd_vel
+    obs_schema: ros2.obs.v1
+    state_schema: ros2.state.v1
+    action_schema: ros2.action.v1
+  topics:
+    odom:
+      type: nav_msgs/msg/Odometry
+      direction: isaac_to_muesli
+      notes: Base pose and twist for the wheeled robot.
+    cmd_vel:
+      type: geometry_msgs/msg/Twist
+      direction: muesli_to_isaac
+      notes: High-level velocity command consumed by the Isaac-side differential-drive controller.
+    tf:
+      type: tf2_msgs/msg/TFMessage
+      direction: isaac_to_ros_graph
+      notes: Optional transform tree for visualisation and frame debugging.
+    clock:
+      type: rosgraph_msgs/msg/Clock
+      direction: isaac_to_ros_graph
+      notes: Optional simulation clock when the scene uses ROS simulation time.
+
+isaac_sim:
+  preferred_robot_family:
+    - turtlebot3_burger
+    - turtlebot3_waffle
+    - jetbot
+  scene_requirements:
+    - planar wheeled robot
+    - fixed goal marker
+    - small number of fixed obstacles
+    - one third-person capture camera
+  simulation_services:
+    get_state: /get_simulation_state
+    set_state: /set_simulation_state
+    reset: /reset_simulation
+    step: /step_simulation
+  action_graph_nodes:
+    - ROS2 Context
+    - On Playback Tick
+    - Isaac Read Simulation Time
+    - ROS2 Publish Odometry
+    - ROS2 Publish Raw Transform Tree
+    - ROS2 Publish Transform Tree
+    - ROS2 Subscribe Twist
+    - Break 3-Vector
+    - Differential Controller
+    - Articulation Controller
+  expected_frames:
+    odom_frame: odom
+    base_frame: base_link
+
+website_capture:
+  target_duration_s: 10-20
+  required_outputs:
+    - short video clip
+    - one screenshot
+    - run-loop JSONL log
+    - canonical mbt.evt.v1 log

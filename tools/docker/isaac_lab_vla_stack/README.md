@@ -203,6 +203,35 @@ The topic contract checked into the repository is:
 
 - `examples/isaac_h1_ros2_demo/isaac/topic_contract.yaml`
 
+## wheeled flagship showcase flow
+
+The repository also includes helper commands for the planned Isaac-backed wheeled flagship showcase.
+
+The intended contract stays on the released ROS 2 surface:
+
+- `/robot/odom`
+- `/robot/cmd_vel`
+
+Use the helper commands once Isaac Sim is running a wheeled robot scene with the ROS 2 bridge enabled:
+
+```bash
+verify-isaac-wheeled-topics
+isaac-sim-state play
+isaac-wheeled-demo
+```
+
+The runtime script is the existing shared ROS-backed flagship wrapper:
+
+- `examples/repl_scripts/ros2-flagship-goal.lisp`
+
+The checked-in topic contract is:
+
+- `examples/isaac_wheeled_ros2_demo/isaac/topic_contract.yaml`
+
+The detailed runbook is:
+
+- `docs/examples/isaac-wheeled-ros2-showcase.md`
+
 The run script mounts this repository at `/workspace/muesli-bt` and persists caches under `~/.cache/muesli-bt/isaac-lab-vla/`. The Isaac Lab runtime install is persisted under `~/.cache/muesli-bt/isaac-lab-vla/isaaclab-runtime/`, so `install-isaacsim` is normally a one-time setup per host cache.
 
 ## prerequisites

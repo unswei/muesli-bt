@@ -8,18 +8,21 @@ The goal is to compare the shared wheeled flagship across:
 
 - PyBullet
 - Webots
+- ROS2
 
-using one fixed collection window and one fixed set of controller settings.
+using one shared normalisation path, while the fixed collection window remains the PyBullet and Webots portability pair.
 
 This protocol is intentionally narrow.
 It is the first evidence protocol for the flagship, not the final evaluation design for `1.0`.
 It is a portability protocol, not the stricter same-robot comparison track.
+ROS2 support in the normalisation tooling does not, by itself, mean this fixed paper-facing collection protocol has expanded to a three-way parity claim.
 
 ## when to use it
 
 Use this page when you:
 
 - collect a matched PyBullet and Webots flagship pair
+- want the shared tooling to stay compatible with the ROS2 flagship wrapper
 - want one repeatable command set for the current comparison tooling
 - need to know which metrics count as primary evidence and which are only secondary context
 
@@ -151,6 +154,11 @@ python3 examples/flagship_wheeled/tools/normalise_run.py \
   --output examples/flagship_wheeled/out/webots_flagship.json \
   examples/webots_epuck_goal/logs/flagship_goal.jsonl
 
+python3 examples/flagship_wheeled/tools/normalise_run.py \
+  --backend ros2 \
+  --output examples/flagship_wheeled/out/ros2_flagship.json \
+  build/linux-ros2/ros2-flagship-goal.jsonl
+
 python3 examples/flagship_wheeled/tools/compare_runs.py \
   --max-ticks 320 \
   examples/flagship_wheeled/out/pybullet_flagship.json \
@@ -168,6 +176,7 @@ Interpretation of the current protocol output:
 ## gotchas
 
 - Do not compare a short PyBullet sanity run against the full Webots run without `--max-ticks 320`.
+- Do not treat ROS2 normalisation support as proof that the fixed PyBullet/Webots portability protocol has already become a three-way equivalence protocol.
 - Do not change planner budget or thresholds between backends inside the same comparison pair.
 - Do not treat full-run terminal mismatch as the primary failure signal yet. The current protocol is prefix-first by design.
 - Do not change the shared BT branch order just to improve one backend’s numbers.

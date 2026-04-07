@@ -22,6 +22,7 @@ For the release-oriented path from the current baseline to `v1.0.0`, see [roadma
 - host capability bundles for richer external services such as manipulation, navigation, and perception
 - cross-transport evidence for the existing ROS2 thin adaptor
 - keep the existing Isaac Sim / ROS2 H1 showcase documented and reproducible
+- add one documented Isaac Sim wheeled showcase that reuses the released `Odometry -> Twist` path and yields website-ready capture artefacts
 - additional VLA backends beyond stub/replay capability adapters
 - consumer-driven expansion of the thin ROS2 adaptor only after parity and evidence needs are clear
 - external telemetry/export integrations

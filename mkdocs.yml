@@ -74,6 +74,7 @@ nav:
           - Flagship Comparison: examples/cross-transport-flagship-comparison.md
       - Isaac Sim / ROS2:
           - H1 Locomotion Demo: examples/isaac-h1-ros2-demo.md
+          - Wheeled Flagship Showcase: examples/isaac-wheeled-ros2-showcase.md
       - More Scripted Examples:
           - Hello BT: examples/hello-bt.md
           - Memoryful Sequence Demo: examples/memoryful-sequence-demo.md
