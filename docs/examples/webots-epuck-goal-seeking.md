@@ -78,6 +78,8 @@ MUESLI_BT_WEBOTS_LISP_ENTRY=lisp/flagship_entry.lisp \
   examples/webots_epuck_goal/worlds/epuck_goal_cluttered.wbt
 ```
 
+The flagship wrapper keeps running after first success and writes zero shared action after goal arrival until its configured `max_ticks`. That makes the log suitable for post-success hold checks.
+
 Useful plots:
 
 ```bash

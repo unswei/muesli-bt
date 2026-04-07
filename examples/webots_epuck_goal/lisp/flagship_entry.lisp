@@ -214,7 +214,8 @@
 
 (define run-cfg (map.make))
 (map.set! run-cfg 'tick_hz 20)
-(map.set! run-cfg 'max_ticks 3200)
+(map.set! run-cfg 'max_ticks 640)
+(map.set! run-cfg 'stop_on_success #f)
 (map.set! run-cfg 'safe_action safe-action)
 (map.set! run-cfg 'realtime #t)
 (map.set! run-cfg 'log_path "logs/flagship_goal.jsonl")

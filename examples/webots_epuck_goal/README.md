@@ -51,6 +51,8 @@ MUESLI_BT_WEBOTS_LISP_ENTRY=lisp/flagship_entry.lisp \
   examples/webots_epuck_goal/worlds/epuck_goal_cluttered.wbt
 ```
 
+The flagship wrapper does not stop at first success. It keeps ticking with a zero command until its configured `max_ticks`, so the log captures both goal arrival and post-success hold behaviour.
+
 ## Logs
 
 Default log file:
