@@ -181,6 +181,7 @@ Delivered exit target:
 - choose one canonical wheeled BT and reuse it across PyBullet, Webots, and ROS2
 - prefer a goal-seeking behaviour derived from odometry/pose plus bounded obstacle context, not line-follow or wall-follow logic tied to simulator-specific sensors
 - treat the existing Webots cluttered-goal demo as the best starting point for the shared behaviour
+- implement the ROS2 flagship wrapper by deriving the shared keys from odometry plus fixed goal and obstacle geometry inside `examples/repl_scripts/ros2-flagship-goal.lisp`
 - keep differences at attach/config and transport wiring only
 - add scripted checks that compare key behaviour or decision-trace invariants across the transports
 

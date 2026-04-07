@@ -65,6 +65,7 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`=`](builtins/math/eq.md)
 - [`>`](builtins/math/gt.md)
 - [`>=`](builtins/math/gte.md)
+- [`atan2`](builtins/math/atan2.md)
 - [`abs`](builtins/math/abs.md)
 - [`clamp`](builtins/math/clamp.md)
 - [`exp`](builtins/math/exp.md)

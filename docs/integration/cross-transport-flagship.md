@@ -161,7 +161,7 @@ Responsibility split:
 
 - `examples/repl_scripts/ros2-flagship-goal.lisp`
   - loads the shared BT
-  - derives shared keys from odometry plus fixed scenario configuration
+  - derives shared keys from odometry plus fixed goal and obstacle geometry
   - publishes the shared command intent through `ros2.action.v1`
 
 This keeps existing demo directories intact while giving the flagship its own backend-neutral home.

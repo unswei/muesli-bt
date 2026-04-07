@@ -596,6 +596,13 @@ value builtin_exp(const std::vector<value>& args) {
     return make_float(std::exp(number_as_double(as_numeric(args[0], "exp"))));
 }
 
+value builtin_atan2(const std::vector<value>& args) {
+    require_arity("atan2", args, 2);
+    const double y = number_as_double(as_numeric(args[0], "atan2"));
+    const double x = number_as_double(as_numeric(args[1], "atan2"));
+    return make_float(std::atan2(y, x));
+}
+
 value builtin_abs(const std::vector<value>& args) {
     require_arity("abs", args, 1);
     if (is_integer(args[0])) {
@@ -2844,6 +2851,7 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "sqrt", builtin_sqrt);
     bind_primitive(global_env, "log", builtin_log);
     bind_primitive(global_env, "exp", builtin_exp);
+    bind_primitive(global_env, "atan2", builtin_atan2);
     bind_primitive(global_env, "abs", builtin_abs);
     bind_primitive(global_env, "clamp", builtin_clamp);
 

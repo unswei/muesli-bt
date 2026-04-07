@@ -1097,6 +1097,10 @@ void test_math_time_and_domain_errors() {
     check(is_float(exp_value), "exp should return float");
     check_close(float_value(exp_value), 1.0, 1e-12, "exp(0) mismatch");
 
+    value atan2_value = eval_text("(atan2 1 1)", env);
+    check(is_float(atan2_value), "atan2 should return float");
+    check_close(float_value(atan2_value), 0.7853981633974483, 1e-12, "atan2(1, 1) mismatch");
+
     value abs_i = eval_text("(abs -7)", env);
     check(is_integer(abs_i) && integer_value(abs_i) == 7, "abs over integer mismatch");
     value abs_f = eval_text("(abs -2.5)", env);
@@ -3256,6 +3260,31 @@ void test_racecar_planner_model_and_env_api_contract() {
 
     bt::clear_racecar_demo_state();
 }
+
+void test_shared_flagship_planner_model_in_core_runtime() {
+    reset_bt_runtime_host();
+    bt::runtime_host& host = bt::default_runtime_host();
+
+    check(host.planner_ref().has_model("flagship-goal-shared-v1"),
+          "core runtime should register flagship-goal-shared-v1 model");
+
+    bt::planner_request request;
+    request.schema_version = "planner.request.v1";
+    request.planner = bt::planner_backend::mcts;
+    request.model_service = "flagship-goal-shared-v1";
+    request.action_schema = "flagship.cmd.v1";
+    request.state = {1.0, 0.2, 0.1, 0.0};
+    request.budget_ms = 8;
+    request.work_max = 120;
+
+    const bt::planner_result result = host.planner_ref().plan(request);
+    check(result.status == bt::planner_status::ok, "core runtime flagship planner request should succeed");
+    check(result.action.u.size() == 2, "core runtime flagship planner should emit [linear_x angular_z]");
+    check(result.action.u[0] >= -1.0 && result.action.u[0] <= 1.0,
+          "core runtime flagship planner linear_x should stay in range");
+    check(result.action.u[1] >= -1.0 && result.action.u[1] <= 1.0,
+          "core runtime flagship planner angular_z should stay in range");
+}
 #endif
 
 void test_env_run_loop_multi_episode_reset_true() {
@@ -4374,6 +4403,7 @@ int main() {
         {"racecar run-loop error safe-action", test_racecar_loop_error_safe_action},
         {"racecar planner model + env.api contract", test_racecar_planner_model_and_env_api_contract},
 #endif
+        {"shared flagship planner model in core runtime", test_shared_flagship_planner_model_in_core_runtime},
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
         {"env generic ros2 backend contract", test_env_generic_ros2_backend_contract},
         {"ros2 backend config validation and reset policy", test_ros2_backend_config_validation_and_reset_policy},

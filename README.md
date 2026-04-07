@@ -271,7 +271,7 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 - non-moving mark/sweep GC
 - mutable `vec` and `map` containers
 - deterministic RNG (`rng.make`, `rng.uniform`, `rng.normal`, `rng.int`)
-- numeric helpers (`sqrt`, `log`, `exp`, `abs`, `clamp`)
+- numeric helpers (`sqrt`, `log`, `exp`, `atan2`, `abs`, `clamp`)
 - monotonic time (`time.now-ms`)
 - JSON built-ins (`json.encode`, `json.decode`)
 

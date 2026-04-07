@@ -133,6 +133,7 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `=` -> [page](language/reference/builtins/math/eq.md)
 - [x] `>` -> [page](language/reference/builtins/math/gt.md)
 - [x] `>=` -> [page](language/reference/builtins/math/gte.md)
+- [x] `atan2` -> [page](language/reference/builtins/math/atan2.md)
 - [x] `abs` -> [page](language/reference/builtins/math/abs.md)
 - [x] `clamp` -> [page](language/reference/builtins/math/clamp.md)
 - [x] `exp` -> [page](language/reference/builtins/math/exp.md)

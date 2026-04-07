@@ -11,7 +11,7 @@ This page is a summary and link hub for built-ins. Detailed behaviour, errors, a
 
 - arithmetic: `+`, `-`, `*`, `/`
 - comparisons: `=`, `<`, `>`, `<=`, `>=`
-- helpers: `sqrt`, `log`, `exp`, `abs`, `clamp`
+- helpers: `sqrt`, `log`, `exp`, `atan2`, `abs`, `clamp`
 - predicates: `number?`, `int?`, `integer?`, `float?`, `zero?`
 
 ## Sampling And Time

@@ -728,6 +728,78 @@ public:
     }
 };
 
+class flagship_shared_goal_planner_model final : public planner_model {
+public:
+    planner_step_result step(const planner_vector& state, const planner_vector& action, planner_rng& rng) const override {
+        const planner_vector u = clamp_action(action);
+        const double dist = state.empty() ? 1.0 : clamp_double(state[0], 0.0, 3.0);
+        const double bearing = state.size() > 1 ? wrap_angle(state[1]) : 0.0;
+        const double obstacle = state.size() > 2 ? clamp_double(state[2], 0.0, 1.0) : 0.0;
+        const double speed = state.size() > 3 ? clamp_double(state[3], 0.0, 1.0) : 0.0;
+
+        const double linear_x = clamp_double(u[0], -1.0, 1.0);
+        const double angular_z = clamp_double(u[1], -1.0, 1.0);
+
+        const double turn_cost = std::fabs(angular_z);
+        const double heading_gain = std::max(0.05, 1.0 - std::fabs(bearing));
+        const double progress = 0.13 * std::max(0.0, linear_x) * heading_gain * (1.0 - 0.45 * obstacle);
+        const double next_bearing = wrap_angle(0.82 * bearing - 0.90 * angular_z + rng.normal(0.0, 0.04));
+        const double next_speed =
+            clamp_double(0.55 * speed + 0.45 * std::max(0.0, linear_x) + rng.normal(0.0, 0.03), 0.0, 1.0);
+        const double next_dist =
+            clamp_double(dist - progress + 0.05 * turn_cost + 0.10 * obstacle + rng.normal(0.0, 0.01), 0.0, 3.0);
+        const double next_obstacle = clamp_double(
+            0.78 * obstacle + 0.10 * turn_cost - 0.05 * std::max(0.0, linear_x) + rng.normal(0.0, 0.03), 0.0, 1.0);
+
+        planner_step_result out;
+        out.next_state = {next_dist, next_bearing, next_obstacle, next_speed};
+        out.reward =
+            1.6 * (dist - next_dist) - 0.35 * std::fabs(next_bearing) - 0.55 * next_obstacle - 0.10 * turn_cost;
+        if (next_obstacle > 0.93) {
+            out.reward -= 1.0;
+        }
+        if (next_dist < 0.06) {
+            out.reward += 1.5;
+            out.done = true;
+        }
+        return out;
+    }
+
+    planner_vector sample_action(const planner_vector&, planner_rng& rng) const override {
+        return {rng.uniform(0.05, 0.95), rng.uniform(-0.95, 0.95)};
+    }
+
+    planner_vector rollout_action(const planner_vector& state, planner_rng&) const override {
+        const double dist = state.empty() ? 1.0 : clamp_double(state[0], 0.0, 3.0);
+        const double bearing = state.size() > 1 ? wrap_angle(state[1]) : 0.0;
+        const double linear_x = clamp_double(0.25 + 0.30 * dist, 0.0, 0.85);
+        const double angular_z = clamp_double(0.85 * bearing, -0.95, 0.95);
+        return {linear_x, angular_z};
+    }
+
+    planner_vector clamp_action(const planner_vector& action) const override {
+        if (action.empty()) {
+            return {0.0, 0.0};
+        }
+        if (action.size() == 1) {
+            return {clamp_double(action[0], -1.0, 1.0), 0.0};
+        }
+        return {clamp_double(action[0], -1.0, 1.0), clamp_double(action[1], -1.0, 1.0)};
+    }
+
+    planner_vector zero_action() const override {
+        return {0.0, 0.0};
+    }
+
+    bool validate_state(const planner_vector& state) const override {
+        return state.size() >= 4 && vector_all_finite(state);
+    }
+
+    std::size_t action_dims() const override {
+        return 2;
+    }
+};
+
 struct mcts_node;
 
 struct mcts_child {
@@ -1818,6 +1890,7 @@ planner_service::planner_service() {
     register_model("toy-1d", std::make_shared<toy_1d_model>());
     register_model("ptz-track", std::make_shared<ptz_track_model>());
     register_model("toy-unicycle", std::make_shared<toy_unicycle_goal_model>());
+    register_model("flagship-goal-shared-v1", std::make_shared<flagship_shared_goal_planner_model>());
 }
 
 void planner_service::register_model(std::string name, std::shared_ptr<planner_model> model) {
