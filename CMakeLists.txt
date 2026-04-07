@@ -56,7 +56,7 @@ target_include_directories(
                         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
-set_target_properties(muesli_bt_core PROPERTIES EXPORT_NAME runtime)
+set_target_properties(muesli_bt_core PROPERTIES EXPORT_NAME runtime POSITION_INDEPENDENT_CODE ON)
 
 target_compile_features(muesli_bt_core PUBLIC cxx_std_20)
 
@@ -79,7 +79,10 @@ if (MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/integrations>
            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
-  set_target_properties(muesli_bt_integration_pybullet PROPERTIES EXPORT_NAME integration_pybullet)
+  set_target_properties(
+    muesli_bt_integration_pybullet PROPERTIES EXPORT_NAME integration_pybullet
+                                                 POSITION_INDEPENDENT_CODE ON
+  )
   target_compile_features(muesli_bt_integration_pybullet PUBLIC cxx_std_20)
 endif ()
 
@@ -158,7 +161,10 @@ if (MUESLI_BT_BUILD_INTEGRATION_WEBOTS AND MUESLI_BT_HAVE_WEBOTS)
            $<BUILD_INTERFACE:${WEBOTS_CPP_INCLUDE_DIR}>
            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
-  set_target_properties(muesli_bt_integration_webots PROPERTIES EXPORT_NAME integration_webots)
+  set_target_properties(
+    muesli_bt_integration_webots PROPERTIES EXPORT_NAME integration_webots
+                                               POSITION_INDEPENDENT_CODE ON
+  )
   target_compile_features(muesli_bt_integration_webots PUBLIC cxx_std_20)
   if (APPLE)
     if (MUESLI_BT_WEBOTS_RPATH_ROOT STREQUAL "")
@@ -197,7 +203,10 @@ if (MUESLI_BT_BUILD_INTEGRATION_ROS2)
            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/integrations>
            $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
-  set_target_properties(muesli_bt_integration_ros2 PROPERTIES EXPORT_NAME integration_ros2)
+  set_target_properties(
+    muesli_bt_integration_ros2 PROPERTIES EXPORT_NAME integration_ros2
+                                             POSITION_INDEPENDENT_CODE ON
+  )
   target_compile_features(muesli_bt_integration_ros2 PUBLIC cxx_std_20)
 endif ()
 
@@ -304,17 +313,21 @@ if (MUESLI_BT_BUILD_PYTHON_BRIDGE)
     COMPONENTS Interpreter Development.Module
     REQUIRED
   )
+  execute_process(
+    COMMAND "${Python3_EXECUTABLE}" -m pybind11 --cmakedir
+    OUTPUT_VARIABLE PYBIND11_CMAKE_DIR
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    RESULT_VARIABLE PYBIND11_DIR_RESULT
+  )
+  if (PYBIND11_DIR_RESULT EQUAL 0 AND EXISTS "${PYBIND11_CMAKE_DIR}")
+    set(pybind11_DIR "${PYBIND11_CMAKE_DIR}" CACHE PATH "pybind11 CMake package directory" FORCE)
+    list(PREPEND CMAKE_PREFIX_PATH "${PYBIND11_CMAKE_DIR}")
+  endif ()
+
   find_package(pybind11 CONFIG QUIET)
 
   if (NOT pybind11_FOUND)
-    execute_process(
-      COMMAND "${Python3_EXECUTABLE}" -m pybind11 --cmakedir
-      OUTPUT_VARIABLE PYBIND11_CMAKE_DIR
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-      RESULT_VARIABLE PYBIND11_DIR_RESULT
-    )
     if (PYBIND11_DIR_RESULT EQUAL 0 AND EXISTS "${PYBIND11_CMAKE_DIR}")
-      list(APPEND CMAKE_PREFIX_PATH "${PYBIND11_CMAKE_DIR}")
       find_package(pybind11 CONFIG REQUIRED)
     else ()
       message(
