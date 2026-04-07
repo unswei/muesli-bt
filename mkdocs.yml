@@ -65,10 +65,13 @@ nav:
   - Examples:
       - Overview: examples/index.md
       - Webots:
+          - e-puck Goal Seeking: examples/webots-epuck-goal-seeking.md
           - e-puck Obstacle Avoidance and Wall Following: examples/webots-epuck-obstacle-wall-following.md
           - e-puck Line Following: examples/webots-epuck-line-following.md
       - PyBullet:
           - Racecar: examples/pybullet-racecar.md
+      - Cross-transport:
+          - Flagship Comparison: examples/cross-transport-flagship-comparison.md
       - Isaac Sim / ROS2:
           - H1 Locomotion Demo: examples/isaac-h1-ros2-demo.md
       - More Scripted Examples:
@@ -127,6 +130,10 @@ nav:
       - ROS2 Tutorial: integration/ros2-tutorial.md
       - Writing A Backend: integration/writing-a-backend.md
       - ROS2 Backend Scope: integration/ros2-backend-scope.md
+      - Cross-transport Flagship for v0.5: integration/cross-transport-flagship.md
+      - Cross-transport Comparison Protocol: integration/cross-transport-comparison-protocol.md
+      - Same-robot Strict Comparison Track: integration/same-robot-strict-comparison.md
+      - Cross-transport Shared Contract: integration/cross-transport-shared-contract.md
       - Sensing and Blackboard: integration/sensing-and-blackboard.md
   - Contracts:
       - Index: contracts/README.md

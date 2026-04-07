@@ -179,12 +179,15 @@ Delivered exit target:
 `phase 9: v0.5.0 same BT, different IO transport`
 
 - choose one canonical wheeled BT and reuse it across PyBullet, Webots, and ROS2
+- prefer a goal-seeking behaviour derived from odometry/pose plus bounded obstacle context, not line-follow or wall-follow logic tied to simulator-specific sensors
+- treat the existing Webots cluttered-goal demo as the best starting point for the shared behaviour
 - keep differences at attach/config and transport wiring only
 - add scripted checks that compare key behaviour or decision-trace invariants across the transports
 
 Exit target:
 
 - the ROS2 thin adaptor is clearly a transport/backend surface, not a ROS-specific semantic fork
+- the chosen flagship runs on the released `Odometry` -> `Twist` contract without broadening the ROS surface first
 
 `phase 10: v0.6.0 host capability bundles at the ROS boundary`
 
@@ -499,4 +502,5 @@ ctest --test-dir build/linux-ros2 --output-on-failure
 - [integration overview](overview.md)
 - [environment api (`env.api.v1`)](env-api.md)
 - [writing a backend](writing-a-backend.md)
+- [cross-transport flagship for v0.5](cross-transport-flagship.md)
 - [conformance levels](../contracts/conformance.md)

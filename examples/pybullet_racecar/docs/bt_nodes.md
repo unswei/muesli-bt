@@ -36,9 +36,22 @@ Behaviour:
 - `plan-action` returns `success` only when planner status is `:ok`; on `:timeout`/`:error`/`:noaction`, the branch fails.
 - Host loop applies fallback `[0.0, 0.0]` if no valid planner action is available after the BT tick.
 
+## `bt_flagship`
+
+- `bb-truthy` (condition callback)
+- `select-action` (action callback)
+- `plan-action` (planner node, model `flagship-goal-shared-v1`)
+
+Behaviour:
+
+- The tree follows the shared v0.5 flagship order: `goal reached -> avoid -> plan -> direct-goal fallback`.
+- The BT and planner operate on the shared contract: `goal_dist`, `goal_bearing`, `obstacle_front`, `speed`, and `[linear_x, angular_z]`.
+- PyBullet keeps backend-specific work in the host layer by projecting `[linear_x, angular_z]` into steering/throttle only after the BT tick.
+
 ## Introspection
 
 Per tick logs keep `racecar_demo.v1` unchanged, with optional:
 
 - `bt.status`
 - `planner` block derived from unified planner meta (`planner.v1`) when planning executes
+- `shared_action` plus stable flagship branch traces when `bt_flagship` is active

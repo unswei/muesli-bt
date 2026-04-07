@@ -12,6 +12,7 @@ _Runtime action trace snapshot from a planner-mode run._
 
 - backend-managed observe/tick/act/step loop in PyBullet
 - BT safety branch + planner branch (`plan-action` -> `planner.plan`)
+- shared flagship mode that projects `[linear_x, angular_z]` to racecar steering/throttle
 - structured tick logs (`racecar_demo.v1`) with planner diagnostics
 
 ## Run It
@@ -19,6 +20,7 @@ _Runtime action trace snapshot from a planner-mode run._
 ```bash
 make demo-setup
 make demo-run MODE=bt_planner
+make demo-run MODE=bt_flagship
 ```
 
 Direct command:
@@ -26,15 +28,15 @@ Direct command:
 ```bash
 PYTHONPATH=build/dev/python \
   .venv-py311/bin/python examples/pybullet_racecar/run_demo.py \
-  --mode bt_planner --budget-ms 20 --work-max 1200
+  --mode bt_flagship --budget-ms 20 --work-max 280
 ```
 
 ## What To Look For
 
 - budgets: planner `time_used_ms` should stay near or below configured `budget_ms`
-- behaviour switching: safety branch pre-empts when collisions are predicted
+- behaviour switching: safety branch pre-empts when collisions are predicted, otherwise the shared goal planner or direct-goal fallback remains active
 - fallback: safe action path should be used when planner output is unavailable
-- event logging: inspect `racecar_demo.v1` records plus canonical `mbt.evt.v1` events
+- event logging: inspect `racecar_demo.v1` records, optional `shared_action`, and canonical `mbt.evt.v1` events
 
 ## Logs And Plots
 
@@ -51,6 +53,7 @@ PYTHONPATH=build/dev/python \
 ## Key BT Files
 
 - `examples/pybullet_racecar/bt/racecar_bt.lisp`
+- `examples/pybullet_racecar/bt/flagship_entry.lisp`
 - runtime entry: `examples/pybullet_racecar/run_demo.py`
 
 ## BT Source (Inline)

@@ -2,6 +2,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -457,6 +458,80 @@ public:
 
     [[nodiscard]] bool validate_state(const bt::planner_vector& state) const override {
         return state.size() >= 3 && std::isfinite(state[0]) && std::isfinite(state[1]) && std::isfinite(state[2]);
+    }
+
+    [[nodiscard]] std::size_t action_dims() const override {
+        return 2;
+    }
+};
+
+class epuck_shared_goal_planner_model final : public bt::planner_model {
+public:
+    [[nodiscard]] bt::planner_step_result step(const bt::planner_vector& state,
+                                               const bt::planner_vector& action,
+                                               bt::planner_rng& rng) const override {
+        const bt::planner_vector u = clamp_action(action);
+        const double dist = state.empty() ? 1.0 : clampd(state[0], 0.0, 3.0);
+        const double bearing = state.size() > 1 ? wrap_angle(state[1]) : 0.0;
+        const double obstacle = state.size() > 2 ? clampd(state[2], 0.0, 1.0) : 0.0;
+        const double speed = state.size() > 3 ? clampd(state[3], 0.0, 1.0) : 0.0;
+
+        const double linear_x = clampd(u[0], -1.0, 1.0);
+        const double angular_z = clampd(u[1], -1.0, 1.0);
+
+        const double turn_cost = std::fabs(angular_z);
+        const double heading_gain = std::max(0.05, 1.0 - std::fabs(bearing));
+        const double progress = 0.13 * std::max(0.0, linear_x) * heading_gain * (1.0 - 0.45 * obstacle);
+        const double next_bearing = wrap_angle(0.82 * bearing - 0.90 * angular_z + rng.normal(0.0, 0.04));
+        const double next_speed = clampd(0.55 * speed + 0.45 * std::max(0.0, linear_x) + rng.normal(0.0, 0.03), 0.0, 1.0);
+        const double next_dist = clampd(dist - progress + 0.05 * turn_cost + 0.10 * obstacle + rng.normal(0.0, 0.01), 0.0, 3.0);
+        const double next_obstacle =
+            clampd(0.78 * obstacle + 0.10 * turn_cost - 0.05 * std::max(0.0, linear_x) + rng.normal(0.0, 0.03), 0.0, 1.0);
+
+        const bool done = next_dist < 0.06;
+
+        bt::planner_step_result out;
+        out.next_state = {next_dist, next_bearing, next_obstacle, next_speed};
+        out.reward = 1.6 * (dist - next_dist) - 0.35 * std::fabs(next_bearing) - 0.55 * next_obstacle - 0.10 * turn_cost;
+        if (next_obstacle > 0.93) {
+            out.reward -= 1.0;
+        }
+        if (done) {
+            out.reward += 1.5;
+        }
+        out.done = done;
+        return out;
+    }
+
+    [[nodiscard]] bt::planner_vector sample_action(const bt::planner_vector&, bt::planner_rng& rng) const override {
+        return {rng.uniform(0.05, 0.95), rng.uniform(-0.95, 0.95)};
+    }
+
+    [[nodiscard]] bt::planner_vector rollout_action(const bt::planner_vector& state, bt::planner_rng&) const override {
+        const double dist = state.empty() ? 1.0 : clampd(state[0], 0.0, 3.0);
+        const double bearing = state.size() > 1 ? wrap_angle(state[1]) : 0.0;
+        const double linear_x = clampd(0.25 + 0.30 * dist, 0.0, 0.85);
+        const double angular_z = clampd(0.85 * bearing, -0.95, 0.95);
+        return {linear_x, angular_z};
+    }
+
+    [[nodiscard]] bt::planner_vector clamp_action(const bt::planner_vector& action) const override {
+        if (action.empty()) {
+            return {0.0, 0.0};
+        }
+        if (action.size() == 1) {
+            return {clampd(action[0], -1.0, 1.0), 0.0};
+        }
+        return {clampd(action[0], -1.0, 1.0), clampd(action[1], -1.0, 1.0)};
+    }
+
+    [[nodiscard]] bt::planner_vector zero_action() const override {
+        return {0.0, 0.0};
+    }
+
+    [[nodiscard]] bool validate_state(const bt::planner_vector& state) const override {
+        return state.size() >= 4 && std::isfinite(state[0]) && std::isfinite(state[1]) && std::isfinite(state[2]) &&
+               std::isfinite(state[3]);
     }
 
     [[nodiscard]] std::size_t action_dims() const override {
@@ -1143,6 +1218,19 @@ std::filesystem::path resolve_example_root(const char* argv0) {
     return controller_dir.parent_path().parent_path();
 }
 
+std::filesystem::path resolve_lisp_entry(const std::filesystem::path& example_root) {
+    const char* override_env = std::getenv("MUESLI_BT_WEBOTS_LISP_ENTRY");
+    if (!override_env || std::string_view(override_env).empty()) {
+        return example_root / "lisp" / "main.lisp";
+    }
+
+    std::filesystem::path configured = override_env;
+    if (configured.is_relative()) {
+        configured = example_root / configured;
+    }
+    return configured;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -1160,6 +1248,7 @@ int main(int argc, char** argv) {
         host.planner_ref().register_model("epuck-goal-v1", target_model);
         host.planner_ref().register_model("epuck-target-v1", target_model);
         host.planner_ref().register_model("epuck-intercept-v1", target_model);
+        host.planner_ref().register_model("flagship-goal-shared-v1", std::make_shared<epuck_shared_goal_planner_model>());
 
         extension_context context;
         context.backend = std::make_shared<webots_env_backend>(&devices);
@@ -1170,12 +1259,17 @@ int main(int argc, char** argv) {
         muslisp::env_ptr env = muslisp::create_global_env(std::move(config));
 
         const std::filesystem::path example_root = resolve_example_root(argc > 0 ? argv[0] : nullptr);
-        const std::filesystem::path lisp_entry = example_root / "lisp" / "main.lisp";
+        const std::filesystem::path lisp_entry = resolve_lisp_entry(example_root);
 
         std::error_code ec;
         std::filesystem::current_path(example_root, ec);
         if (ec) {
             std::cerr << "warning: failed to set cwd to " << example_root << ": " << ec.message() << '\n';
+        }
+
+        if (!std::filesystem::exists(lisp_entry)) {
+            std::cerr << "fatal: Lisp entrypoint does not exist: " << lisp_entry << '\n';
+            return 1;
         }
 
         return run_script(lisp_entry, env);

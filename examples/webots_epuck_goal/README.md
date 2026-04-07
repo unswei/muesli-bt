@@ -12,6 +12,7 @@ The observation includes a lightweight ray-style signal (`lidar_lite`) derived f
 - `worlds/epuck_goal_cluttered.wbt`: cluttered arena with a visible goal marker.
 - `controllers/muesli_epuck/muesli_epuck.cpp`: tiny wrapper to the shared Webots controller.
 - `lisp/main.lisp`: loop entrypoint and behaviour logic.
+- `lisp/flagship_entry.lisp`: shared `v0.5` flagship entrypoint wrapper.
 - `lisp/bt_goal_seek.lisp`: BT structure.
 - `logs/`: JSONL output.
 - `out/`: plots and DOT renders.
@@ -38,11 +39,24 @@ cmake --build --preset dev -j --target muesli_webots_epuck_goal
   examples/webots_epuck_goal/worlds/epuck_goal_cluttered.wbt
 ```
 
+### Select a different Lisp entrypoint
+
+The shared Webots controller now defaults to `lisp/main.lisp`, but you can override that with `MUESLI_BT_WEBOTS_LISP_ENTRY`.
+
+Run the shared `v0.5` flagship wrapper:
+
+```bash
+MUESLI_BT_WEBOTS_LISP_ENTRY=lisp/flagship_entry.lisp \
+  "$WEBOTS_HOME/webots" --batch --mode=fast --stdout --stderr \
+  examples/webots_epuck_goal/worlds/epuck_goal_cluttered.wbt
+```
+
 ## Logs
 
 Default log file:
 
 - `examples/webots_epuck_goal/logs/goal.jsonl`
+- flagship wrapper log file: `examples/webots_epuck_goal/logs/flagship_goal.jsonl`
 
 Schema notes:
 

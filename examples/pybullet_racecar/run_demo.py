@@ -37,7 +37,7 @@ REQUIRED_LOG_FIELDS = {
     "collisions_total",
     "goal_reached",
 }
-OPTIONAL_LOG_FIELDS = {"bt", "planner"}
+OPTIONAL_LOG_FIELDS = {"bt", "planner", "shared_action"}
 
 STEERING_JOINTS = (4, 6)
 DRIVE_JOINTS = (2, 3, 5, 7)
@@ -45,6 +45,49 @@ DRIVE_JOINTS = (2, 3, 5, 7)
 
 def clamp(value: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, value))
+
+
+def flagship_command_to_native_action(linear_x: float, angular_z: float) -> Dict[str, float]:
+    return {
+        "steering": clamp(1.1 * float(angular_z), -1.0, 1.0),
+        "throttle": clamp(float(linear_x), -1.0, 1.0),
+    }
+
+
+def flagship_branch_path(branch_id: int) -> List[str]:
+    if branch_id == 0:
+        return ["root", "goal_reached"]
+    if branch_id == 1:
+        return ["root", "avoid"]
+    if branch_id == 2:
+        return ["root", "plan_goal"]
+    return ["root", "direct_goal"]
+
+
+def flagship_branch_label(branch_id: int) -> str:
+    if branch_id == 0:
+        return "goal_reached"
+    if branch_id == 1:
+        return "avoid"
+    if branch_id == 2:
+        return "planner"
+    return "direct_goal"
+
+
+def bt_log_payload(mode: str, bt_status: str, active_branch: Optional[int], goal_reached: bool) -> Dict[str, object]:
+    branch_id = active_branch
+    if mode == "bt_flagship" and branch_id is None and goal_reached:
+        branch_id = 0
+    if mode == "bt_flagship" and branch_id is not None:
+        return {
+            "status": bt_status,
+            "active_path": flagship_branch_path(int(branch_id)),
+            "node_status": {
+                "root": "success" if int(branch_id) == 0 else bt_status,
+                "branch": flagship_branch_label(int(branch_id)),
+            },
+        }
+    return {"status": bt_status, "active_path": [], "node_status": {}}
 
 
 def now_utc_iso8601() -> str:
@@ -472,6 +515,37 @@ def build_muesli_bt_dsl(mode: str, args: argparse.Namespace) -> str:
             "      (act apply-action action) "
             "      (running))))"
         )
+    if mode == "bt_flagship":
+        budget_ms = max(1, int(round(args.budget_ms)))
+        return (
+            "(sel "
+            "  (seq (cond bb-truthy goal_reached) (succeed)) "
+            "  (seq "
+            "    (cond bb-truthy collision_imminent) "
+            "    (act select-action act_avoid 1 action_cmd) "
+            "    (running)) "
+            "  (seq "
+            "    (plan-action "
+            "      :name \"goal-plan\" "
+            "      :planner \"mcts\" "
+            f"      :budget_ms {budget_ms} "
+            f"      :work_max {int(args.work_max)} "
+            f"      :max_depth {int(args.max_depth)} "
+            f"      :gamma {float(args.gamma)} "
+            f"      :pw_k {float(args.pw_k)} "
+            f"      :pw_alpha {float(args.pw_alpha)} "
+            "      :model_service \"flagship-goal-shared-v1\" "
+            "      :state_key planner_state "
+            "      :action_key planner_action "
+            "      :meta_key plan-meta "
+            "      :action_schema \"flagship.cmd.v1\" "
+            "      :top_k 5) "
+            "    (act select-action planner_action 2 action_cmd) "
+            "    (running)) "
+            "  (seq "
+            "    (act select-action act_goal_direct 3 action_cmd) "
+            "    (running)))"
+        )
     raise ValueError(f"Unsupported BT mode: {mode}")
 
 
@@ -485,8 +559,10 @@ def planner_payload_from_meta(meta_json: str) -> Optional[Dict[str, object]]:
 
     action_u: List[float] = [0.0, 0.0]
     raw_action = meta.get("action")
+    action_schema = ""
     if isinstance(raw_action, dict):
         raw_u = raw_action.get("u")
+        action_schema = str(raw_action.get("action_schema", ""))
         if isinstance(raw_u, list):
             action_u = [float(v) for v in raw_u[:2]]
     elif isinstance(raw_action, list):
@@ -494,6 +570,7 @@ def planner_payload_from_meta(meta_json: str) -> Optional[Dict[str, object]]:
     while len(action_u) < 2:
         action_u.append(0.0)
 
+    planner_action = {"steering": action_u[0], "throttle": action_u[1]}
     payload: Dict[str, object] = {
         "schema_version": PLANNER_SCHEMA_VERSION,
         "planner": str(meta.get("planner", "")),
@@ -502,8 +579,11 @@ def planner_payload_from_meta(meta_json: str) -> Optional[Dict[str, object]]:
         "time_used_ms": float(meta.get("time_used_ms", 0.0)),
         "work_done": int(meta.get("work_done", meta.get("iters", 0))),
         "confidence": float(meta.get("confidence", 0.0)),
-        "action": {"steering": action_u[0], "throttle": action_u[1]},
+        "action": planner_action,
     }
+    if action_schema == "flagship.cmd.v1":
+        payload["shared_action"] = {"linear_x": action_u[0], "angular_z": action_u[1]}
+        payload["action"] = flagship_command_to_native_action(action_u[0], action_u[1])
     trace = meta.get("trace")
     if isinstance(trace, dict):
         payload["trace"] = trace
@@ -672,13 +752,18 @@ class BridgeRacecarSimAdapter:
 
         bt_status = payload.get("bt_status")
         if isinstance(bt_status, str):
-            record["bt"] = {"status": bt_status, "active_path": [], "node_status": {}}
+            active_branch = payload.get("active_branch")
+            branch_id = int(active_branch) if isinstance(active_branch, int) else None
+            record["bt"] = bt_log_payload(self.mode, bt_status, branch_id, bool(payload["goal_reached"]))
 
         planner_meta = payload.get("planner_meta_json")
         if isinstance(planner_meta, str) and planner_meta:
             planner = planner_payload_from_meta(planner_meta)
             if planner is not None:
                 record["planner"] = planner
+        shared_action = payload.get("shared_action")
+        if isinstance(shared_action, dict):
+            record["shared_action"] = shared_action
 
         validate_log_record_v1(record)
         self.sink.write(record)
@@ -698,7 +783,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="PyBullet racecar showcase demo for muesli-bt style BT + bounded-time planning."
     )
-    parser.add_argument("--mode", choices=("manual", "bt_basic", "bt_obstacles", "bt_planner"), default="manual")
+    parser.add_argument("--mode", choices=("manual", "bt_basic", "bt_obstacles", "bt_planner", "bt_flagship"), default="manual")
     parser.add_argument("--duration-sec", type=float, default=35.0)
     parser.add_argument("--physics-hz", type=float, default=240.0)
     parser.add_argument("--tick-hz", type=float, default=20.0)
@@ -828,7 +913,7 @@ def main() -> int:
         _ = goal_body_id
 
         obstacles: List[Obstacle] = []
-        if args.mode in ("bt_obstacles", "bt_planner"):
+        if args.mode in ("bt_obstacles", "bt_planner", "bt_flagship"):
             obstacle_specs = [
                 ((2.0, 0.9), (0.40, 0.55)),
                 ((3.7, -0.9), (0.45, 0.45)),
@@ -876,13 +961,14 @@ def main() -> int:
                     "tick_hz": float(args.tick_hz),
                     "max_ticks": int(max_ticks),
                     "state_key": "state",
-                    "action_key": "action",
+                    "action_key": "action_cmd" if args.mode == "bt_flagship" else "action",
                     "steps_per_tick": int(steps_per_tick),
                     "safe_action": [0.0, 0.0],
                     "draw_debug": bool(not args.headless),
                     "mode": args.mode,
                     "planner_meta_key": "plan-meta",
                     "run_id": run_id,
+                    "action_semantics": "flagship.cmd.v1" if args.mode == "bt_flagship" else "racecar.native.v1",
                 },
             )
 

@@ -147,15 +147,15 @@ void validate_state_schema(const racecar_state& state) {
 }
 
 struct extracted_action {
-    double steering = 0.0;
-    double throttle = 0.0;
+    double first = 0.0;
+    double second = 0.0;
     bool used_fallback = true;
 };
 
 extracted_action extract_action(const bb_entry* entry) {
     extracted_action out;
-    out.steering = 0.0;
-    out.throttle = 0.0;
+    out.first = 0.0;
+    out.second = 0.0;
     out.used_fallback = true;
 
     if (!entry) {
@@ -173,10 +173,64 @@ extracted_action extract_action(const bb_entry* entry) {
         return out;
     }
 
-    out.steering = clamp_double(s, -1.0, 1.0);
-    out.throttle = clamp_double(t, -1.0, 1.0);
+    out.first = clamp_double(s, -1.0, 1.0);
+    out.second = clamp_double(t, -1.0, 1.0);
     out.used_fallback = false;
     return out;
+}
+
+constexpr double kFlagshipObstacleRayLength = 3.0;
+constexpr char kFlagshipActionSemantics[] = "flagship.cmd.v1";
+
+double obstacle_front_from_rays(const std::vector<double>& rays) {
+    if (rays.empty()) {
+        return 0.0;
+    }
+    const double min_ray = *std::min_element(rays.begin(), rays.end());
+    const double risk = 1.0 - (min_ray / kFlagshipObstacleRayLength);
+    return clamp_double(risk, 0.0, 1.0);
+}
+
+double goal_bearing(const racecar_state& state) {
+    if (state.goal.size() < 2) {
+        return 0.0;
+    }
+    const double heading = std::atan2(state.goal[1] - state.y, state.goal[0] - state.x);
+    return wrap_angle(heading - state.yaw);
+}
+
+std::vector<double> direct_goal_command(const racecar_state& state) {
+    return {0.45, clamp_double(0.8 * goal_bearing(state), -1.0, 1.0)};
+}
+
+std::vector<double> avoid_command(const std::vector<double>& rays) {
+    if (rays.empty()) {
+        return {0.0, 0.0};
+    }
+
+    const std::size_t n = rays.size();
+    const std::size_t mid = n / 2;
+    double left_sum = 0.0;
+    double right_sum = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+        if (i > mid) {
+            left_sum += rays[i];
+        } else if (i < mid) {
+            right_sum += rays[i];
+        }
+    }
+
+    const double obstacle_front = obstacle_front_from_rays(rays);
+    const double angular_mag = clamp_double(0.55 + (0.45 * obstacle_front), 0.0, 1.0);
+    const double linear_x = obstacle_front > 0.92 ? -0.15 : 0.10;
+    const double angular_z = left_sum >= right_sum ? angular_mag : -angular_mag;
+    return {linear_x, angular_z};
+}
+
+std::array<double, 2> flagship_shared_to_native_action(double linear_x, double angular_z) {
+    const double steering = clamp_double(1.1 * angular_z, -1.0, 1.0);
+    const double throttle = clamp_double(linear_x, -1.0, 1.0);
+    return {steering, throttle};
 }
 
 class racecar_kinematic_model final : public planner_model {
@@ -290,6 +344,78 @@ public:
     }
 };
 
+class flagship_shared_goal_planner_model final : public planner_model {
+public:
+    planner_step_result step(const planner_vector& state, const planner_vector& action, planner_rng& rng) const override {
+        const planner_vector u = clamp_action(action);
+        const double dist = state.empty() ? 1.0 : clamp_double(state[0], 0.0, 3.0);
+        const double bearing = state.size() > 1 ? wrap_angle(state[1]) : 0.0;
+        const double obstacle = state.size() > 2 ? clamp_double(state[2], 0.0, 1.0) : 0.0;
+        const double speed = state.size() > 3 ? clamp_double(state[3], 0.0, 1.0) : 0.0;
+
+        const double linear_x = clamp_double(u[0], -1.0, 1.0);
+        const double angular_z = clamp_double(u[1], -1.0, 1.0);
+
+        const double turn_cost = std::fabs(angular_z);
+        const double heading_gain = std::max(0.05, 1.0 - std::fabs(bearing));
+        const double progress = 0.13 * std::max(0.0, linear_x) * heading_gain * (1.0 - 0.45 * obstacle);
+        const double next_bearing = wrap_angle(0.82 * bearing - 0.90 * angular_z + rng.normal(0.0, 0.04));
+        const double next_speed =
+            clamp_double(0.55 * speed + 0.45 * std::max(0.0, linear_x) + rng.normal(0.0, 0.03), 0.0, 1.0);
+        const double next_dist =
+            clamp_double(dist - progress + 0.05 * turn_cost + 0.10 * obstacle + rng.normal(0.0, 0.01), 0.0, 3.0);
+        const double next_obstacle = clamp_double(
+            0.78 * obstacle + 0.10 * turn_cost - 0.05 * std::max(0.0, linear_x) + rng.normal(0.0, 0.03), 0.0, 1.0);
+
+        planner_step_result out;
+        out.next_state = {next_dist, next_bearing, next_obstacle, next_speed};
+        out.reward = 1.6 * (dist - next_dist) - 0.35 * std::fabs(next_bearing) - 0.55 * next_obstacle - 0.10 * turn_cost;
+        if (next_obstacle > 0.93) {
+            out.reward -= 1.0;
+        }
+        if (next_dist < 0.06) {
+            out.reward += 1.5;
+            out.done = true;
+        }
+        return out;
+    }
+
+    planner_vector sample_action(const planner_vector&, planner_rng& rng) const override {
+        return {rng.uniform(0.05, 0.95), rng.uniform(-0.95, 0.95)};
+    }
+
+    planner_vector rollout_action(const planner_vector& state, planner_rng&) const override {
+        const double dist = state.empty() ? 1.0 : clamp_double(state[0], 0.0, 3.0);
+        const double bearing = state.size() > 1 ? wrap_angle(state[1]) : 0.0;
+        const double linear_x = clamp_double(0.25 + 0.30 * dist, 0.0, 0.85);
+        const double angular_z = clamp_double(0.85 * bearing, -0.95, 0.95);
+        return {linear_x, angular_z};
+    }
+
+    planner_vector clamp_action(const planner_vector& action) const override {
+        if (action.empty()) {
+            return {0.0, 0.0};
+        }
+        if (action.size() == 1) {
+            return {clamp_double(action[0], -1.0, 1.0), 0.0};
+        }
+        return {clamp_double(action[0], -1.0, 1.0), clamp_double(action[1], -1.0, 1.0)};
+    }
+
+    planner_vector zero_action() const override {
+        return {0.0, 0.0};
+    }
+
+    bool validate_state(const planner_vector& state) const override {
+        return state.size() >= 4 && std::isfinite(state[0]) && std::isfinite(state[1]) && std::isfinite(state[2]) &&
+               std::isfinite(state[3]);
+    }
+
+    std::size_t action_dims() const override {
+        return 2;
+    }
+};
+
 void write_state_to_blackboard(instance& inst,
                                const racecar_state& state,
                                const racecar_loop_options& options,
@@ -310,7 +436,25 @@ void write_state_to_blackboard(instance& inst,
     inst.bb.put("collision_imminent", bb_value{state.collision_imminent}, tick_index, now, 0, "env.run-loop");
     inst.bb.put("collision_count", bb_value{state.collision_count}, tick_index, now, 0, "env.run-loop");
     inst.bb.put("t_ms", bb_value{state.t_ms}, tick_index, now, 0, "env.run-loop");
-    inst.bb.put("distance_to_goal", bb_value{distance_to_goal(state)}, tick_index, now, 0, "env.run-loop");
+    const double goal_dist = distance_to_goal(state);
+    const double obstacle_front = obstacle_front_from_rays(state.rays);
+    const double bearing = goal_bearing(state);
+    const bool goal_reached = std::isfinite(goal_dist) && goal_dist <= options.goal_tolerance;
+    inst.bb.put("distance_to_goal", bb_value{goal_dist}, tick_index, now, 0, "env.run-loop");
+    inst.bb.put("goal_dist", bb_value{goal_dist}, tick_index, now, 0, "env.run-loop");
+    inst.bb.put("goal_bearing", bb_value{bearing}, tick_index, now, 0, "env.run-loop");
+    inst.bb.put("goal_reached", bb_value{goal_reached}, tick_index, now, 0, "env.run-loop");
+    inst.bb.put("pose_x", bb_value{state.x}, tick_index, now, 0, "env.run-loop");
+    inst.bb.put("pose_y", bb_value{state.y}, tick_index, now, 0, "env.run-loop");
+    inst.bb.put("obstacle_front", bb_value{obstacle_front}, tick_index, now, 0, "env.run-loop");
+    inst.bb.put("planner_state",
+                bb_value{std::vector<double>{goal_dist, bearing, obstacle_front, state.speed}},
+                tick_index,
+                now,
+                0,
+                "env.run-loop");
+    inst.bb.put("act_avoid", bb_value{avoid_command(state.rays)}, tick_index, now, 0, "env.run-loop");
+    inst.bb.put("act_goal_direct", bb_value{direct_goal_command(state)}, tick_index, now, 0, "env.run-loop");
 }
 
 }  // namespace
@@ -430,6 +574,7 @@ racecar_loop_result run_racecar_loop(runtime_host& host, std::int64_t instance_h
 
     const double safe_steer = clamp_double(options.safe_action[0], -1.0, 1.0);
     const double safe_throttle = clamp_double(options.safe_action[1], -1.0, 1.0);
+    const bool action_is_shared = options.action_semantics == kFlagshipActionSemantics;
 
     for (std::int64_t i = 0; i < options.max_ticks; ++i) {
         if (adapter->stop_requested()) {
@@ -463,13 +608,23 @@ racecar_loop_result run_racecar_loop(runtime_host& host, std::int64_t instance_h
             const status bt_status = host.tick_instance(instance_handle);
             const bb_entry* action_entry = inst->bb.get(options.action_key);
             extracted_action action = extract_action(action_entry);
+            double steering = 0.0;
+            double throttle = 0.0;
             if (action.used_fallback) {
                 ++fallback_count;
-                action.steering = 0.0;
-                action.throttle = 0.0;
+            } else if (action_is_shared) {
+                const auto native_action = flagship_shared_to_native_action(action.first, action.second);
+                steering = native_action[0];
+                throttle = native_action[1];
+                tick_record.has_shared_action = true;
+                tick_record.shared_linear_x = action.first;
+                tick_record.shared_angular_z = action.second;
+            } else {
+                steering = action.first;
+                throttle = action.second;
             }
 
-            adapter->apply_action(action.steering, action.throttle);
+            adapter->apply_action(steering, throttle);
             adapter->step(options.steps_per_tick);
             if (options.draw_debug) {
                 adapter->debug_draw();
@@ -485,12 +640,18 @@ racecar_loop_result run_racecar_loop(runtime_host& host, std::int64_t instance_h
                 std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - wall_start).count() /
                 1000000.0;
             tick_record.distance_to_goal = dist;
-            tick_record.steering = action.steering;
-            tick_record.throttle = action.throttle;
+            tick_record.steering = steering;
+            tick_record.throttle = throttle;
             tick_record.collisions_total = collisions_total;
             tick_record.goal_reached = goal_reached;
             tick_record.bt_status = status_name(bt_status);
             tick_record.used_fallback = action.used_fallback;
+            if (const bb_entry* branch_entry = inst->bb.get("active_branch");
+                branch_entry && std::holds_alternative<std::int64_t>(branch_entry->value)) {
+                tick_record.active_branch = std::get<std::int64_t>(branch_entry->value);
+            } else if (goal_reached || bt_status == status::success) {
+                tick_record.active_branch = 0;
+            }
 
             if (!options.planner_meta_key.empty()) {
                 const bb_entry* meta_entry = inst->bb.get(options.planner_meta_key);
@@ -583,6 +744,7 @@ racecar_loop_result run_racecar_loop(runtime_host& host, std::int64_t instance_h
 
 void install_racecar_demo_callbacks(runtime_host& host) {
     host.planner_ref().register_model("racecar-kinematic-v1", std::make_shared<racecar_kinematic_model>());
+    host.planner_ref().register_model("flagship-goal-shared-v1", std::make_shared<flagship_shared_goal_planner_model>());
     registry& reg = host.callbacks();
 
     reg.register_condition("collision-imminent", [](tick_context& ctx, std::span<const muslisp::value> args) {

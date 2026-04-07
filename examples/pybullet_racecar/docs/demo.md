@@ -29,6 +29,7 @@ Action:
 - `bt_basic`: constant-action BT leaf (sanity path)
 - `bt_obstacles`: selector with avoid branch vs drive-to-goal branch
 - `bt_planner`: selector with safety branch plus bounded-time planner branch (`plan-action`)
+- `bt_flagship`: shared cross-transport selector using shared planner state and shared command intent
 
 ## BT Structure (Planner Mode)
 
@@ -48,6 +49,29 @@ Selector
 ```
 
 The goal branch is terminal. Otherwise the tree keeps returning `running` while driving.
+
+## Flagship Structure (`bt_flagship` mode)
+
+```text
+Selector
+  Sequence
+    bb-truthy(goal_reached)?
+    Succeed
+  Sequence
+    bb-truthy(collision_imminent)?
+    SelectAction(act_avoid -> action_cmd)
+    Running
+  Sequence
+    PlanActionNode(flagship-goal-shared-v1)
+    SelectAction(planner_action -> action_cmd)
+    Running
+  Sequence
+    SelectAction(act_goal_direct -> action_cmd)
+    Running
+```
+
+This mode keeps the BT backend-neutral. PyBullet derives the shared keys before the tick, and projects the chosen
+`[linear_x, angular_z]` command to steering/throttle only after the tick.
 
 ## Planner Configuration (`bt_planner` mode)
 
@@ -72,6 +96,7 @@ Each tick emits a JSONL record with schema `racecar_demo.v1`:
 - BT status (BT modes)
 - planner diagnostics (planner mode): unified `planner.v1` envelope (`planner`, `status`, `budget_ms`, `time_used_ms`,
   `work_done`, `confidence`, action) plus backend `trace` when available
+- `shared_action` and stable branch traces in `bt_flagship` mode
 
 Every run also writes `run_metadata.json` containing:
 

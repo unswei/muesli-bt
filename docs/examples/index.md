@@ -12,12 +12,17 @@ Most examples follow the same pattern:
 
 ## Webots
 
+- [e-puck goal seeking](webots-epuck-goal-seeking.md)
 - [e-puck obstacle avoidance and wall following](webots-epuck-obstacle-wall-following.md)
 - [e-puck line following](webots-epuck-line-following.md)
 
 ## PyBullet
 
 - [racecar](pybullet-racecar.md)
+
+## Cross-transport
+
+- [flagship comparison](cross-transport-flagship-comparison.md)
 
 ## Isaac Sim / ROS2
 

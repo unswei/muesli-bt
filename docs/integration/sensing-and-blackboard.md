@@ -55,4 +55,5 @@ Planner and safety branches consume those values to decide action.
 
 - [Integration Overview](overview.md)
 - [Writing A Backend](writing-a-backend.md)
+- [cross-transport shared contract](cross-transport-shared-contract.md)
 - [Blackboard](../bt/blackboard.md)

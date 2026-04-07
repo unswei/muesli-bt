@@ -3187,6 +3187,8 @@ void test_racecar_planner_model_and_env_api_contract() {
     bt::runtime_host& host = bt::default_runtime_host();
     env_ptr env = create_env_with_pybullet_extension();
     check(host.planner_ref().has_model("racecar-kinematic-v1"), "planner should register racecar-kinematic-v1 model");
+    check(host.planner_ref().has_model("flagship-goal-shared-v1"),
+          "planner should register flagship-goal-shared-v1 model");
 
     auto adapter = std::make_shared<mock_racecar_adapter>();
     bt::set_racecar_sim_adapter(adapter);
@@ -3226,6 +3228,31 @@ void test_racecar_planner_model_and_env_api_contract() {
     check(action_entry != nullptr, "racecar plan-action should publish action");
     const auto* action_vec = std::get_if<std::vector<double>>(&action_entry->value);
     check(action_vec && action_vec->size() >= 2, "racecar plan-action should output [steering throttle]");
+
+    (void)eval_text(
+        "(define flagship-tree "
+        "  (bt.compile "
+        "    '(seq "
+        "       (plan-action :name \"flagship-race\" :planner :mcts :budget_ms 8 :work_max 120 "
+        "                    :model_service \"flagship-goal-shared-v1\" :state_key planner_state "
+        "                    :action_key shared_action :meta_key plan-meta :action_schema \"flagship.cmd.v1\") "
+        "       (act apply-action shared_action))))",
+        env);
+    (void)eval_text("(define flagship-inst (bt.new-instance flagship-tree))", env);
+    value flagship_st = eval_text("(bt.tick flagship-inst '((planner_state (1.2 0.35 0.25 0.10))))", env);
+    check(is_symbol(flagship_st) && symbol_name(flagship_st) == "success",
+          "plan-action with flagship shared model should succeed");
+
+    bt::instance* flagship_inst = host.find_instance(bt_handle(eval_text("flagship-inst", env)));
+    check(flagship_inst != nullptr, "flagship plan-action instance should exist");
+    const bt::bb_entry* shared_action_entry = flagship_inst->bb.get("shared_action");
+    check(shared_action_entry != nullptr, "flagship plan-action should publish shared action");
+    const auto* shared_action_vec = std::get_if<std::vector<double>>(&shared_action_entry->value);
+    check(shared_action_vec && shared_action_vec->size() >= 2, "flagship plan-action should output [linear_x angular_z]");
+    check((*shared_action_vec)[0] >= -1.0 && (*shared_action_vec)[0] <= 1.0,
+          "flagship linear_x should stay within shared command range");
+    check((*shared_action_vec)[1] >= -1.0 && (*shared_action_vec)[1] <= 1.0,
+          "flagship angular_z should stay within shared command range");
 
     bt::clear_racecar_demo_state();
 }

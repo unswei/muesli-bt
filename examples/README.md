@@ -4,6 +4,7 @@ This directory contains runnable muesli-bt examples.
 
 ## New Webots e-puck demos (`env.*`)
 
+- `flagship_wheeled/`: shared `v0.5` cross-transport BT, shared contract helpers, thresholds, and comparison-tool scaffolding.
 - `webots_epuck_obstacle/`: obstacle avoidance + wall following with BT branch switching.
 - `webots_epuck_line/`: line following with BT + bounded planner confidence logging.
 - `webots_epuck_goal/`: goal seeking in a cluttered arena with lidar-lite observations.
@@ -18,7 +19,7 @@ This directory contains runnable muesli-bt examples.
 - `repl_scripts/`: standalone Lisp algorithm and planner scripts.
 - `repl_scripts/ros2-live-odom-twist.lisp`: minimal live ROS2 control-loop script for the Ubuntu 22.04 + Humble `Odometry` -> `Twist` baseline.
 - `isaac_h1_ros2_demo/`: ROS2 H1 locomotion demo assets, including the checked-in Lisp BT, runtime wrapper, and Isaac topic contract.
-- `pybullet_racecar/`: PyBullet racecar showcase.
+- `pybullet_racecar/`: PyBullet racecar showcase, including the shared `bt_flagship` cross-transport mode.
 - `../integrations/pybullet/`: shared C++ integration plumbing used by the PyBullet racecar demo.
 
 ## Script Extension Convention

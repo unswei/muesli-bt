@@ -324,10 +324,19 @@ public:
             action_obj[py::str("steering")] = py::float_(record.steering);
             action_obj[py::str("throttle")] = py::float_(record.throttle);
             payload[py::str("action")] = action_obj;
+            if (record.has_shared_action) {
+                py::dict shared_action_obj;
+                shared_action_obj[py::str("linear_x")] = py::float_(record.shared_linear_x);
+                shared_action_obj[py::str("angular_z")] = py::float_(record.shared_angular_z);
+                payload[py::str("shared_action")] = shared_action_obj;
+            }
 
             payload[py::str("collisions_total")] = py::int_(record.collisions_total);
             payload[py::str("goal_reached")] = py::bool_(record.goal_reached);
             payload[py::str("bt_status")] = py::str(record.bt_status);
+            if (record.active_branch >= 0) {
+                payload[py::str("active_branch")] = py::int_(record.active_branch);
+            }
             if (!record.planner_meta_json.empty()) {
                 payload[py::str("planner_meta_json")] = py::str(record.planner_meta_json);
             }
@@ -501,6 +510,11 @@ public:
                 options.run_id = py::cast<std::string>(val);
             } else if (key == "goal_tolerance") {
                 options.goal_tolerance = require_py_number(val, "Runtime.run_loop.goal_tolerance");
+            } else if (key == "action_semantics") {
+                if (!py::isinstance<py::str>(val)) {
+                    throw std::runtime_error("Runtime.run_loop.action_semantics: expected str");
+                }
+                options.action_semantics = py::cast<std::string>(val);
             } else {
                 throw std::runtime_error("Runtime.run_loop: unknown option: " + key);
             }

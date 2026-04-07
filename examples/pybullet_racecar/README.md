@@ -52,6 +52,7 @@ make demo-run MODE=manual
 make demo-run MODE=bt_basic
 make demo-run MODE=bt_obstacles
 make demo-run MODE=bt_planner
+make demo-run MODE=bt_flagship
 ```
 
 Or direct command:
@@ -93,6 +94,20 @@ PYTHONPATH=build/dev/python \
 
 BT modes keep default pacing (`--bt-sim-speed 1.0`). Increase this value to make BT simulation advance faster per tick.
 The `bt_planner` tree routes through unified `planner.plan`; this script currently sets `:planner "mcts"` with MCTS config keys.
+
+### Step 5: Shared flagship goal-seeking BT
+
+```bash
+PYTHONPATH=build/dev/python \
+  .venv-py311/bin/python examples/pybullet_racecar/run_demo.py \
+  --mode bt_flagship --budget-ms 20 --work-max 280
+```
+
+`bt_flagship` keeps the same obstacle field and goal marker, but runs the shared cross-transport contract:
+
+- shared state to planner: `[goal_dist, goal_bearing, obstacle_front, speed]`
+- shared command intent from BT/planner: `[linear_x, angular_z]`
+- PyBullet host-side projection from shared intent to racecar steering/throttle
 
 Budget sweep example:
 
@@ -154,6 +169,7 @@ If Graphviz is unavailable, the script still generates a `.dot` file.
 - `native/`: demo-native C++/pybind bridge entrypoint that drives canonical `env.api.v1`
 - `../../integrations/pybullet/`: optional C++ integration target and racecar adapter/model helpers
 - `bt/racecar_bt.lisp`: canonical BT DSL for diagram export
+- `bt/flagship_entry.lisp`: raw DSL mirror of the shared v0.5 flagship tree
 - `scripts/plot_logs.py`: log-to-plot utility
 - `scripts/render_bt_dot.py`: DOT/SVG export helper
 - `docs/demo.md`: long-form walkthrough

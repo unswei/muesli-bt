@@ -10,3 +10,9 @@ This folder contains the shared C++ controller implementation used by:
 
 The per-demo `muesli_epuck.cpp` files are intentionally small wrappers. This keeps behaviour logic in Lisp while avoiding duplicated controller boilerplate.
 The corresponding Lisp entrypoints follow the `.lisp` naming convention.
+
+The shared controller defaults to `lisp/main.lisp` inside the selected example directory.
+Set `MUESLI_BT_WEBOTS_LISP_ENTRY` to override that entrypoint with either:
+
+- a path relative to the example root, for example `lisp/flagship_entry.lisp`
+- an absolute filesystem path

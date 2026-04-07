@@ -27,6 +27,7 @@ The demo writes one JSON object per control tick (`JSON Lines`).
 
 - `bt` (object)
 - `planner` (object)
+- `shared_action` (object: `linear_x`, `angular_z`)
 
 ### `bt` Object
 
@@ -44,6 +45,7 @@ The demo writes one JSON object per control tick (`JSON Lines`).
 - `work_done` (int)
 - `confidence` (float)
 - `action` (object: `steering`, `throttle`)
+- `shared_action` (optional object: `linear_x`, `angular_z`) when the planner action schema is `flagship.cmd.v1`
 - `trace` (optional object, backend-specific)
 - `overrun` (optional bool)
 - `note` (optional string)
@@ -52,6 +54,7 @@ Notes:
 
 - The internal planner metadata uses canonical action format (`action_schema` + `u` vector).
 - The racecar demo log projects that action to `{steering, throttle}` for convenience.
+- In `bt_flagship` mode, the log also exposes the original shared action as `{linear_x, angular_z}`.
 
 #### `planner.trace` (backend-specific)
 

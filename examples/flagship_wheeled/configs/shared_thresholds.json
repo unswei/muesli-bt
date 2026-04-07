@@ -1,0 +1,7 @@
+{
+  "schema_version": "flagship.thresholds.v1",
+  "status": "provisional",
+  "goal_tolerance_m": 0.25,
+  "collision_threshold": 0.75,
+  "notes": "Provisional thresholds for the first PyBullet/Webots flagship comparison protocol. Keep these fixed within a comparison pair."
+}

@@ -118,7 +118,11 @@ Focus:
 Scope:
 
 - choose one canonical wheeled behaviour as the cross-transport flagship
+- prefer a goal-seeking wheeled behaviour that can be expressed from pose, heading, velocity, goal, and bounded obstacle signals rather than backend-specific line or wall sensors
+- use the existing Webots cluttered-goal path as the visual simulator baseline and align PyBullet and ROS2 around that same high-level behaviour
 - run the same high-level BT through PyBullet, Webots, and ROS2 with adapter-only differences
+- treat the current Webots e-puck versus PyBullet racecar pair as portability evidence, not as a same-robot decision-equivalence claim
+- start a stricter comparison track by mirroring the Webots e-puck embodiment in PyBullet as a differential-drive surrogate
 - document the common BT source and the transport-specific attach/config layer separately
 - publish an improved integration tutorial that walks one supported backend path from attach/config through canonical log validation
 - define a small set of scripted comparison checks for key behaviour, action, or decision-trace invariants across the three transports
@@ -126,6 +130,7 @@ Scope:
 Exit criteria:
 
 - one flagship behaviour has a shared BT definition that is reused across simulator and ROS-backed runs
+- the chosen flagship fits the released ROS2 `Odometry` -> `Twist` surface without introducing new ROS-specific sensors or message contracts
 - docs point all three backends at the same BT logic, with only backend wiring changed
 - one integration tutorial shows the supported backend flow end-to-end, including canonical log validation
 - at least one scripted check compares key metrics or decision-trace invariants across the three transports
@@ -272,6 +277,7 @@ If a ROS-backed demo works but the same BT cannot be shown across simulator and 
 ## gotchas
 
 - Do not let ROS2 scope expand into a second semantic runtime.
+- Do not choose a flagship that depends on backend-specific line sensors, wall sensors, or other signals that the released ROS2 baseline does not expose.
 - Do not let “host capability bundles” turn into one giant catch-all ROS super-interface.
 - Do not treat ad hoc replay artefacts as a replacement for canonical `mbt.evt.v1` logs.
 - Do not use demo polish to hide missing conformance or observability guarantees.
@@ -284,3 +290,4 @@ If a ROS-backed demo works but the same BT cannot be shown across simulator and 
 - [conformance levels](contracts/conformance.md)
 - [runtime contract v1](contracts/runtime-contract-v1.md)
 - [ros2 backend scope](integration/ros2-backend-scope.md)
+- [cross-transport flagship for v0.5](integration/cross-transport-flagship.md)

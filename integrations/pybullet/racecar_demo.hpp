@@ -35,9 +35,13 @@ struct racecar_tick_record {
     double distance_to_goal = 0.0;
     double steering = 0.0;
     double throttle = 0.0;
+    bool has_shared_action = false;
+    double shared_linear_x = 0.0;
+    double shared_angular_z = 0.0;
     std::int64_t collisions_total = 0;
     bool goal_reached = false;
     std::string bt_status = "failure";
+    std::int64_t active_branch = -1;
     std::string planner_meta_json{};
     bool used_fallback = false;
     bool is_error_record = false;
@@ -79,6 +83,7 @@ struct racecar_loop_options {
     std::string planner_meta_key = "plan-meta";
     std::string run_id = "run";
     double goal_tolerance = 0.6;
+    std::string action_semantics = "racecar.native.v1";
 };
 
 enum class racecar_loop_status {
