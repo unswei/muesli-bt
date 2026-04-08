@@ -409,6 +409,10 @@ if (Python3_Interpreter_FOUND)
     NAME muesli_bt_trace_validator_smoke
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_validate_trace.py"
   )
+  add_test(
+    NAME muesli_bt_flagship_compare_smoke
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_flagship_compare_runs.py"
+  )
 endif ()
 
 if (MUESLI_BT_BUILD_BENCHMARKS)
