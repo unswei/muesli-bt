@@ -1,8 +1,19 @@
 # Getting Started
 
-This page gets a new developer from clone to runnable REPL, tests, and docs.
+This page gets a new developer from clone to a verified local build, a working REPL, and one first runnable script.
+It is written for the shortest path to first success, not for full architecture or language coverage.
+If you only need to confirm that the repository builds and the runtime works, you can stop after the install verification step.
+If you want to understand the BT example on this page, follow the linked Lisp and BT introductions immediately afterwards.
 
 If you are new to the architecture, read [What Is muesli-bt](getting-oriented/what-is-muesli-bt.md) first.
+
+## What You Will Have Working After This Page
+
+- a successful local build and test run
+- a verified install path that emits the canonical event log
+- a working `muslisp` REPL
+- one recommended first script to run next
+- a clear path into the Lisp, BT, and example docs
 
 ## Toolchain Requirements
 
@@ -43,6 +54,9 @@ make verify-install
 `make verify-install` writes `logs/verify-install.mbt.evt.v1.jsonl` and validates it
 against `schemas/event_log/v1/mbt.evt.v1.schema.json`.
 
+If you only needed a verified install, you can stop here and use the repository normally.
+If you want a first readable example, continue with the REPL and the recommended script below.
+
 Without presets:
 
 ```bash
@@ -74,6 +88,29 @@ REPL notes:
 - Persistent REPL history is stored at `~/.muesli_bt_history`.
 - Use `:clear` to drop a pending multi-line buffer without leaving the REPL.
 
+## Run A First Script
+
+Recommended first script:
+
+```bash
+./build/dev/muslisp examples/repl_scripts/lisp-basics.lisp
+```
+
+Use this first if you are new to Lisp syntax.
+The matching walkthrough page is [Example: muslisp Basics](examples/lisp-basics.md).
+
+## Before You Read The BT Snippet
+
+If you are new to Lisp or BTs, treat the next snippet as a quick shape check rather than required knowledge for installation.
+
+- Read [Brief Lisp Introduction](lisp-basics.md) for the minimum language needed to read it.
+- Read [Brief Behaviour Tree Introduction](bt/intro.md) for the first BT forms and statuses.
+- Run [Example: Hello BT](examples/hello-bt.md) if you want the same ideas explained tick by tick.
+
+In the snippet below, `target-visible`, `approach-target`, `grasp`, and `search-target` are host callback names, not built-in Lisp keywords.
+
+## First BT Snippet
+
 Quick BT authoring example:
 
 ```lisp
@@ -92,8 +129,9 @@ Quick BT authoring example:
 
 ## Run Scripts
 
+Other runnable scripts:
+
 ```bash
-./build/dev/muslisp examples/repl_scripts/lisp-basics.lisp
 ./build/dev/muslisp examples/repl_scripts/a-star-grid.lisp
 ./build/dev/muslisp examples/repl_scripts/dijkstra-grid-pq.lisp
 ./build/dev/muslisp examples/repl_scripts/prm-2d-pq.lisp
@@ -134,6 +172,8 @@ See the built-in reference index for exact signatures and error behaviour:
 
 - [Language Reference Index](language/reference/index.md)
 
+If you want the control-loop picture before the detailed reference, read [How Execution Works](getting-oriented/how-execution-works.md).
+
 ## Run Tests Directly
 
 ```bash
@@ -172,6 +212,14 @@ python3 scripts/render-doc-diagrams.py
 - runnable Lisp scripts: `examples/repl_scripts/` and `examples/bt/`
 - prose walkthroughs: `docs/examples/`
 - simulator/robot integrations: [Integration chapter](integration/overview.md)
+
+## Recommended Next Pages
+
+- [What Is muesli-bt](getting-oriented/what-is-muesli-bt.md) for the runtime pieces and overall scope
+- [Brief Lisp Introduction](lisp-basics.md) for the minimum language needed in the first examples
+- [Brief Behaviour Tree Introduction](bt/intro.md) for the first composite and leaf forms
+- [Example: Hello BT](examples/hello-bt.md) for the first tiny tree with expected tick outcomes
+- [Examples Overview](examples/index.md) for the broader learning path
 
 ## Common Issues
 
