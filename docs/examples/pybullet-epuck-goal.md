@@ -1,10 +1,14 @@
 # pybullet: e-puck-style goal seeking
 
+<video controls muted loop playsinline width="100%">
+  <source src="../assets/demos/pybullet-epuck-goal/showcase.mp4" type="video/mp4">
+</video>
+
 ![PyBullet e-puck-style scene](../assets/demos/pybullet-epuck-goal/scene.png)
 
 This example runs the shared wheeled flagship BT against a compact differential-drive surrogate in PyBullet.
 
-The default run is deliberately simple: it reaches the goal on a clear path and gives you a quick success check for the shared BT, the Python bridge, and the JSONL log surface. The optional clutter layout adds a tighter scene that is useful for inspection and screenshots.
+The default run is deliberately simple: it reaches the goal on a clear path and gives you a quick success check for the shared BT, the Python bridge, and the JSONL log surface. The checked-in clutter layout also reaches the goal, which makes it a better fit for same-robot comparison work and for a more visually useful demo clip.
 
 ## what it demonstrates
 
@@ -38,22 +42,43 @@ PYTHONPATH=build/dev/python \
   .venv-py311/bin/python examples/pybullet_epuck_goal/run_demo.py --with-default-obstacles
 ```
 
+That clutter run now reaches the goal on the checked-in seed and scene.
+
 ## capture a scene preview
 
-The checked-in preview image on this page comes from the clutter layout:
+The checked-in preview image and clip on this page come from the clutter layout:
 
 ```bash
 PYTHONPATH=build/dev/python \
   .venv-py311/bin/python examples/pybullet_epuck_goal/run_demo.py \
   --headless \
   --with-default-obstacles \
-  --camera-distance 1.25 \
+  --camera-distance 1.35 \
   --camera-yaw 38 \
   --camera-pitch -63 \
-  --screenshot-target-x 0.02 \
-  --screenshot-target-y 0.02 \
+  --screenshot-target-x 0.08 \
+  --screenshot-target-y 0.05 \
   --screenshot-path docs/assets/demos/pybullet-epuck-goal/scene.png
 ```
+
+Export the short MP4 clip:
+
+```bash
+PYTHONPATH=build/dev/python \
+  .venv-py311/bin/python examples/pybullet_epuck_goal/run_demo.py \
+  --headless \
+  --with-default-obstacles \
+  --camera-distance 1.35 \
+  --camera-yaw 38 \
+  --camera-pitch -63 \
+  --screenshot-target-x 0.08 \
+  --screenshot-target-y 0.05 \
+  --video-path docs/assets/demos/pybullet-epuck-goal/showcase.mp4 \
+  --video-fps 12 \
+  --video-every-nth-tick 4
+```
+
+`ffmpeg` is required for `--video-path`.
 
 ## what to look for
 
@@ -67,6 +92,7 @@ PYTHONPATH=build/dev/python \
 - tick log: `examples/pybullet_epuck_goal/logs/<run_id>.jsonl`
 - metadata: `examples/pybullet_epuck_goal/logs/<run_id>.run_metadata.json`
 - optional scene preview: any path passed via `--screenshot-path`
+- optional MP4 clip: any path passed via `--video-path`
 
 ## key files
 

@@ -44,6 +44,7 @@ The current racecar path stays useful, but it should not be used to argue for al
 
 The repository now includes an initial strict-track surrogate at `examples/pybullet_epuck_goal/`.
 That path is still a surrogate rather than a full robot clone, but it keeps the embodiment class and command surface much closer to the Webots e-puck family.
+The checked-in clutter layout for that path now also reaches the goal, so the strict track can use a successful cluttered-goal run rather than only a clean-path smoke test.
 
 ### source of truth
 

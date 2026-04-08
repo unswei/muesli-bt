@@ -10,6 +10,7 @@ import platform
 import random
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -297,6 +298,60 @@ def write_camera_png(
     image.save(out_path)
 
 
+def write_camera_mp4(
+    client_id: int,
+    frame_targets_xy: Sequence[Tuple[float, float]],
+    *,
+    width: int,
+    height: int,
+    distance: float,
+    yaw: float,
+    pitch: float,
+    target_z: float,
+    fps: int,
+    out_path: Path,
+) -> None:
+    if len(frame_targets_xy) < 2:
+        raise ValueError("Need at least two frames to write an MP4 clip.")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="pybullet_epuck_video_") as tmp_dir:
+        frames_dir = Path(tmp_dir)
+        for frame_index, frame_target_xy in enumerate(frame_targets_xy):
+            frame_path = frames_dir / f"frame_{frame_index:05d}.png"
+            write_camera_png(
+                client_id,
+                frame_target_xy,
+                width=width,
+                height=height,
+                distance=distance,
+                yaw=yaw,
+                pitch=pitch,
+                target_z=target_z,
+                out_path=frame_path,
+            )
+        try:
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-loglevel",
+                    "error",
+                    "-framerate",
+                    str(max(1, fps)),
+                    "-i",
+                    str(frames_dir / "frame_%05d.png"),
+                    "-c:v",
+                    "libx264",
+                    "-pix_fmt",
+                    "yuv420p",
+                    str(out_path),
+                ],
+                check=True,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError("ffmpeg is required for --video-path export.") from exc
+
+
 def raycast_observation(
     client_id: int,
     ignore_body_id: int,
@@ -581,6 +636,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--screenshot-path", type=Path, default=None, help="Optional PNG path for a final scene preview.")
     parser.add_argument("--screenshot-target-x", type=float, default=None, help="Optional camera target x for screenshot export.")
     parser.add_argument("--screenshot-target-y", type=float, default=None, help="Optional camera target y for screenshot export.")
+    parser.add_argument("--video-path", type=Path, default=None, help="Optional MP4 path for a short overview clip.")
+    parser.add_argument("--video-fps", type=int, default=12, help="Frame rate for MP4 export.")
+    parser.add_argument("--video-every-nth-tick", type=int, default=2, help="Capture one video frame every N BT ticks.")
     return parser.parse_args()
 
 
@@ -634,9 +692,8 @@ def main() -> int:
         obstacle_specs = []
         if args.with_default_obstacles:
             obstacle_specs = [
-                ((-0.08, -0.05), (0.05, 0.10)),
-                ((0.10, 0.10), (0.05, 0.08)),
-                ((0.22, -0.02), (0.04, 0.10)),
+                ((-0.08, -0.03), (0.03, 0.09)),
+                ((0.14, 0.12), (0.03, 0.09)),
             ]
         obstacles = [make_box_obstacle(client_id, center, half) for center, half in obstacle_specs]
 
@@ -677,6 +734,7 @@ def main() -> int:
             "log_path": str(log_path),
             "metadata_path": str(metadata_path),
         }
+        video_targets_xy: List[Tuple[float, float]] = []
 
         for tick_index in range(1, max_ticks + 1):
             if sim.stop_requested():
@@ -747,6 +805,11 @@ def main() -> int:
             if planner is not None:
                 record["planner"] = planner
             sink.write(record)
+            if args.video_path is not None and (tick_index % max(1, args.video_every_nth_tick) == 0):
+                if args.screenshot_target_x is not None and args.screenshot_target_y is not None:
+                    video_targets_xy.append((float(args.screenshot_target_x), float(args.screenshot_target_y)))
+                else:
+                    video_targets_xy.append((state.x, state.y))
 
             sim.step(steps_per_tick)
 
@@ -782,6 +845,24 @@ def main() -> int:
                 out_path=args.screenshot_path,
             )
             summary["screenshot_path"] = str(args.screenshot_path)
+        if args.video_path is not None:
+            if args.screenshot_target_x is not None and args.screenshot_target_y is not None:
+                video_targets_xy.append((float(args.screenshot_target_x), float(args.screenshot_target_y)))
+            else:
+                video_targets_xy.append((final_state.x, final_state.y))
+            write_camera_mp4(
+                client_id,
+                video_targets_xy,
+                width=1280,
+                height=720,
+                distance=args.camera_distance,
+                yaw=args.camera_yaw,
+                pitch=args.camera_pitch,
+                target_z=args.camera_target_z,
+                fps=args.video_fps,
+                out_path=args.video_path,
+            )
+            summary["video_path"] = str(args.video_path)
 
         print(json.dumps(summary, indent=2))
         return 0
