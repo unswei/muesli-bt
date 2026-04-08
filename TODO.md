@@ -5,24 +5,20 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 
 ## now
 
-- `v0.5.0`: choose one canonical wheeled BT and reuse it across PyBullet, Webots, and ROS2 with adapter-only differences
-- `v0.5.0`: publish an improved integration tutorial that walks one supported backend path from attach/config through canonical log validation
+- `v0.5.0`: cut the release from the current green `main` baseline and publish the final release notes
+- `v0.5.0`: verify release artefacts and final docs wording against the current cross-transport flagship path
 
 ## next
-
-- `v0.5.0`: add scripted invariant checks that compare key behaviour or decision traces across simulator and ROS-backed runs
-- `v0.5.0`: treat the cross-transport invariant checks as paper evidence, not just integration smoke
-- `v0.5.0`: publish end-to-end ROS2 consumer docs/examples for the supported path
-- `v0.5.0`: stand up one Isaac Sim wheeled ROS-backed showcase that reuses `ros2-flagship-goal.lisp`, and capture a short website-ready video plus one screenshot
-- `v0.5.0`: deepen ROS2 `L2` evidence only when there is a concrete new transport path or failure mode to cover
-- `v0.5.0`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
-
-## later
 
 - `v0.6.0`: define host capability bundles for external execution, navigation, and perception services without expanding `env.*` or `planner.plan`
 - `v0.6.0`: define the first manipulator capability contract as a generic host bundle, with MoveIt as the intended first adapter rather than a core semantic surface
 - `v0.6.0`: define the first perception capability contract as a generic host bundle, with any detector-specific adapter kept behind that contract
 - `v0.6.0`: stabilise planner request/result semantics and make the boundary between `planner.plan` and external host capabilities explicit
+- `v0.6.0`: deepen ROS2 `L2` evidence only when there is a concrete new transport path or failure mode to cover
+- `v0.6.0`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
+
+## later
+
 - `v0.7.0`: add extended fixture coverage for async cancellation edge cases and optional ROS-level pre-emption coverage only if it stays thin
 - `v0.8.0`: polish the flagship wheeled demo flow, assets, and reproducible run/log inspection steps
 - `v0.8.0`: add one current Isaac Sim demo through ROS before `v1.0.0`, but keep it as a deployability/demo lane rather than a new semantic surface

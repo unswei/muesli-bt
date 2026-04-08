@@ -2,7 +2,7 @@
 
 ## what this is
 
-This page records the next design decision for `v0.5.0`.
+This page records the checked-in flagship shape for `v0.5.0`.
 
 The goal is to make one wheeled behaviour the cross-transport flagship for:
 
@@ -16,7 +16,7 @@ The same high-level BT can run across those transports while backend-specific se
 
 For a stricter “almost identical decisions under the same circumstances” claim, the project should use a same-robot comparison track rather than the current e-puck versus racecar pairing.
 
-This page is a design note for the `v0.5.0` milestone.
+This page describes the current flagship lane on `main`.
 It is not a new runtime contract.
 
 The concrete shared blackboard and command specification lives in [cross-transport shared contract](cross-transport-shared-contract.md).
@@ -25,7 +25,7 @@ The concrete shared blackboard and command specification lives in [cross-transpo
 
 Use this page when you:
 
-- choose the first shared wheeled behaviour for `v0.5.0`
+- review the shared wheeled behaviour used for `v0.5.0`
 - decide which inputs belong in the shared BT contract
 - decide which differences must stay backend-specific
 - review whether a proposed demo still fits the released ROS2 `Odometry` -> `Twist` scope
@@ -34,7 +34,7 @@ Use this page when you:
 
 ### chosen starting point
 
-Use the existing Webots cluttered-goal demo as the starting point, not the line-following or wall-following demos.
+The current flagship uses the Webots cluttered-goal demo family as the starting point, not the line-following or wall-following demos.
 
 Reason:
 
@@ -109,9 +109,9 @@ These responsibilities should stay outside the shared BT:
 - configuring topic names, simulator worlds, reset policy, and transport wiring
 - exposing backend-native telemetry beyond the shared comparison set
 
-### proposed repository layout
+### repository layout
 
-The cleanest implementation shape is:
+The current implementation shape is:
 
 1. one shared flagship example directory for backend-neutral BT logic and comparison tooling
 2. one thin wrapper in each backend-specific example that maps native observations and actions to the shared contract
@@ -166,26 +166,14 @@ Responsibility split:
 
 This keeps existing demo directories intact while giving the flagship its own backend-neutral home.
 
-### implementation checklist
+### current status
 
-Build this in the following order:
+The current `v0.5` baseline on `main` now includes:
 
-1. freeze the shared keys, units, thresholds, and command intent from [cross-transport shared contract](cross-transport-shared-contract.md)
-2. add `examples/flagship_wheeled/lisp/bt_goal_flagship.lisp` with no backend-specific sensor or actuator assumptions
-3. add `contract_helpers.lisp` for shared formulas such as `goal_dist`, `goal_bearing`, and deterministic direct-goal fallback
-4. wire Webots first by adding a thin `flagship_entry.lisp` on top of the existing cluttered-goal demo
-5. wire PyBullet second by mapping racecar state and rays into the same shared keys
-6. wire ROS2 third by keeping the current `Odometry` -> `Twist` surface and deriving obstacle and goal context in the host wrapper
-7. add comparison scripts that check branch trace, goal-distance trace, final outcome, and action trace in the shared command intent
-8. add one end-to-end docs page that shows the shared BT once and then explains only the backend-specific wrapper differences
-9. freeze one concrete PyBullet/Webots comparison protocol before expanding the same flow to ROS2
-
-Definition of done for the implementation phase:
-
-- one shared BT file is loaded by all three backend paths
-- backend wrappers are each short and mostly limited to normalisation plus command conversion
-- no backend wrapper changes the BT branch order or branch meaning
-- cross-transport comparisons use the shared command intent, not backend-native actuator logs
+1. one shared BT file loaded by Webots, PyBullet, and ROS2 wrappers
+2. backend wrappers that stay mostly limited to normalisation and command conversion
+3. cross-transport comparison tooling over the shared command intent rather than backend-native actuator logs
+4. a stricter same-robot lane through the PyBullet e-puck-style surrogate
 
 ## api / syntax
 

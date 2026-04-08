@@ -4,6 +4,22 @@ muesli-bt
 
 ## [Unreleased]
 
+This unreleased section captures the current `v0.5.0` baseline on `main`.
+
+### Added
+- Added a shared wheeled flagship BT path that is reused across Webots, PyBullet, and ROS2 with adapter-only wrapper differences.
+- Added cross-transport normalisation and comparison tooling for the wheeled flagship, including scripted invariant checks that assert successful goal completion across the supported transport lanes.
+- Added a stricter same-robot comparison lane with a PyBullet e-puck-style differential-drive surrogate, a checked-in strict comparison protocol, and scripted comparison coverage against the Webots e-puck path.
+- Added an end-to-end ROS2 tutorial that walks the supported Ubuntu 22.04 + Humble path from build and attach through canonical log validation.
+- Added an Isaac Sim TurtleBot3 ROS2 showcase with checked-in media and reproducible setup and capture instructions.
+- Added an educational Webots goal-seeking BT entrypoint plus a transition guide that explains how the explicit teaching example leads into the shared flagship wrapper.
+
+### Changed
+- Refocused the public example and integration docs around the landed `v0.5` story: same BT, different IO transport, with a separate stricter same-robot lane.
+- Polished the PyBullet e-puck demo surface with checked-in image and video assets, direct screenshot and MP4 export support, and a cluttered layout that still reaches the goal on the checked-in seed.
+- Updated the README and example guides so the current flagship, ROS2 tutorial, Isaac showcase, and strict same-robot comparison path are easier to discover from the repository root.
+- Expanded CI coverage so flagship comparison and same-robot comparison checks run from committed, self-contained fixtures instead of relying on local artefacts.
+
 ## [0.4.0] - 2026-03-21
 
 ### Added

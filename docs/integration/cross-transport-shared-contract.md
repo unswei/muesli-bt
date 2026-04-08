@@ -13,14 +13,14 @@ It exists so one high-level BT can run across:
 
 while each [host](../terminology.md#host) (backend) keeps its own sensing and actuation details.
 
-This page is a design-level specification for the `v0.5.0` flagship.
+This page describes the checked-in contract used by the shared flagship examples on `main`.
 It is not a new external runtime schema and it does not change BT or Lisp semantics.
 
 ## when to use it
 
 Use this page when you:
 
-- implement the shared flagship BT
+- review or extend the shared flagship BT
 - map backend observations into the shared blackboard keys
 - convert shared command intent into backend-native actuator commands
 - review whether a proposed comparison still fits the released ROS2 `Odometry` -> `Twist` boundary

@@ -79,6 +79,14 @@ Already shipped in `v0.4.0`:
 The repository also now includes a checked-in benchmark harness and a documented Isaac Sim / ROS2 H1 showcase path.
 Those help evidence gathering, but they do not replace the remaining release gates for `v1.0.0`.
 
+The current `main` branch also now carries the `v0.5.0` cross-transport flagship baseline:
+
+- one shared wheeled BT reused across Webots, PyBullet, and ROS2
+- a supported ROS2 tutorial from build through canonical log validation
+- scripted cross-transport comparison checks
+- a stricter same-robot comparison lane through the PyBullet e-puck-style surrogate
+- supporting Isaac Sim / ROS2 wheeled showcase media and docs
+
 This means the remaining path to `v1.0.0` is not “add ROS2 somehow” or “make replay work somehow”.
 The thin adaptor and observability baseline are already real enough that the next question is how to exploit them without widening the semantic surface.
 
@@ -106,9 +114,20 @@ The remaining path is:
 - released trace-level replay validation and one shared canonical artefact layout across simulator and ROS-backed runs
 - documented canonical lifecycle anchors and ROS timing metadata in the released log surface
 
+`v0.5.0`: same BT, different IO transport landed on `main`
+
+- one shared wheeled flagship BT now runs across Webots, PyBullet, and ROS2 with adapter-only differences
+- scripted comparison checks now cover both the cross-transport lane and the stricter same-robot PyBullet/Webots lane
+- the supported ROS2 tutorial now walks the end-to-end path through canonical log validation
+- the PyBullet e-puck-style surrogate and the Isaac wheeled ROS2 showcase now provide supporting demo and evidence lanes
+
 Further work should now move to cross-transport evidence, host-boundary definition, correctness hardening, or concrete consumer fixes rather than casually broadening the baseline transport.
 
 #### `v0.5.0`: same BT, different IO transport
+
+Status:
+
+- complete on `main`; retained here as the release record for scope and exit criteria
 
 Focus:
 

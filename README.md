@@ -101,6 +101,12 @@ PYTHONPATH=build/dev/python \
 
 Guide: [PyBullet: e-puck-style goal seeking](docs/examples/pybullet-epuck-goal.md)
 
+Shared flagship guides:
+
+- [cross-transport flagship comparison](docs/examples/cross-transport-flagship-comparison.md)
+- [ROS2 tutorial](docs/integration/ros2-tutorial.md)
+- [same-robot strict comparison](docs/integration/same-robot-strict-comparison.md)
+
 Verify install (single command; writes + validates canonical event log):
 
 ```bash
@@ -121,9 +127,18 @@ Additional runnable commands:
 
 On interactive Linux and macOS terminals, `muslisp` now uses a small vendored line editor for current-line editing, history, and wrapped multi-line input. Persistent history is stored at `~/.muesli_bt_history`, and `:clear` drops a pending multi-line buffer without leaving the REPL.
 
-## ROS2 Release Baseline
+## v0.5 Flagship Baseline
 
-The current `v0.4.x` ROS2 release baseline is intentionally narrow:
+The current `v0.5.x` baseline keeps the transport surface intentionally narrow and uses one shared wheeled BT across the main backend paths:
+
+- shared flagship BT reused across Webots, PyBullet, and ROS2
+- strict host boundary: backend wrappers own observation shaping and command mapping
+- supported ROS host: Ubuntu 22.04 + ROS 2 Humble
+- supported ROS transport: `nav_msgs/msg/Odometry` in, `geometry_msgs/msg/Twist` out
+- scripted cross-transport comparison and same-robot strict comparison checks
+- canonical logging through `mbt.evt.v1`
+
+The ROS2 part of that baseline remains intentionally narrow:
 
 - supported host: Ubuntu 22.04 + ROS 2 Humble
 - attach path: `(env.attach "ros2")`
@@ -142,6 +157,13 @@ Release artefact posture:
 - the ROS-enabled archive requires a matching ROS 2 Humble runtime on the target host
 
 Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md) for the supported end-to-end build, run, and canonical log validation flow, then use [docs/integration/ros2-backend-scope.md](docs/integration/ros2-backend-scope.md) and [docs/contracts/conformance.md](docs/contracts/conformance.md) for the backend boundary and conformance lanes.
+
+For the flagship comparison story itself, use:
+
+- [cross-transport flagship comparison](docs/examples/cross-transport-flagship-comparison.md)
+- [same-robot strict comparison](docs/integration/same-robot-strict-comparison.md)
+- [PyBullet: e-puck-style goal seeking](docs/examples/pybullet-epuck-goal.md)
+- [Isaac Sim: TurtleBot3 ROS2 demo](docs/examples/isaac-wheeled-ros2-showcase.md)
 
 ## package and tooling integration
 
