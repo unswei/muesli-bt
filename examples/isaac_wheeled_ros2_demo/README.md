@@ -15,15 +15,21 @@ Files:
 4. Configure the ROS 2 bridge and OmniGraph so Isaac publishes `/robot/odom` and subscribes to `/robot/cmd_vel`.
 5. Verify `/robot/odom` and `/tf`.
 6. Run `./build/linux-ros2/muslisp_ros2 examples/repl_scripts/ros2-flagship-goal.lisp`.
-7. Record a short clip and export one screenshot from the configured third-person camera.
+7. Capture the live clip and still with `tools/isaac_capture_helpers/run_live_ros2_tb3_capture.sh`, or use the scripted preview helper if you only want a camera-only render.
 
 ## runtime shape
 
 - Isaac Sim provides the robot, scene, and ROS 2 bridge
 - `muesli-bt` runs `examples/repl_scripts/ros2-flagship-goal.lisp`
 - the public interface stays on `nav_msgs/msg/Odometry` in and `geometry_msgs/msg/Twist` out
+- the bundled media lives under `docs/assets/demos/isaac-turtlebot3/`
+- the bundled media is captured from a live ROS 2 run; the scripted preview helper remains available for quick scene checks
 
 ## see also
 
 - `docs/examples/isaac-wheeled-ros2-showcase.md`
 - `docs/integration/ros2-tutorial.md`
+- `tools/isaac_capture_helpers/run_live_ros2_tb3_capture.sh`
+- `tools/isaac_capture_helpers/live_ros2_tb3_showcase.py`
+- `tools/isaac_capture_helpers/ros2_udp_bridge.py`
+- `tools/isaac_capture_helpers/export_tb3_showcase.py`
