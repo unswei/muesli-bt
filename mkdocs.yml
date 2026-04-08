@@ -129,18 +129,19 @@ nav:
       - iLQR Backend: planning/ilqr.md
       - plan-action Node: planning/plan-action-node.md
       - Planner Logging: observability/planner-logging.md
-  - Integration:
-      - Overview: integration/overview.md
-      - env API (`env.api.v1`): integration/env-api.md
-      - ROS2 Tutorial: integration/ros2-tutorial.md
-      - ROS2 Flagship Source: integration/ros2-flagship-source.md
-      - Writing A Backend: integration/writing-a-backend.md
-      - ROS2 Backend Scope: integration/ros2-backend-scope.md
-      - Cross-transport Flagship for v0.5: integration/cross-transport-flagship.md
-      - Cross-transport Comparison Protocol: integration/cross-transport-comparison-protocol.md
-      - Same-robot Strict Comparison Track: integration/same-robot-strict-comparison.md
-      - Cross-transport Shared Contract: integration/cross-transport-shared-contract.md
-      - Sensing and Blackboard: integration/sensing-and-blackboard.md
+      - Integration:
+          - Overview: integration/overview.md
+          - env API (`env.api.v1`): integration/env-api.md
+          - ROS2 Tutorial: integration/ros2-tutorial.md
+          - ROS2 Flagship Source: integration/ros2-flagship-source.md
+          - Writing A Backend: integration/writing-a-backend.md
+          - ROS2 Backend Scope: integration/ros2-backend-scope.md
+          - Cross-transport Flagship for v0.5: integration/cross-transport-flagship.md
+          - Cross-transport Comparison Protocol: integration/cross-transport-comparison-protocol.md
+          - Same-robot Strict Comparison Track: integration/same-robot-strict-comparison.md
+          - Same-robot Strict Comparison Protocol: integration/same-robot-strict-comparison-protocol.md
+          - Cross-transport Shared Contract: integration/cross-transport-shared-contract.md
+          - Sensing and Blackboard: integration/sensing-and-blackboard.md
   - Contracts:
       - Index: contracts/README.md
       - Runtime Contract v1: contracts/runtime-contract-v1.md

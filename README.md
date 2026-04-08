@@ -99,6 +99,8 @@ PYTHONPATH=build/dev/python \
   .venv-py311/bin/python examples/pybullet_epuck_goal/run_demo.py --headless
 ```
 
+Guide: [PyBullet: e-puck-style goal seeking](docs/examples/pybullet-epuck-goal.md)
+
 Verify install (single command; writes + validates canonical event log):
 
 ```bash
@@ -195,6 +197,7 @@ Then use that same environment for docs:
 - `make demo-setup`: installs pinned demo deps and builds `muesli_bt_bridge`.
 - `make demo-run MODE=bt_planner`: runs the racecar demo through the bridge/runtime path.
 - `PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_epuck_goal/run_demo.py --headless`: runs the e-puck-style PyBullet flagship path.
+  Guide: [`docs/examples/pybullet-epuck-goal.md`](docs/examples/pybullet-epuck-goal.md)
 - `make verify-install`: runs a deterministic BT smoke run, writes `logs/verify-install.mbt.evt.v1.jsonl`, and validates it against `mbt.evt.v1`.
 
 ## Benchmark Harness

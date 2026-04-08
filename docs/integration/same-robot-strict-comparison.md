@@ -111,6 +111,10 @@ Recommended first constants for the PyBullet strict track:
 
 These should be validated against behaviour, but they are already close enough to support an initial same-robot surrogate.
 
+The first checked-in strict-track protocol now lives here:
+
+- [same-robot strict comparison protocol](same-robot-strict-comparison-protocol.md)
+
 ## example
 
 Good strict-track comparison:

@@ -1,0 +1,56 @@
+{
+  "schema_version": "flagship.comparison_protocol.v1",
+  "status": "provisional",
+  "name": "v0.5_webots_pybullet_epuck_same_robot",
+  "scope": {
+    "backends": [
+      "webots",
+      "pybullet_epuck"
+    ],
+    "scenario": "same-robot wheeled flagship goal-seeking",
+    "comparison_window_ticks": 320,
+    "tick_hz": 20
+  },
+  "controller": {
+    "planner": "mcts",
+    "budget_ms": 20,
+    "work_max": 280,
+    "max_depth": 18,
+    "gamma": 0.96,
+    "pw_k": 2.0,
+    "pw_alpha": 0.5,
+    "action_schema": "flagship.cmd.v1",
+    "model_service": "flagship-goal-shared-v1"
+  },
+  "collection": {
+    "seed": 7,
+    "webots": {
+      "entrypoint": "lisp/flagship_entry.lisp",
+      "world": "examples/webots_epuck_goal/worlds/epuck_goal_cluttered.wbt"
+    },
+    "pybullet_epuck": {
+      "runner": "examples/pybullet_epuck_goal/run_demo.py",
+      "headless": true,
+      "duration_sec": 16.0,
+      "with_default_obstacles": false,
+      "goal_x": 0.37,
+      "goal_y": 0.38
+    }
+  },
+  "comparison": {
+    "primary_metrics": [
+      "full_run_goal_reached",
+      "full_run_final_status",
+      "branch_family_overlap",
+      "progress.reduction_ratio_delta",
+      "aligned_debug.goal_dist_mae",
+      "aligned_debug.shared_action.linear_x_mae",
+      "aligned_debug.shared_action.angular_z_mae"
+    ],
+    "secondary_metrics": [
+      "aligned_debug.branch_trace.agreement_ratio",
+      "full_run_final_goal_dist"
+    ]
+  },
+  "notes": "This is the initial same-robot surrogate protocol. Webots remains the embodiment reference, while PyBullet uses a compact differential-drive surrogate with the same shared flagship BT and command surface."
+}

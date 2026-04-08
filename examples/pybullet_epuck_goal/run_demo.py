@@ -14,8 +14,10 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import numpy as np
 import pybullet as p
 import pybullet_data
+from PIL import Image
 
 
 SCHEMA_VERSION = "pybullet_epuck_goal.v1"
@@ -252,6 +254,47 @@ def update_follow_camera(
         cameraTargetPosition=[float(state.x), float(state.y), float(target_z)],
         physicsClientId=client_id,
     )
+
+
+def write_camera_png(
+    client_id: int,
+    target_xy: Tuple[float, float],
+    *,
+    width: int,
+    height: int,
+    distance: float,
+    yaw: float,
+    pitch: float,
+    target_z: float,
+    out_path: Path,
+) -> None:
+    view = p.computeViewMatrixFromYawPitchRoll(
+        cameraTargetPosition=[float(target_xy[0]), float(target_xy[1]), float(target_z)],
+        distance=float(distance),
+        yaw=float(yaw),
+        pitch=float(pitch),
+        roll=0.0,
+        upAxisIndex=2,
+        physicsClientId=client_id,
+    )
+    projection = p.computeProjectionMatrixFOV(
+        fov=60.0,
+        aspect=float(width) / float(height),
+        nearVal=0.02,
+        farVal=5.0,
+    )
+    _, _, rgba, _, _ = p.getCameraImage(
+        width=width,
+        height=height,
+        viewMatrix=view,
+        projectionMatrix=projection,
+        renderer=p.ER_TINY_RENDERER,
+        physicsClientId=client_id,
+    )
+    rgba_array = np.asarray(rgba, dtype=np.uint8).reshape((height, width, 4))
+    image = Image.fromarray(rgba_array[:, :, :3], mode="RGB")
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    image.save(out_path)
 
 
 def raycast_observation(
@@ -535,6 +578,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--camera-pitch", type=float, default=-58.0)
     parser.add_argument("--camera-target-z", type=float, default=0.06)
     parser.add_argument("--log-path", type=Path, default=None, help="Optional explicit JSONL log file path.")
+    parser.add_argument("--screenshot-path", type=Path, default=None, help="Optional PNG path for a final scene preview.")
+    parser.add_argument("--screenshot-target-x", type=float, default=None, help="Optional camera target x for screenshot export.")
+    parser.add_argument("--screenshot-target-y", type=float, default=None, help="Optional camera target y for screenshot export.")
     return parser.parse_args()
 
 
@@ -711,6 +757,31 @@ def main() -> int:
                 summary["status"] = "success"
                 summary["reason"] = "goal reached"
                 break
+
+        final_state = robot_state(client_id, robot_id)
+        summary["final_pose"] = {
+            "x": final_state.x,
+            "y": final_state.y,
+            "yaw": final_state.yaw,
+        }
+        summary["final_distance_to_goal"] = math.hypot(goal_xy[0] - final_state.x, goal_xy[1] - final_state.y)
+
+        if args.screenshot_path is not None:
+            screenshot_target_xy = (final_state.x, final_state.y)
+            if args.screenshot_target_x is not None and args.screenshot_target_y is not None:
+                screenshot_target_xy = (float(args.screenshot_target_x), float(args.screenshot_target_y))
+            write_camera_png(
+                client_id,
+                screenshot_target_xy,
+                width=1280,
+                height=720,
+                distance=args.camera_distance,
+                yaw=args.camera_yaw,
+                pitch=args.camera_pitch,
+                target_z=args.camera_target_z,
+                out_path=args.screenshot_path,
+            )
+            summary["screenshot_path"] = str(args.screenshot_path)
 
         print(json.dumps(summary, indent=2))
         return 0
