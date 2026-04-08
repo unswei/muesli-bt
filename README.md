@@ -205,24 +205,25 @@ Use the `bench-release` preset for meaningful numbers, then run the generated `b
 
 ## Isaac Sim H1 Demo
 
-For a Linux/NVIDIA showcase that keeps the current ROS2 thin adaptor intact, use the checked-in H1 locomotion demo:
+For a Linux/NVIDIA humanoid example that keeps the current ROS2 thin adaptor intact, use the checked-in H1 locomotion demo:
 
 - Lisp demo assets: `examples/isaac_h1_ros2_demo/`
 - container/tooling helpers: `tools/docker/isaac_lab_vla_stack/`
 - docs page: `docs/examples/isaac-h1-ros2-demo.md`
 
-This path keeps `muesli-bt` on the released `Odometry` -> `Twist` ROS2 surface while Isaac Sim and NVIDIA's H1 controller own the low-level humanoid policy loop.
+This example keeps `muesli-bt` on the `Odometry` -> `Twist` ROS2 surface while Isaac Sim and NVIDIA's H1 controller handle the low-level humanoid policy loop.
 
-## Isaac Sim Wheeled Showcase
+## Isaac Sim Wheeled Demo
 
-For the website-facing wheeled Isaac path, the preferred direction is a small differential-drive robot in Isaac Sim using the same ROS 2 boundary:
+For a wheeled Isaac Sim example, use a small differential-drive robot with the same ROS 2 boundary:
 
 - input: `nav_msgs/msg/Odometry`
 - output: `geometry_msgs/msg/Twist`
 - runtime entrypoint: `examples/repl_scripts/ros2-flagship-goal.lisp`
 - docs page: `docs/examples/isaac-wheeled-ros2-showcase.md`
+- example guide: [Isaac Sim: TurtleBot3 ROS2 Demo](docs/examples/isaac-wheeled-ros2-showcase.md)
 
-This keeps the Isaac showcase aligned with the `v0.5` flagship story and gives a clean path to a short website video plus reproducible setup notes.
+This example gives you a simple path to run TurtleBot3 in Isaac Sim, keep the ROS 2 interface easy to understand, and record a repeatable simulator run.
 
 ## VLA Integration Status
 

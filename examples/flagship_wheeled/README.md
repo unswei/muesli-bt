@@ -1,23 +1,23 @@
 # flagship wheeled example
 
-This directory is the backend-neutral home for the `v0.5.0` cross-transport flagship.
+This directory contains the reusable wheeled behaviour, shared helper code, and log-normalisation tools used by the main wheeled examples.
 
-It is intended to own:
+It includes:
 
 - the canonical shared BT
 - shared helper formulas and blackboard shaping helpers
 - comparison and normalisation tooling
-- shared thresholds used by cross-transport runs
+- shared thresholds used by the wheeled runs
 
-Current status:
+Current contents:
 
 - shared BT and helper files are checked in
-- Webots and PyBullet flagship wrappers now run
+- Webots and PyBullet wrappers run against the shared behaviour
 - ROS2 flagship normalisation is supported by the shared tooling
 - normalisation and comparison tooling is available under `tools/`
 - ROS2 wrapper remains a thin host-side derivation over the released `Odometry` -> `Twist` surface
 
-Planned backend wrappers:
+Current backend wrappers:
 
 - `examples/webots_epuck_goal/lisp/flagship_entry.lisp`
 - `examples/pybullet_racecar/bt/flagship_entry.lisp`

@@ -13,6 +13,7 @@ Most examples follow the same pattern:
 ## Webots
 
 - [e-puck goal seeking](webots-epuck-goal-seeking.md)
+- [from educational goal BT to reusable wrapper](webots-epuck-goal-transition.md)
 - [e-puck obstacle avoidance and wall following](webots-epuck-obstacle-wall-following.md)
 - [e-puck line following](webots-epuck-line-following.md)
 
@@ -27,7 +28,7 @@ Most examples follow the same pattern:
 ## Isaac Sim / ROS2
 
 - [H1 locomotion demo](isaac-h1-ros2-demo.md)
-- [wheeled flagship showcase](isaac-wheeled-ros2-showcase.md)
+- [TurtleBot3 ROS2 demo](isaac-wheeled-ros2-showcase.md)
 
 ## More Scripted Examples
 

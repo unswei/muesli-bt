@@ -66,6 +66,7 @@ nav:
       - Overview: examples/index.md
       - Webots:
           - e-puck Goal Seeking: examples/webots-epuck-goal-seeking.md
+          - From Educational Goal BT To Reusable Wrapper: examples/webots-epuck-goal-transition.md
           - e-puck Obstacle Avoidance and Wall Following: examples/webots-epuck-obstacle-wall-following.md
           - e-puck Line Following: examples/webots-epuck-line-following.md
       - PyBullet:
@@ -74,7 +75,7 @@ nav:
           - Flagship Comparison: examples/cross-transport-flagship-comparison.md
       - Isaac Sim / ROS2:
           - H1 Locomotion Demo: examples/isaac-h1-ros2-demo.md
-          - Wheeled Flagship Showcase: examples/isaac-wheeled-ros2-showcase.md
+          - TurtleBot3 ROS2 Demo: examples/isaac-wheeled-ros2-showcase.md
       - More Scripted Examples:
           - Hello BT: examples/hello-bt.md
           - Memoryful Sequence Demo: examples/memoryful-sequence-demo.md

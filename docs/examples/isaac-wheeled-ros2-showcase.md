@@ -4,7 +4,7 @@
 
 This example shows a TurtleBot3 Burger in Isaac Sim driven through the existing ROS 2 wheeled interface.
 
-`muesli-bt` reads `nav_msgs/msg/Odometry`, publishes `geometry_msgs/msg/Twist`, and runs the same flagship goal-seeking behaviour used by the other wheeled examples.
+`muesli-bt` reads `nav_msgs/msg/Odometry`, publishes `geometry_msgs/msg/Twist`, and runs the same goal-seeking behaviour used by the other wheeled examples.
 
 The demo is designed to be easy to stage, easy to record, and easy to repeat.
 
@@ -12,9 +12,9 @@ The demo is designed to be easy to stage, easy to record, and easy to repeat.
 
 Use this example when you want to:
 
-- run the wheeled flagship in Isaac Sim
+- run the wheeled goal-seeking demo in Isaac Sim
 - keep the ROS 2 interface simple and familiar
-- capture a short simulator clip for docs or the website
+- record a short simulator clip
 - collect the same JSONL and canonical event logs as the other ROS-backed runs
 
 ## how it works
@@ -27,7 +27,7 @@ The runtime boundary is:
 ```
 
 Isaac Sim hosts the robot, scene, camera, and ROS 2 bridge.
-`muesli-bt` runs the existing ROS 2 flagship entrypoint:
+`muesli-bt` runs the existing ROS 2 demo entrypoint:
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -140,7 +140,7 @@ If you are using the checked-in Isaac Lab container helpers:
 
 - the robot should turn cleanly towards the route and progress to the goal without changing the ROS 2 message surface
 - `/robot/odom` should stay live throughout the run
-- `/robot/cmd_vel` should reflect the active branch decisions from the flagship behaviour
+- `/robot/cmd_vel` should reflect the active branch decisions from the BT
 - the run should produce both the run-loop log and the canonical event log
 
 ### logs
@@ -162,7 +162,7 @@ python3 examples/flagship_wheeled/tools/normalise_run.py \
 
 ### capture it
 
-For a clean website asset:
+For a clean recording:
 
 1. frame the third-person camera before pressing play
 2. hide overlays where practical
@@ -177,7 +177,7 @@ Recommended output set:
 - `build/linux-ros2/ros2-flagship-goal.jsonl`
 - `build/linux-ros2/ros2-flagship-goal/events.jsonl`
 
-Suggested caption:
+Example caption:
 
 `TurtleBot3 Burger in Isaac Sim running the shared muesli-bt wheeled demo through the ROS 2 odometry-to-twist interface.`
 
@@ -194,4 +194,3 @@ Suggested caption:
 - `examples/isaac_wheeled_ros2_demo/isaac/turtlebot3_scene_recipe.yaml`
 - [Isaac Sim / ROS2: H1 locomotion demo](isaac-h1-ros2-demo.md)
 - [ROS2 tutorial](../integration/ros2-tutorial.md)
-- [cross-transport comparison protocol](../integration/cross-transport-comparison-protocol.md)
