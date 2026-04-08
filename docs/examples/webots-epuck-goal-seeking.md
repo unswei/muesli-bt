@@ -135,6 +135,7 @@ python3 examples/_tools/plot_planner_root.py \
 
 ## see also
 
+- [Webots e-puck Goal: Full Source](webots-epuck-goal-source.md)
 - [From educational goal BT to reusable wrapper](webots-epuck-goal-transition.md)
 - [PyBullet: racecar](pybullet-racecar.md)
 - [ROS2 tutorial](../integration/ros2-tutorial.md)

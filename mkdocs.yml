@@ -66,6 +66,7 @@ nav:
       - Overview: examples/index.md
       - Webots:
           - e-puck Goal Seeking: examples/webots-epuck-goal-seeking.md
+          - e-puck Goal Full Source: examples/webots-epuck-goal-source.md
           - From Educational Goal BT To Reusable Wrapper: examples/webots-epuck-goal-transition.md
           - e-puck Obstacle Avoidance and Wall Following: examples/webots-epuck-obstacle-wall-following.md
           - e-puck Line Following: examples/webots-epuck-line-following.md
@@ -130,6 +131,7 @@ nav:
       - Overview: integration/overview.md
       - env API (`env.api.v1`): integration/env-api.md
       - ROS2 Tutorial: integration/ros2-tutorial.md
+      - ROS2 Flagship Source: integration/ros2-flagship-source.md
       - Writing A Backend: integration/writing-a-backend.md
       - ROS2 Backend Scope: integration/ros2-backend-scope.md
       - Cross-transport Flagship for v0.5: integration/cross-transport-flagship.md

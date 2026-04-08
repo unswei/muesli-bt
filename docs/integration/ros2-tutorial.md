@@ -2,169 +2,75 @@
 
 ## what this is
 
-This page explains how the current ROS2 connection in `muesli-bt` works.
+This page is the supported end-to-end ROS2 path for `muesli-bt`.
 
-The goal is to make the boundary concrete:
+It shows one complete workflow on the released baseline:
 
-- `muesli-bt` still owns BT semantics, planning semantics, async semantics, and canonical logging
-- ROS2 supplies transport, timing, and host-side integration
-- the adaptor stays thin, so deployability does not contaminate core runtime behaviour
+1. build the ROS2-enabled runner
+2. feed odometry into the flagship wrapper
+3. run the BT through `muslisp_ros2`
+4. validate the canonical event log
+5. inspect the normalised run output
+
+The aim is to give a new user one path that works from setup through verification.
 
 ## when to use it
 
 Use this page when you want to:
 
-- understand what the current ROS2 adaptor does and does not do
-- run the first supported Linux ROS2 baseline
-- embed `muesli_bt::integration_ros2` in a host application
-- explain the `muesli-bt` and ROS2 boundary to another developer or reviewer
+- bring up the first supported ROS2 integration on Ubuntu 22.04 + Humble
+- run the shared wheeled flagship through the released `Odometry` -> `Twist` transport
+- verify that the run produced a valid canonical `mbt.evt.v1` log
+- inspect the secondary flagship run log with the shared normalisation tool
 
-If you need the detailed implementation plan and contract surface, use [ros2 backend scope](ros2-backend-scope.md) after this page.
+If you need the backend design boundary and non-goals, use [ros2 backend scope](ros2-backend-scope.md) after this page.
 
 ## how it works
 
-### the short version
+The current ROS2 adaptor stays intentionally thin.
 
-The current ROS2 adaptor is a thin host/backend bridge.
+`muesli-bt` still owns:
 
-It does three practical jobs:
+- BT semantics
+- planner semantics
+- async semantics
+- canonical event logging
 
-1. subscribe to `nav_msgs/msg/Odometry`
-2. translate the latest sample into canonical `ros2.obs.v1` and `ros2.state.v1` maps
-3. publish canonical `ros2.action.v1` commands as `geometry_msgs/msg/Twist`
+ROS2 owns:
 
-That means the control flow looks like this:
+- message transport
+- topic wiring
+- host-side timing and integration
 
-1. a host process registers the ROS2 extension
-2. Lisp code attaches the backend with `(env.attach "ros2")`
-3. the backend observes ROS2 state through `env.observe`
-4. BT or Lisp logic decides on an action
-5. the backend publishes that action through `env.act`
-6. `env.step` advances the control loop while the runtime keeps the same BT/planner/async semantics it would use elsewhere
+The supported path in this tutorial uses:
 
-### what stays inside muesli-bt
+- input topic: `/robot/odom`
+- input type: `nav_msgs/msg/Odometry`
+- output topic: `/robot/cmd_vel`
+- output type: `geometry_msgs/msg/Twist`
+- runner: `muslisp_ros2`
+- Lisp entrypoint: `examples/repl_scripts/ros2-flagship-goal.lisp`
 
-The following behaviour remains runtime-owned and ROS-independent:
+For a deterministic bring-up, this tutorial uses the checked-in odometry publisher:
 
-- BT compilation and ticking
-- `planner.plan` and `plan-action` semantics
-- async and VLA lifecycle semantics
-- canonical event schema design
-- fallback and budget handling semantics
+- `examples/repl_scripts/ros2_flagship_test_publisher.py`
 
-ROS2 does not become the semantic model.
-It is the transport and host integration layer.
-
-### what the ROS2 adaptor owns
-
-The current adaptor owns:
-
-- ROS node and executor lifecycle inside the backend instance
-- topic name resolution
-- schema validation for `backend_version`, `obs_schema`, `state_schema`, and `action_schema`
-- translation between ROS messages and canonical map payloads
-- bounded executor progress for `env.observe` and `env.step`
-
-### what the current adaptor does not do
-
-The current release baseline is intentionally narrow.
-It does not try to be a general ROS framework.
-
-Non-goals in this release:
-
-- MoveIt integration
-- ROS actions or services as public runtime semantics
-- multi-robot orchestration
-- real reset support for live robot or simulator runs
-- broader topic families beyond `Odometry` in and `Twist` out
-
-### why this shape matters
-
-This split gives you one BT/runtime story across different host environments.
-
-The same `muesli-bt` logic can:
-
-- run against a simulator backend
-- run against the thin ROS2 transport adaptor
-- emit the same canonical contract-facing data surfaces
-
-That is the main point of the current ROS2 work.
-It proves deployability without moving semantics into ROS.
+That publisher gives the ROS2 backend a simple goal-directed trajectory so the wrapper can run without requiring a simulator first.
 
 ## api / syntax
 
 ### supported baseline
 
-The current supported ROS2 baseline is:
+The current supported baseline is:
 
 - OS: Ubuntu 22.04
 - ROS distro: ROS 2 Humble
-- input: `nav_msgs/msg/Odometry`
-- output: `geometry_msgs/msg/Twist`
 - attach path: `(env.attach "ros2")`
-- package export: `muesli_bt::integration_ros2`
-- runner: `muslisp_ros2`
-- live reset policy: `reset_mode="unsupported"`
+- transport: `nav_msgs/msg/Odometry` in, `geometry_msgs/msg/Twist` out
+- reset policy: `reset_mode="unsupported"`
+- canonical event log artefact: `build/linux-ros2/ros2-flagship-goal/events.jsonl`
 
-### minimal attach and configure flow
-
-```lisp
-(begin
-  (env.attach "ros2")
-
-  (define cfg (map.make))
-  (map.set! cfg 'backend_version "ros2.transport.v1")
-  (map.set! cfg 'topic_ns "/robot")
-  (map.set! cfg 'obs_source "odom")
-  (map.set! cfg 'action_sink "cmd_vel")
-  (map.set! cfg 'reset_mode "unsupported")
-  (env.configure cfg)
-
-  (env.info))
-```
-
-This attaches the backend, binds the supported topics, and exposes the backend identity through `env.info`.
-
-### time-source policy
-
-The ROS2 backend keeps time policy explicit:
-
-- `use_sim_time=#t` means the backend node follows ROS simulation time
-- `use_sim_time=#f` means the backend node follows ROS wall time
-- observation `t_ms` comes from the message header stamp when one is present
-- otherwise observation `t_ms` falls back to the backend node clock
-
-`env.info` reports:
-
-- `time_source`: `ros_sim_time` or `ros_wall_time`
-- `obs_timestamp_source`: `message_header_or_node_clock`
-
-When `env.run-loop` writes a canonical event log, the `run_start` event records the same policy so replay tools can read it from the artefact itself.
-
-### consumer-side CMake shape
-
-```cmake
-find_package(muesli_bt CONFIG REQUIRED)
-
-add_executable(app main.cpp)
-target_link_libraries(app PRIVATE muesli_bt::runtime)
-
-if(TARGET muesli_bt::integration_ros2)
-  target_link_libraries(app PRIVATE muesli_bt::integration_ros2)
-endif()
-```
-
-### live runner flow
-
-Terminal A publishes odometry on the supported topic path:
-
-```bash
-source /opt/ros/humble/setup.bash
-ros2 topic pub -r 20 /robot/odom nav_msgs/msg/Odometry \
-  '{header: {frame_id: "map"}, child_frame_id: "base_link", pose: {pose: {position: {x: 0.0, y: 0.0, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}}}, twist: {twist: {linear: {x: 0.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}}}'
-```
-
-Terminal B runs the checked-in script through the ROS2-enabled runner:
+### build the ROS2 runner
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -175,41 +81,121 @@ cmake -S . -B build/linux-ros2 -G Ninja \
   -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
   -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
   -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF
-cmake --build build/linux-ros2 -j
-./build/linux-ros2/muslisp_ros2 examples/repl_scripts/ros2-live-odom-twist.lisp
+cmake --build build/linux-ros2 --parallel --target muslisp_ros2
 ```
 
-This can write a canonical event log such as `build/linux-ros2/ros2-live-run/events.jsonl` when the script configures `event_log_path`.
+### terminal 1: publish test odometry
+
+```bash
+source /opt/ros/humble/setup.bash
+python3 examples/repl_scripts/ros2_flagship_test_publisher.py \
+  --topic /robot/odom \
+  --tick-hz 20 \
+  --duration-sec 6 \
+  --goal-x 1.0 \
+  --goal-y 0.0
+```
+
+This publisher sends a simple trajectory from the origin to the configured goal.
+
+### terminal 2: observe commanded motion
+
+```bash
+source /opt/ros/humble/setup.bash
+ros2 topic echo /robot/cmd_vel
+```
+
+This is optional, but useful while bringing the path up.
+
+### terminal 3: run the flagship wrapper
+
+```bash
+source /opt/ros/humble/setup.bash
+./build/linux-ros2/muslisp_ros2 examples/repl_scripts/ros2-flagship-goal.lisp
+```
+
+The wrapper:
+
+- attaches the `ros2` backend
+- configures `/robot/odom` and `/robot/cmd_vel`
+- derives shared wheeled flagship keys from odometry and fixed scenario geometry
+- runs the shared BT from `examples/flagship_wheeled/lisp/bt_goal_flagship.lisp`
+- writes both the secondary run-loop log and the canonical event log
+
+### validate the canonical event log
+
+After the run completes, validate the canonical log:
+
+```bash
+python3 tools/validate_log.py build/linux-ros2/ros2-flagship-goal/events.jsonl
+```
+
+Expected result:
+
+```text
+event log validation passed
+```
+
+### inspect the flagship run log
+
+The flagship wrapper also writes a secondary run log:
+
+```text
+build/linux-ros2/ros2-flagship-goal.jsonl
+```
+
+Normalise that run into the shared comparison schema:
+
+```bash
+python3 examples/flagship_wheeled/tools/normalise_run.py \
+  --backend ros2 \
+  --output build/linux-ros2/ros2-flagship-goal.normalised.json \
+  build/linux-ros2/ros2-flagship-goal.jsonl
+```
+
+This lets you inspect:
+
+- branch choices
+- shared action output
+- final outcome
+- goal-distance progression
 
 ## example
 
-The checked-in live example uses `env.run-loop` to observe odometry and publish a bounded angular command.
+### expected artefacts
 
-```lisp
---8<-- "examples/repl_scripts/ros2-live-odom-twist.lisp"
-```
+After a successful run, these files should exist:
 
-What this example demonstrates:
+- `build/linux-ros2/ros2-flagship-goal.jsonl`
+- `build/linux-ros2/ros2-flagship-goal/events.jsonl`
+- `build/linux-ros2/ros2-flagship-goal.normalised.json` after normalisation
 
-- the ROS2 extension attach path
-- stable backend configuration through canonical keys
-- `env.run-loop` using ROS-backed observations
-- action publication through the `cmd_vel` sink
-- canonical event-log generation without changing core runtime semantics
+### expected outcome
+
+The run should:
+
+- publish `Twist` commands on `/robot/cmd_vel`
+- stop once the wrapper decides the goal has been reached
+- produce a valid canonical `mbt.evt.v1` event log
+- produce a normalised flagship summary with `goal_reached = true`
+
+### source
+
+The full flagship ROS2 wrapper source is shown on:
+
+- [ros2 flagship source](ros2-flagship-source.md)
 
 ## gotchas
 
-- `muslisp` by itself does not auto-register the ROS2 extension. Use `muslisp_ros2` or register `muslisp::integrations::ros2::make_extension()` in your own host.
-- For scripted validation, start the odometry publisher before the runner. Otherwise the first tick may fall back safely before transport is ready.
-- Live runs currently use `reset_mode="unsupported"`. Multi-episode loops therefore need a reset-capable harness rather than a live robot/simulator path.
-- Schema ids are version-checked. Stay inside the current `ros2.obs.*.v1`, `ros2.state.*.v1`, and `ros2.action.*.v1` families.
-- Replay tooling should treat canonical event `seq` as the ordering key. Do not infer ordering from timestamps alone.
-- The current adaptor is a transport bridge, not a MoveIt, Nav2, or perception framework.
+- Use `muslisp_ros2`, not plain `muslisp`. The ROS2 extension is registered by the ROS2-enabled runner.
+- Start the odometry publisher before the runner. Otherwise the first tick can fall back before transport data arrives.
+- The supported live path is still `reset_mode="unsupported"`. Use a harness for multi-episode reset tests.
+- Keep the topic namespace on `/robot` unless you also change the wrapper configuration.
+- Validate the canonical event log from `events.jsonl`. The secondary run log is useful, but it is not the primary contract artefact.
 
 ## see also
 
-- [integration overview](overview.md)
-- [env api (`env.api.v1`)](env-api.md)
+- [ros2 flagship source](ros2-flagship-source.md)
 - [ros2 backend scope](ros2-backend-scope.md)
+- [cross-transport flagship for v0.5](cross-transport-flagship.md)
 - [conformance levels](../contracts/conformance.md)
-- [consume as a package](../getting-started-consume.md)

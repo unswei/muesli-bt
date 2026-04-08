@@ -224,6 +224,20 @@ Recommended planner state shape:
 [goal_dist, goal_bearing, obstacle_front, speed]
 ```
 
+### checked-in shared source
+
+Shared BT:
+
+```lisp
+--8<-- "examples/flagship_wheeled/lisp/bt_goal_flagship.lisp"
+```
+
+Shared helpers:
+
+```lisp
+--8<-- "examples/flagship_wheeled/lisp/contract_helpers.lisp"
+```
+
 Recommended comparison artefacts:
 
 - canonical `mbt.evt.v1` log

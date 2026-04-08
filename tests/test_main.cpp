@@ -3261,6 +3261,8 @@ void test_racecar_planner_model_and_env_api_contract() {
     bt::clear_racecar_demo_state();
 }
 
+#endif
+
 void test_shared_flagship_planner_model_in_core_runtime() {
     reset_bt_runtime_host();
     bt::runtime_host& host = bt::default_runtime_host();
@@ -3285,7 +3287,6 @@ void test_shared_flagship_planner_model_in_core_runtime() {
     check(result.action.u[1] >= -1.0 && result.action.u[1] <= 1.0,
           "core runtime flagship planner angular_z should stay in range");
 }
-#endif
 
 void test_env_run_loop_multi_episode_reset_true() {
     using namespace muslisp;

@@ -131,7 +131,7 @@ Release artefact posture:
 - `ubuntu-22.04-ros2-humble-x86_64` archive: ROS-enabled build with `muesli_bt::integration_ros2` and `muslisp_ros2`
 - the ROS-enabled archive requires a matching ROS 2 Humble runtime on the target host
 
-Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md) for the boundary and live flow, then use [docs/integration/ros2-backend-scope.md](docs/integration/ros2-backend-scope.md) and [docs/contracts/conformance.md](docs/contracts/conformance.md) for the detailed commands and conformance lanes.
+Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md) for the supported end-to-end build, run, and canonical log validation flow, then use [docs/integration/ros2-backend-scope.md](docs/integration/ros2-backend-scope.md) and [docs/contracts/conformance.md](docs/contracts/conformance.md) for the backend boundary and conformance lanes.
 
 ## package and tooling integration
 
