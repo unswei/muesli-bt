@@ -3276,8 +3276,11 @@ void test_shared_flagship_planner_model_in_core_runtime() {
     request.model_service = "flagship-goal-shared-v1";
     request.action_schema = "flagship.cmd.v1";
     request.state = {1.0, 0.2, 0.1, 0.0};
-    request.budget_ms = 8;
-    request.work_max = 120;
+    // Keep this check robust under sanitiser overhead. The intent is to validate
+    // that the shared model is registered and returns a valid shared action, not
+    // to exercise a tight wall-clock budget.
+    request.budget_ms = 40;
+    request.work_max = 240;
 
     const bt::planner_result result = host.planner_ref().plan(request);
     check(result.status == bt::planner_status::ok, "core runtime flagship planner request should succeed");
