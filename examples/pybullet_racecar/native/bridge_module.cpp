@@ -5,6 +5,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -174,6 +175,37 @@ py::object lisp_to_py(const muslisp::value& value) {
         return py::int_(blob_handle_id(value));
     }
     return py::str(print_value(value));
+}
+
+py::object bb_value_to_py(const bt::bb_value& value) {
+    return std::visit(
+        [](const auto& item) -> py::object {
+            using T = std::decay_t<decltype(item)>;
+            if constexpr (std::is_same_v<T, std::monostate>) {
+                return py::none();
+            } else if constexpr (std::is_same_v<T, bool>) {
+                return py::bool_(item);
+            } else if constexpr (std::is_same_v<T, std::int64_t>) {
+                return py::int_(item);
+            } else if constexpr (std::is_same_v<T, double>) {
+                return py::float_(item);
+            } else if constexpr (std::is_same_v<T, std::string>) {
+                return py::str(item);
+            } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+                py::list out;
+                for (double v : item) {
+                    out.append(py::float_(v));
+                }
+                return out;
+            } else if constexpr (std::is_same_v<T, bt::image_handle_ref>) {
+                return py::int_(item.id);
+            } else if constexpr (std::is_same_v<T, bt::blob_handle_ref>) {
+                return py::int_(item.id);
+            } else {
+                return py::none();
+            }
+        },
+        value);
 }
 
 bt::bb_value py_to_bb_value(const py::handle& value, const std::string& where) {
@@ -557,6 +589,18 @@ public:
         return lisp_to_py(out);
     }
 
+    py::object blackboard_get(std::int64_t instance_handle, const std::string& key) {
+        bt::instance* inst = bt::default_runtime_host().find_instance(instance_handle);
+        if (!inst) {
+            throw std::runtime_error("Runtime.blackboard_get: unknown instance handle");
+        }
+        const bt::bb_entry* entry = inst->bb.get(key);
+        if (!entry) {
+            return py::none();
+        }
+        return bb_value_to_py(entry->value);
+    }
+
     std::uint64_t session_generation() const noexcept {
         return session_generation_;
     }
@@ -582,5 +626,6 @@ PYBIND11_MODULE(muesli_bt_bridge, m) {
         .def("tick", &runtime_bridge::tick, py::arg("instance_handle"), py::arg("bb_inputs") = py::none())
         .def("run_loop", &runtime_bridge::run_loop, py::arg("instance_handle"), py::arg("options"))
         .def("eval", &runtime_bridge::eval, py::arg("source"))
+        .def("blackboard_get", &runtime_bridge::blackboard_get, py::arg("instance_handle"), py::arg("key"))
         .def_property_readonly("session_generation", &runtime_bridge::session_generation);
 }

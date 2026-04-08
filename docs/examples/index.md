@@ -20,6 +20,7 @@ Most examples follow the same pattern:
 ## PyBullet
 
 - [racecar](pybullet-racecar.md)
+- [e-puck-style goal seeking](pybullet-epuck-goal.md)
 
 ## Cross-transport
 

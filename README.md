@@ -91,6 +91,14 @@ make demo-setup
 make demo-run MODE=bt_planner
 ```
 
+Run the PyBullet e-puck-style differential-drive flagship demo:
+
+```bash
+make demo-setup
+PYTHONPATH=build/dev/python \
+  .venv-py311/bin/python examples/pybullet_epuck_goal/run_demo.py --headless
+```
+
 Verify install (single command; writes + validates canonical event log):
 
 ```bash
@@ -186,6 +194,7 @@ Then use that same environment for docs:
 
 - `make demo-setup`: installs pinned demo deps and builds `muesli_bt_bridge`.
 - `make demo-run MODE=bt_planner`: runs the racecar demo through the bridge/runtime path.
+- `PYTHONPATH=build/dev/python .venv-py311/bin/python examples/pybullet_epuck_goal/run_demo.py --headless`: runs the e-puck-style PyBullet flagship path.
 - `make verify-install`: runs a deterministic BT smoke run, writes `logs/verify-install.mbt.evt.v1.jsonl`, and validates it against `mbt.evt.v1`.
 
 ## Benchmark Harness
@@ -384,8 +393,8 @@ ctest --test-dir build/dev --output-on-failure
 - `examples/bt/`: compact BT scripts
 - `examples/repl_scripts/`: end-to-end experiments and demos
 - `examples/pybullet_racecar/`: racecar demo package
-
-    - `native/`: demo bridge entrypoint that uses canonical `env.api.v1` via the PyBullet integration
+- `examples/pybullet_epuck_goal/`: differential-drive PyBullet surrogate for the shared wheeled flagship BT
+- `examples/pybullet_racecar/native/`: demo bridge entrypoint that uses canonical `env.api.v1` via the PyBullet integration
 
 - `tests/`: unit/integration coverage
 - `docs/`: user and internals documentation

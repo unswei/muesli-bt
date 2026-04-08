@@ -72,6 +72,7 @@ nav:
           - e-puck Line Following: examples/webots-epuck-line-following.md
       - PyBullet:
           - Racecar: examples/pybullet-racecar.md
+          - e-puck-style Goal Seeking: examples/pybullet-epuck-goal.md
       - Cross-transport:
           - Flagship Comparison: examples/cross-transport-flagship-comparison.md
       - Isaac Sim / ROS2:
@@ -99,6 +100,7 @@ nav:
           - Webots e-puck Obstacle Source: examples/webots-epuck-obstacle-wall-following-source.md
           - Webots e-puck Line Source: examples/webots-epuck-line-following-source.md
           - PyBullet Racecar Source: examples/pybullet-racecar-source.md
+          - PyBullet e-puck-style Goal Source: examples/pybullet-epuck-goal-source.md
           - Isaac H1 Demo Source: examples/isaac-h1-ros2-demo-source.md
   - Language:
       - Syntax: language/syntax.md

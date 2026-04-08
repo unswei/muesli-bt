@@ -24,6 +24,7 @@ This directory contains runnable muesli-bt examples.
 - `isaac_h1_ros2_demo/`: ROS2 H1 locomotion demo assets, including the checked-in Lisp BT, runtime wrapper, and Isaac topic contract.
 - `isaac_wheeled_ros2_demo/`: topic contract and runbook assets for the Isaac-backed wheeled demo.
 - `pybullet_racecar/`: PyBullet racecar demo, including the shared `bt_flagship` wheeled mode.
+- `pybullet_epuck_goal/`: PyBullet e-puck-style differential-drive surrogate for the shared wheeled flagship BT.
 - `../integrations/pybullet/`: shared C++ integration plumbing used by the PyBullet racecar demo.
 
 ## Script Extension Convention

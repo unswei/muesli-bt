@@ -42,6 +42,9 @@ Strict comparison track:
 
 The current racecar path stays useful, but it should not be used to argue for almost identical decisions under the same circumstances.
 
+The repository now includes an initial strict-track surrogate at `examples/pybullet_epuck_goal/`.
+That path is still a surrogate rather than a full robot clone, but it keeps the embodiment class and command surface much closer to the Webots e-puck family.
+
 ### source of truth
 
 The Webots e-puck should be the source of truth for the strict track.
@@ -64,6 +67,12 @@ The cleanest implementation is:
 2. keep the existing racecar path intact as a separate portability/demo path
 3. reuse the same shared flagship BT and shared planner model contract
 4. use wheel-speed or differential-drive actuation on the strict path rather than steering/throttle
+
+Current checked-in path:
+
+- `examples/pybullet_epuck_goal/`
+- shared BT source at `examples/pybullet_epuck_goal/bt/flagship_entry.lisp`
+- differential-drive mapping in `examples/pybullet_epuck_goal/run_demo.py`
 
 Recommended PyBullet strict-track shape:
 
