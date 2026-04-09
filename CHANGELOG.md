@@ -4,7 +4,7 @@ muesli-bt
 
 ## [Unreleased]
 
-This unreleased section captures the current `v0.5.0` baseline on `main`.
+This unreleased section captures the current `v0.5.0` release candidate.
 
 ### Added
 - Added a shared wheeled flagship BT path that is reused across Webots, PyBullet, and ROS2 with adapter-only wrapper differences.
