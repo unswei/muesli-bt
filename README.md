@@ -11,6 +11,8 @@ A compact Lisp runtime with an integrated Behaviour Tree engine, bounded-time pl
 
 On the shared benchmark subset under matched conditions, muesli-bt shows lower tick latency and faster BT compilation and instantiation than BehaviorTree.CPP 4.9.0.
 
+If you are new to the repository, start with [Getting Started](docs/getting-started.md) and [Examples Overview](docs/examples/index.md).
+
 ## Why muesli-bt
 
 When control loops need to stay responsive, three things matter:

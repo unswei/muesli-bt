@@ -19,6 +19,7 @@ This unreleased section captures the current `v0.5.0` baseline on `main`.
 - Polished the PyBullet e-puck demo surface with checked-in image and video assets, direct screenshot and MP4 export support, and a cluttered layout that still reaches the goal on the checked-in seed.
 - Updated the README and example guides so the current flagship, ROS2 tutorial, Isaac showcase, and strict same-robot comparison path are easier to discover from the repository root.
 - Expanded CI coverage so flagship comparison and same-robot comparison checks run from committed, self-contained fixtures instead of relying on local artefacts.
+- Improved newcomer documentation flow across `getting-started`, the example index, the first BT and Lisp example pages, planning, integration, and logging so the reader path is clearer without changing semantics.
 
 ## [0.4.0] - 2026-03-21
 
