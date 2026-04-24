@@ -48,6 +48,7 @@ Scene previews and runtime snapshots are included on each demo page, with exact 
 - [Behaviour trees](bt/intro.md)
 - [Planning](planning/overview.md)
 - [Integration](integration/overview.md)
+- [Host capability bundles](integration/host-capability-bundles.md)
 - [Observability](observability/logging.md)
 
 ## what muesli-bt is good at

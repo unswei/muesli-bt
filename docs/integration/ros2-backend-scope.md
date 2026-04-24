@@ -194,7 +194,7 @@ Exit target:
 
 - keep `env.*` as the direct transport surface
 - keep `planner.plan` as the in-runtime bounded decision planner
-- define host capability bundle rules for richer external services such as manipulation, navigation, and perception
+- define [host capability bundle](host-capability-bundles.md) rules for richer external services such as manipulation, navigation, and perception
 - document that higher-level ROS libraries such as MoveIt and Nav2 belong behind separate host capability contracts rather than inside core semantics
 
 Exit target:

@@ -4,6 +4,9 @@ Planning in muesli-bt means computing an action under a bounded budget during a 
 
 Planning runs inside the [host](../terminology.md#host) (backend) planner service and is exposed to Lisp through `planner.plan`. In BTs, `plan-action` is the planner leaf wrapper.
 
+Planning is separate from higher-level host services such as manipulation, navigation, and perception.
+Those services should use [host capability bundles](../integration/host-capability-bundles.md) rather than widening `planner.plan`.
+
 Read this page when you already understand basic BT ticking and want the smallest mental model for planning inside a tree.
 For most readers, the first useful goal is not planner internals. It is understanding what state must already exist, what key receives the planned action, and why the tree keeps ticking after planning.
 
@@ -85,6 +88,7 @@ What to notice:
 ## See Also
 
 - [planner.plan Request/Result](planner-plan.md)
+- [Host Capability Bundles](../integration/host-capability-bundles.md)
 - [PlanAction Node](plan-action-node.md)
 - [How Execution Works](../getting-oriented/how-execution-works.md)
 - [MCTS](mcts.md)

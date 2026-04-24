@@ -4,7 +4,13 @@ muesli-bt
 
 ## [Unreleased]
 
-This unreleased section captures the current `v0.5.0` release candidate.
+This unreleased section captures work toward `v0.6.0`.
+
+### Added
+- Added initial host capability bundle documentation that defines the boundary between `env.*`, `planner.plan`, and future higher-level host services for manipulation, navigation, and perception.
+- Added the first concrete `cap.motion.v1` spec page for generic host-owned motion requests, including operation names, request/result fields, status values, and adapter-boundary rules.
+
+## [0.5.0] - 2026-04-09
 
 ### Added
 - Added a shared wheeled flagship BT path that is reused across Webots, PyBullet, and ROS2 with adapter-only wrapper differences.

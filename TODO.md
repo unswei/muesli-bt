@@ -5,14 +5,12 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 
 ## now
 
-- `v0.5.0`: cut the release from the current green `main` baseline and publish the final release notes
-- `v0.5.0`: verify release artefacts and final docs wording against the current cross-transport flagship path
+- `v0.6.0`: define the first perception capability contract as a generic host bundle, with any detector-specific adapter kept behind that contract
+- `v0.6.0`: add one small BT-facing example that shows how host capability bundles are consumed without implying released runtime built-ins
 
 ## next
 
-- `v0.6.0`: define host capability bundles for external execution, navigation, and perception services without expanding `env.*` or `planner.plan`
-- `v0.6.0`: define the first manipulator capability contract as a generic host bundle, with MoveIt as the intended first adapter rather than a core semantic surface
-- `v0.6.0`: define the first perception capability contract as a generic host bundle, with any detector-specific adapter kept behind that contract
+- `v0.6.0`: refine host capability bundles for external execution, navigation, manipulation, and perception services without expanding `env.*` or `planner.plan`
 - `v0.6.0`: stabilise planner request/result semantics and make the boundary between `planner.plan` and external host capabilities explicit
 - `v0.6.0`: deepen ROS2 `L2` evidence only when there is a concrete new transport path or failure mode to cover
 - `v0.6.0`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
@@ -32,3 +30,10 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 - `post-1.0`: extend ROS2 transport binding beyond the first `Odometry` / `Twist` path (`topics` / `actions` / `services`)
 - `post-1.0`: add a second supported Linux distro lane (Ubuntu 24.04 + Jazzy) after Humble is stable
 - `post-1.0`: add production-oriented backend adapters beyond simulator demos and the thin ROS2 adaptor
+
+## done
+
+- `v0.5.0`: cut the release from the current green `main` baseline and publish the final release notes
+- `v0.6.0`: define host capability bundle naming and registration rules without changing BT or Lisp semantics
+- `v0.6.0`: make the boundary between `env.*`, `planner.plan`, and external host capabilities explicit in docs and examples
+- `v0.6.0`: define the first motion/manipulation capability contract as a generic host bundle, with MoveIt as the intended first adapter rather than a core semantic surface

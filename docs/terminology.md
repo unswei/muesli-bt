@@ -20,6 +20,12 @@ A **capability** is a host-provided function/module exposed to Lisp with control
 
 Examples: `env.*`, planner calls, and VLA calls.
 
+## host capability bundle
+
+A **host capability bundle** is a named family of host-owned services with its own versioned request/result contract.
+
+Use a host capability bundle for higher-level external services such as manipulation, navigation, or perception when those services should not become new `env.*`, `planner.plan`, or BT language semantics.
+
 ## blackboard
 
 The **blackboard** is the shared per-instance data store used by behaviour tree nodes and Lisp glue code.

@@ -2,6 +2,11 @@
 
 `planner.plan` is the unified planner entrypoint.
 
+It is the bounded in-runtime decision planner surface.
+It is not a generic host service call and should not absorb external services such as MoveIt, Nav2, detector pipelines, or simulator-specific task APIs.
+
+Use a [host capability bundle](../integration/host-capability-bundles.md) when a higher-level host service needs its own contract.
+
 Signature:
 
 ```lisp
@@ -51,6 +56,27 @@ Optional:
 - `stats.overrun`, `stats.note`
 - `error` message
 
+## boundary
+
+Keep `planner.plan` focused on bounded action selection.
+
+Belongs in `planner.plan`:
+
+- request/result maps using `planner.request.v1` and `planner.result.v1`
+- planner choice such as `mcts`, `mppi`, or `ilqr`
+- model-service selection
+- state, horizon, budget, work cap, bounds, and safe action fields
+- planner stats and diagnostics
+
+Does not belong in `planner.plan`:
+
+- direct middleware messages
+- robot-driver handles
+- MoveIt, Nav2, detector, or simulator-specific RPCs
+- long-running execution services that need progress, cancellation, or host lifecycle ownership
+
+Use host capability bundles for those external services.
+
 ## Minimal Example
 
 ```lisp
@@ -74,6 +100,7 @@ Optional:
 ## See Also
 
 - [Planner Overview](overview.md)
+- [Host Capability Bundles](../integration/host-capability-bundles.md)
 - [MCTS Backend](mcts.md)
 - [MPPI Backend](mppi.md)
 - [iLQR Backend](ilqr.md)
