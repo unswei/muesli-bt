@@ -41,7 +41,7 @@ Good bundle ids:
 
 - [`cap.motion.v1`](cap-motion-v1.md)
 - `cap.navigation.v1`
-- `cap.perception.scene.v1`
+- [`cap.perception.scene.v1`](cap-perception-scene-v1.md)
 
 Avoid bundle ids that expose implementation details as core semantics:
 
@@ -93,7 +93,7 @@ The motion bundle asks the host to execute or validate a higher-level motion ser
 
 ### perception scene
 
-The perception scene bundle is for host-owned perception that produces normalised scene state.
+[`cap.perception.scene.v1`](cap-perception-scene-v1.md) is for host-owned perception that produces normalised scene state.
 
 The first likely adapter can be a YOLO-compatible detector followed by a scene-state normaliser, but the public contract should not expose raw detector classes as the core interface.
 BT logic should consume stable scene facts, object poses, confidences, and timestamps.
@@ -110,6 +110,8 @@ The first ROS-facing adapter might use Nav2, but the public contract should stay
 BT logic should request goals, constraints, progress, cancellation, and final status through the capability contract.
 
 ## example
+
+For a BT-facing sketch, see [host capability BT example](host-capability-bt-example.md).
 
 Illustrative request shape:
 
@@ -150,6 +152,8 @@ They are not released runtime APIs until a concrete bundle contract lands.
 
 - [integration overview](overview.md)
 - [cap.motion.v1](cap-motion-v1.md)
+- [cap.perception.scene.v1](cap-perception-scene-v1.md)
+- [host capability BT example](host-capability-bt-example.md)
 - [environment api (`env.*`)](env-api.md)
 - [planner.plan request/result](../planning/planner-plan.md)
 - [roadmap to 1.0](../roadmap-to-1.0.md)

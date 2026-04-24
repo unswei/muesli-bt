@@ -137,6 +137,8 @@ nav:
           - Writing A Backend: integration/writing-a-backend.md
           - Host Capability Bundles: integration/host-capability-bundles.md
           - cap.motion.v1: integration/cap-motion-v1.md
+          - cap.perception.scene.v1: integration/cap-perception-scene-v1.md
+          - Host Capability BT Example: integration/host-capability-bt-example.md
           - ROS2 Backend Scope: integration/ros2-backend-scope.md
           - Cross-transport Flagship for v0.5: integration/cross-transport-flagship.md
           - Cross-transport Comparison Protocol: integration/cross-transport-comparison-protocol.md

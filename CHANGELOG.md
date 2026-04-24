@@ -9,6 +9,8 @@ This unreleased section captures work toward `v0.6.0`.
 ### Added
 - Added initial host capability bundle documentation that defines the boundary between `env.*`, `planner.plan`, and future higher-level host services for manipulation, navigation, and perception.
 - Added the first concrete `cap.motion.v1` spec page for generic host-owned motion requests, including operation names, request/result fields, status values, and adapter-boundary rules.
+- Added the matching `cap.perception.scene.v1` spec page for normalised scene objects, facts, confidence, timestamps, frames, and detector-adapter boundaries.
+- Added a small BT-facing host capability pseudocode example that shows scene perception feeding symbolic task choice and generic motion execution.
 
 ## [0.5.0] - 2026-04-09
 
