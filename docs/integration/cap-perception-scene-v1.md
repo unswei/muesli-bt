@@ -94,16 +94,22 @@ Common optional:
 
 ### status values
 
-Stable status values:
+Common host capability status values:
 
 - `:ok`: operation completed successfully
+- `:accepted`: asynchronous operation was accepted and returned a `job_id`
+- `:running`: asynchronous operation is still in progress
+- `:cancelled`: operation was cancelled before completion
+- `:timeout`: operation exceeded its timeout, budget, or freshness bound
+- `:rejected`: adapter rejected the request before execution
+- `:error`: adapter failed for an implementation-specific reason
+- `:unavailable`: no suitable adapter is available
+
+Perception-specific status values:
+
 - `:stale`: scene state exists but is older than `max_age_ms`
 - `:not-found`: requested object or fact is absent
 - `:low-confidence`: scene state exists but confidence is below the requested threshold
-- `:timeout`: operation exceeded its timeout
-- `:rejected`: adapter rejected the request before execution
-- `:error`: adapter failed for an implementation-specific reason
-- `:unavailable`: no suitable perception adapter is available
 
 Adapters may include extra diagnostic fields, but BT logic should branch only on stable status values.
 

@@ -1920,6 +1920,77 @@ void test_json_and_handle_builtins() {
     check(print_value(fields[2]) == "(2 3)", "json.decode array mismatch");
 }
 
+void test_capability_registry_call_echo() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    value caps = eval_text("(cap.list)", env);
+    check(is_proper_list(caps), "cap.list should return list");
+    bool saw_echo = false;
+    for (value cap_name : vector_from_list(caps)) {
+        if (is_string(cap_name) && string_value(cap_name) == "cap.echo.v1") {
+            saw_echo = true;
+        }
+    }
+    check(saw_echo, "cap.list should include cap.echo.v1");
+
+    value desc = eval_text("(cap.describe \"cap.echo.v1\")", env);
+    check(is_map(desc), "cap.describe cap.echo.v1 should return map");
+    check(string_value(eval_text("(map.get (cap.describe \"cap.echo.v1\") 'name \"\")", env)) == "cap.echo.v1",
+          "cap.describe echo name mismatch");
+    check(string_value(eval_text("(map.get (cap.describe \"cap.echo.v1\") 'safety_class \"\")", env)) == "safe",
+          "cap.describe echo safety_class mismatch");
+
+    value response = eval_text(
+        "(begin "
+        "  (define req (map.make)) "
+        "  (define payload (map.make)) "
+        "  (map.set! payload 'message \"hello\") "
+        "  (map.set! payload 'n 7) "
+        "  (map.set! req 'schema_version \"cap.echo.request.v1\") "
+        "  (map.set! req 'capability \"cap.echo.v1\") "
+        "  (map.set! req 'operation \"echo\") "
+        "  (map.set! req 'request_id \"echo-1\") "
+        "  (map.set! req 'payload payload) "
+        "  (define response (cap.call req)) "
+        "  response)",
+        env);
+    check(is_map(response), "cap.call should return map");
+    check(symbol_name(eval_text("(map.get response 'status ':none)", env)) == ":ok", "cap.call echo status mismatch");
+    check(string_value(eval_text("(map.get response 'request_id \"\")", env)) == "echo-1",
+          "cap.call should preserve request_id");
+    check(string_value(eval_text("(map.get (map.get response 'echo (map.make)) 'message \"\")", env)) == "hello",
+          "cap.call should echo payload");
+    check(integer_value(eval_text("(map.get (map.get response 'echo (map.make)) 'n -1)", env)) == 7,
+          "cap.call should preserve payload fields");
+
+    value rejected = eval_text(
+        "(begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.echo.request.v1\") "
+        "  (map.set! req 'capability \"cap.echo.v1\") "
+        "  (map.set! req 'operation \"nope\") "
+        "  (define rejected (cap.call req)) "
+        "  rejected)",
+        env);
+    check(is_map(rejected), "cap.call rejected operation should return map");
+    check(symbol_name(eval_text("(map.get rejected 'status ':none)", env)) == ":rejected",
+          "cap.call unsupported operation should return :rejected");
+
+    expect_lisp_error_message(
+        "(begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.echo.request.v1\") "
+        "  (map.set! req 'capability \"cap.unknown.v1\") "
+        "  (map.set! req 'operation \"echo\") "
+        "  (cap.call req))",
+        env,
+        "cap.call: unknown capability",
+        "cap.call unknown capability");
+}
+
 void test_vla_builtins_submit_poll_cancel_and_caps() {
     using namespace muslisp;
 
@@ -1928,8 +1999,13 @@ void test_vla_builtins_submit_poll_cancel_and_caps() {
 
     value caps = eval_text("(cap.list)", env);
     check(is_proper_list(caps), "cap.list should return list");
-    check(string_value(eval_text("(car (cap.list))", env)).find("vla.") != std::string::npos,
-          "cap.list should include vla capability");
+    bool saw_vla = false;
+    for (value cap_name : vector_from_list(caps)) {
+        if (is_string(cap_name) && string_value(cap_name).find("vla.") != std::string::npos) {
+            saw_vla = true;
+        }
+    }
+    check(saw_vla, "cap.list should include vla capability");
     check(is_map(eval_text("(cap.describe \"vla.rt2\")", env)), "cap.describe should return map");
 
     (void)eval_text(
@@ -4371,6 +4447,7 @@ int main() {
         {"plan-action node all planner backends", test_plan_action_node_with_all_planner_backends},
         {"hash64 builtin", test_hash64_builtin},
         {"json and handle builtins", test_json_and_handle_builtins},
+        {"capability registry call echo", test_capability_registry_call_echo},
         {"vla builtins submit/poll/cancel/caps", test_vla_builtins_submit_poll_cancel_and_caps},
         {"vla bt nodes flow and cancel", test_vla_bt_nodes_flow_and_cancel},
         {"bt compile checks", test_bt_compile_checks},

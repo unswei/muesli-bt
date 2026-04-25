@@ -3,13 +3,10 @@
 This backlog is maintained forward from March 2, 2026.
 It is aligned with `docs/roadmap-to-1.0.md`.
 
-## now
-
-- `v0.6.0`: review `cap.motion.v1` and `cap.perception.scene.v1` together for consistent request/result and status vocabulary
-
 ## next
 
 - `v0.6.0`: refine host capability bundles for external execution, navigation, manipulation, and perception services without expanding `env.*` or `planner.plan`
+- `v0.6.0`: decide whether the tiny `cap.call` / `cap.echo.v1` registry path is enough for the release, or whether it needs canonical capability call events
 - `v0.6.0`: stabilise planner request/result semantics and make the boundary between `planner.plan` and external host capabilities explicit
 - `v0.6.0`: deepen ROS2 `L2` evidence only when there is a concrete new transport path or failure mode to cover
 - `v0.6.0`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
@@ -38,3 +35,5 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 - `v0.6.0`: define the first motion/manipulation capability contract as a generic host bundle, with MoveIt as the intended first adapter rather than a core semantic surface
 - `v0.6.0`: define the first perception capability contract as a generic host bundle, with any detector-specific adapter kept behind that contract
 - `v0.6.0`: add one small BT-facing example that shows how host capability bundles are consumed without implying released runtime built-ins
+- `v0.6.0`: review `cap.motion.v1` and `cap.perception.scene.v1` together for consistent request/result and status vocabulary
+- `v0.6.0`: implement the smallest possible `cap.list` / `cap.describe` / `cap.call` registry path with a deterministic `cap.echo.v1` fixture

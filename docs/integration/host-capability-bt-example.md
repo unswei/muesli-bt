@@ -36,9 +36,8 @@ The BT owns the task policy:
 
 ## api / syntax
 
-The pseudocode below uses a placeholder `(cap.call request-map)` form.
-That form is illustrative only.
-A later implementation may use a different built-in name or host callback shape.
+The pseudocode below uses `(cap.call request-map)`.
+The built-in exists, but real `cap.motion.v1` and `cap.perception.scene.v1` adapters are not released yet.
 
 ```lisp
 (define (get-current-scene)

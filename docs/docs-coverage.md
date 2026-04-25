@@ -55,6 +55,7 @@ Audit language/runtime surfaces against code before updating this checklist:
 - [x] `cap.motion.v1` -> [page](integration/cap-motion-v1.md)
 - [x] `cap.perception.scene.v1` -> [page](integration/cap-perception-scene-v1.md)
 - [x] host capability BT example -> [page](integration/host-capability-bt-example.md)
+- [x] `cap.call` -> [page](language/reference/builtins/cap/cap-call.md)
 - [x] Planning backend docs: MCTS -> [page](planning/mcts.md)
 - [x] Planning backend docs: MPPI -> [page](planning/mppi.md)
 - [x] Planning backend docs: iLQR -> [page](planning/ilqr.md)

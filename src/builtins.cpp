@@ -2360,9 +2360,48 @@ value builtin_blob_info(const std::vector<value>& args) {
     return out;
 }
 
+bt::capability_descriptor echo_capability_descriptor() {
+    bt::capability_descriptor cap;
+    cap.name = "cap.echo.v1";
+    cap.safety_class = "safe";
+    cap.cost_category = "low";
+    cap.request_schema = {
+        {"schema_version", "string", true},
+        {"capability", "string", true},
+        {"operation", "string", true},
+        {"request_id", "string", false},
+        {"payload", "any", false},
+    };
+    cap.response_schema = {
+        {"schema_version", "string", true},
+        {"capability", "string", true},
+        {"operation", "string", true},
+        {"request_id", "string", false},
+        {"status", "keyword", true},
+        {"echo", "any", false},
+    };
+    return cap;
+}
+
+std::optional<bt::capability_descriptor> describe_builtin_capability(const std::string& name) {
+    if (name == "cap.echo.v1") {
+        return echo_capability_descriptor();
+    }
+    return std::nullopt;
+}
+
+std::vector<std::string> builtin_capability_names() {
+    return {"cap.echo.v1"};
+}
+
 value builtin_cap_list(const std::vector<value>& args) {
     require_arity("cap.list", args, 0);
-    const std::vector<std::string> names = bt::default_runtime_host().vla_ref().capabilities().list();
+    std::vector<std::string> names = bt::default_runtime_host().vla_ref().capabilities().list();
+    const std::vector<std::string> builtin_names = builtin_capability_names();
+    names.insert(names.end(), builtin_names.begin(), builtin_names.end());
+    std::sort(names.begin(), names.end());
+    names.erase(std::unique(names.begin(), names.end()), names.end());
+
     std::vector<value> out;
     out.reserve(names.size());
     gc_root_scope roots(default_gc());
@@ -2376,7 +2415,10 @@ value builtin_cap_list(const std::vector<value>& args) {
 value builtin_cap_describe(const std::vector<value>& args) {
     require_arity("cap.describe", args, 1);
     const std::string name = require_text_value(args[0], "cap.describe");
-    const auto cap = bt::default_runtime_host().vla_ref().capabilities().describe(name);
+    std::optional<bt::capability_descriptor> cap = bt::default_runtime_host().vla_ref().capabilities().describe(name);
+    if (!cap.has_value()) {
+        cap = describe_builtin_capability(name);
+    }
     if (!cap.has_value()) {
         throw lisp_error("cap.describe: unknown capability");
     }
@@ -2409,6 +2451,58 @@ value builtin_cap_describe(const std::vector<value>& args) {
     roots.add(&res_schema);
     map_set_symbol(out, "request_schema", req_schema);
     map_set_symbol(out, "response_schema", res_schema);
+    return out;
+}
+
+value builtin_cap_call(const std::vector<value>& args) {
+    require_arity("cap.call", args, 1);
+    const value request_map = require_map_arg(args[0], "cap.call");
+    const std::optional<value> capability_v = map_lookup_option(request_map, "capability");
+    if (!capability_v.has_value()) {
+        throw lisp_error("cap.call: missing required capability");
+    }
+    const std::string capability = require_text_value(*capability_v, "cap.call capability");
+    if (capability != "cap.echo.v1") {
+        throw lisp_error("cap.call: unknown capability");
+    }
+
+    const std::optional<value> schema_v = map_lookup_option(request_map, "schema_version");
+    if (!schema_v.has_value()) {
+        throw lisp_error("cap.call: missing required schema_version");
+    }
+    const std::string schema_version = require_text_value(*schema_v, "cap.call schema_version");
+    if (schema_version != "cap.echo.request.v1") {
+        throw lisp_error("cap.call: schema_version must be \"cap.echo.request.v1\"");
+    }
+
+    const std::optional<value> operation_v = map_lookup_option(request_map, "operation");
+    if (!operation_v.has_value()) {
+        throw lisp_error("cap.call: missing required operation");
+    }
+    const std::string operation = require_text_value(*operation_v, "cap.call operation");
+
+    value out = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&out);
+    map_set_symbol(out, "schema_version", make_string("cap.echo.result.v1"));
+    map_set_symbol(out, "capability", make_string("cap.echo.v1"));
+    map_set_symbol(out, "operation", make_string(operation));
+    if (const std::optional<value> request_id_v = map_lookup_option(request_map, "request_id"); request_id_v.has_value()) {
+        map_set_symbol(out, "request_id", *request_id_v);
+    }
+
+    if (operation != "echo") {
+        map_set_symbol(out, "status", make_symbol(":rejected"));
+        map_set_symbol(out, "error", make_string("unsupported operation"));
+        return out;
+    }
+
+    map_set_symbol(out, "status", make_symbol(":ok"));
+    if (const std::optional<value> payload_v = map_lookup_option(request_map, "payload"); payload_v.has_value()) {
+        map_set_symbol(out, "echo", *payload_v);
+    } else {
+        map_set_symbol(out, "echo", request_map);
+    }
     return out;
 }
 
@@ -2875,6 +2969,7 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "rng.int", builtin_rng_int);
     bind_primitive(global_env, "cap.list", builtin_cap_list);
     bind_primitive(global_env, "cap.describe", builtin_cap_describe);
+    bind_primitive(global_env, "cap.call", builtin_cap_call);
     bind_primitive(global_env, "vla.submit", builtin_vla_submit);
     bind_primitive(global_env, "vla.poll", builtin_vla_poll);
     bind_primitive(global_env, "vla.cancel", builtin_vla_cancel);

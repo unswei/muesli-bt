@@ -103,18 +103,21 @@ Common optional:
 
 ### status values
 
-Stable status values:
+Common host capability status values:
 
 - `:ok`: operation completed successfully
-- `:accepted`: asynchronous operation was accepted and has a `job_id`
+- `:accepted`: asynchronous operation was accepted and returned a `job_id`
 - `:running`: asynchronous operation is still in progress
 - `:cancelled`: operation was cancelled before completion
-- `:timeout`: operation exceeded its timeout or budget
+- `:timeout`: operation exceeded its timeout, budget, or freshness bound
 - `:rejected`: adapter rejected the request before execution
+- `:error`: adapter failed for an implementation-specific reason
+- `:unavailable`: no suitable adapter is available
+
+Motion-specific status values:
+
 - `:unreachable`: target is not reachable under the provided constraints
 - `:collision`: adapter detected a collision or safety violation
-- `:error`: adapter failed for an implementation-specific reason
-- `:unavailable`: no suitable motion adapter is available
 
 Adapters may include extra diagnostic fields, but BT logic should branch only on stable status values.
 

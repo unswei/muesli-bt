@@ -66,13 +66,19 @@ Each public request and result must include:
 - stable status values
 - adapter metadata that is optional for BT logic
 
-Minimum status vocabulary:
+Common status vocabulary:
 
 - `:ok`
+- `:accepted`
+- `:running`
+- `:cancelled`
 - `:timeout`
 - `:rejected`
 - `:error`
 - `:unavailable`
+
+Specific bundles may add domain statuses.
+Examples include `:unreachable` and `:collision` for motion, or `:stale`, `:not-found`, and `:low-confidence` for perception.
 
 All host-owned blocking work must have explicit budget or timeout semantics.
 The host must document fallback behaviour for non-`ok` statuses.

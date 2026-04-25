@@ -5,6 +5,7 @@
 ## What It Does
 
 Lists registered [host](../../../../terminology.md#host) capabilities available to Lisp.
+The initial built-in registry includes `cap.echo.v1` for deterministic API smoke coverage, alongside host-registered capabilities such as `vla.rt2`.
 
 ## Arguments And Return
 
@@ -38,5 +39,6 @@ Lists registered [host](../../../../terminology.md#host) capabilities available 
 ## See Also
 
 - [Reference Index](../../index.md)
+- [cap.call](cap-call.md)
 - [cap.describe](cap-describe.md)
 - [VLA Integration In BTs](../../../../bt/vla-integration.md)

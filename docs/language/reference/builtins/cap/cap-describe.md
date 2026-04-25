@@ -5,6 +5,7 @@
 ## What It Does
 
 Returns schema and policy metadata for one capability.
+The initial built-in fixture capability is `cap.echo.v1`.
 
 ## Arguments And Return
 
@@ -20,7 +21,7 @@ Returns schema and policy metadata for one capability.
 ### Minimal
 
 ```lisp
-(cap.describe "vla.rt2")
+(cap.describe "cap.echo.v1")
 ```
 
 ### Realistic
@@ -38,5 +39,6 @@ Returns schema and policy metadata for one capability.
 ## See Also
 
 - [Reference Index](../../index.md)
+- [cap.call](cap-call.md)
 - [cap.list](cap-list.md)
 - [VLA Integration In BTs](../../../../bt/vla-integration.md)

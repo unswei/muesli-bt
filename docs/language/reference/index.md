@@ -98,6 +98,9 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 
 ### Planning services
 
+- [`cap.call`](builtins/cap/cap-call.md)
+- [`cap.describe`](builtins/cap/cap-describe.md)
+- [`cap.list`](builtins/cap/cap-list.md)
 - [`planner.get-base-seed`](builtins/planner/planner-get-base-seed.md)
 - [`planner.plan`](builtins/planner/planner-plan.md)
 - [`planner.set-base-seed`](builtins/planner/planner-set-base-seed.md)
