@@ -196,10 +196,12 @@ Exit target:
 - keep `planner.plan` as the in-runtime bounded decision planner
 - define [host capability bundle](host-capability-bundles.md) rules for richer external services such as manipulation, navigation, and perception
 - document that higher-level ROS libraries such as MoveIt and Nav2 belong behind separate host capability contracts rather than inside core semantics
+- do not deepen ROS2 `L2` for `v0.6.0` unless a concrete new ROS-backed planner, capability, transport, or failure-mode path needs coverage
 
 Exit target:
 
 - the split between `env.*`, `planner.plan`, and external host capability bundles is explicit in docs and examples
+- the existing ROS2 `L2` lane remains focused on the released thin `Odometry` -> `Twist` transport and canonical artefact validation
 
 `phase 11: v0.8.0 ROS-backed Isaac evidence packaging`
 

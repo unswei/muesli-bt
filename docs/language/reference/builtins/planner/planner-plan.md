@@ -18,6 +18,7 @@ Runs a planner backend selected in `request-map` and returns a unified `planner.
 
 - `seed`, `safe_action`, `action_schema`
 - `work_max`, `horizon`, `dt_ms`, `bounds`, `constraints`, `top_k`
+- `run_id`, `tick_index`, `node_name`, `state_key` for observability
 - backend config maps: `mcts`, `mppi`, `ilqr`
 
 ## Result Shape
@@ -29,6 +30,10 @@ Runs a planner backend selected in `request-map` and returns a unified `planner.
 - `confidence` in `[0,1]`
 - `stats` with at least `budget_ms`, `time_used_ms`, `work_done`, `seed`
 - optional `trace` and `error`
+
+Non-`:ok` statuses still return an action map.
+The action is the resolved safe action unless the backend produced a valid bounded candidate before timing out.
+`stats.overrun` is present when elapsed planner time is greater than `budget_ms`.
 
 ## Example
 
@@ -54,3 +59,4 @@ Runs a planner backend selected in `request-map` and returns a unified `planner.
 
 - [Planner Configuration](../../../../bt/planner-configuration.md)
 - [PlanAction Node](../../../../bt/plan-action-node.md)
+- [Planner Logging](../../../../observability/planner-logging.md)

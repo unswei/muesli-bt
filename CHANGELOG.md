@@ -15,6 +15,8 @@ This unreleased section captures work toward `v0.6.0`.
 
 ### Changed
 - Aligned host capability status vocabulary across `cap.motion.v1` and `cap.perception.scene.v1`, with shared lifecycle statuses separated from bundle-specific statuses.
+- Tightened `planner.plan` request/result documentation around success, timeout, error, fallback action handling, budget/work caps, and canonical planner logging.
+- Documented the `v0.6.0` decision to leave ROS2 `L2` evidence unchanged unless a concrete new ROS-backed planner, capability, transport, or failure-mode path needs coverage.
 
 ## [0.5.0] - 2026-04-09
 

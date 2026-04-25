@@ -77,13 +77,13 @@ What to notice:
 - `apply-planned-1d` is the host action callback that consumes `action` and updates `state`
 - the example keeps ticking because planning and state application happen as part of a repeated control loop, not a one-shot solve
 
-> Maintainer note: checked-in examples currently use string planner identifiers such as `"mcts"`, while some planning prose documents keyword forms such as `:mcts`. This page keeps the checked-in example form and should be reconciled with the reference docs once the recommended copy-paste form is confirmed.
-
 ## Budgets And Deadlines
 
 - primary time budget: `budget_ms`
 - secondary cap: `work_max` (iterations/samples/optimiser iters)
-- backend should still enforce safe action on overruns/failures
+- `stats.overrun` records when elapsed planner time exceeds `budget_ms`
+- small overruns can occur because planner code checks deadlines at decision points
+- non-`:ok` statuses should be handled by BT fallback logic or backend safe action handling
 
 ## See Also
 

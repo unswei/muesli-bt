@@ -56,6 +56,21 @@ This page documents the unified planner request schema used by `planner.plan` an
 - backend keys (examples): `:max_depth`, `:n_samples`, `:max_iters`, `:derivatives`
 
 Node fallback rule: if planner status is not `:ok`, the node returns `failure`.
+The planner result still carries an action map.
+On timeout, no-action, or error paths, that action is the resolved safe action unless the planner produced a valid bounded candidate before timing out.
+
+## Result And Logging
+
+`planner.plan` returns `planner.result.v1` with:
+
+- `status`: `:ok`, `:timeout`, `:noaction`, or `:error`
+- `action`: canonical `{action_schema, u}` map
+- `confidence`
+- `stats`: `budget_ms`, `time_used_ms`, `work_done`, `seed`, and optional `overrun` / `note`
+- optional backend `trace`
+- optional `error`
+
+Each call also records a `planner.v1` event payload through the canonical `planner_v1` event type when canonical events are enabled.
 
 ## Example (`planner.plan`)
 

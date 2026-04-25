@@ -25,12 +25,14 @@ Required:
 
 Common optional:
 
-- `seed`
-- `work_max`
-- `horizon`, `dt_ms`
-- `bounds`
-- `constraints`
-- `safe_action` and `action_schema`
+- `seed`: deterministic seed; strings and symbols are hashed
+- `work_max`: secondary work cap for iterations, samples, or optimiser steps
+- `horizon`, `dt_ms`: rollout horizon and timestep hints
+- `bounds`: action bounds as `(list (list lo hi) ...)`
+- `constraints`: optional map (`max_du`, `smoothness_weight`, `collision_weight`, `goal_tolerance`)
+- `safe_action` and `action_schema`: fallback action shape and default action schema
+- `run_id`, `tick_index`, `node_name`, `state_key`: optional observability metadata
+- `top_k`: number of planner trace candidates to expose where supported
 - backend block: `mcts`, `mppi`, or `ilqr`
 
 Canonical action map:
@@ -56,6 +58,35 @@ Optional:
 - `stats.overrun`, `stats.note`
 - `error` message
 
+## statuses and fallback
+
+`status` is one of:
+
+- `:ok`: planner selected an action within its normal success path
+- `:timeout`: planner exceeded the requested budget target but still returns the best available action
+- `:noaction`: planner did work but did not produce a usable candidate
+- `:error`: request, model, derivative, or backend validation failed
+
+`planner.plan` always returns an action map.
+When the planner cannot produce a usable action, the returned action is the resolved safe action.
+The safe action comes from `safe_action` when provided; otherwise the planner service derives a bounded default from the selected model and action schema.
+
+`plan-action` treats non-`:ok` statuses as node failure.
+Use BT fallback branches or backend-side safe action handling for non-`:ok` results.
+
+## budgets and work caps
+
+`budget_ms` is the primary bounded-time target.
+`work_max` is a secondary cap whose meaning depends on the backend:
+
+- MCTS: tree iterations
+- MPPI: sample/evaluation work
+- iLQR: optimiser iterations
+
+The planner records `stats.time_used_ms`, `stats.work_done`, and `stats.overrun`.
+`stats.overrun` means elapsed planner time was greater than `budget_ms`.
+Small overruns can still happen because the runtime checks time at planner decision points rather than pre-empting arbitrary C++ code.
+
 ## boundary
 
 Keep `planner.plan` focused on bounded action selection.
@@ -67,6 +98,7 @@ Belongs in `planner.plan`:
 - model-service selection
 - state, horizon, budget, work cap, bounds, and safe action fields
 - planner stats and diagnostics
+- `planner.v1` records emitted as canonical `planner_v1` events
 
 Does not belong in `planner.plan`:
 
@@ -76,6 +108,21 @@ Does not belong in `planner.plan`:
 - long-running execution services that need progress, cancellation, or host lifecycle ownership
 
 Use host capability bundles for those external services.
+
+## logging
+
+Every `planner.plan` call appends a `planner.v1` record.
+When canonical events are enabled, the runtime emits that record through event type `planner_v1`.
+
+The record includes:
+
+- `run_id`, `tick_index`, `node_name`, and optional `state_key`
+- `planner`, `status`, `budget_ms`, `time_used_ms`, `work_done`, `seed`
+- selected or safe action
+- `confidence`, `overrun`, optional `note`
+- backend trace fields where available
+
+Use [Planner Logging](../observability/planner-logging.md) for the event wrapper details.
 
 ## Minimal Example
 
