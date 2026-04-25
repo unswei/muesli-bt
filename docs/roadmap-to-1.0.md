@@ -172,7 +172,7 @@ Scope:
 - document that higher-level ROS libraries such as MoveIt and Nav2 belong behind separate host capability contracts
 - define the first target capability families for manipulation and perception, but keep the public contracts generic rather than MoveIt-named or detector-named
 - freeze the user-facing planner request/result contract for the paper baseline
-- expand planner conformance evidence under simulator and ROS-backed replay where it is cheap and reproducible
+- keep existing planner and ROS-backed conformance evidence unchanged unless a concrete new ROS-backed planner, capability, transport, or failure-mode path needs coverage
 - keep planner time-budget behaviour explicit in docs and logs
 
 Exit criteria:
@@ -181,8 +181,8 @@ Exit criteria:
 - at least one manipulation contract and one perception contract are specified at the host level without hard-coding ROS library names into core semantics
 - the split between `env.*`, `planner.plan`, and external host capabilities is explicit in docs and examples
 - planner request/result docs match released behaviour and fixtures
-- planner logs and canonical events cover the paper-critical success, timeout, and fallback paths
-- at least one ROS-backed or rosbag-driven example demonstrates planning without introducing ROS-specific planner semantics
+- planner documentation covers the paper-critical success, timeout, error, fallback, `budget_ms`, `work_max`, and logging paths
+- ROS2 `L2` remains focused on the released thin `Odometry` -> `Twist` lane until a concrete new ROS-backed path is added
 
 #### `v0.7.0`: async and cancellation correctness
 

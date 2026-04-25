@@ -4,10 +4,12 @@ muesli-bt
 
 ## [Unreleased]
 
-This unreleased section captures work toward `v0.6.0`.
+No unreleased changes yet.
+
+## [0.6.0] - 2026-04-25
 
 ### Added
-- Added draft `v0.6.0` release notes and release checklist.
+- Added `v0.6.0` release notes and release checklist.
 - Added initial host capability bundle documentation that defines the boundary between `env.*`, `planner.plan`, and future higher-level host services for manipulation, navigation, and perception.
 - Added the first concrete `cap.motion.v1` spec page for generic host-owned motion requests, including operation names, request/result fields, status values, and adapter-boundary rules.
 - Added the matching `cap.perception.scene.v1` spec page for normalised scene objects, facts, confidence, timestamps, frames, and detector-adapter boundaries.
@@ -18,6 +20,7 @@ This unreleased section captures work toward `v0.6.0`.
 - Aligned host capability status vocabulary across `cap.motion.v1` and `cap.perception.scene.v1`, with shared lifecycle statuses separated from bundle-specific statuses.
 - Tightened `planner.plan` request/result documentation around success, timeout, error, fallback action handling, budget/work caps, and canonical planner logging.
 - Documented the `v0.6.0` decision to leave ROS2 `L2` evidence unchanged unless a concrete new ROS-backed planner, capability, transport, or failure-mode path needs coverage.
+- Updated the CMake package version to `0.6.0` for release artefacts and downstream consumers.
 
 ## [0.5.0] - 2026-04-09
 

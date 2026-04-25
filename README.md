@@ -129,9 +129,11 @@ Additional runnable commands:
 
 On interactive Linux and macOS terminals, `muslisp` now uses a small vendored line editor for current-line editing, history, and wrapped multi-line input. Persistent history is stored at `~/.muesli_bt_history`, and `:clear` drops a pending multi-line buffer without leaving the REPL.
 
-## v0.5 Flagship Baseline
+## v0.6 Release Baseline
 
-The current `v0.5.x` baseline keeps the transport surface intentionally narrow and uses one shared wheeled BT across the main backend paths:
+The current `v0.6.x` baseline keeps the `v0.5.0` cross-transport flagship intact and adds the first host capability boundary contracts for future higher-level services.
+
+The flagship transport surface remains intentionally narrow and uses one shared wheeled BT across the main backend paths:
 
 - shared flagship BT reused across Webots, PyBullet, and ROS2
 - strict host boundary: backend wrappers own observation shaping and command mapping
@@ -139,6 +141,13 @@ The current `v0.5.x` baseline keeps the transport surface intentionally narrow a
 - supported ROS transport: `nav_msgs/msg/Odometry` in, `geometry_msgs/msg/Twist` out
 - scripted cross-transport comparison and same-robot strict comparison checks
 - canonical logging through `mbt.evt.v1`
+
+The new v0.6 capability boundary is deliberately small:
+
+- `cap.list`, `cap.describe`, and `cap.call` are available as the first registry/API path
+- `cap.echo.v1` is the only implemented fixture capability
+- `cap.motion.v1` and `cap.perception.scene.v1` are documented host capability contracts, not released robot adapters
+- MoveIt, Nav2, detector, and perception adapters are host-side future work behind those contracts
 
 The ROS2 part of that baseline remains intentionally narrow:
 
@@ -343,9 +352,10 @@ This pattern keeps ticking while a VLA job runs, uses planner output when availa
 - backend selection across MCTS, MPPI, and iLQR
 - structured planner stats and logs
 
-### VLA capability layer
+### Capability and VLA layer
 
-- capability registry (`cap.list`, `cap.describe`)
+- capability registry (`cap.list`, `cap.describe`, `cap.call`)
+- deterministic capability fixture (`cap.echo.v1`)
 - async job API (`vla.submit`, `vla.poll`, `vla.cancel`)
 - stream-aware polling (`:queued`, `:running`, `:streaming`, `:done`, `:error`, `:timeout`, `:cancelled`)
 - opaque media handles (`image_handle`, `blob_handle`) plus metadata accessors

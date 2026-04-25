@@ -5,9 +5,9 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 
 ## next
 
-- `v0.6.0`: refine host capability bundles for external execution, navigation, manipulation, and perception services without expanding `env.*` or `planner.plan`
-- `v0.6.0`: decide whether the tiny `cap.call` / `cap.echo.v1` registry path is enough for the release, or whether it needs canonical capability call events
-- `v0.6.0`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
+- `v0.7.0`: complete async cancellation and late-completion-drop evidence for the runtime contract
+- `v0.7.0`: decide whether canonical capability call events are needed once a real capability can affect runtime behaviour
+- `post-release`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
 
 ## later
 
@@ -37,4 +37,5 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 - `v0.6.0`: implement the smallest possible `cap.list` / `cap.describe` / `cap.call` registry path with a deterministic `cap.echo.v1` fixture
 - `v0.6.0`: stabilise planner request/result semantics and make the boundary between `planner.plan` and external host capabilities explicit
 - `v0.6.0`: audit ROS2 `L2` evidence and defer expansion until there is a concrete new ROS-backed planner, capability, transport, or failure-mode path to cover
-- `v0.6.0`: add draft release notes and release checklist
+- `v0.6.0`: add release notes and release checklist
+- `v0.6.0`: confirm the tiny `cap.call` / `cap.echo.v1` registry path is enough for the release without canonical capability call events
