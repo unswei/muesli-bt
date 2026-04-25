@@ -7,6 +7,7 @@ muesli-bt
 This unreleased section captures work toward `v0.6.0`.
 
 ### Added
+- Added draft `v0.6.0` release notes and release checklist.
 - Added initial host capability bundle documentation that defines the boundary between `env.*`, `planner.plan`, and future higher-level host services for manipulation, navigation, and perception.
 - Added the first concrete `cap.motion.v1` spec page for generic host-owned motion requests, including operation names, request/result fields, status values, and adapter-boundary rules.
 - Added the matching `cap.perception.scene.v1` spec page for normalised scene objects, facts, confidence, timestamps, frames, and detector-adapter boundaries.
