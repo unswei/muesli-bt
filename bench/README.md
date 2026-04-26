@@ -50,7 +50,7 @@ Each run:
 
 For `B6`, the current harness records full-trace capture with deferred JSONL serialisation when no file or ring sink is enabled. `log_bytes_total` still reports the canonical `mbt.evt.v1` line size that would be emitted.
 
-`schema_version=4` adds first-class async outcome columns for deadline miss rate, fallback activation count, and dropped-completion count. `schema_version=3` added GC and memory evidence columns for `B7`, including GC pause quantiles, collection count, heap-live slope, RSS slope, and event-log bytes per tick.
+`schema_version=5` adds paper-facing async/fallback rate columns: fallback activation rate, dropped-completion rate, and aggregate deadline miss counts. `schema_version=4` added first-class async outcome columns for deadline miss rate, fallback activation count, and dropped-completion count. `schema_version=3` added GC and memory evidence columns for `B7`, including GC pause quantiles, collection count, heap-live slope, RSS slope, and event-log bytes per tick.
 
 `schema_version=2` added two latency interpretation columns:
 
@@ -153,7 +153,7 @@ Run the async cancellation contract edge smoke group:
 ./build/bench-release/bench/bench run-group B8
 ```
 
-`B8` covers the five checked-in async fixture edges: cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. The benchmark records operation latency and cancellation latency while checking that each edge finishes without semantic errors. Each repetition also keeps the matching canonical `events.jsonl` under the scenario result directory, so async lifecycle claims can be inspected from the event stream rather than only from CSV summaries.
+`B8` covers the five checked-in async fixture edges: cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. The benchmark records operation latency, cancellation latency, deadline miss count/rate, fallback activation count/rate, dropped-completion count/rate, and semantic-error counts. Each repetition also keeps the matching canonical `events.jsonl` under the scenario result directory, so async lifecycle claims can be inspected from the event stream rather than only from CSV summaries.
 
 Run one group against `BehaviorTree.CPP`:
 

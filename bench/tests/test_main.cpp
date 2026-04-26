@@ -264,7 +264,9 @@ void test_b8_async_contract_benchmarks_run() {
         if (row.scenario_id == "B8-async-cancel-before-start") {
             check(row.deadline_miss_rate == 0.0, "B8 cancel-before-start should record zero deadline miss rate");
             check(row.fallback_activation_count == 0u, "B8 cancel-before-start should record zero fallback activations");
+            check(row.fallback_activation_rate == 0.0, "B8 cancel-before-start should record zero fallback rate");
             check(row.dropped_completion_count == 0u, "B8 cancel-before-start should record zero dropped completions");
+            check(row.dropped_completion_rate == 0.0, "B8 cancel-before-start should record zero dropped-completion rate");
         }
         if (row.scenario_id == "B8-async-cancel-after-timeout") {
             check(row.deadline_miss_rate > 0.0, "B8 cancel-after-timeout should record deadline miss rate");
@@ -272,6 +274,8 @@ void test_b8_async_contract_benchmarks_run() {
         }
         if (row.scenario_id == "B8-async-late-completion-after-cancel") {
             check(row.dropped_completion_count > 0u, "B8 late-completion scenario should count dropped completions");
+            check(row.dropped_completion_rate > 0.0,
+                  "B8 late-completion scenario should record dropped-completion rate");
         }
         check(row.semantic_errors == 0u, "B8 async contract scenario should be semantically clean");
         check(row.log_bytes_total > 0u, "B8 should keep canonical async event-log evidence bytes");
@@ -286,14 +290,19 @@ void test_b8_async_contract_benchmarks_run() {
     for (const std::string& column : {
              "deadline_miss_rate",
              "fallback_activation_count",
+             "fallback_activation_rate",
              "dropped_completion_count",
+             "dropped_completion_rate",
          }) {
         check(first_line(run_summary).find(column) != std::string::npos, "run summary missing async outcome column: " + column);
     }
     for (const std::string& column : {
+             "deadline_miss_count_median",
              "deadline_miss_rate_median",
              "fallback_activation_count_median",
+             "fallback_activation_rate_median",
              "dropped_completion_count_median",
+             "dropped_completion_rate_median",
          }) {
         check(first_line(aggregate_summary).find(column) != std::string::npos,
               "aggregate summary missing async outcome column: " + column);

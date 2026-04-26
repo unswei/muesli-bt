@@ -14,7 +14,7 @@ muesli-bt
 - Added `B7` GC and memory benchmark smoke scenarios with canonical GC lifecycle logs and CSV summary columns for GC pause, heap-live slope, RSS slope, and event-log bytes per tick.
 - Added runtime `tick_audit` emission for opt-in per-tick allocation, heap, GC-delta, node-path, and logging-mode evidence.
 - Added `B8` async contract benchmark scenarios for cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation.
-- Added first-class async outcome columns to benchmark CSV output for deadline miss rate, fallback activation count, and dropped-completion count.
+- Added first-class async outcome columns to benchmark CSV output for deadline miss counts/rates, fallback activation counts/rates, and dropped-completion counts/rates.
 - Added per-benchmark `experiment_manifest.json` output with build, platform, runtime flag, scenario seed, and trace schema metadata.
 - Added precise replay comparison divergence fields for tick, event type, field path, node id, blackboard key, async job id, planner id, and host capability.
 - Added compact `runtime_outcome.v1` taxonomy event types for tick, planner timeout, VLA timeout, fallback, late-result-drop, and cancellation outcomes.

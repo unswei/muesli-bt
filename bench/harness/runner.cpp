@@ -780,7 +780,13 @@ run_summary_row run_async_contract_once(const environment_info& environment,
     row.deadline_miss_rate =
         operations_total == 0u ? 0.0 : static_cast<double>(deadline_miss_count) / static_cast<double>(operations_total);
     row.fallback_activation_count = fallback_activation_count;
+    row.fallback_activation_rate = operations_total == 0u ? 0.0
+                                                          : static_cast<double>(fallback_activation_count) /
+                                                                static_cast<double>(operations_total);
     row.dropped_completion_count = dropped_completion_count;
+    row.dropped_completion_rate = operations_total == 0u ? 0.0
+                                                         : static_cast<double>(dropped_completion_count) /
+                                                               static_cast<double>(operations_total);
     row.notes = "events=" + event_path.string() + "; fixture=fixtures/async-" + scenario.variant + "-case";
     return row;
 }
@@ -874,9 +880,12 @@ aggregate_summary_row build_aggregate_row(const environment_info& environment,
     std::vector<double> heap_slopes;
     std::vector<double> rss_slopes;
     std::vector<double> event_log_bytes_per_tick;
+    std::vector<std::uint64_t> deadline_miss_counts;
     std::vector<double> deadline_miss_rates;
     std::vector<std::uint64_t> fallback_activation_counts;
+    std::vector<double> fallback_activation_rates;
     std::vector<std::uint64_t> dropped_completion_counts;
+    std::vector<double> dropped_completion_rates;
 
     std::size_t semantic_error_runs = 0u;
     for (const run_summary_row& row : rows) {
@@ -898,9 +907,12 @@ aggregate_summary_row build_aggregate_row(const environment_info& environment,
         heap_slopes.push_back(row.heap_live_bytes_slope_per_tick);
         rss_slopes.push_back(row.rss_bytes_slope_per_tick);
         event_log_bytes_per_tick.push_back(row.event_log_bytes_per_tick);
+        deadline_miss_counts.push_back(row.deadline_miss_count);
         deadline_miss_rates.push_back(row.deadline_miss_rate);
         fallback_activation_counts.push_back(row.fallback_activation_count);
+        fallback_activation_rates.push_back(row.fallback_activation_rate);
         dropped_completion_counts.push_back(row.dropped_completion_count);
+        dropped_completion_rates.push_back(row.dropped_completion_rate);
         if (row.interrupt_latency_ns_median.has_value()) {
             interrupt_medians.push_back(*row.interrupt_latency_ns_median);
         }
@@ -949,9 +961,12 @@ aggregate_summary_row build_aggregate_row(const environment_info& environment,
     aggregate.heap_live_bytes_slope_per_tick_median = percentile_double(heap_slopes, 0.50);
     aggregate.rss_bytes_slope_per_tick_median = percentile_double(rss_slopes, 0.50);
     aggregate.event_log_bytes_per_tick_median = percentile_double(event_log_bytes_per_tick, 0.50);
+    aggregate.deadline_miss_count_median = percentile_u64(deadline_miss_counts, 0.50);
     aggregate.deadline_miss_rate_median = percentile_double(deadline_miss_rates, 0.50);
     aggregate.fallback_activation_count_median = percentile_u64(fallback_activation_counts, 0.50);
+    aggregate.fallback_activation_rate_median = percentile_double(fallback_activation_rates, 0.50);
     aggregate.dropped_completion_count_median = percentile_u64(dropped_completion_counts, 0.50);
+    aggregate.dropped_completion_rate_median = percentile_double(dropped_completion_rates, 0.50);
     aggregate.semantic_error_runs = semantic_error_runs;
     return aggregate;
 }

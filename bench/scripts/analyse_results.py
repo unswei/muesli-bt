@@ -99,6 +99,12 @@ def format_ratio(value: float | None) -> str:
     return f"{value:.2f}x"
 
 
+def format_rate(value: float | None) -> str:
+    if value is None:
+        return "n/a"
+    return f"{value * 100.0:.2f}%"
+
+
 def short_commit(commit: str) -> str:
     return commit[:10] if commit else "unknown"
 
@@ -339,7 +345,13 @@ def print_report(result_dir: Path) -> int:
             print(
                 f"- {row['scenario_id']}: "
                 f"{format_latency_ns(scenario_metric(row, 'latency_ns_median_of_medians'))} median operation, "
-                f"cancel median {format_latency_ns(scenario_metric(row, 'cancel_latency_ns_median_of_medians'))}"
+                f"cancel median {format_latency_ns(scenario_metric(row, 'cancel_latency_ns_median_of_medians'))}, "
+                f"deadline misses {scenario_metric(row, 'deadline_miss_count_median') or 0:.0f} "
+                f"({format_rate(scenario_metric(row, 'deadline_miss_rate_median'))}), "
+                f"fallbacks {scenario_metric(row, 'fallback_activation_count_median') or 0:.0f} "
+                f"({format_rate(scenario_metric(row, 'fallback_activation_rate_median'))}), "
+                f"dropped completions {scenario_metric(row, 'dropped_completion_count_median') or 0:.0f} "
+                f"({format_rate(scenario_metric(row, 'dropped_completion_rate_median'))})"
             )
     else:
         print("- no B8 scenarios present in this result set")

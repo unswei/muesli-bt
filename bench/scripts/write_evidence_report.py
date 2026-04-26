@@ -92,6 +92,12 @@ def format_bytes(value: float | None) -> str:
     return f"{value:.0f} B"
 
 
+def format_rate(value: float | None) -> str:
+    if value is None:
+        return "n/a"
+    return f"{value * 100.0:.2f}%"
+
+
 def resolve_event_log_paths(raw_paths: list[str], result_dir: Path) -> list[Path]:
     paths: list[Path] = []
     for raw in raw_paths:
@@ -222,6 +228,31 @@ def write_report(result_dir: Path, event_log_paths: list[Path], output: Path) ->
         lines.append(f"- heap-live delta: `{format_bytes(heap_live_after[-1] - heap_live_after[0])}`")
     else:
         lines.append("- heap-live delta: `pending longer GC-producing run`")
+
+    b8_rows = [row for row in aggregate_rows if row.get("scenario_id", "").startswith("B8-")]
+    lines.extend(
+        [
+            "",
+            "## async and fallback metrics",
+            "",
+        ]
+    )
+    if b8_rows:
+        lines.append("| scenario | deadline misses | deadline rate | fallback count | fallback rate | dropped completions | dropped rate |")
+        lines.append("| --- | ---: | ---: | ---: | ---: | ---: | ---: |")
+        for row in b8_rows:
+            lines.append(
+                "| "
+                f"`{row.get('scenario_id', 'unknown')}` | "
+                f"{maybe_float(row.get('deadline_miss_count_median')) or 0:.0f} | "
+                f"{format_rate(maybe_float(row.get('deadline_miss_rate_median')))} | "
+                f"{maybe_float(row.get('fallback_activation_count_median')) or 0:.0f} | "
+                f"{format_rate(maybe_float(row.get('fallback_activation_rate_median')))} | "
+                f"{maybe_float(row.get('dropped_completion_count_median')) or 0:.0f} | "
+                f"{format_rate(maybe_float(row.get('dropped_completion_rate_median')))} |"
+            )
+    else:
+        lines.append("- B8 async contract rows: `missing`")
 
     lines.extend(
         [

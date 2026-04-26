@@ -9,7 +9,7 @@
 
 namespace muesli_bt::bench {
 
-inline constexpr std::string_view kSchemaVersion = "4";
+inline constexpr std::string_view kSchemaVersion = "5";
 inline constexpr std::string_view kBenchmarkSuiteVersion = "0.1.0-m1";
 
 enum class benchmark_kind {

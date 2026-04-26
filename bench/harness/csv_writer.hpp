@@ -75,7 +75,9 @@ struct run_summary_row {
     std::uint64_t deadline_miss_count = 0;
     double deadline_miss_rate = 0.0;
     std::uint64_t fallback_activation_count = 0;
+    double fallback_activation_rate = 0.0;
     std::uint64_t dropped_completion_count = 0;
+    double dropped_completion_rate = 0.0;
     std::uint64_t semantic_errors = 0;
     std::string notes;
 };
@@ -113,9 +115,12 @@ struct aggregate_summary_row {
     double heap_live_bytes_slope_per_tick_median = 0.0;
     double rss_bytes_slope_per_tick_median = 0.0;
     double event_log_bytes_per_tick_median = 0.0;
+    std::uint64_t deadline_miss_count_median = 0;
     double deadline_miss_rate_median = 0.0;
     std::uint64_t fallback_activation_count_median = 0;
+    double fallback_activation_rate_median = 0.0;
     std::uint64_t dropped_completion_count_median = 0;
+    double dropped_completion_rate_median = 0.0;
     std::size_t semantic_error_runs = 0;
     std::string notes;
 };

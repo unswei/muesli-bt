@@ -214,7 +214,7 @@ Run the async cancellation contract edge benchmark group:
 ./build/bench-release/bench/bench run-group B8
 ```
 
-`B8` covers cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. These scenarios mirror the checked-in `fixtures/async-*` bundles and record cancellation latency, deadline miss rate, fallback activation count, dropped-completion count, and semantic-error counts in the normal benchmark CSV files. Each repetition also keeps the matching canonical `events.jsonl` under the scenario result directory.
+`B8` covers cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. These scenarios mirror the checked-in `fixtures/async-*` bundles and record cancellation latency, deadline miss count/rate, fallback activation count/rate, dropped-completion count/rate, and semantic-error counts in the normal benchmark CSV files. Each repetition also keeps the matching canonical `events.jsonl` under the scenario result directory.
 
 Run the strict precompiled-tick allocation lane:
 
