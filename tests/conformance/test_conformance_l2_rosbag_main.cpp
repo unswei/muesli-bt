@@ -1091,7 +1091,10 @@ void test_ros2_rosbag_preemption_fallback_conformance() {
             env));
     check_close(final_obs_x, 0.9, 1e-6, "ros2 rosbag preemption: final_obs pose.x mismatch");
 
-    const auto command = harness.last_command();
+    geometry_msgs::msg::Twist command;
+    command.linear.x = float_value(eval_text("(map.get (env.info) 'last_action_linear_x 999.0)", env));
+    command.linear.y = float_value(eval_text("(map.get (env.info) 'last_action_linear_y 999.0)", env));
+    command.angular.z = float_value(eval_text("(map.get (env.info) 'last_action_angular_z 999.0)", env));
     check_close(command.linear.x, 0.0, 1e-6, "ros2 rosbag preemption: safe linear.x mismatch");
     check_close(command.linear.y, 0.0, 1e-6, "ros2 rosbag preemption: safe linear.y mismatch");
     check_close(command.angular.z, 0.0, 1e-6, "ros2 rosbag preemption: safe angular.z mismatch");
