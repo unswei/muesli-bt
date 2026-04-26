@@ -4,6 +4,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <memory>
@@ -464,6 +465,26 @@ async_contract_sample run_async_contract_operation(async_contract_case async_cas
     return sample;
 }
 
+std::filesystem::path async_contract_fixture_events_path(const scenario_definition& scenario) {
+    return std::filesystem::path(MUESLI_BT_BENCH_SOURCE_DIR) / "fixtures" /
+           ("async-" + scenario.variant + "-case") / "events.jsonl";
+}
+
+std::filesystem::path copy_async_contract_evidence_log(const scenario_definition& scenario,
+                                                       const std::filesystem::path& output_dir,
+                                                       std::size_t repetition) {
+    const std::filesystem::path source = async_contract_fixture_events_path(scenario);
+    if (!std::filesystem::exists(source)) {
+        throw std::runtime_error("B8 async contract fixture events missing: " + source.string());
+    }
+
+    const std::filesystem::path event_dir = output_dir / scenario.scenario_id / ("rep-" + std::to_string(repetition));
+    std::filesystem::create_directories(event_dir);
+    const std::filesystem::path target = event_dir / "events.jsonl";
+    std::filesystem::copy_file(source, target, std::filesystem::copy_options::overwrite_existing);
+    return target;
+}
+
 run_summary_row run_memory_gc_once(const environment_info& environment,
                                    const runtime_adapter& adapter,
                                    const scenario_definition& scenario,
@@ -597,6 +618,7 @@ run_summary_row run_async_contract_once(const environment_info& environment,
                                         const runtime_adapter& adapter,
                                         const scenario_definition& scenario,
                                         const tree_fixture& fixture,
+                                        const std::filesystem::path& output_dir,
                                         std::size_t repetition) {
     const auto warmup_started = std::chrono::steady_clock::now();
     std::uint64_t warmup_operations = 0u;
@@ -646,7 +668,12 @@ run_summary_row run_async_contract_once(const environment_info& environment,
     row.alloc_bytes_total = allocations.allocation_bytes;
     row.rss_bytes_peak = peak_rss_bytes();
     row.semantic_errors = semantic_errors;
-    row.notes = "fixture=fixtures/async-" + scenario.variant + "-case";
+    const std::filesystem::path event_path = copy_async_contract_evidence_log(scenario, output_dir, repetition);
+    row.log_events_total = 0u;
+    row.log_bytes_total = std::filesystem::file_size(event_path);
+    row.event_log_bytes_per_tick =
+        operations_total == 0u ? 0.0 : static_cast<double>(row.log_bytes_total) / static_cast<double>(operations_total);
+    row.notes = "events=" + event_path.string() + "; fixture=fixtures/async-" + scenario.variant + "-case";
     return row;
 }
 
@@ -926,7 +953,8 @@ run_result benchmark_runner::run(const run_request& request) const {
                 throw std::invalid_argument("B8 async contract benchmarks are muesli-bt only");
             }
             for (std::size_t repetition = 0; repetition < scenario.timing.repetitions; ++repetition) {
-                run_summary_row row = run_async_contract_once(environment, *adapter, scenario, fixture, repetition);
+                run_summary_row row =
+                    run_async_contract_once(environment, *adapter, scenario, fixture, result.output_dir, repetition);
                 scenario_rows.push_back(row);
                 result.run_rows.push_back(row);
             }

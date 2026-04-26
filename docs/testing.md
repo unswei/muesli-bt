@@ -152,6 +152,14 @@ Run the comparable subset against `BehaviorTree.CPP`:
 ./build/bench-release-btcpp/bench/bench run-all --runtime btcpp
 ```
 
+`run-all` is the reasonable whole-catalogue runner. Use the publication script for paper-facing runs with longer durations and stronger repetition counts:
+
+```bash
+python3 bench/scripts/run_publication_benchmarks.py
+```
+
+Add `--with-btcpp` when the optional comparison preset is available. The script writes one timestamped bundle under `bench/results/`, including per-run summaries and generated figure/report artefacts.
+
 The first milestone writes:
 
 - `run_summary.csv`
@@ -204,7 +212,7 @@ Run the async cancellation contract edge benchmark group:
 ./build/bench-release/bench/bench run-group B8
 ```
 
-`B8` covers cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. These scenarios mirror the checked-in `fixtures/async-*` bundles and record cancellation latency plus semantic-error counts in the normal benchmark CSV files.
+`B8` covers cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. These scenarios mirror the checked-in `fixtures/async-*` bundles and record cancellation latency plus semantic-error counts in the normal benchmark CSV files. Each repetition also keeps the matching canonical `events.jsonl` under the scenario result directory.
 
 Run the strict precompiled-tick allocation lane:
 
@@ -230,7 +238,9 @@ python3 bench/scripts/figure_memory_gc.py bench/results/my-run --event-log build
 python3 bench/scripts/write_evidence_report.py bench/results/my-run --event-log build/dev/gc-events.jsonl
 ```
 
-The tail-latency script reads `aggregate_summary.csv` and writes `tail_latency.svg`. The memory/GC script reads benchmark allocation/RSS columns and canonical `gc_end` lifecycle events when supplied or found under the result directory. `B7` result directories already contain those GC event logs. The evidence report records which figures exist and lists missing GC or long-run heap-live evidence explicitly.
+The tail-latency script reads `aggregate_summary.csv` and writes `tail_latency.svg`. The memory/GC script reads benchmark allocation/RSS columns and canonical `gc_end` lifecycle events when supplied or found under the result directory. `B7` result directories already contain those GC event logs. `B8` result directories keep the canonical async lifecycle logs. The evidence report records which figures exist and lists missing GC or long-run heap-live evidence explicitly.
+
+Treat benchmark CSV files as summaries. Keep the canonical `events.jsonl` artefacts with any result set used for GC, heap-live, cancellation, timeout, or late-completion claims.
 
 The analysis summary reports `A1`, `A2`, `B1`, `B2`, `B5`, `B6`, `B7`, and `B8` when those rows are present.
 That same summary works for the optional `btcpp` result sets; absent groups are reported as absent rather than treated as failures.

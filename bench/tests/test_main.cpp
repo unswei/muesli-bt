@@ -25,6 +25,14 @@ std::string read_text(const std::filesystem::path& path) {
     return text;
 }
 
+std::string first_line(std::string_view text) {
+    const std::size_t newline = text.find('\n');
+    if (newline == std::string_view::npos) {
+        return std::string(text);
+    }
+    return std::string(text.substr(0u, newline));
+}
+
 void test_catalogue_contains_new_benchmarks() {
     using namespace muesli_bt::bench;
 
@@ -190,6 +198,22 @@ void test_b7_gc_memory_benchmark_runs() {
     check(row.gc_pause_ns_p99 > 0u, "B7 should record GC pause quantiles");
     check(row.log_events_total > 0u, "B7 should record canonical GC event count");
     check(row.event_log_bytes_per_tick > 0.0, "B7 should record event-log bytes per tick");
+    const std::string run_summary = read_text(result.output_dir / "run_summary.csv");
+    const std::string header = first_line(run_summary);
+    for (const std::string& column : {
+             "gc_pause_ns_p50",
+             "gc_pause_ns_p95",
+             "gc_pause_ns_p99",
+             "gc_pause_ns_p999",
+             "gc_collections_total",
+             "heap_live_bytes_start",
+             "heap_live_bytes_end",
+             "heap_live_bytes_slope_per_tick",
+             "rss_bytes_slope_per_tick",
+             "event_log_bytes_per_tick",
+         }) {
+        check(header.find(column) != std::string::npos, "run summary missing GC/memory column: " + column);
+    }
     check(std::filesystem::exists(output_dir / "B7-gc-between-ticks-smoke" / "rep-0" / "events.jsonl"),
           "B7 should write canonical GC events.jsonl");
 }
@@ -220,6 +244,11 @@ void test_b8_async_contract_benchmarks_run() {
         check(row.latency_ns_median > 0u, "B8 should record contract latency");
         check(row.cancel_latency_ns_median.has_value(), "B8 should record cancellation latency");
         check(row.semantic_errors == 0u, "B8 async contract scenario should be semantically clean");
+        check(row.log_bytes_total > 0u, "B8 should keep canonical async event-log evidence bytes");
+        check(row.event_log_bytes_per_tick > 0.0, "B8 should record async event-log bytes per operation");
+        check(std::filesystem::exists(output_dir / row.scenario_id / "rep-0" / "events.jsonl"),
+              "B8 should copy canonical async events.jsonl evidence");
+        check(row.notes.find("events=") != std::string::npos, "B8 should point at copied canonical events");
         check(row.notes.find("fixtures/async-") != std::string::npos, "B8 should point at the matching fixture bundle");
     }
 }

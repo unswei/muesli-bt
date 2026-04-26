@@ -135,4 +135,14 @@ if (Python3_Interpreter_FOUND)
             "${CMAKE_CURRENT_SOURCE_DIR}/scripts/write_evidence_report.py"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/data/analysis_sample"
   )
+  add_test(
+    NAME muesli_bt_bench_publication_script_dry_run
+    COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/scripts/run_publication_benchmarks.py"
+            --profile smoke
+            --skip-build
+            --with-btcpp
+            --dry-run
+            --output-root "${CMAKE_CURRENT_BINARY_DIR}/publication-script-smoke"
+  )
 endif ()

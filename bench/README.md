@@ -87,6 +87,8 @@ Run the comparison subset against `BehaviorTree.CPP`:
 
 Unsupported scenarios are skipped automatically for the selected runtime. For `btcpp`, that means `B6`, `B5` `parse`, and `B5` `loadbin` are omitted.
 
+`run-all` is the reasonable whole-catalogue runner. It keeps the default smoke-quality `B7` and `B8` settings and is useful for regression sweeps. Use the publication script below when collecting paper-facing evidence.
+
 The CLI prints one line at the start of the suite and one line at the start of each scenario. These messages are emitted before timing begins.
 
 Run the strict allocation CTest lane for precompiled BT ticks:
@@ -96,6 +98,30 @@ ctest --preset bench-release -R muesli_bt_bench_precompiled_tick_allocation_stri
 ```
 
 The strict lane warms and primes a precompiled `B1` tree before enabling allocation failure for the measured tick loop. Allocations are only allowed inside explicit benchmark allocation whitelist scopes reserved for logging paths. The current logging-off case expects zero total allocations and zero whitelist usage.
+
+Run the curated publication suite:
+
+```bash
+python3 bench/scripts/run_publication_benchmarks.py
+```
+
+This writes one timestamped bundle under `bench/results/` with separate result directories for the baseline, static tick, reactive interruption, logging, tail-latency, lifecycle, memory/GC, and async contract groups. It also writes per-directory `analysis.txt` summaries and generates the checked-in figure/report outputs where applicable.
+
+Run the same suite with the optional `BehaviorTree.CPP` comparison subset:
+
+```bash
+python3 bench/scripts/run_publication_benchmarks.py --with-btcpp
+```
+
+`--with-btcpp` configures and builds the `bench-release-btcpp` preset unless `--skip-build` is also passed. That preset uses CMake `FetchContent` to fetch the pinned `BehaviorTree.CPP` `4.9.0` source into the build tree, usually under `build/bench-release-btcpp/_deps/`. No system-wide `BehaviorTree.CPP` install or fixed external checkout path is required.
+
+If `--skip-build --with-btcpp` is used, the script expects the comparison binary to already exist at `build/bench-release-btcpp/bench/bench`. Override that path with `--btcpp-bench-bin /path/to/bench` when using a prebuilt binary.
+
+Check the script path without collecting publication-length data:
+
+```bash
+python3 bench/scripts/run_publication_benchmarks.py --profile smoke --skip-build
+```
 
 Run one scenario:
 
@@ -127,7 +153,7 @@ Run the async cancellation contract edge smoke group:
 ./build/bench-release/bench/bench run-group B8
 ```
 
-`B8` covers the five checked-in async fixture edges: cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. The benchmark records operation latency and cancellation latency while checking that each edge finishes without semantic errors.
+`B8` covers the five checked-in async fixture edges: cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. The benchmark records operation latency and cancellation latency while checking that each edge finishes without semantic errors. Each repetition also keeps the matching canonical `events.jsonl` under the scenario result directory, so async lifecycle claims can be inspected from the event stream rather than only from CSV summaries.
 
 Run one group against `BehaviorTree.CPP`:
 
@@ -219,6 +245,7 @@ The output directory will contain:
 - `environment_metadata.csv`
 - `jitter_trace.csv` when the selected scenarios include `A2`
 - `B7-*/rep-*/events.jsonl` when the selected scenarios include `B7`
+- `B8-*/rep-*/events.jsonl` when the selected scenarios include `B8`
 - `tail_latency.svg` when generated with `bench/scripts/figure_tail_latency.py`
 - `memory_gc.svg` when generated with `bench/scripts/figure_memory_gc.py`
 - `evidence_report.md` when generated with `bench/scripts/write_evidence_report.py`
@@ -261,6 +288,7 @@ python3 bench/scripts/compare_results.py \
 - The strict allocation CTest lane is a guardrail for precompiled steady-state ticks. Warm-up, compilation, instantiation, and ordinary benchmark CSV writing happen outside the guarded section.
 - `B7` default scenarios are smoke runs. Use longer `--run-ms` and more repetitions before treating heap-live or RSS slope as paper evidence.
 - `B8` default scenarios are smoke runs. Use longer `--run-ms` and more repetitions before treating async cancellation latency as paper evidence.
+- The CSV files are summaries. Keep the canonical `events.jsonl` artefacts with result bundles whenever making GC pause, heap-live, cancellation, timeout, or late-completion claims.
 - `BehaviorTree.CPP` comparison runs are pinned to release `4.9.0` and the common semantic subset. Do not treat skipped groups as missing data bugs.
 - `compare_results.py` assumes both result sets were collected under meaningfully similar machine and build settings. It prints a warning when the recorded environment metadata differ.
 
