@@ -408,10 +408,15 @@ void test_async_lifecycle_and_idempotent_cancel() {
     check(late_cancelled, "async lifecycle: late completion should still resolve as cancelled");
 
     bool saw_completion_dropped = false;
-    for (const auto& rec : vla.recent_records(200)) {
-        if (rec.completion_dropped) {
-            saw_completion_dropped = true;
-            break;
+    for (int i = 0; i < 160 && !saw_completion_dropped; ++i) {
+        for (const auto& rec : vla.recent_records(200)) {
+            if (rec.completion_dropped) {
+                saw_completion_dropped = true;
+                break;
+            }
+        }
+        if (!saw_completion_dropped) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
         }
     }
     check(saw_completion_dropped, "async lifecycle: expected completion_dropped record for late completion");

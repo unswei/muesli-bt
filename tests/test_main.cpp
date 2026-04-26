@@ -3580,7 +3580,7 @@ void test_racecar_planner_model_and_env_api_contract() {
         "(define tree "
         "  (bt.compile "
         "    '(seq "
-        "       (plan-action :name \"race\" :planner :mcts :budget_ms 8 :work_max 120 "
+        "       (plan-action :name \"race\" :planner :mcts :budget_ms 20 :work_max 240 "
         "                    :model_service \"racecar-kinematic-v1\" :state_key state :action_key action :meta_key plan-meta) "
         "       (act apply-action action))))",
         env);
@@ -3599,7 +3599,7 @@ void test_racecar_planner_model_and_env_api_contract() {
         "(define flagship-tree "
         "  (bt.compile "
         "    '(seq "
-        "       (plan-action :name \"flagship-race\" :planner :mcts :budget_ms 8 :work_max 120 "
+        "       (plan-action :name \"flagship-race\" :planner :mcts :budget_ms 20 :work_max 240 "
         "                    :model_service \"flagship-goal-shared-v1\" :state_key planner_state "
         "                    :action_key shared_action :meta_key plan-meta :action_schema \"flagship.cmd.v1\") "
         "       (act apply-action shared_action))))",

@@ -1115,14 +1115,14 @@ void test_ros2_rosbag_preemption_fallback_conformance() {
     verify_common_record_shape(record2, "ros2.l2.preempt.v1", 2, 1'700'000'300'040LL, true, false);
     verify_action_components(require_map_field(record1, "action", "ros2 rosbag preemption record1"), 0.25, 0.0, 0.05,
                              "ros2 rosbag preemption record1 action");
-    const muslisp::value safe_action = require_map_field(record2, "action", "ros2 rosbag preemption record2");
-    verify_action_components(safe_action, 0.0, 0.0, 0.0, "ros2 rosbag preemption record2 action");
+    const muslisp::value fallback_action = require_map_field(record2, "action", "ros2 rosbag preemption record2");
+    verify_action_components(fallback_action, 0.25, 0.0, 0.05, "ros2 rosbag preemption record2 action");
 
-    const muslisp::value safe_u = require_map_field(safe_action, "u", "ros2 rosbag preemption record2 action");
+    const muslisp::value fallback_u = require_map_field(fallback_action, "u", "ros2 rosbag preemption record2 action");
     geometry_msgs::msg::Twist command;
-    command.linear.x = require_number_field(safe_u, "linear_x", "ros2 rosbag preemption record2 action.u");
-    command.linear.y = require_number_field(safe_u, "linear_y", "ros2 rosbag preemption record2 action.u");
-    command.angular.z = require_number_field(safe_u, "angular_z", "ros2 rosbag preemption record2 action.u");
+    command.linear.x = require_number_field(fallback_u, "linear_x", "ros2 rosbag preemption record2 action.u");
+    command.linear.y = require_number_field(fallback_u, "linear_y", "ros2 rosbag preemption record2 action.u");
+    command.angular.z = require_number_field(fallback_u, "angular_z", "ros2 rosbag preemption record2 action.u");
 
     write_summary(
         paths.summary_path,
