@@ -562,6 +562,7 @@ void test_ros2_rosbag_replay_conformance() {
     const std::string run_expr =
         "(begin "
         + safe_action_snippet() +
+        "  (define preempt-state (map.make)) "
         "  (define rosbag-run-result "
         "    (env.run-loop "
         "      (begin "
@@ -1040,9 +1041,9 @@ void test_ros2_rosbag_preemption_fallback_conformance() {
         "        cfg) "
         "      (lambda (obs) "
         "        (begin "
-        "          (define state (map.get obs 'state (map.make))) "
-        "          (define pose (map.get state 'pose (map.make))) "
-        "          (if (> (map.get pose 'x 0.0) 0.5) "
+        "          (define tick (+ (map.get preempt-state 'tick 0) 1)) "
+        "          (map.set! preempt-state 'tick tick) "
+        "          (if (> tick 1) "
         "            (begin "
         "              (define bad (map.make)) "
         "              (map.set! bad 'action_schema \"ros2.action.v1\") "
