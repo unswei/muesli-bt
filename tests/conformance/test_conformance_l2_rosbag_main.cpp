@@ -562,7 +562,6 @@ void test_ros2_rosbag_replay_conformance() {
     const std::string run_expr =
         "(begin "
         + safe_action_snippet() +
-        "  (define preempt-state (map.make)) "
         "  (define rosbag-run-result "
         "    (env.run-loop "
         "      (begin "
@@ -1025,6 +1024,7 @@ void test_ros2_rosbag_preemption_fallback_conformance() {
     const std::string run_expr =
         "(begin "
         + safe_action_snippet() +
+        "  (define preempt-state (map.make)) "
         "  (define rosbag-run-result "
         "    (env.run-loop "
         "      (begin "
