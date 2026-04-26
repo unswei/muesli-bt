@@ -1,5 +1,9 @@
 # Isaac Sim / ROS2: H1 locomotion demo
 
+!!! note "status"
+    Status: experimental supporting demo.
+    This page documents a Linux/NVIDIA Isaac Sim path. It is supporting evidence and does not change the released core BT or ROS2 transport semantics.
+
 ## what this is
 
 This example is the first Isaac-facing H1 locomotion demo for `muesli-bt`.

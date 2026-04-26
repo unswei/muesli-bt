@@ -1,5 +1,9 @@
 # ros2 backend scope
 
+!!! note "status"
+    Status: released thin transport baseline.
+    ROS2 support is a host integration layer. It does not redefine the Lisp language, BT semantics, planner contract, or canonical event stream.
+
 ## what this is
 
 This page turns the current ROS2 backend intent for `muesli-bt` into a concrete implementation plan.

@@ -5,6 +5,12 @@ muesli-bt
 ## [Unreleased]
 
 ### Added
+- Added a visitor-facing documentation entry path with a concise README, a reworked docs home page, a "choose your path" guide, a "first 10 minutes" quickstart, a known limitations page, an evidence index, and an observability-first guide.
+- Added a fair `BehaviorTree.CPP` comparison orientation page and a preserved feature inventory page so the README can stay short without dropping the detailed runtime surface map.
+- Added a runtime contract tutorial that walks through running a tiny BT, writing a canonical event log, validating it, and checking replay fixture structure.
+- Added a minimal task-shaped BT example with a guarded command and fallback action, including canonical event-log output and documentation.
+- Added standard repository files for security reporting, citation metadata, conduct, support, issue templates, and pull request checklist guidance.
+- Added documentation quality scripts for README links, docs links, MkDocs navigation, status labels, reference coverage, and beginner example smoke tests, with CI coverage for the new checks.
 - Added GC lifecycle telemetry events (`gc_begin`, `gc_end`) with `gc.lifecycle.v1` payloads.
 - Added GC policy builtins: `gc.policy` and `gc.set-policy!`.
 - Added deterministic async edge fixture bundles for cancellation before start, cancellation while running, cancellation after timeout, repeated cancellation, and late completion after cancellation.
@@ -21,6 +27,11 @@ muesli-bt
 - Added a ROS2 L2 rosbag pre-emption/fallback scenario that reuses canonical `host_action_invalid` and `fallback_used` outcome events.
 
 ### Changed
+- Reorganised MkDocs navigation around reader journeys, concepts, reference, integrations, evidence, internals, and project material.
+- Rewrote the root README as a front door with status vocabulary, maturity table, first examples, evidence links, ROS2/VLA status, and clear limitations.
+- Added visible status blocks to contract-only, experimental, ROS2, VLA, Isaac, and benchmark-evidence pages so planned and released surfaces are easier to distinguish.
+- Updated beginner example pages with expected output, expected artefacts, and next-step links.
+- Updated GitHub repository metadata with a concise description and robotics, Behaviour Tree, ROS2, replay, and observability topics.
 - Extended the canonical event schema to accept GC lifecycle and planned tick-audit event types.
 - Extended fixture verification with exact per-event-type count checks through `expected_metrics.type_counts`.
 - Extended strict allocation coverage beyond the narrow logging-off lane to representative reactive and logging-on precompiled tick shapes.

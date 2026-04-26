@@ -26,12 +26,16 @@ plugins:
           - terminology.md: terminology and glossary
           - getting-oriented/*.md: orientation guides
           - getting-started.md: quickstart and setup
+          - getting-started-10min.md: first 10 minutes
+          - tutorials/*.md: tutorials
           - getting-started-consume.md: package installation and consumer setup
           - integration/*.md: backend integration workflows
           - contracts/*.md: integration contracts and compatibility guarantees
+          - evidence/*.md: evidence index and artefacts
           - planning/*.md: planner API and backend docs
           - bt/*.md: behaviour tree semantics and usage
           - language/**/*.md: language syntax and reference
+          - contributing/*.md: contributor documentation
           - internals/*.md: implementer notes
           - observability/*.md: tracing, logging, profiling
           - diagrams/*.md: diagram authoring and workflow
@@ -53,17 +57,72 @@ markdown_extensions:
 
 nav:
   - Home: index.md
-  - Getting Oriented:
+  - Start Here:
       - What Is muesli-bt: getting-oriented/what-is-muesli-bt.md
+      - Choose Your Path: getting-oriented/choose-your-path.md
+      - Feature Inventory: getting-oriented/feature-inventory.md
       - How Execution Works: getting-oriented/how-execution-works.md
+      - Getting Started: getting-started.md
+      - First 10 Minutes: getting-started-10min.md
       - Scheme vs Common Lisp: getting-oriented/scheme-vs-common-lisp.md
       - Terminology: terminology.md
-  - Getting Started:
-      - Getting Started: getting-started.md
-      - Consume As A Package: getting-started-consume.md
-      - Lisp Basics: lisp-basics.md
-  - Examples:
-      - Overview: examples/index.md
+      - Known Limitations: known-limitations.md
+  - Tutorials:
+      - Runtime Contract In Practice: tutorials/runtime-contract-in-practice.md
+      - Hello BT: examples/hello-bt.md
+      - Minimal Real BT: examples/minimal-real-bt.md
+      - Lisp Basics: examples/lisp-basics.md
+      - PyBullet e-puck-style Goal Seeking: examples/pybullet-epuck-goal.md
+      - ROS2 Tutorial: integration/ros2-tutorial.md
+      - A* Tutorial (Step By Step): examples/tutorials/a-star-step-by-step.md
+      - Dijkstra Tutorial (Step By Step): examples/tutorials/dijkstra-step-by-step.md
+      - PRM Tutorial (Step By Step): examples/tutorials/prm-step-by-step.md
+  - Concepts:
+      - Behaviour Trees: bt/intro.md
+      - Bounded-Time Planning: bt/bounded-time-planning.md
+      - Async And VLA Orchestration: bt/vla-integration.md
+      - Host Capability Bundles: integration/host-capability-bundles.md
+      - Observability And Replay: getting-oriented/observability-first.md
+      - Why Not Just BehaviorTree.CPP: getting-oriented/why-not-btcpp.md
+      - How Execution Works: getting-oriented/how-execution-works.md
+  - Reference:
+      - Language:
+          - Syntax: language/syntax.md
+          - Semantics: language/semantics.md
+          - Built-ins Overview: language/builtins.md
+          - Reference Index: language/reference/index.md
+          - Lisp Basics: lisp-basics.md
+      - Behaviour Trees:
+          - Syntax: bt/syntax.md
+          - Semantics: bt/semantics.md
+          - BT.CPP Crosswalk: bt/cpp-crosswalk.md
+          - Blackboard: bt/blackboard.md
+          - Scheduler: bt/scheduler.md
+          - PlanAction Node: bt/plan-action-node.md
+          - Planner Configuration: bt/planner-configuration.md
+          - VLA Nodes: bt/vla-nodes.md
+          - VLA Request/Response: bt/vla-request-response.md
+          - Host Integration: bt/robot-integration.md
+      - Planning:
+          - Overview: planning/overview.md
+          - planner.plan Request/Result: planning/planner-plan.md
+          - MCTS Backend: planning/mcts.md
+          - MPPI Backend: planning/mppi.md
+          - iLQR Backend: planning/ilqr.md
+          - plan-action Node: planning/plan-action-node.md
+      - Integration APIs:
+          - env API (`env.api.v1`): integration/env-api.md
+          - Capability Contracts:
+              - Host Capability Bundles: integration/host-capability-bundles.md
+              - cap.motion.v1: integration/cap-motion-v1.md
+              - cap.perception.scene.v1: integration/cap-perception-scene-v1.md
+              - Host Capability BT Example: integration/host-capability-bt-example.md
+  - Integrations:
+      - Overview: integration/overview.md
+      - Writing A Backend: integration/writing-a-backend.md
+      - ROS2 Backend Scope: integration/ros2-backend-scope.md
+      - ROS2 Tutorial: integration/ros2-tutorial.md
+      - ROS2 Flagship Source: integration/ros2-flagship-source.md
       - Webots:
           - e-puck Goal Seeking: examples/webots-epuck-goal-seeking.md
           - e-puck Goal Full Source: examples/webots-epuck-goal-source.md
@@ -73,86 +132,51 @@ nav:
       - PyBullet:
           - Racecar: examples/pybullet-racecar.md
           - e-puck-style Goal Seeking: examples/pybullet-epuck-goal.md
-      - Cross-transport:
-          - Flagship Comparison: examples/cross-transport-flagship-comparison.md
       - Isaac Sim / ROS2:
           - H1 Locomotion Demo: examples/isaac-h1-ros2-demo.md
           - TurtleBot3 ROS2 Demo: examples/isaac-wheeled-ros2-showcase.md
-      - More Scripted Examples:
-          - Hello BT: examples/hello-bt.md
-          - Memoryful Sequence Demo: examples/memoryful-sequence-demo.md
-          - Reactive Guard Demo: examples/reactive-guard-demo.md
-          - Lisp Basics: examples/lisp-basics.md
-          - A* Search: examples/a-star-search.md
-          - A* Tutorial (Step By Step): examples/tutorials/a-star-step-by-step.md
-          - Dijkstra (PQ): examples/dijkstra-pq.md
-          - Dijkstra Tutorial (Step By Step): examples/tutorials/dijkstra-step-by-step.md
-          - PRM (PQ): examples/prm-pq.md
-          - PRM Tutorial (Step By Step): examples/tutorials/prm-step-by-step.md
-          - Recovery BT: examples/recovery-bt.md
-          - Continuous MCTS: examples/continuous-mcts.md
-          - Planning BT (1D): examples/planner-bt-1d.md
-          - Planning BT (PTZ): examples/planner-bt-ptz.md
-          - VLA Stub BT: examples/vla-stub-bt.md
-          - Hybrid VLA + Planner: examples/hybrid-vla-mcts.md
-          - C++ Nodes: examples/cpp-nodes.md
-      - Full Source Walkthroughs:
-          - Webots e-puck Obstacle Source: examples/webots-epuck-obstacle-wall-following-source.md
-          - Webots e-puck Line Source: examples/webots-epuck-line-following-source.md
-          - PyBullet Racecar Source: examples/pybullet-racecar-source.md
-          - PyBullet e-puck-style Goal Source: examples/pybullet-epuck-goal-source.md
-          - Isaac H1 Demo Source: examples/isaac-h1-ros2-demo-source.md
-  - Language:
-      - Syntax: language/syntax.md
-      - Semantics: language/semantics.md
-      - Built-ins Overview: language/builtins.md
-      - Reference Index: language/reference/index.md
-  - Behaviour Trees:
-      - Introduction: bt/intro.md
-      - Syntax: bt/syntax.md
-      - Semantics: bt/semantics.md
-      - BT.CPP Crosswalk: bt/cpp-crosswalk.md
-      - Blackboard: bt/blackboard.md
-      - Scheduler: bt/scheduler.md
-      - PlanAction Node: bt/plan-action-node.md
-      - Planner Configuration: bt/planner-configuration.md
-      - Bounded-Time Planning: bt/bounded-time-planning.md
-      - VLA Integration: bt/vla-integration.md
-      - VLA Nodes: bt/vla-nodes.md
-      - VLA Request/Response: bt/vla-request-response.md
-      - Host Integration: bt/robot-integration.md
-  - Planning:
-      - Overview: planning/overview.md
-      - planner.plan Request/Result: planning/planner-plan.md
-      - MCTS Backend: planning/mcts.md
-      - MPPI Backend: planning/mppi.md
-      - iLQR Backend: planning/ilqr.md
-      - plan-action Node: planning/plan-action-node.md
-      - Planner Logging: observability/planner-logging.md
-      - Integration:
-          - Overview: integration/overview.md
-          - env API (`env.api.v1`): integration/env-api.md
-          - ROS2 Tutorial: integration/ros2-tutorial.md
-          - ROS2 Flagship Source: integration/ros2-flagship-source.md
-          - Writing A Backend: integration/writing-a-backend.md
-          - Host Capability Bundles: integration/host-capability-bundles.md
-          - cap.motion.v1: integration/cap-motion-v1.md
-          - cap.perception.scene.v1: integration/cap-perception-scene-v1.md
-          - Host Capability BT Example: integration/host-capability-bt-example.md
-          - ROS2 Backend Scope: integration/ros2-backend-scope.md
+      - Cross-transport:
+          - Flagship Comparison: examples/cross-transport-flagship-comparison.md
           - Cross-transport Flagship for v0.5: integration/cross-transport-flagship.md
           - Cross-transport Comparison Protocol: integration/cross-transport-comparison-protocol.md
           - Same-robot Strict Comparison Track: integration/same-robot-strict-comparison.md
           - Same-robot Strict Comparison Protocol: integration/same-robot-strict-comparison-protocol.md
           - Cross-transport Shared Contract: integration/cross-transport-shared-contract.md
           - Sensing and Blackboard: integration/sensing-and-blackboard.md
-  - Contracts:
+  - Examples:
+      - Overview: examples/index.md
+      - Hello BT: examples/hello-bt.md
+      - Minimal Real BT: examples/minimal-real-bt.md
+      - Memoryful Sequence Demo: examples/memoryful-sequence-demo.md
+      - Reactive Guard Demo: examples/reactive-guard-demo.md
+      - Lisp Basics: examples/lisp-basics.md
+      - A* Search: examples/a-star-search.md
+      - Dijkstra (PQ): examples/dijkstra-pq.md
+      - PRM (PQ): examples/prm-pq.md
+      - Recovery BT: examples/recovery-bt.md
+      - Continuous MCTS: examples/continuous-mcts.md
+      - Planning BT (1D): examples/planner-bt-1d.md
+      - Planning BT (PTZ): examples/planner-bt-ptz.md
+      - VLA Stub BT: examples/vla-stub-bt.md
+      - Hybrid VLA + Planner: examples/hybrid-vla-mcts.md
+      - C++ Nodes: examples/cpp-nodes.md
+      - Full Source Walkthroughs:
+          - Webots e-puck Obstacle Source: examples/webots-epuck-obstacle-wall-following-source.md
+          - Webots e-puck Line Source: examples/webots-epuck-line-following-source.md
+          - PyBullet Racecar Source: examples/pybullet-racecar-source.md
+          - PyBullet e-puck-style Goal Source: examples/pybullet-epuck-goal-source.md
+          - Isaac H1 Demo Source: examples/isaac-h1-ros2-demo-source.md
+  - Evidence:
+      - Evidence Index: evidence/index.md
       - Index: contracts/README.md
       - Runtime Contract v1: contracts/runtime-contract-v1.md
-      - Studio Compatibility Matrix: contracts/studio-compatibility-matrix.md
       - Compatibility Policy: contracts/compatibility.md
       - Conformance Levels: contracts/conformance.md
+      - Runtime Performance: internals/runtime-performance.md
+      - Canonical Event Log: observability/event-log.md
+      - Tick Audit Record: observability/tick-audit.md
       - muesli-studio Integration: contracts/muesli-studio-integration.md
+      - Studio Compatibility Matrix: contracts/studio-compatibility-matrix.md
   - Observability:
       - Canonical Event Log: observability/event-log.md
       - Tracing: observability/tracing.md
@@ -161,8 +185,6 @@ nav:
       - Tick Audit Record: observability/tick-audit.md
       - Planner Logging: observability/planner-logging.md
       - VLA Logging: observability/vla-logging.md
-  - Diagrams:
-      - Diagram Workflow: diagrams/diagrams.md
   - Internals:
       - Architecture: internals/architecture.md
       - Runtime Performance: internals/runtime-performance.md
@@ -171,7 +193,15 @@ nav:
       - Extending: internals/extending.md
       - Testing And Verification: testing.md
       - Docs Coverage: docs-coverage.md
-  - Changelog: changelog.md
+      - Diagram Workflow: diagrams/diagrams.md
+  - Project:
+      - Roadmap To 1.0: roadmap-to-1.0.md
+      - Roadmap: limitations-roadmap.md
+      - Known Limitations: known-limitations.md
+      - Changelog: changelog.md
+      - TODO: todo.md
+      - Consume As A Package: getting-started-consume.md
+      - Contributing To Docs: contributing/docs-style-guide.md
   - Release Notes:
       - Overview: releases/index.md
       - v0.6.0: releases/v0.6.0.md
@@ -181,6 +211,3 @@ nav:
       - v0.3.0: releases/v0.3.0.md
       - v0.2.0: releases/v0.2.0.md
       - v0.1.0: releases/v0.1.0.md
-  - TODO: todo.md
-  - Roadmap To 1.0: roadmap-to-1.0.md
-  - Roadmap: limitations-roadmap.md

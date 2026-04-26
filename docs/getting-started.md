@@ -7,6 +7,45 @@ If you want to understand the BT example on this page, follow the linked Lisp an
 
 If you are new to the architecture, read [What Is muesli-bt](getting-oriented/what-is-muesli-bt.md) first.
 
+## pick a path
+
+### core runtime only
+
+Use this path if you want Lisp, Behaviour Trees, canonical logging, and tests without ROS2:
+
+```bash
+cmake --preset dev
+cmake --build --preset dev -j
+./build/dev/muslisp examples/bt/hello_bt.lisp
+./scripts/setup-python-env.sh
+make verify-install
+```
+
+### first simulator demo
+
+Use this path if you want the PyBullet example:
+
+```bash
+cmake --preset dev
+cmake --build --preset dev -j
+make demo-setup
+PYTHONPATH=build/dev/python \
+  .venv-py311/bin/python examples/pybullet_epuck_goal/run_demo.py --headless
+```
+
+### ROS2 path
+
+Use this path only on a ROS2 Humble host, normally Ubuntu 22.04:
+
+```bash
+cmake --preset linux-ros2
+cmake --build --preset linux-ros2 -j
+./build/linux-ros2/muslisp_ros2 examples/repl_scripts/ros2-flagship-goal.lisp
+python3 tools/validate_log.py build/linux-ros2/ros2-flagship-goal/events.jsonl
+```
+
+ROS2 remains a thin host integration layer. It does not redefine the core BT semantics.
+
 ## What You Will Have Working After This Page
 
 - a successful local build and test run

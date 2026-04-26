@@ -1,5 +1,9 @@
 # host capability bundles
 
+!!! note "status"
+    Status: contract-only / emerging.
+    This page defines host capability boundaries and the first released registry/API direction. Individual robot adapters are released only when their implementation and tests are documented.
+
 ## what this is
 
 A host capability bundle is a named host-side service family exposed to muesli-bt through a small, versioned contract.

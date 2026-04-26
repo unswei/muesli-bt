@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use muesli-bt in academic work, please cite the repository or the tagged release you used."
+title: "muesli-bt"
+type: software
+authors:
+  - name: "muesli-bt contributors"
+repository-code: "https://github.com/unswei/muesli-bt"
+url: "https://unswei.github.io/muesli-bt/"
+license: MIT
+date-released: 2026-04-26
+abstract: "A compact Lisp-authored Behaviour Tree runtime for robotics, with bounded-time planning, cancellable asynchronous jobs, and canonical event logs."
+keywords:
+  - robotics
+  - behaviour trees
+  - behavior trees
+  - Lisp
+  - ROS2
+  - replay
+  - observability

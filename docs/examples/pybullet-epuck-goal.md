@@ -44,6 +44,19 @@ PYTHONPATH=build/dev/python \
 
 That clutter run now reaches the goal on the checked-in seed and scene.
 
+## expected output
+
+You should see run progress and a final summary from the Python runner. Exact timings and run ids vary.
+
+The important success signal is that the run completes without an exception and writes a tick log plus run metadata under `examples/pybullet_epuck_goal/logs/`.
+
+## expected artefacts
+
+- `examples/pybullet_epuck_goal/logs/<run_id>.jsonl`
+- `examples/pybullet_epuck_goal/logs/<run_id>.run_metadata.json`
+- optional screenshot path if `--screenshot-path` is provided
+- optional MP4 path if `--video-path` is provided
+
 ## capture a scene preview
 
 The checked-in preview image and clip on this page come from the clutter layout:

@@ -1,0 +1,39 @@
+name: Feature request
+description: Propose a focused feature or integration.
+title: "[feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the smallest useful change.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - core runtime
+        - Behaviour Trees
+        - planner
+        - async/VLA
+        - event logs/replay
+        - PyBullet/Webots
+        - ROS2
+        - host capability
+        - documentation
+        - other
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence or acceptance criteria
+      description: How should this be tested, documented, logged, or benchmarked?

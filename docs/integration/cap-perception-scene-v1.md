@@ -1,5 +1,9 @@
 # cap.perception.scene.v1
 
+!!! note "status"
+    Status: contract-only.
+    This page defines the intended host capability boundary for scene perception. It is not a released detector or perception backend.
+
 ## what this is
 
 `cap.perception.scene.v1` is the host capability bundle contract for host-owned scene perception.

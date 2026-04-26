@@ -1,5 +1,9 @@
 # Isaac Sim: TurtleBot3 ROS2 Demo
 
+!!! note "status"
+    Status: experimental supporting demo.
+    This page documents a reproducible Isaac Sim / ROS2 showcase path. It does not expand the core runtime semantics beyond the thin ROS2 host integration boundary.
+
 ## what this is
 
 This example shows a TurtleBot3 Burger in Isaac Sim driven through the existing ROS 2 wheeled interface.

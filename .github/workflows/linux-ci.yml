@@ -124,6 +124,53 @@ jobs:
       - name: Verify docs snippet freshness
         run: python3 ./scripts/check_docs_snippet_freshness.py
 
+  docs-quality:
+    name: docs-quality
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Check README links
+        run: python3 ./scripts/check-readme-links.py
+
+      - name: Check docs links
+        run: python3 ./scripts/check-docs-links.py
+
+      - name: Check MkDocs navigation
+        run: python3 ./scripts/check-mkdocs-nav.py
+
+      - name: Check status labels
+        run: python3 ./scripts/check-status-labels.py
+
+      - name: Check reference coverage bookkeeping
+        run: python3 ./scripts/check-reference-coverage.py
+
+  beginner-examples:
+    name: beginner-examples
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++
+
+      - name: Configure dev build
+        run: cmake --preset dev
+
+      - name: Build muslisp
+        run: cmake --build --preset dev --target muslisp --parallel
+
+      - name: Smoke-test beginner examples
+        run: python3 ./scripts/check-examples-runnable.py
+
   schema-validation:
     name: schema-validation
     if: github.event_name != 'schedule'

@@ -38,7 +38,14 @@ python3 tools/fixtures/verify_fixture.py
 ```bash
 ./scripts/setup-python-env.sh
 .venv-py311/bin/python -m mkdocs build --strict
+python3 scripts/check-readme-links.py
+python3 scripts/check-docs-links.py
+python3 scripts/check-mkdocs-nav.py
+python3 scripts/check-status-labels.py
+python3 scripts/check-reference-coverage.py
 ```
+
+Use the [docs style guide](docs/contributing/docs-style-guide.md) when adding or reorganising user-facing documentation.
 
 ## formatting
 

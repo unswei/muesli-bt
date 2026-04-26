@@ -8,13 +8,31 @@ Script path:
 
 - `examples/repl_scripts/reactive-guard-demo.lisp`
 
-Run:
+## run it
 
 ```bash
 ./build/dev/muslisp examples/repl_scripts/reactive-guard-demo.lisp
 ```
 
-## Source
+## expected output
+
+You should see approximately:
+
+```text
+reactive-guard-demo
+(tick-1 running)
+(tick-2-stop failure)
+("...sched_submit..." "...sched_cancel..." "...tick_end...")
+nil
+```
+
+The event records include run ids and timings, so they will not match byte for byte.
+
+## expected artefacts
+
+This example prints event excerpts from memory and does not write files.
+
+## source
 
 ```lisp
 --8<-- "examples/repl_scripts/reactive-guard-demo.lisp"
@@ -54,7 +72,7 @@ In practice, inspect:
 
 > Maintainer note: this page previously named `node_preempt` and `node_halt`, but [Canonical Event Log](../observability/event-log.md) does not currently list those event types. Reconcile the example wording with the canonical event reference before making the event-name claim more specific.
 
-Read next:
+## next
 
 - [Brief Behaviour Tree Introduction](../bt/intro.md)
 - [Logging](../observability/logging.md)

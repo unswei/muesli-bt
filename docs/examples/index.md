@@ -11,9 +11,10 @@ Recommended first path:
 
 1. [muslisp basics](lisp-basics.md) - beginner, pure Lisp, no BT semantics yet
 2. [hello BT](hello-bt.md) - beginner, first tree, first repeated ticks
-3. [Memoryful Sequence Demo](memoryful-sequence-demo.md) - semantics, shows why memory matters across ticks
-4. [e-puck-style goal seeking](pybullet-epuck-goal.md) - simulator, first backend-backed success path
-5. [Reactive Guard Demo](reactive-guard-demo.md) - intermediate, reactive guards and cancellation
+3. [minimal real BT](minimal-real-bt.md) - beginner, guarded task logic and fallback command
+4. [Memoryful Sequence Demo](memoryful-sequence-demo.md) - semantics, shows why memory matters across ticks
+5. [e-puck-style goal seeking](pybullet-epuck-goal.md) - simulator, first backend-backed success path
+6. [Reactive Guard Demo](reactive-guard-demo.md) - intermediate, reactive guards and cancellation
 
 If you already know BTs but not the runtime shape, read [How Execution Works](../getting-oriented/how-execution-works.md) before moving to the simulator examples.
 
@@ -29,6 +30,7 @@ That makes the examples reliable as reference material, but it also means you sh
 
 - [muslisp basics](lisp-basics.md) - beginner, introduces `define`, quoting, and list-shaped code before BT syntax appears
 - [hello BT](hello-bt.md) - beginner, first BT example after the Lisp basics page
+- [minimal real BT](minimal-real-bt.md) - beginner, first guarded fallback shape with a canonical log file
 
 ## Best First Simulator Example
 
@@ -73,6 +75,7 @@ For pure Lisp algorithms and smaller BT samples, see:
 - [examples directory overview](https://github.com/unswei/muesli-bt/blob/main/examples/README.md)
 - [Memoryful Sequence Demo](memoryful-sequence-demo.md) - semantics
 - [Reactive Guard Demo](reactive-guard-demo.md) - intermediate semantics
+- [minimal real BT](minimal-real-bt.md) - task-shaped BT without a simulator
 - [A* Search](a-star-search.md) - planning algorithm
 - [Dijkstra + PQ](dijkstra-pq.md) - planning algorithm
 - [PRM + PQ](prm-pq.md) - planning algorithm

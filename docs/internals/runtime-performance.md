@@ -1,5 +1,9 @@
 # runtime performance
 
+!!! note "status"
+    Status: experimental / evolving benchmark evidence.
+    Treat local benchmark numbers as current interpretation unless they are tied to a tagged release artefact bundle with hardware, commit, compiler, build flags, and commands.
+
 ## what this is
 
 This page records the current runtime performance guidance for `muesli-bt`.

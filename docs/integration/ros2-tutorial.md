@@ -1,5 +1,9 @@
 # ros2 tutorial
 
+!!! note "status"
+    Status: released thin transport baseline, Humble-focused.
+    This tutorial uses ROS2 as a host integration layer with canonical logging. It does not introduce ROS-specific BT semantics.
+
 ## what this is
 
 This page is the supported end-to-end ROS2 path for `muesli-bt`.

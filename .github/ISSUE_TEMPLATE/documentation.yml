@@ -1,0 +1,34 @@
+name: Documentation issue
+description: Report missing, unclear, stale, or contradictory documentation.
+title: "[docs]: "
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: page
+    attributes:
+      label: Page or section
+      description: Link the page or describe where the problem appears.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is unclear, missing, stale, or inconsistent?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Suggested improvement
+      description: What should the page say or link to?
+  - type: dropdown
+    id: status
+    attributes:
+      label: Status label involved
+      options:
+        - released
+        - experimental
+        - contract-only
+        - planned
+        - not sure

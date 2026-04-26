@@ -1,5 +1,9 @@
 # VLA Integration In BTs
 
+!!! note "status"
+    Status: released lifecycle hooks and stubs.
+    The runtime exposes submit, poll, cancel, timeout, BT node semantics, and canonical logging. Production provider transport and credentials are host-side integration work unless a concrete backend is documented and tested.
+
 This runtime exposes VLA access through [host](../terminology.md#host) capabilities and async jobs.
 
 Current repository scope: **stub integration + contract hooks**.

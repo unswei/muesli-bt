@@ -5,11 +5,26 @@ Path: `examples/repl_scripts/lisp-basics.lisp`
 This is the best first runnable example if you are new to Lisp syntax.
 Use it before [Example: Hello BT](hello-bt.md), because it shows the list-shaped syntax and symbol handling without introducing BT semantics yet.
 
-Run via:
+## run it
 
 ```bash
 ./build/dev/muslisp examples/repl_scripts/lisp-basics.lisp
 ```
+
+## expected output
+
+You should see:
+
+```text
+12.5
+#t
+(a b c)
+11
+```
+
+## expected artefacts
+
+This example does not write files.
 
 This page does not cover BT syntax.
 Its job is to make the first BT examples easier to read.
@@ -25,7 +40,7 @@ Its job is to make the first BT examples easier to read.
 - quoted symbols stay as data instead of being evaluated
 - lists are ordinary values, not a special BT-only syntax
 
-## What This Shows
+## what this demonstrates
 
 - `define` for values
 - arithmetic with mixed numeric types
@@ -33,7 +48,7 @@ Its job is to make the first BT examples easier to read.
 - quoting symbols
 - list construction
 
-Read next:
+## next
 
 - [Brief Lisp Introduction](../lisp-basics.md)
 - [Example: Hello BT](hello-bt.md)

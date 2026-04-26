@@ -1,5 +1,9 @@
 # cap.motion.v1
 
+!!! note "status"
+    Status: contract-only.
+    This page defines the intended host capability boundary for motion services. It is not a released MoveIt adapter.
+
 ## what this is
 
 `cap.motion.v1` is the first concrete host capability bundle contract for host-owned motion work.
