@@ -104,6 +104,10 @@ set_target_properties(muesli_bt_bench PROPERTIES OUTPUT_NAME bench)
 add_executable(muesli_bt_bench_tests tests/test_main.cpp)
 target_link_libraries(muesli_bt_bench_tests PRIVATE muesli_bt_bench_harness)
 add_test(NAME muesli_bt_bench_tests COMMAND muesli_bt_bench_tests)
+add_test(
+  NAME muesli_bt_bench_precompiled_tick_allocation_strict
+  COMMAND muesli_bt_bench_tests --strict-allocation
+)
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if (Python3_Interpreter_FOUND)
@@ -121,5 +125,14 @@ if (Python3_Interpreter_FOUND)
             "${CMAKE_CURRENT_SOURCE_DIR}/scripts/compare_results.py"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/data/analysis_sample"
             "${CMAKE_CURRENT_SOURCE_DIR}/tests/data/btcpp_sample"
+  )
+  add_test(
+    NAME muesli_bt_bench_figure_scripts_smoke
+    COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_figure_scripts.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/scripts/figure_tail_latency.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/scripts/figure_memory_gc.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/scripts/write_evidence_report.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/data/analysis_sample"
   )
 endif ()

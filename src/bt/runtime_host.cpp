@@ -11,6 +11,7 @@
 
 #include "muesli_bt/contract/events.hpp"
 #include "muslisp/error.hpp"
+#include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
 
 namespace bt {
@@ -143,6 +144,29 @@ job_status status_from_memory(std::int64_t raw) {
 
 std::int64_t status_to_memory(job_status st) {
     return static_cast<std::int64_t>(st);
+}
+
+std::string gc_lifecycle_payload_json(const muslisp::gc_lifecycle_event& event) {
+    std::ostringstream data;
+    data << "{\"schema_version\":\"gc.lifecycle.v1\","
+         << "\"collection_id\":" << event.collection_id << ","
+         << "\"phase\":\"" << (event.begin ? "begin" : "end") << "\","
+         << "\"reason\":\"" << muslisp::gc::collection_reason_name(event.reason) << "\","
+         << "\"policy\":\"" << muslisp::gc::policy_name(event.policy) << "\","
+         << "\"forced\":" << (event.forced ? "true" : "false") << ","
+         << "\"in_tick\":" << (event.in_tick ? "true" : "false") << ","
+         << "\"heap_live_bytes_before\":" << event.heap_live_bytes_before << ","
+         << "\"live_objects_before\":" << event.live_objects_before;
+    if (!event.begin) {
+        data << ",\"heap_live_bytes_after\":" << event.heap_live_bytes_after
+             << ",\"live_objects_after\":" << event.live_objects_after
+             << ",\"freed_objects\":" << event.freed_objects
+             << ",\"mark_time_ns\":" << event.mark_time_ns
+             << ",\"sweep_time_ns\":" << event.sweep_time_ns
+             << ",\"pause_time_ns\":" << event.pause_time_ns;
+    }
+    data << '}';
+    return data.str();
 }
 
 }  // namespace
@@ -424,6 +448,13 @@ std::string runtime_host::dump_vla_records(std::size_t max_count) const {
 
 runtime_host& default_runtime_host() {
     static runtime_host host;
+    runtime_host* host_ptr = &host;
+    muslisp::default_gc().set_lifecycle_listener([host_ptr](const muslisp::gc_lifecycle_event& event) {
+        (void)host_ptr->events().emit(event.begin ? muesli_bt::contract::kEventGcBegin
+                                                  : muesli_bt::contract::kEventGcEnd,
+                                      std::nullopt,
+                                      gc_lifecycle_payload_json(event));
+    });
     return host;
 }
 

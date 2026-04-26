@@ -72,10 +72,31 @@ scenario_definition make_lifecycle_scenario(std::string scenario_id,
     };
 }
 
+scenario_definition make_memory_gc_scenario(std::string scenario_id,
+                                            gc_benchmark_mode gc_mode,
+                                            std::string variant,
+                                            timing_config timing) {
+    return scenario_definition{
+        .scenario_id = std::move(scenario_id),
+        .group_id = "B7",
+        .kind = benchmark_kind::memory_gc,
+        .family = tree_family::single_leaf,
+        .tree_size_nodes = 1,
+        .logging = logging_mode::off,
+        .schedule = schedule_kind::none,
+        .lifecycle = lifecycle_phase::none,
+        .gc_mode = gc_mode,
+        .variant = std::move(variant),
+        .timing = timing,
+        .seed = 20260315ull,
+        .capture_tick_trace = false,
+    };
+}
+
 const std::vector<scenario_definition>& scenario_catalogue() {
     static const std::vector<scenario_definition> catalogue = [] {
         std::vector<scenario_definition> scenarios;
-        scenarios.reserve(40);
+        scenarios.reserve(44);
 
         scenarios.push_back(
             make_static_scenario("A1-single-leaf-off", "A1", tree_family::single_leaf, 1, logging_mode::off, "base"));
@@ -166,6 +187,24 @@ const std::vector<scenario_definition>& scenario_catalogue() {
         scenarios.push_back(make_reactive_scenario(
             "B6-reactive-31-flip20-fulltrace", "B6", 31, logging_mode::fulltrace, schedule_kind::flip_every_20, "flip20"));
 
+        const timing_config b7_timing{
+            .warmup = std::chrono::milliseconds(50),
+            .run = std::chrono::milliseconds(250),
+            .repetitions = 3,
+        };
+        scenarios.push_back(make_memory_gc_scenario("B7-gc-manual-smoke",
+                                                    gc_benchmark_mode::manual,
+                                                    "manual",
+                                                    b7_timing));
+        scenarios.push_back(make_memory_gc_scenario("B7-gc-between-ticks-smoke",
+                                                    gc_benchmark_mode::between_ticks,
+                                                    "between-ticks",
+                                                    b7_timing));
+        scenarios.push_back(make_memory_gc_scenario("B7-gc-forced-pressure-smoke",
+                                                    gc_benchmark_mode::forced_pressure,
+                                                    "forced-pressure",
+                                                    b7_timing));
+
         timing_config jitter_timing;
         jitter_timing.warmup = std::chrono::milliseconds(2000);
         jitter_timing.run = std::chrono::milliseconds(60000);
@@ -190,6 +229,8 @@ std::string_view benchmark_kind_name(benchmark_kind kind) noexcept {
             return "reactive_interrupt";
         case benchmark_kind::compile_lifecycle:
             return "compile_lifecycle";
+        case benchmark_kind::memory_gc:
+            return "memory_gc";
     }
     return "unknown";
 }

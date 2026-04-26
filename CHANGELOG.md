@@ -4,7 +4,18 @@ muesli-bt
 
 ## [Unreleased]
 
-No unreleased changes yet.
+### Added
+- Added GC lifecycle telemetry events (`gc_begin`, `gc_end`) with `gc.lifecycle.v1` payloads.
+- Added GC policy builtins: `gc.policy` and `gc.set-policy!`.
+- Added deterministic async edge fixture bundles for cancellation before start, cancellation while running, cancellation after timeout, repeated cancellation, and late completion after cancellation.
+- Added a strict benchmark CTest lane for precompiled BT ticks that fails allocations outside explicitly whitelisted logging paths.
+- Added checked-in benchmark figure scripts for tail latency and memory/GC evidence.
+- Added a checked-in benchmark evidence report script that records generated figures and remaining evidence gaps.
+- Added `B7` GC and memory benchmark smoke scenarios with canonical GC lifecycle logs and CSV summary columns for GC pause, heap-live slope, RSS slope, and event-log bytes per tick.
+
+### Changed
+- Extended the canonical event schema to accept GC lifecycle and planned tick-audit event types.
+- Extended fixture verification with exact per-event-type count checks through `expected_metrics.type_counts`.
 
 ## [0.6.0] - 2026-04-25
 

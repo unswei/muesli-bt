@@ -2337,6 +2337,7 @@ status tick(instance& inst, registry& reg, services& svc) {
 
     ++inst.tick_index;
     const auto tick_start = svc.clock ? svc.clock->now() : std::chrono::steady_clock::now();
+    muslisp::gc_tick_scope gc_tick(muslisp::default_gc());
     auto tick_deadline = std::chrono::steady_clock::time_point::max();
     if (inst.tree_stats.configured_tick_budget.count() > 0) {
         tick_deadline = tick_start + inst.tree_stats.configured_tick_budget;

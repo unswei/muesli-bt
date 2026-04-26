@@ -1044,6 +1044,7 @@ void test_gc_and_stats_builtins() {
     using namespace muslisp;
 
     env_ptr env = create_global_env();
+    default_gc().set_policy(gc_policy::default_policy);
 
     for (int i = 0; i < 2000; ++i) {
         (void)eval_text("(list 1 2 3 4 5 6 7 8 9 10)", env);
@@ -1064,12 +1065,57 @@ void test_gc_and_stats_builtins() {
 
     const auto gc_stats_result = eval_text("(gc-stats)", env);
     check(is_nil(gc_stats_result), "gc-stats should return nil");
+
+    check(symbol_name(eval_text("(gc.policy)", env)) == ":default", "gc.policy default mismatch");
+    check(symbol_name(eval_text("(gc.set-policy! \"between-ticks\")", env)) == ":between-ticks",
+          "gc.set-policy! between-ticks mismatch");
+    check(default_gc().policy() == gc_policy::between_ticks, "C++ GC policy should be between-ticks");
+    check(symbol_name(eval_text("(gc.set-policy! \"manual\")", env)) == ":manual", "gc.set-policy! manual mismatch");
+    check(default_gc().policy() == gc_policy::manual, "C++ GC policy should be manual");
+    check(symbol_name(eval_text("(gc.set-policy! \"fail-on-tick-gc\")", env)) == ":fail-on-tick-gc",
+          "gc.set-policy! fail-on-tick-gc mismatch");
+    check(default_gc().policy() == gc_policy::fail_on_tick_gc, "C++ GC policy should be fail-on-tick-gc");
+    expect_lisp_error_message("(gc.set-policy! \"sometimes\")",
+                              env,
+                              "gc.set-policy!: expected :default, :between-ticks, :manual, or :fail-on-tick-gc",
+                              "gc.set-policy! invalid policy");
+    (void)eval_text("(gc.set-policy! \"default\")", env);
+    check(default_gc().policy() == gc_policy::default_policy, "GC policy should reset to default");
+}
+
+void test_gc_lifecycle_events() {
+    using namespace muslisp;
+
+    bt::runtime_host& host = bt::default_runtime_host();
+    host.events().set_enabled(true);
+    host.events().set_ring_capacity(64);
+    host.events().clear_ring();
+    default_gc().set_policy(gc_policy::default_policy);
+
+    default_gc().collect();
+
+    const std::vector<std::string> lines = host.events().snapshot();
+    bool saw_begin = false;
+    bool saw_end = false;
+    bool saw_schema = false;
+    bool saw_forced = false;
+    for (const std::string& line : lines) {
+        saw_begin = saw_begin || line.find("\"type\":\"gc_begin\"") != std::string::npos;
+        saw_end = saw_end || line.find("\"type\":\"gc_end\"") != std::string::npos;
+        saw_schema = saw_schema || line.find("\"schema_version\":\"gc.lifecycle.v1\"") != std::string::npos;
+        saw_forced = saw_forced || line.find("\"reason\":\"forced\"") != std::string::npos;
+    }
+    check(saw_begin, "GC lifecycle should emit gc_begin");
+    check(saw_end, "GC lifecycle should emit gc_end");
+    check(saw_schema, "GC lifecycle should emit gc.lifecycle.v1 payload");
+    check(saw_forced, "GC lifecycle should record forced collection reason");
 }
 
 void test_gc_during_argument_evaluation() {
     using namespace muslisp;
 
     env_ptr env = create_global_env();
+    default_gc().set_policy(gc_policy::default_policy);
 
     // Calling gc-stats while evaluating later arguments must not invalidate earlier values.
     value out = eval_text("(begin (define x (list 1 2 3)) (list x (gc-stats) x))", env);
@@ -4435,6 +4481,7 @@ int main() {
         {"bt binary save/load roundtrip and validation", test_bt_binary_save_load_roundtrip_and_validation},
         {"list and predicate builtins", test_list_and_predicate_builtins},
         {"gc and stats builtins", test_gc_and_stats_builtins},
+        {"gc lifecycle events", test_gc_lifecycle_events},
         {"gc during argument evaluation", test_gc_during_argument_evaluation},
         {"math/time builtins and domain errors", test_math_time_and_domain_errors},
         {"rng determinism and ranges", test_rng_determinism_and_ranges},

@@ -2,16 +2,22 @@
 
 #include <algorithm>
 #include <ctime>
+#include <fstream>
 #include <iomanip>
 #include <memory>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
+#include "bt/event_log.hpp"
 #include "harness/allocation_tracker.hpp"
 #include "harness/metadata.hpp"
 #include "harness/stats.hpp"
 #include "bench_config.hpp"
 #include "fixtures/tree_factory.hpp"
+#include "muesli_bt/contract/events.hpp"
+#include "muslisp/gc.hpp"
+#include "muslisp/value.hpp"
 #include "runtimes/muesli_adapter.hpp"
 #if MUESLI_BT_BENCH_WITH_BTCPP
 #include "runtimes/btcpp_adapter.hpp"
@@ -147,9 +153,195 @@ std::string scenario_description(const scenario_definition& scenario) {
             if (scenario.group_id == "B6") {
                 return scenario.kind == benchmark_kind::reactive_interrupt ? "reactive logging trace" : "static logging trace";
             }
+            if (scenario.group_id == "B7") {
+                return "GC and memory evidence (" + scenario.variant + ")";
+            }
             break;
     }
     return scenario.scenario_id;
+}
+
+run_summary_row make_base_run_row(const environment_info& environment,
+                                  const runtime_adapter& adapter,
+                                  const scenario_definition& scenario,
+                                  const tree_fixture& fixture,
+                                  std::size_t repetition);
+
+std::string gc_lifecycle_payload_json(const muslisp::gc_lifecycle_event& event) {
+    std::ostringstream data;
+    data << "{\"schema_version\":\"gc.lifecycle.v1\","
+         << "\"collection_id\":" << event.collection_id << ","
+         << "\"phase\":\"" << (event.begin ? "begin" : "end") << "\","
+         << "\"reason\":\"" << muslisp::gc::collection_reason_name(event.reason) << "\","
+         << "\"policy\":\"" << muslisp::gc::policy_name(event.policy) << "\","
+         << "\"forced\":" << (event.forced ? "true" : "false") << ","
+         << "\"in_tick\":" << (event.in_tick ? "true" : "false") << ","
+         << "\"heap_live_bytes_before\":" << event.heap_live_bytes_before << ","
+         << "\"live_objects_before\":" << event.live_objects_before;
+    if (!event.begin) {
+        data << ",\"heap_live_bytes_after\":" << event.heap_live_bytes_after
+             << ",\"live_objects_after\":" << event.live_objects_after
+             << ",\"freed_objects\":" << event.freed_objects
+             << ",\"mark_time_ns\":" << event.mark_time_ns
+             << ",\"sweep_time_ns\":" << event.sweep_time_ns
+             << ",\"pause_time_ns\":" << event.pause_time_ns;
+    }
+    data << '}';
+    return data.str();
+}
+
+muslisp::gc_policy policy_for_gc_mode(gc_benchmark_mode mode) {
+    switch (mode) {
+        case gc_benchmark_mode::manual:
+            return muslisp::gc_policy::manual;
+        case gc_benchmark_mode::between_ticks:
+            return muslisp::gc_policy::between_ticks;
+        case gc_benchmark_mode::forced_pressure:
+            return muslisp::gc_policy::default_policy;
+        case gc_benchmark_mode::none:
+            break;
+    }
+    return muslisp::gc_policy::default_policy;
+}
+
+void allocate_gc_pressure_batch(std::uint64_t tick_index, muslisp::value& retained) {
+    muslisp::value transient = muslisp::make_nil();
+    for (std::size_t i = 0; i < 64u; ++i) {
+        const auto raw = static_cast<std::int64_t>(tick_index * 64u + i);
+        transient = muslisp::make_cons(muslisp::make_integer(raw), transient);
+    }
+    if ((tick_index % 8u) == 0u) {
+        retained = muslisp::make_cons(muslisp::make_integer(static_cast<std::int64_t>(tick_index)), retained);
+    }
+}
+
+run_summary_row run_memory_gc_once(const environment_info& environment,
+                                   const runtime_adapter& adapter,
+                                   const scenario_definition& scenario,
+                                   const tree_fixture& fixture,
+                                   const std::filesystem::path& output_dir,
+                                   std::size_t repetition) {
+    muslisp::gc& heap = muslisp::default_gc();
+    const muslisp::gc_policy old_policy = heap.policy();
+    heap.clear_lifecycle_listener();
+    heap.set_policy(policy_for_gc_mode(scenario.gc_mode));
+    heap.collect();
+
+    const std::filesystem::path event_dir = output_dir / scenario.scenario_id / ("rep-" + std::to_string(repetition));
+    std::filesystem::create_directories(event_dir);
+    const std::filesystem::path event_path = event_dir / "events.jsonl";
+    std::filesystem::remove(event_path);
+
+    bt::event_log events(0u);
+    events.set_path(event_path.string());
+    events.set_file_enabled(true);
+    events.set_flush_each_message(false);
+    events.set_flush_on_tick_end(false);
+    events.set_capture_stats_enabled(true);
+    events.set_run_id(scenario.scenario_id + "-rep-" + std::to_string(repetition));
+    events.set_git_sha(MUESLI_BT_BENCH_GIT_COMMIT);
+    events.set_host_info("muesli-bt-bench", MUESLI_BT_BENCH_PROJECT_VERSION, "bench");
+    events.ensure_run_started("", "{\"reset\":false,\"benchmark_group\":\"B7\"}");
+
+    std::vector<std::uint64_t> latencies_ns;
+    std::vector<std::uint64_t> gc_pause_ns;
+    muslisp::value retained = muslisp::make_nil();
+    muslisp::gc_root_scope roots(heap);
+    roots.add(&retained);
+
+    heap.set_lifecycle_listener([&](const muslisp::gc_lifecycle_event& event) {
+        const std::string payload = gc_lifecycle_payload_json(event);
+        (void)events.emit(event.begin ? muesli_bt::contract::kEventGcBegin : muesli_bt::contract::kEventGcEnd,
+                          std::nullopt,
+                          payload);
+        if (!event.begin) {
+            gc_pause_ns.push_back(event.pause_time_ns);
+        }
+    });
+
+    const auto warmup_started = std::chrono::steady_clock::now();
+    while (std::chrono::steady_clock::now() - warmup_started < scenario.timing.warmup) {
+        allocate_gc_pressure_batch(0u, retained);
+        heap.collect();
+    }
+    heap.collect();
+
+    const auto stats_start = heap.stats();
+    const std::uint64_t rss_start = peak_rss_bytes();
+    const auto run_started = std::chrono::steady_clock::now();
+    std::uint64_t ticks_total = 0u;
+
+    allocation_tracker::reset();
+    allocation_tracker::set_enabled(true);
+    while (std::chrono::steady_clock::now() - run_started < scenario.timing.run) {
+        const auto tick_started = std::chrono::steady_clock::now();
+        {
+            muslisp::gc_tick_scope tick_scope(heap);
+            allocate_gc_pressure_batch(ticks_total + 1u, retained);
+            if (scenario.gc_mode == gc_benchmark_mode::manual || scenario.gc_mode == gc_benchmark_mode::between_ticks) {
+                heap.request_collection();
+            }
+        }
+        if (scenario.gc_mode == gc_benchmark_mode::manual || scenario.gc_mode == gc_benchmark_mode::forced_pressure) {
+            heap.collect();
+        } else {
+            heap.maybe_collect();
+        }
+        const auto tick_finished = std::chrono::steady_clock::now();
+        latencies_ns.push_back(static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(tick_finished - tick_started).count()));
+        ++ticks_total;
+    }
+    allocation_tracker::set_enabled(false);
+
+    heap.collect();
+    heap.clear_lifecycle_listener();
+    const auto stats_end = heap.stats();
+    const std::uint64_t rss_end = peak_rss_bytes();
+    const auto run_finished = std::chrono::steady_clock::now();
+    const auto allocations = allocation_tracker::read();
+    const bt::event_log_stats event_stats = events.capture_stats();
+
+    heap.set_policy(old_policy);
+
+    const latency_summary latency = summarise_latencies(latencies_ns);
+    run_summary_row row = make_base_run_row(environment, adapter, scenario, fixture, repetition);
+    row.warmup_seconds = std::chrono::duration<double>(scenario.timing.warmup).count();
+    row.run_seconds = std::chrono::duration<double>(run_finished - run_started).count();
+    row.ticks_total = ticks_total;
+    row.ticks_per_second = row.run_seconds > 0.0 ? static_cast<double>(ticks_total) / row.run_seconds : 0.0;
+    row.latency_ns_median = latency.median;
+    row.latency_ns_p95 = latency.p95;
+    row.latency_ns_p99 = latency.p99;
+    row.latency_ns_p999 = latency.p999;
+    row.latency_ns_max = latency.max;
+    row.jitter_ratio_p99_over_median = latency.jitter_ratio_p99_over_median;
+    row.alloc_count_total = allocations.allocation_count;
+    row.alloc_bytes_total = allocations.allocation_bytes;
+    row.rss_bytes_peak = rss_end;
+    row.log_events_total = event_stats.event_count;
+    row.log_bytes_total = event_stats.byte_count;
+    row.gc_collections_total = stats_end.collection_count - stats_start.collection_count;
+    row.gc_pause_ns_p50 = percentile_u64(gc_pause_ns, 0.50);
+    row.gc_pause_ns_p95 = percentile_u64(gc_pause_ns, 0.95);
+    row.gc_pause_ns_p99 = percentile_u64(gc_pause_ns, 0.99);
+    row.gc_pause_ns_p999 = percentile_u64(gc_pause_ns, 0.999);
+    row.heap_live_bytes_start = static_cast<std::uint64_t>(stats_start.bytes_allocated);
+    row.heap_live_bytes_end = static_cast<std::uint64_t>(stats_end.bytes_allocated);
+    row.heap_live_bytes_slope_per_tick =
+        ticks_total == 0u ? 0.0 : (static_cast<double>(row.heap_live_bytes_end) -
+                                   static_cast<double>(row.heap_live_bytes_start)) /
+                                      static_cast<double>(ticks_total);
+    row.rss_bytes_start = rss_start;
+    row.rss_bytes_end = rss_end;
+    row.rss_bytes_slope_per_tick =
+        ticks_total == 0u ? 0.0 : (static_cast<double>(row.rss_bytes_end) -
+                                   static_cast<double>(row.rss_bytes_start)) /
+                                      static_cast<double>(ticks_total);
+    row.event_log_bytes_per_tick =
+        ticks_total == 0u ? 0.0 : static_cast<double>(event_stats.byte_count) / static_cast<double>(ticks_total);
+    row.notes = "events=" + (event_dir / "events.jsonl").string();
+    return row;
 }
 
 std::unique_ptr<runtime_adapter> make_runtime_adapter(const std::string& runtime_name) {
@@ -233,6 +425,14 @@ aggregate_summary_row build_aggregate_row(const environment_info& environment,
     std::vector<std::uint64_t> rss_peaks;
     std::vector<std::uint64_t> interrupt_medians;
     std::vector<std::uint64_t> cancel_medians;
+    std::vector<std::uint64_t> gc_collections;
+    std::vector<std::uint64_t> gc_pause_p50s;
+    std::vector<std::uint64_t> gc_pause_p95s;
+    std::vector<std::uint64_t> gc_pause_p99s;
+    std::vector<std::uint64_t> gc_pause_p999s;
+    std::vector<double> heap_slopes;
+    std::vector<double> rss_slopes;
+    std::vector<double> event_log_bytes_per_tick;
 
     std::size_t semantic_error_runs = 0u;
     for (const run_summary_row& row : rows) {
@@ -246,6 +446,14 @@ aggregate_summary_row build_aggregate_row(const environment_info& environment,
         alloc_counts.push_back(row.alloc_count_total);
         alloc_bytes.push_back(row.alloc_bytes_total);
         rss_peaks.push_back(row.rss_bytes_peak);
+        gc_collections.push_back(row.gc_collections_total);
+        gc_pause_p50s.push_back(row.gc_pause_ns_p50);
+        gc_pause_p95s.push_back(row.gc_pause_ns_p95);
+        gc_pause_p99s.push_back(row.gc_pause_ns_p99);
+        gc_pause_p999s.push_back(row.gc_pause_ns_p999);
+        heap_slopes.push_back(row.heap_live_bytes_slope_per_tick);
+        rss_slopes.push_back(row.rss_bytes_slope_per_tick);
+        event_log_bytes_per_tick.push_back(row.event_log_bytes_per_tick);
         if (row.interrupt_latency_ns_median.has_value()) {
             interrupt_medians.push_back(*row.interrupt_latency_ns_median);
         }
@@ -286,6 +494,14 @@ aggregate_summary_row build_aggregate_row(const environment_info& environment,
     aggregate.alloc_count_total_median = percentile_u64(alloc_counts, 0.50);
     aggregate.alloc_bytes_total_median = percentile_u64(alloc_bytes, 0.50);
     aggregate.rss_bytes_peak_max = percentile_u64(rss_peaks, 1.0);
+    aggregate.gc_collections_total_median = percentile_u64(gc_collections, 0.50);
+    aggregate.gc_pause_ns_p50_of_runs = percentile_u64(gc_pause_p50s, 0.50);
+    aggregate.gc_pause_ns_p95_of_runs = percentile_u64(gc_pause_p95s, 0.95);
+    aggregate.gc_pause_ns_p99_of_runs = percentile_u64(gc_pause_p99s, 0.99);
+    aggregate.gc_pause_ns_p999_of_runs = percentile_u64(gc_pause_p999s, 0.999);
+    aggregate.heap_live_bytes_slope_per_tick_median = percentile_double(heap_slopes, 0.50);
+    aggregate.rss_bytes_slope_per_tick_median = percentile_double(rss_slopes, 0.50);
+    aggregate.event_log_bytes_per_tick_median = percentile_double(event_log_bytes_per_tick, 0.50);
     aggregate.semantic_error_runs = semantic_error_runs;
     return aggregate;
 }
@@ -385,6 +601,19 @@ run_result benchmark_runner::run(const run_request& request) const {
         const tree_fixture fixture = make_fixture(scenario);
         std::vector<run_summary_row> scenario_rows;
         scenario_rows.reserve(scenario.timing.repetitions);
+
+        if (scenario.kind == benchmark_kind::memory_gc) {
+            if (adapter->name() != "muesli-bt") {
+                throw std::invalid_argument("B7 memory/GC benchmarks are muesli-bt only");
+            }
+            for (std::size_t repetition = 0; repetition < scenario.timing.repetitions; ++repetition) {
+                run_summary_row row = run_memory_gc_once(environment, *adapter, scenario, fixture, result.output_dir, repetition);
+                scenario_rows.push_back(row);
+                result.run_rows.push_back(row);
+            }
+            result.aggregate_rows.push_back(build_aggregate_row(environment, scenario, scenario_rows));
+            continue;
+        }
 
         if (scenario.kind == benchmark_kind::compile_lifecycle) {
             const std::filesystem::path scratch_dir = result.output_dir / ".scratch" / scenario.scenario_id;

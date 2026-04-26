@@ -92,11 +92,13 @@ The thin adaptor and observability baseline are already real enough that the nex
 
 The remaining path is:
 
-- prove “same BT, different IO transport” on one flagship behaviour as paper-facing evidence
-- define host capability bundles for richer external services without bloating `env.*` or `planner.plan`
-- finish the async and cancellation correctness story for released runtime semantics
+- preserve “same BT, different IO transport” as the first paper-facing evidence point
+- harden the Lisp/C++ runtime so the paper can defend allocation behaviour, GC pauses, deadline handling, cancellation, and deterministic replay
+- replace VLA stubs with at least one real model-backed asynchronous service and failure-injection path
+- build a fair comparison engine against BehaviorTree.CPP rather than relying only on internal microbenchmarks
+- add ROS2 host capability bridges, especially Nav2 and, if still feasible, MoveIt, without widening core runtime semantics
 - keep the existing Isaac showcase as supporting evidence rather than a second semantic surface
-- finish paper-facing evaluation and release hygiene
+- finish paper-facing evaluation, trace bundles, and release hygiene
 
 ### milestone plan
 
@@ -121,7 +123,15 @@ The remaining path is:
 - the supported ROS2 tutorial now walks the end-to-end path through canonical log validation
 - the PyBullet e-puck-style surrogate and the Isaac wheeled ROS2 showcase now provide supporting demo and evidence lanes
 
-Further work should now move to cross-transport evidence, host-boundary definition, correctness hardening, or concrete consumer fixes rather than casually broadening the baseline transport.
+`v0.6.0`: host capability bundles and planner boundary stabilisation landed
+
+- host capability bundle boundaries are documented for future manipulation, navigation, and perception services
+- `cap.motion.v1` and `cap.perception.scene.v1` are specified as host-level contracts, not released robot adapters
+- `cap.list`, `cap.describe`, and `cap.call` provide the first registry/API path with deterministic `cap.echo.v1` smoke coverage
+- `planner.plan` request/result documentation now states success, timeout, error, fallback, budget, work cap, and `planner_v1` logging behaviour explicitly
+- ROS2 `L2` remains focused on the released thin `Odometry` -> `Twist` lane because no concrete new ROS-backed path was added
+
+Further work should now move to correctness hardening, runtime measurement, async evidence, model-backed services, host capability adapters, or concrete consumer fixes rather than casually broadening the baseline transport.
 
 #### `v0.5.0`: same BT, different IO transport
 
@@ -158,6 +168,20 @@ Exit criteria:
 
 #### `v0.6.0`: host capability bundles and planner boundary stabilisation
 
+Status:
+
+- complete in `v0.6.0`; retained here as the release record for scope, exit criteria, and follow-up boundaries
+
+Evidence:
+
+- release notes: [v0.6.0](releases/v0.6.0.md)
+- host boundary: [host capability bundles](integration/host-capability-bundles.md)
+- manipulation contract: [cap.motion.v1](integration/cap-motion-v1.md)
+- perception contract: [cap.perception.scene.v1](integration/cap-perception-scene-v1.md)
+- planner contract: [`planner.plan`](planning/planner-plan.md)
+- capability API docs: [`cap.list`](language/reference/builtins/cap/cap-list.md), [`cap.describe`](language/reference/builtins/cap/cap-describe.md), and [`cap.call`](language/reference/builtins/cap/cap-call.md)
+- capability smoke coverage: `test_capability_registry_and_echo_call` in `tests/test_main.cpp`
+
 Focus:
 
 - keep the core/runtime planner story clean while preparing for richer external services
@@ -184,90 +208,159 @@ Exit criteria:
 - planner documentation covers the paper-critical success, timeout, error, fallback, `budget_ms`, `work_max`, and logging paths
 - ROS2 `L2` remains focused on the released thin `Odometry` -> `Twist` lane until a concrete new ROS-backed path is added
 
-#### `v0.7.0`: async and cancellation correctness
+#### `v0.7.0`: core defensibility and async correctness
 
 Focus:
 
+- close the most obvious rejection gap: a custom Lisp runtime inside C++ must not look like an unmeasured real-time liability
 - finish the correctness story for cancellable async work
+- make the runtime contract measurable through `mbt.evt.v1`, not only described in prose
 
 Scope:
 
-- complete runtime-level async cancellation edge coverage
-- add one ROS-level cancellation or pre-emption scenario only if it stays cheap and clean
-- keep the main correctness argument in the runtime contract, not in ROS-specific glue
+- add a tick hot-path audit mode that emits the [tick audit record](observability/tick-audit.md), including allocation count, allocation bytes, heap live bytes, GC deltas, tick id, node path, and logging mode for every tick
+- add a strict benchmark and test mode where allocations during precompiled BT ticks fail the test, except for explicitly whitelisted logging paths outside the tick critical section
+- pre-intern symbols and reuse node-state, blackboard, scheduler, and logging buffers where needed to make the common tick path allocation-free after warm-up
+- add GC lifecycle telemetry for `gc_begin`, `gc_end`, forced collection, heap snapshots, mark time, sweep time, total pause time, live object count, freed object count, and triggering reason
+- add a runtime GC policy switch for at least `default`, `between-ticks`, `manual`, and `fail-on-tick-gc`
+- extend deterministic replay checks to cover async submit, poll, cancel, timeout, late completion, dropped completion, planner timeout, fallback, blackboard deltas, and host-action validation outcomes
+- add a compact runtime outcome taxonomy for paper-facing traces: `tick_ok`, `tick_deadline_missed`, `planner_timeout`, `vla_timeout`, `host_action_invalid`, `fallback_used`, `fallback_failed`, `late_result_dropped`, `cancel_acknowledged`, and `cancel_late`
+- complete runtime-level async cancellation edge coverage, including cancellation before start, cancellation while running, cancellation after timeout, late completion after cancellation, and repeated cancellation
+- add one ROS-level cancellation or pre-emption scenario only if it reuses the same runtime events and does not introduce a separate ROS-specific cancellation model
+- document explicitly that `muesli-bt` is a task-level control runtime, not a hard real-time servo-loop runtime
+
+Benchmark and evidence requirements:
+
+- report per-tick allocation count and allocation bytes under representative BTs, with and without canonical logging enabled
+- report GC pause distributions, including p50, p95, p99, and p999 pause times under long-running synthetic missions
+- report tick latency distributions under no-GC, between-ticks-GC, and forced-GC-pressure conditions
+- report deadline miss rate, fallback activation count, late-completion count, and dropped-completion count under deterministic injected async delays
+- add a long-run memory benchmark that reports resident-set-size slope, heap-live-byte slope, and event-log size per tick
+- make every `v0.7.0` benchmark emit an experiment manifest with compiler, build type, platform, CPU, runtime flags, scenario seed, and trace schema version
 
 Exit criteria:
 
+- precompiled core BT execution has a measured zero-allocation hot path in strict audit mode, or any remaining allocation is explicitly documented and justified
+- GC during tick is either forbidden in strict mode or logged as a contract violation
 - async submit, poll, cancel, timeout, and late-completion-drop behaviour are all covered by deterministic tests or fixtures
-- canonical logs show the required cancellation lifecycle events for the supported cases
-- any ROS-level cancellation coverage reuses the same runtime semantics and does not introduce a second cancellation model
+- canonical logs show the required cancellation, timeout, fallback, and late-result lifecycle events for the supported cases
+- replay validation reports first divergence precisely, including divergent tick index, node id, blackboard key, async job id, or host capability call where applicable
+- any ROS-level cancellation coverage reuses the runtime semantics and does not introduce a second cancellation model
+- the release can generate at least one paper-quality tail-latency figure and one memory/GC figure from checked-in scripts
 
-#### `v0.8.0`: flagship wheeled demo polish
-
-Focus:
-
-- make the paper-facing primary demo strong enough for both evaluation and presentation
-- keep the supporting Isaac evidence current without turning it into a second primary track
-
-Scope:
-
-- Webots remains the visual flagship
-- PyBullet remains the fast CI and development harness
-- ROS-backed execution of the same wheeled behaviour becomes a deployability check
-- keep the existing Isaac Sim / ROS2 H1 showcase as a modern-simulator evidence point
-- treat Isaac as a ROS-integrated simulator host, not as a new semantic surface inside `muesli-bt`
-- keep Isaac off the critical CI path unless it becomes cheap and reproducible enough to maintain
-
-Exit criteria:
-
-- docs, scripts, and assets support one clear flagship demo flow
-- the wheeled demo has reproducible commands, expected outputs, and canonical log inspection steps
-- one ROS-backed run of the flagship behaviour is documented and repeatable on the supported baseline
-- the existing Isaac demo remains documented as a supporting ROS-backed deployability showcase
-- the Isaac demo reuses existing BT semantics and canonical logging expectations rather than introducing simulator-specific semantics
-
-#### `v0.9.0`: second scenario and evaluation hardening
+#### `v0.8.0`: model-backed async and VLA stress path
 
 Focus:
 
-- reduce the risk that the paper story rests on one example only
-- prove that the host capability bundle model works on a real non-transport ROS integration
+- move VLA support from stubbed orchestration to a real model-backed asynchronous service
+- prove that deadlines, cancellation, stale-result rejection, and fallback matter under model latency
+- keep the model integration behind host capability contracts rather than turning VLA into a special runtime case
 
 Scope:
 
-- add a second serious scenario or platform
-- preferred candidate: Towers of Hanoi with a simulated robot arm
-- treat MoveIt as the first concrete instance of a host capability bundle, specifically an arm-motion or goal-execution capability
-- add a usable perception path for disc and peg state rather than relying on hidden oracle state in the paper-facing demo
-- likely first concrete perception adapter, if it stays the lightest reproducible path: a YOLO-compatible detector feeding a scene-state normaliser rather than exposing raw detections directly to BT logic
-- choose the simulator based on reproducibility, MoveIt compatibility, and usable perception first
-- prefer Isaac Sim for the manipulator/Hanoi path if it gives the cleanest ROS + perception + manipulation story without breaking reproducibility
-- use Webots + ROS only if it stays thin and repeatable enough; otherwise use the most reproducible MoveIt-friendly simulator
-- if the earlier “booster” plan is still valid and stronger than Hanoi, compare both on evidence and scope, not novelty
+- implement at least one real model backend behind the existing VLA service interface, preferably as a local process or HTTP backend that can be replayed deterministically from stored request and response records
+- keep the current stub backend as a deterministic unit-test backend, not as the paper-facing VLA evidence path
+- support submit, poll, timeout, cancellation, partial response, final response, response hashing, request hashing, replay from stored records, and backend failure reporting
+- define first capability names for model-backed perception or action proposal, for example `cap.perception.scene.v1`, `cap.vla.select_target.v1`, or `cap.vla.propose_nav_goal.v1`
+- implement an injected latency and failure layer for VLA and planner backends, including delayed success, timeout, invalid action schema, unsafe action value, stale scene timestamp, dropped response, backend crash, and cancellation ignored until completion
+- implement first-class action validation before any VLA or planner output can reach `env.act` or a host capability execution call
+- include validators for continuous bounds, max command delta, timestamp freshness, target frame validity, forbidden zones, Nav2 goal validity where available, and host-declared capability schema compliance
+- extend canonical logs with `vla_submit`, `vla_partial`, `vla_result`, `vla_cancel`, `vla_timeout`, `action_validation`, and `model_result_dropped` events, or their existing canonical equivalents if already named differently
+- keep the flagship wheeled demo polished, but make the paper-facing novelty in this milestone the model-latency and cancellation behaviour, not visual demo quality
+- keep the existing Isaac Sim / ROS2 showcase as supporting evidence, not as a required semantic surface or CI dependency
+
+Benchmark and evidence requirements:
+
+- report VLA latency distributions under real backend execution and under seeded injected-latency profiles
+- report stale completion rate, cancellation acknowledgement latency, late-result-drop count, invalid-action count, fallback count, and unsafe-action-to-host count
+- report task success under at least three VLA/planner latency conditions: nominal, heavy-tail latency, and failure-injected latency
+- report the effect of runtime validation by comparing invalid model outputs produced, invalid model outputs rejected, and invalid model outputs reaching the host, which should be zero for the supported path
+- include one trace bundle where a model result arrives late and is correctly dropped rather than committed
 
 Exit criteria:
 
-- two distinct scenarios exist with clear rationale
-- one non-wheeled scenario uses explicit host capability bundle boundaries for transport, manipulation, and perception
-- preferred outcome: a simulated arm solves a bounded Towers of Hanoi task with MoveIt-backed motion and usable perception
-- perception output is normalised into a stable scene-state layer before BT logic consumes it
-- acceptable fallback: if Hanoi proves too heavy for the `1.0` paper path, replace it with a simpler manipulator benchmark and record why Hanoi was deferred
-- evaluation scripts and result collection are reproducible from the tagged codebase
-- at least one baseline comparison and one ROS-backed row or slice exist in the evaluation outputs
+- at least one real model backend is used in a reproducible demo or benchmark
+- all VLA and planner outputs pass through a documented validator before execution
+- seeded latency and failure injection is reproducible across runs
+- the same VLA or planner fault schedule can be replayed from trace artefacts
+- the release can generate a paper-quality “tail latency under injected model lag” figure
+- the release can generate a paper-quality “stale result, cancellation, and fallback outcomes” table
+- the wheeled flagship demo remains reproducible with canonical log validation and does not depend on simulator-specific semantics
+
+#### `v0.9.0`: baselines, ROS capability bridges, and evaluation hardening
+
+Focus:
+
+- prevent the paper from looking like an implementation report with only internal benchmarks
+- build a fair comparison path against BehaviorTree.CPP
+- add the ROS2 glue needed for a physical or physical-like validation run without contaminating core runtime semantics
+- reduce the risk that the paper rests on one example only
+
+Scope:
+
+- add a neutral scenario description format that can emit both `muesli-bt` Lisp and BehaviorTree.CPP XML for matched experiments
+- generate or provide equivalent BehaviorTree.CPP custom node skeletons for async planner/model calls, polling, timeout, and halt/pre-emption
+- make the BehaviorTree.CPP baseline a strong baseline, using non-blocking/stateful action nodes and proper halt handling rather than blocking actions inside `tick`
+- add a neutral comparison event schema or adapter layer so both systems can report tick start/end, node status, async submit, async cancel, async result, deadline miss, stale commit, fallback, and action commit events
+- extend the benchmark harness beyond microbenchmarks with contract benchmarks for async timeout, late cancellation, invalid action, hot subtree swap, replay parity, VLA latency sweep, ROS callback pressure, and long-run memory behaviour
+- add live subtree patching as the Lisp-specific evidence path, with compile, validate, and swap only at tick boundaries; failed validation must leave the old tree active and emit a canonical event
+- implement a Nav2 host capability adapter as the main ROS2 bridge for the wheeled demo, with capability surfaces for navigate-to-pose, follow-waypoints if needed, cancel-goal, status, and clear-costmaps if needed
+- map Nav2 action feedback, result codes, cancellation acknowledgement, transform age, and planner/controller timing into canonical host capability events
+- keep the existing thin `Odometry` -> `Twist` lane as the baseline transport path; Nav2 is a host capability bundle, not a replacement for `env.*`
+- add a physical-demo runbook for a TurtleBot3-style or equivalent differential-drive platform, including required ROS distro, launch files, map, BT source hash, model backend, fault seed, rosbag, `events.jsonl`, replay report, and video/time-alignment artefacts
+- add a second serious scenario only if it can be kept reproducible; preferred candidate remains Towers of Hanoi with a simulated robot arm, but a simpler manipulator benchmark is acceptable if Hanoi becomes too heavy
+- treat MoveIt as the first concrete manipulation host capability bundle if the non-wheeled scenario proceeds
+- add a perception scene normaliser before BT logic consumes perception outputs, preferably using a YOLO-compatible detector or another reproducible detector path feeding stable scene state rather than raw detections
+- choose Isaac Sim, Webots + ROS, or another simulator for the non-wheeled path based on reproducibility, MoveIt compatibility, and perception support, not appearance
+
+Benchmark and evidence requirements:
+
+- report matched `muesli-bt` versus BehaviorTree.CPP results for tick latency, deadline miss rate, stale-result count, fallback count, cancellation acknowledgement latency, and trace completeness under identical scenario seeds
+- report generated-tree or live-patch compile, validate, and swap latency versus subtree size
+- report Nav2 goal cancellation latency, recovery time after a blocked path, transform age distribution, and deadline miss rate while ROS callbacks are active
+- if the physical robot path is available, report success rate, recovery latency, stale-result suppression count, fallback count, and failure classifications across repeated runs
+- if the manipulator path is available, report planning latency, stale-scene rejection, trajectory validity, execution cancellation latency, and task success
+- keep every comparison reproducible from a checked-in manifest, not from hand-run shell history
+
+Exit criteria:
+
+- at least one fair BehaviorTree.CPP baseline exists for a matched scenario and is runnable from documented commands
+- at least one contract benchmark shows behaviour that is not reducible to ordinary mean tick speed
+- at least one generated or live-patched subtree experiment demonstrates why a Lisp runtime is useful beyond implementation taste
+- the Nav2 adapter can run the wheeled scenario through a host capability boundary and emit canonical logs
+- one ROS-backed row or slice exists in the evaluation outputs, preferably Nav2-backed; if not physical, it must at least be rosbag-backed and replay-validated
+- two distinct scenarios exist with clear rationale, or the roadmap records why the second scenario was deferred to preserve the paper’s core claim
+- all baseline and ROS evidence uses the same canonical event-log discipline as the core runtime experiments
 
 #### `v1.0.0`: paper artefacts and release baseline
 
 Focus:
 
 - cut the first paper-ready, tool-builder-friendly, release-quality baseline
+- make the tagged release match the paper exactly, including traces, scripts, manifests, and benchmark outputs
+
+Scope:
+
+- freeze the paper-facing runtime contract, compatibility policy, event schema, conformance levels, benchmark manifests, and supported host capability contracts
+- ensure `L0`, `L1`, and `L2` are documented with exact run commands, expected artefacts, and failure interpretation
+- publish source release plus verified Ubuntu `x86_64`, Ubuntu ROS-enabled, and macOS `arm64` artefacts where still supported
+- publish trace bundles for the core runtime, VLA/model-latency path, BehaviorTree.CPP comparison path, and ROS-backed evaluation path
+- publish scripts that regenerate all paper tables and figures from checked-in or archived artefacts
+- include memory, GC, allocation, tail-latency, cancellation, fallback, replay, baseline, and ROS evidence in the release artefact set
+- document the exact claim boundaries: task-level deadlines rather than hard real time, host capabilities rather than ROS semantics, and model orchestration rather than a new VLA model
 
 Exit criteria:
 
 - runtime contract, compatibility policy, and conformance docs match the tagged code exactly
-- `L0`, `L1`, and `L2` are all documented with exact run commands and expected artefacts
-- source release plus Ubuntu `x86_64` and macOS `arm64` release artefacts are published and verified
+- `L0`, `L1`, and `L2` pass from clean checkout using documented commands
+- hot-path allocation, GC pause, and long-run memory evidence are generated from the tagged codebase
+- async cancellation, timeout, late-completion-drop, fallback, and action-validation behaviour are covered by deterministic fixtures and trace validation
+- at least one real model-backed VLA or model-mediated async experiment is included, not only stub output
+- at least one fair BehaviorTree.CPP baseline comparison is included with public baseline code and matched scenario manifests
 - at least one paper figure, table row, or evaluation slice includes ROS-backed evidence
-- the core claim is demonstrably true: BT semantics stay stable while transport changes, and canonical event logs support replay and inspection across those transports
+- preferred outcome: at least one Nav2-backed or physical wheeled run is included with `events.jsonl`, rosbag, replay report, and failure classification
+- acceptable fallback: if physical hardware is not stable enough by the tag, the release includes a rosbag-backed Nav2 or equivalent ROS action-capability run and states the physical limitation plainly
+- the core claim is demonstrably true: BT semantics stay stable while transport changes, asynchronous planner/model work is deadline-aware and cancellable, and canonical event logs support replay and inspection across supported transports
 
 ## api / syntax
 
@@ -293,6 +386,12 @@ Example interpretation for `v1.0.0`:
 
 If a ROS-backed demo works but the same BT cannot be shown across simulator and ROS transport, the deployability story is still incomplete.
 
+If the VLA path still uses only the stub backend, the model-integration claim is not paper-ready.
+
+If the BehaviorTree.CPP comparison uses blocking action nodes or a weaker hand-written baseline, the comparison is not paper-ready.
+
+If the hot-path benchmark reports only mean tick time and not allocations, GC pauses, and tail latency, the Lisp runtime defensibility story is incomplete.
+
 ## gotchas
 
 - Do not let ROS2 scope expand into a second semantic runtime.
@@ -300,6 +399,10 @@ If a ROS-backed demo works but the same BT cannot be shown across simulator and 
 - Do not let “host capability bundles” turn into one giant catch-all ROS super-interface.
 - Do not treat ad hoc replay artefacts as a replacement for canonical `mbt.evt.v1` logs.
 - Do not use demo polish to hide missing conformance or observability guarantees.
+- Do not present stub VLA output as evidence for model-integrated robotics.
+- Do not present average tick speed as evidence of real-time suitability. Tail latency, allocation, GC, and long-run memory behaviour must be shown.
+- Do not compare against a deliberately weak BehaviorTree.CPP baseline. The baseline must use proper non-blocking actions and halt/pre-emption handling.
+- Do not let a real model, Nav2, MoveIt, or Isaac integration leak new semantics into the Lisp or BT core. They remain host capabilities.
 - Do not lock the second flagship too early if the strongest reproducible evidence points elsewhere.
 
 ## see also

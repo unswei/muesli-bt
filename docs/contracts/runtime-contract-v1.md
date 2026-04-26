@@ -176,6 +176,14 @@ Minimum required runtime events:
 - async: submit/poll/cancel/result plus cancel/drop events
 - planner: `planner_call_start`, `planner_call_end`, `planner_v1`
 - timing: `budget_warning`, `deadline_exceeded`
+- heap lifecycle: `gc_begin`, `gc_end` when the Lisp heap collector runs through the default runtime host
+
+GC policy:
+
+- `default`: automatic collection uses the normal runtime policy
+- `between-ticks`: automatic collection requested during a BT tick is deferred until the tick exits
+- `manual`: automatic `maybe_collect` checks do not collect; explicit collection can still run
+- `fail-on-tick-gc`: collection during a BT tick is a contract violation and raises an error
 
 Determinism scope:
 

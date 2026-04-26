@@ -1,0 +1,25 @@
+{
+  "absent_types": [
+    "vla_result",
+    "async_completion_dropped"
+  ],
+  "event_count": 10,
+  "events_sha256": "6b76a7b5930680b0dbe4c0ab4fae5a9553abd210bd30c15f939abfc13e914283",
+  "required_types": [
+    "run_start",
+    "tick_begin",
+    "vla_submit",
+    "vla_poll",
+    "deadline_exceeded",
+    "async_cancel_requested",
+    "async_cancel_acknowledged",
+    "tick_end"
+  ],
+  "type_counts": {
+    "async_cancel_acknowledged": 1,
+    "async_cancel_requested": 1,
+    "deadline_exceeded": 1,
+    "vla_poll": 1,
+    "vla_submit": 1
+  }
+}

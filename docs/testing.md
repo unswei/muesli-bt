@@ -45,6 +45,11 @@ Runtime-contract fixture bundles for reproducibility are stored under `fixtures/
 - `fixtures/deadline-cancel-case/`
 - `fixtures/late-completion-drop-case/`
 - `fixtures/determinism-replay-case/`
+- `fixtures/async-cancel-before-start-case/`
+- `fixtures/async-cancel-while-running-case/`
+- `fixtures/async-cancel-after-timeout-case/`
+- `fixtures/async-repeated-cancel-case/`
+- `fixtures/async-late-completion-after-cancel-case/`
 
 ## Run Tests
 
@@ -162,6 +167,7 @@ Current harness coverage includes:
 - `B2` reactive interruption
 - `B5` parse, compile, load, and instantiate cost
 - `B6` logging overhead
+- `B7` GC and memory evidence smoke runs
 
 For `BehaviorTree.CPP`, the harness currently covers:
 
@@ -179,6 +185,26 @@ Run one `B5` phase benchmark:
 ./build/bench-release/bench/bench run B5-alt-255-compile-off
 ```
 
+Run the GC and memory benchmark group:
+
+```bash
+./build/bench-release/bench/bench run-group B7
+```
+
+`B7` writes per-repetition canonical `events.jsonl` files with `gc_begin` and `gc_end` lifecycle events. Use longer durations for release evidence:
+
+```bash
+./build/bench-release/bench/bench run-group B7 --run-ms 30000 --repetitions 5
+```
+
+Run the strict precompiled-tick allocation lane:
+
+```bash
+ctest --preset bench-release -R muesli_bt_bench_precompiled_tick_allocation_strict --output-on-failure
+```
+
+This lane warms and primes a precompiled `B1` tree, enables allocation failure for the steady-state tick loop, and only permits allocations inside explicitly whitelisted logging paths. The current strict case runs with logging disabled, so the expected whitelist count is zero.
+
 The current `B6` full-trace benchmark path uses deferred event-log serialisation when no file sink is enabled. The reported `log_bytes_total` still reflects canonical `mbt.evt.v1` line size.
 
 Summarise the latest benchmark result set:
@@ -186,6 +212,16 @@ Summarise the latest benchmark result set:
 ```bash
 python3 bench/scripts/analyse_results.py
 ```
+
+Generate checked-in-script figure outputs from a benchmark result set:
+
+```bash
+python3 bench/scripts/figure_tail_latency.py bench/results/my-run
+python3 bench/scripts/figure_memory_gc.py bench/results/my-run --event-log build/dev/gc-events.jsonl
+python3 bench/scripts/write_evidence_report.py bench/results/my-run --event-log build/dev/gc-events.jsonl
+```
+
+The tail-latency script reads `aggregate_summary.csv` and writes `tail_latency.svg`. The memory/GC script reads benchmark allocation/RSS columns and canonical `gc_end` lifecycle events when supplied or found under the result directory. `B7` result directories already contain those GC event logs. The evidence report records which figures exist and lists missing GC or long-run heap-live evidence explicitly.
 
 The analysis summary reports `A1`, `A2`, `B1`, `B2`, `B5`, and `B6` when those rows are present.
 That same summary works for the optional `btcpp` result sets; absent groups are reported as absent rather than treated as failures.

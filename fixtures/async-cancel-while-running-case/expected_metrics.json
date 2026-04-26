@@ -1,0 +1,23 @@
+{
+  "absent_types": [
+    "vla_result",
+    "async_completion_dropped"
+  ],
+  "event_count": 10,
+  "events_sha256": "78287fd001e00aa7bd3030c9d71a26784f9fa6e489885be6e5dc2046f9994ea1",
+  "required_types": [
+    "run_start",
+    "tick_begin",
+    "vla_submit",
+    "vla_poll",
+    "async_cancel_requested",
+    "async_cancel_acknowledged",
+    "tick_end"
+  ],
+  "type_counts": {
+    "async_cancel_acknowledged": 1,
+    "async_cancel_requested": 1,
+    "vla_poll": 2,
+    "vla_submit": 1
+  }
+}

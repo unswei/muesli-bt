@@ -182,6 +182,11 @@ Published L0 fixture bundles:
 - `fixtures/deadline-cancel-case`
 - `fixtures/late-completion-drop-case`
 - `fixtures/determinism-replay-case`
+- `fixtures/async-cancel-before-start-case`
+- `fixtures/async-cancel-while-running-case`
+- `fixtures/async-cancel-after-timeout-case`
+- `fixtures/async-repeated-cancel-case`
+- `fixtures/async-late-completion-after-cancel-case`
 
 Published pre-Linux ROS2 surrogate bundles:
 

@@ -1,0 +1,11 @@
+{
+  "contract_id": "runtime-contract-v1.0.0",
+  "contract_version": "1.0.0",
+  "fixture_name": "async-cancel-while-running-case",
+  "generated_from_commit_time_utc": "2026-04-25T07:11:41Z",
+  "generator": "tools/fixtures/update_fixture.py",
+  "git_sha": "654a1e43cdea4bfc2e0a5e4e15e472193ca32f94",
+  "provenance_model": "deterministic-from-git",
+  "schema": "mbt.evt.v1",
+  "schema_path": "schemas/event_log/v1/mbt.evt.v1.schema.json"
+}

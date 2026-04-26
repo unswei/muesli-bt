@@ -1,0 +1,5 @@
+{
+  "deterministic_mode": true,
+  "scenario": "async_cancel_after_timeout_is_idempotent_rejection",
+  "tick_budget_ms": 20
+}

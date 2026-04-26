@@ -158,6 +158,7 @@ nav:
       - Tracing: observability/tracing.md
       - Logging: observability/logging.md
       - Profiling: observability/profiling.md
+      - Tick Audit Record: observability/tick-audit.md
       - Planner Logging: observability/planner-logging.md
       - VLA Logging: observability/vla-logging.md
   - Diagrams:

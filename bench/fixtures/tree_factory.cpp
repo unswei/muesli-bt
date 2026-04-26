@@ -167,6 +167,7 @@ tree_fixture make_reactive_fixture(std::size_t node_count) {
 tree_fixture make_fixture(const scenario_definition& scenario) {
     switch (scenario.kind) {
         case benchmark_kind::single_leaf:
+        case benchmark_kind::memory_gc:
         case benchmark_kind::static_tick:
         case benchmark_kind::compile_lifecycle:
             return make_static_fixture(scenario.family, scenario.tree_size_nodes);

@@ -35,5 +35,6 @@ Prints heap allocation counters.
 
 ## See Also
 
+- [`gc.policy`](gc-policy.md)
 - [Reference Index](../../index.md)
 - [Language Semantics](../../../semantics.md)

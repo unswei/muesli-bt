@@ -170,6 +170,9 @@ void register_common_nodes(BT::BehaviorTreeFactory& factory, const std::shared_p
 }
 
 bool supports_btcpp_scenario(const scenario_definition& scenario) {
+    if (scenario.kind == benchmark_kind::memory_gc) {
+        return false;
+    }
     if (scenario.logging != logging_mode::off) {
         return false;
     }

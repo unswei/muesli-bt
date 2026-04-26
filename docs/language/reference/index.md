@@ -182,6 +182,8 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 
 ### GC and heap stats
 
+- [`gc.policy`](builtins/gc/gc-policy.md)
+- [`gc.set-policy!`](builtins/gc/gc-set-policy.md)
 - [`gc-stats`](builtins/gc/gc-stats.md)
 - [`heap-stats`](builtins/gc/heap-stats.md)
 

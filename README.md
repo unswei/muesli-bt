@@ -9,8 +9,6 @@ A compact Lisp runtime with an integrated Behaviour Tree engine, bounded-time pl
 
 `muslisp` is the executable. `muesli-bt` is the runtime and project.
 
-On the shared benchmark subset under matched conditions, muesli-bt shows lower tick latency and faster BT compilation and instantiation than BehaviorTree.CPP 4.9.0.
-
 If you are new to the repository, start with [Getting Started](docs/getting-started.md) and [Examples Overview](docs/examples/index.md).
 
 ## Why muesli-bt
@@ -23,12 +21,11 @@ When control loops need to stay responsive, three things matter:
 
 muesli-bt keeps those concerns in one place with explicit runtime semantics and built-in observability.
 
-### Benchmarks (against BehaviorTree.CPP 4.9.0)
-- 2.59-2.75x lower per-node traversal cost on the shared 255-node traversal benchmarks
-- 2.27x lower worst-case reactive interruption latency on the shared reactive benchmark
-- approx 10x faster single-instance creation, and around 35x faster batched instantiation, on node instantiation benchmarks
+### Benchmarks
 
-See [`bench/README.md`](bench/README.md) for the harness, scope, and comparison workflow.
+The optional benchmark harness lives under [`bench/`](bench/README.md). It covers runtime latency, lifecycle costs, logging overhead, strict allocation checks, GC/memory evidence, and the optional shared-subset comparison against BehaviorTree.CPP 4.9.0.
+
+Current benchmark interpretation lives in [runtime performance](docs/internals/runtime-performance.md). Keep detailed benchmark claims there or in release artefacts rather than scattering result snapshots through this README.
 
 
 ## Runtime Contract In One Minute

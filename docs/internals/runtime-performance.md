@@ -38,12 +38,46 @@ The benchmark-driven view is simple:
 - minimal dispatch cost is already good
 - static traversal cost scales cleanly
 - static jitter is already good
-- reactive interruption still allocates too much
 - full-trace logging is still too expensive
+- GC and long-run heap-live evidence still need a GC-producing run
 
 That means the runtime should not try to optimise every hot path at once.
 
 ### benchmark-driven summary
+
+The current local `bench-release` result set `bench/results/20260425T115357Z` was generated on:
+
+- `muesli-bt` commit `654a1e43cd`
+- Apple M3
+- Darwin `25.4.0`
+- `8` physical / `8` logical cores
+- AppleClang `17.0.0.17000604`
+- Release build with `-O3 -DNDEBUG`
+
+Headline numbers:
+
+- single-leaf baseline: `125 ns` median, `7.49 Mticks/s`
+- sequence traversal: `1.46 us` at `31` nodes, `11.33 us` at `255` nodes, about `44.08 ns/node`
+- selector traversal: `1.42 us` at `31` nodes, `11.21 us` at `255` nodes, about `43.71 ns/node`
+- alternating traversal: `1.42 us` at `31` nodes, `11.08 us` at `255` nodes, about `43.16 ns/node`
+- tick jitter: `11.21 us` median, `13.21 us` p99, `23.54 us` p99.9, ratio `1.17x`
+- slowest interruption case: `B2-reactive-255-flip100-off` at `5.50 us` median interruption latency
+- worst timed allocation pressure in the analysed run: `0.00 alloc/tick`
+- single-leaf full trace slowdown: `9.34x`
+- static full trace slowdown: `16.00x`
+- reactive full trace slowdown: `16.13x`
+
+The generated evidence report for that run recorded:
+
+- no semantic-error runs
+- `6` zero-allocation `B1` aggregate rows
+- tail-latency and memory/GC figure scripts were able to render output
+- no `gc_begin` or `gc_end` events were attached to the result set
+- heap-live slope and GC pause evidence remain pending
+
+The raw result directory is not linked from the top-level README because `bench/results/` is intentionally ignored and this run includes a large `jitter_trace.csv`. Publish a trimmed artefact bundle before treating these exact files as release evidence.
+
+### earlier comparison baseline
 
 The first benchmark run used result set `bench/results/20260314T234021Z` on:
 
@@ -73,10 +107,11 @@ Correctness was clean in that run, with no semantic errors reported.
 
 The immediate order is:
 
-1. remove allocations from reactive interruption and cancellation
-2. reduce logging and replay overhead
-3. keep `A1`, `B1`, and `A2` as regression guards
-4. only then revisit broader structural tuning where still useful
+1. keep the strict precompiled-tick zero-allocation lane as a regression guard
+2. add a GC-producing long-run benchmark with canonical `gc_begin` and `gc_end` logs
+3. reduce logging and replay overhead
+4. keep `A1`, `B1`, and `A2` as regression guards
+5. only then revisit broader structural tuning where still useful
 
 ### design goals
 
@@ -95,33 +130,31 @@ The compiled definition should be immutable and shared across instances.
 
 The runtime instance should contain all mutable execution state.
 
-### priority 1: remove allocations from reactive interruption and cancellation
+### priority 1: preserve zero-allocation steady-state ticks
 
-The benchmark results show that reactive interruption is currently the first path most likely to hurt real robot control loops.
+The current benchmark result shows zero timed allocations for the analysed `B1` and `B2` rows. Treat that as a regression guard, not as the final memory story.
 
-Profile the `B2` path first. Look specifically for allocations in:
+Keep running:
 
-- cancellation bookkeeping
-- halt event generation
-- temporary child lists or traversal stacks
-- async state creation or destruction
-- status transition recording
-- blackboard updates triggered by interruption
-- exception or error wrapping paths
+```bash
+ctest --preset bench-release -R muesli_bt_bench_precompiled_tick_allocation_strict --output-on-failure
+```
 
-The target is simple: a normal interruption or cancellation path should allocate nothing during a tick.
+The strict lane warms and primes a precompiled tree, then fails on allocations during the measured tick loop except inside explicitly whitelisted logging paths.
 
-Recommended implementation direction:
+### priority 2: add GC and long-run memory evidence
 
-- preallocate per-node async state inside the BT instance
-- avoid allocating cancellation worklists
-- store halt-related metadata in the compiled definition
-- keep running-descendant bookkeeping explicit
-- separate interruption tracing from interruption mechanics
+The current result set does not include canonical GC lifecycle events. That means the memory/GC figure is useful as a scaffold, but it is not yet evidence for GC pause distribution or heap-live slope.
 
-Every change here should be checked against `B2` first, then `A1` and `A2`.
+The next benchmark evidence should include:
 
-### priority 2: reduce logging and replay overhead
+- canonical `gc_begin` and `gc_end` events
+- p50, p95, p99, and p999 GC pause summaries
+- heap-live-byte slope over a long run
+- resident-set-size slope over a long run
+- event-log size per tick
+
+### priority 3: reduce logging and replay overhead
 
 Full-trace logging is expensive enough to deserve explicit work.
 
@@ -143,7 +176,23 @@ Recommended implementation direction:
 
 Every change here should be checked against `B6` first, then `A1` and `A2`.
 
-### priority 3: preserve current strengths
+### reactive interruption checks
+
+Reactive interruption should remain covered because it exercises cancellation-like control flow.
+
+Profile the `B2` path when changing:
+
+- cancellation bookkeeping
+- halt event generation
+- temporary child lists or traversal stacks
+- async state creation or destruction
+- status transition recording
+- blackboard updates triggered by interruption
+- exception or error wrapping paths
+
+The target remains simple: a normal interruption or cancellation path should allocate nothing during a tick.
+
+### priority 4: preserve current strengths
 
 Treat these scenarios as regression guards:
 
@@ -151,9 +200,9 @@ Treat these scenarios as regression guards:
 - `B1` for traversal scaling health
 - `A2` for jitter health
 
-### priority 4: structural tuning after the obvious pain points
+### priority 5: structural tuning after the obvious pain points
 
-The target architecture below is still the right direction. It is just no longer the first emergency task unless profiling shows that the `B2` and `B6` problems start there.
+The target architecture below is still the right direction. It is just no longer the first emergency task unless profiling shows that the logging, GC, or interruption paths start there.
 
 Still recommended medium-term work:
 

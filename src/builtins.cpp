@@ -903,6 +903,9 @@ void print_gc_snapshot(const gc_stats_snapshot& snapshot) {
     std::cout << "live objects after last GC: " << snapshot.live_objects_after_last_gc << '\n';
     std::cout << "bytes allocated: " << snapshot.bytes_allocated << '\n';
     std::cout << "next GC threshold: " << snapshot.next_gc_threshold << '\n';
+    std::cout << "collection count: " << snapshot.collection_count << '\n';
+    std::cout << "total GC pause ns: " << snapshot.total_pause_ns << '\n';
+    std::cout << "freed objects total: " << snapshot.freed_objects_total << '\n';
 }
 
 value builtin_heap_stats(const std::vector<value>& args) {
@@ -916,6 +919,33 @@ value builtin_gc_stats(const std::vector<value>& args) {
     default_gc().collect();
     print_gc_snapshot(default_gc().stats());
     return make_nil();
+}
+
+value gc_policy_to_lisp(gc_policy policy) {
+    return make_symbol(":" + std::string(gc::policy_name(policy)));
+}
+
+value builtin_gc_policy(const std::vector<value>& args) {
+    require_arity("gc.policy", args, 0);
+    return gc_policy_to_lisp(default_gc().policy());
+}
+
+value builtin_gc_set_policy(const std::vector<value>& args) {
+    require_arity("gc.set-policy!", args, 1);
+    std::string text;
+    if (is_string(args[0])) {
+        text = string_value(args[0]);
+    } else if (is_symbol(args[0])) {
+        text = symbol_name(args[0]);
+    } else {
+        throw lisp_error("gc.set-policy!: expected string or symbol");
+    }
+    gc_policy policy = gc_policy::default_policy;
+    if (!gc::parse_policy(text, policy)) {
+        throw lisp_error("gc.set-policy!: expected :default, :between-ticks, :manual, or :fail-on-tick-gc");
+    }
+    default_gc().set_policy(policy);
+    return gc_policy_to_lisp(policy);
 }
 
 value builtin_print(const std::vector<value>& args) {
@@ -3009,6 +3039,8 @@ void install_core_builtins(env_ptr global_env) {
 
     bind_primitive(global_env, "heap-stats", builtin_heap_stats);
     bind_primitive(global_env, "gc-stats", builtin_gc_stats);
+    bind_primitive(global_env, "gc.policy", builtin_gc_policy);
+    bind_primitive(global_env, "gc.set-policy!", builtin_gc_set_policy);
 
     bind_primitive(global_env, "print", builtin_print);
     bind_primitive(global_env, "write", builtin_write);

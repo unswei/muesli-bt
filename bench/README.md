@@ -12,6 +12,7 @@ The current milestone covers:
 - `B2` reactive interruption
 - `B5` parse, compile, load, and instantiate cost
 - `B6` logging overhead for one static and one reactive scenario
+- `B7` GC and memory evidence smoke runs
 
 The harness currently supports:
 
@@ -48,7 +49,9 @@ Each run:
 
 For `B6`, the current harness records full-trace capture with deferred JSONL serialisation when no file or ring sink is enabled. `log_bytes_total` still reports the canonical `mbt.evt.v1` line size that would be emitted.
 
-`schema_version=2` adds two latency interpretation columns:
+`schema_version=3` adds GC and memory evidence columns for `B7`, including GC pause quantiles, collection count, heap-live slope, RSS slope, and event-log bytes per tick.
+
+`schema_version=2` added two latency interpretation columns:
 
 - `latency_ns_p999`
 - `jitter_ratio_p99_over_median`
@@ -85,6 +88,14 @@ Unsupported scenarios are skipped automatically for the selected runtime. For `b
 
 The CLI prints one line at the start of the suite and one line at the start of each scenario. These messages are emitted before timing begins.
 
+Run the strict allocation CTest lane for precompiled BT ticks:
+
+```bash
+ctest --preset bench-release -R muesli_bt_bench_precompiled_tick_allocation_strict --output-on-failure
+```
+
+The strict lane warms and primes a precompiled `B1` tree before enabling allocation failure for the measured tick loop. Allocations are only allowed inside explicit benchmark allocation whitelist scopes reserved for logging paths. The current logging-off case expects zero total allocations and zero whitelist usage.
+
 Run one scenario:
 
 ```bash
@@ -95,6 +106,18 @@ Run one group:
 
 ```bash
 ./build/bench-release/bench/bench run-group B1
+```
+
+Run the GC and memory evidence smoke group:
+
+```bash
+./build/bench-release/bench/bench run-group B7
+```
+
+`B7` writes canonical `events.jsonl` files under each scenario/repetition directory. Use a longer run duration when collecting paper-facing heap and RSS slope evidence:
+
+```bash
+./build/bench-release/bench/bench run-group B7 --run-ms 30000 --repetitions 5
 ```
 
 Run one group against `BehaviorTree.CPP`:
@@ -119,6 +142,33 @@ Summarise a completed benchmark session:
 
 ```bash
 python3 bench/scripts/analyse_results.py bench/results/my-run
+```
+
+Generate the current tail-latency figure:
+
+```bash
+python3 bench/scripts/figure_tail_latency.py \
+  bench/results/my-run \
+  --output bench/results/my-run/tail_latency.svg
+```
+
+Generate the current memory/GC figure:
+
+```bash
+python3 bench/scripts/figure_memory_gc.py \
+  bench/results/my-run \
+  --event-log build/dev/gc-events.jsonl \
+  --output bench/results/my-run/memory_gc.svg
+```
+
+`figure_memory_gc.py` also searches for `events.jsonl` files under the benchmark result directory. If no `gc_end` events are available yet, it still renders the allocation/RSS panel and marks the GC evidence as pending.
+
+Write a compact evidence report for the same result directory:
+
+```bash
+python3 bench/scripts/write_evidence_report.py \
+  bench/results/my-run \
+  --event-log build/dev/gc-events.jsonl
 ```
 
 If you omit the path, the script picks the latest result directory under `bench/results/`.
@@ -159,6 +209,12 @@ The output directory will contain:
 - `aggregate_summary.csv`
 - `environment_metadata.csv`
 - `jitter_trace.csv` when the selected scenarios include `A2`
+- `B7-*/rep-*/events.jsonl` when the selected scenarios include `B7`
+- `tail_latency.svg` when generated with `bench/scripts/figure_tail_latency.py`
+- `memory_gc.svg` when generated with `bench/scripts/figure_memory_gc.py`
+- `evidence_report.md` when generated with `bench/scripts/write_evidence_report.py`
+
+`bench/results/` is intentionally ignored by Git. Local result directories can be large because `A2` writes one latency row per tick. Summarise or trim a result set before linking it from release notes, papers, or the top-level README.
 
 For `B5`, the latency columns record one phase execution per repetition:
 
@@ -193,6 +249,8 @@ python3 bench/scripts/compare_results.py \
 - `A2` writes one row per tick. That file can become large on fast machines.
 - `B5` writes per-phase latency into the same CSV schema as the tick benchmarks. Read those rows as lifecycle operations, not executor ticks.
 - `B6` full-trace rows currently measure capture overhead with deferred serialisation, not forced inline file output.
+- The strict allocation CTest lane is a guardrail for precompiled steady-state ticks. Warm-up, compilation, instantiation, and ordinary benchmark CSV writing happen outside the guarded section.
+- `B7` default scenarios are smoke runs. Use longer `--run-ms` and more repetitions before treating heap-live or RSS slope as paper evidence.
 - `BehaviorTree.CPP` comparison runs are pinned to release `4.9.0` and the common semantic subset. Do not treat skipped groups as missing data bugs.
 - `compare_results.py` assumes both result sets were collected under meaningfully similar machine and build settings. It prints a warning when the recorded environment metadata differ.
 

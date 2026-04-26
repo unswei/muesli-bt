@@ -35,6 +35,8 @@
 - `bt_def`
 - `tick_begin`
 - `tick_end`
+- `tick_audit` (planned `v0.7.0` audit-mode event)
+- `gc_begin`, `gc_end`
 - `node_enter`
 - `node_exit`
 - `node_status`
@@ -71,6 +73,8 @@
 - Blackboard `bb_write.preview` is size-limited (4KB JSON).
 - `seq` is the authoritative ordering key for replay/monitoring.
 - Existing planner/vla metadata is wrapped in canonical events (for example `planner_v1`).
+- `gc_begin` and `gc_end` are emitted when the Lisp heap collector runs through the default runtime host. Payloads use `schema_version: "gc.lifecycle.v1"`.
+- The planned `tick_audit` event is defined in [tick audit record](tick-audit.md), but is not emitted by the released `v0.6.0` runtime.
 - File-backed event output is buffered by default. Enable `(events.set-flush-each-message #t)` when durability after each emitted event matters more than throughput.
 
 ## validation

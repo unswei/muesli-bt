@@ -8,9 +8,14 @@ namespace muesli_bt::bench::allocation_tracker {
 namespace detail {
 
 std::atomic<bool> g_enabled{false};
+std::atomic<bool> g_fail_on_unwhitelisted_allocation{false};
 std::atomic<std::uint64_t> g_allocation_count{0};
 std::atomic<std::uint64_t> g_allocation_bytes{0};
+std::atomic<std::uint64_t> g_allocation_failure_count{0};
+std::atomic<std::uint64_t> g_whitelisted_allocation_count{0};
+std::atomic<std::uint64_t> g_whitelisted_allocation_bytes{0};
 thread_local bool g_reentrant = false;
+thread_local std::uint32_t g_whitelist_depth = 0;
 
 void* allocate_raw(std::size_t size, std::size_t alignment) {
     const std::size_t actual_size = size == 0u ? 1u : size;
@@ -36,10 +41,18 @@ void record_allocation(std::size_t size) noexcept {
     g_reentrant = true;
     g_allocation_count.fetch_add(1u, std::memory_order_relaxed);
     g_allocation_bytes.fetch_add(static_cast<std::uint64_t>(size), std::memory_order_relaxed);
+    if (g_whitelist_depth != 0u) {
+        g_whitelisted_allocation_count.fetch_add(1u, std::memory_order_relaxed);
+        g_whitelisted_allocation_bytes.fetch_add(static_cast<std::uint64_t>(size), std::memory_order_relaxed);
+    }
     g_reentrant = false;
 }
 
 void* checked_allocate(std::size_t size, std::size_t alignment) {
+    if (g_fail_on_unwhitelisted_allocation.load(std::memory_order_relaxed) && g_whitelist_depth == 0u) {
+        g_allocation_failure_count.fetch_add(1u, std::memory_order_relaxed);
+        throw std::bad_alloc();
+    }
     if (void* ptr = allocate_raw(size, alignment)) {
         record_allocation(size);
         return ptr;
@@ -52,6 +65,9 @@ void* checked_allocate(std::size_t size, std::size_t alignment) {
 void reset() noexcept {
     detail::g_allocation_count.store(0u, std::memory_order_relaxed);
     detail::g_allocation_bytes.store(0u, std::memory_order_relaxed);
+    detail::g_allocation_failure_count.store(0u, std::memory_order_relaxed);
+    detail::g_whitelisted_allocation_count.store(0u, std::memory_order_relaxed);
+    detail::g_whitelisted_allocation_bytes.store(0u, std::memory_order_relaxed);
 }
 
 void set_enabled(bool enabled_value) noexcept {
@@ -62,15 +78,44 @@ bool enabled() noexcept {
     return detail::g_enabled.load(std::memory_order_relaxed);
 }
 
+void set_fail_on_unwhitelisted_allocation(bool enabled_value) noexcept {
+    detail::g_fail_on_unwhitelisted_allocation.store(enabled_value, std::memory_order_relaxed);
+}
+
+bool fail_on_unwhitelisted_allocation() noexcept {
+    return detail::g_fail_on_unwhitelisted_allocation.load(std::memory_order_relaxed);
+}
+
 snapshot read() noexcept {
     return snapshot{
         .allocation_count = detail::g_allocation_count.load(std::memory_order_relaxed),
         .allocation_bytes = detail::g_allocation_bytes.load(std::memory_order_relaxed),
+        .allocation_failure_count = detail::g_allocation_failure_count.load(std::memory_order_relaxed),
+        .whitelisted_allocation_count = detail::g_whitelisted_allocation_count.load(std::memory_order_relaxed),
+        .whitelisted_allocation_bytes = detail::g_whitelisted_allocation_bytes.load(std::memory_order_relaxed),
     };
 }
 
 void on_allocation(std::size_t size) noexcept {
     detail::record_allocation(size);
+}
+
+void enter_whitelisted_allocation_path() noexcept {
+    ++detail::g_whitelist_depth;
+}
+
+void leave_whitelisted_allocation_path() noexcept {
+    if (detail::g_whitelist_depth != 0u) {
+        --detail::g_whitelist_depth;
+    }
+}
+
+whitelisted_allocation_scope::whitelisted_allocation_scope() noexcept {
+    enter_whitelisted_allocation_path();
+}
+
+whitelisted_allocation_scope::~whitelisted_allocation_scope() {
+    leave_whitelisted_allocation_path();
 }
 
 }  // namespace muesli_bt::bench::allocation_tracker

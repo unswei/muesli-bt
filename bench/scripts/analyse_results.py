@@ -317,6 +317,21 @@ def print_report(result_dir: Path) -> int:
         print("- no B6 scenarios present in this result set")
     print()
 
+    print("memory and GC")
+    b7_rows = available_rows(aggregate_rows, "B7-")
+    if b7_rows:
+        for row in b7_rows:
+            print(
+                f"- {row['scenario_id']}: "
+                f"{scenario_metric(row, 'gc_collections_total_median') or 0:.0f} collections, "
+                f"GC p99 {format_latency_ns(scenario_metric(row, 'gc_pause_ns_p99_of_runs'))}, "
+                f"heap slope {scenario_metric(row, 'heap_live_bytes_slope_per_tick_median') or 0.0:.2f} B/tick, "
+                f"event log {scenario_metric(row, 'event_log_bytes_per_tick_median') or 0.0:.2f} B/tick"
+            )
+    else:
+        print("- no B7 scenarios present in this result set")
+    print()
+
     recommendations: list[str] = []
     if semantic_error_runs > 0:
         recommendations.append("Fix semantic mismatches before using these numbers for optimisation work.")
@@ -347,6 +362,8 @@ def print_report(result_dir: Path) -> int:
         recommendations.append(
             "Full-trace logging is expensive in this build; optimise or buffer that path before treating trace-on runs as representative."
         )
+    if not b7_rows:
+        recommendations.append("Run B7 when memory/GC pause or heap-live evidence is needed.")
 
     print("recommended next work")
     if recommendations:

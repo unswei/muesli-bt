@@ -1,0 +1,5 @@
+{
+  "deterministic_mode": true,
+  "scenario": "async_late_completion_after_cancel_is_dropped",
+  "tick_budget_ms": 20
+}

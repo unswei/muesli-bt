@@ -118,6 +118,13 @@ def verify_fixture_dir(path: pathlib.Path, validator) -> None:
     for event_type in expected.get("absent_types", []):
         if counts.get(event_type, 0) != 0:
             raise RuntimeError(f"{path}: unexpected event type present: {event_type}")
+    for event_type, expected_count_raw in expected.get("type_counts", {}).items():
+        expected_type_count = int(expected_count_raw)
+        actual_type_count = counts.get(str(event_type), 0)
+        if actual_type_count != expected_type_count:
+            raise RuntimeError(
+                f"{path}: event type {event_type} count mismatch: expected {expected_type_count}, got {actual_type_count}"
+            )
 
     expected_sequence = expected.get("node_status_sequence")
     if expected_sequence is not None:

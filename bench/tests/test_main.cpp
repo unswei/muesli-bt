@@ -1,11 +1,15 @@
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "bench_config.hpp"
+#include "fixtures/tree_factory.hpp"
+#include "harness/allocation_tracker.hpp"
 #include "harness/runner.hpp"
+#include "runtimes/muesli_adapter.hpp"
 
 namespace {
 
@@ -28,6 +32,7 @@ void test_catalogue_contains_new_benchmarks() {
     check(find_scenario("A2-alt-255-jitter-off") != nullptr, "missing A2 jitter scenario");
     check(find_scenario("B5-alt-31-compile-off") != nullptr, "missing B5 compile scenario");
     check(find_scenario("B6-reactive-31-flip20-fulltrace") != nullptr, "missing B6 logging scenario");
+    check(find_scenario("B7-gc-between-ticks-smoke") != nullptr, "missing B7 GC/memory scenario");
 }
 
 void test_runner_writes_expected_csv_files() {
@@ -158,6 +163,123 @@ void test_b5_lifecycle_benchmarks_run() {
     check(inst100_row.ticks_total == 100u, "B5 inst100 phase should report 100 operations");
 }
 
+void test_b7_gc_memory_benchmark_runs() {
+    using namespace muesli_bt::bench;
+
+    const std::filesystem::path output_dir =
+        std::filesystem::temp_directory_path() / "muesli_bt_bench_b7_smoke";
+    std::filesystem::remove_all(output_dir);
+
+    run_request request;
+    request.output_dir = output_dir;
+    request.scenarios.push_back(*find_scenario("B7-gc-between-ticks-smoke"));
+    request.warmup_override = std::chrono::milliseconds(5);
+    request.run_override = std::chrono::milliseconds(10);
+    request.repetitions_override = 1u;
+
+    benchmark_runner runner;
+    const run_result result = runner.run(request);
+
+    check(result.run_rows.size() == 1u, "expected one B7 run row");
+    check(result.aggregate_rows.size() == 1u, "expected one B7 aggregate row");
+    const run_summary_row& row = result.run_rows.front();
+    check(row.gc_collections_total > 0u, "B7 should record GC collections");
+    check(row.gc_pause_ns_p99 > 0u, "B7 should record GC pause quantiles");
+    check(row.log_events_total > 0u, "B7 should record canonical GC event count");
+    check(row.event_log_bytes_per_tick > 0.0, "B7 should record event-log bytes per tick");
+    check(std::filesystem::exists(output_dir / "B7-gc-between-ticks-smoke" / "rep-0" / "events.jsonl"),
+          "B7 should write canonical GC events.jsonl");
+}
+
+class fail_on_unwhitelisted_allocation_scope final {
+public:
+    fail_on_unwhitelisted_allocation_scope() {
+        muesli_bt::bench::allocation_tracker::reset();
+        muesli_bt::bench::allocation_tracker::set_enabled(true);
+        muesli_bt::bench::allocation_tracker::set_fail_on_unwhitelisted_allocation(true);
+    }
+
+    fail_on_unwhitelisted_allocation_scope(const fail_on_unwhitelisted_allocation_scope&) = delete;
+    fail_on_unwhitelisted_allocation_scope& operator=(const fail_on_unwhitelisted_allocation_scope&) = delete;
+
+    ~fail_on_unwhitelisted_allocation_scope() {
+        muesli_bt::bench::allocation_tracker::set_fail_on_unwhitelisted_allocation(false);
+        muesli_bt::bench::allocation_tracker::set_enabled(false);
+    }
+};
+
+void test_allocation_whitelist_allows_explicit_logging_paths_only() {
+    using namespace muesli_bt::bench;
+
+    bool unwhitelisted_allocation_failed = false;
+    allocation_tracker::snapshot failed_snapshot{};
+    {
+        fail_on_unwhitelisted_allocation_scope fail_scope;
+        try {
+            std::string should_fail;
+            should_fail.assign(4096u, 'x');
+        } catch (const std::bad_alloc&) {
+            unwhitelisted_allocation_failed = true;
+        }
+        failed_snapshot = allocation_tracker::read();
+    }
+    check(unwhitelisted_allocation_failed, "unwhitelisted allocation should fail while strict allocation mode is active");
+    check(failed_snapshot.allocation_failure_count == 1u, "strict allocation mode should record one failed allocation");
+
+    bool whitelisted_allocation_failed = false;
+    allocation_tracker::snapshot whitelisted_snapshot{};
+    {
+        fail_on_unwhitelisted_allocation_scope fail_scope;
+        try {
+            allocation_tracker::whitelisted_allocation_scope logging_path;
+            std::string allowed_logging_buffer;
+            allowed_logging_buffer.assign(4096u, 'l');
+        } catch (const std::bad_alloc&) {
+            whitelisted_allocation_failed = true;
+        }
+        whitelisted_snapshot = allocation_tracker::read();
+    }
+    check(!whitelisted_allocation_failed, "explicitly whitelisted logging allocation should be allowed");
+    check(whitelisted_snapshot.allocation_failure_count == 0u, "whitelisted allocation should not record a failure");
+    check(whitelisted_snapshot.whitelisted_allocation_count > 0u, "whitelisted allocation count should be recorded");
+}
+
+void test_precompiled_ticks_fail_on_unwhitelisted_allocations() {
+    using namespace muesli_bt::bench;
+
+    const scenario_definition* scenario = find_scenario("B1-alt-255-base-off");
+    check(scenario != nullptr, "missing B1 strict allocation scenario");
+
+    muesli_adapter adapter;
+    const tree_fixture fixture = make_fixture(*scenario);
+    std::unique_ptr<runtime_adapter::compiled_tree> compiled = adapter.compile_tree(fixture);
+    std::unique_ptr<runtime_adapter::instance_handle> instance = adapter.new_instance(*compiled, *scenario);
+    adapter.prepare_for_timed_run(*instance, 512u, 0u);
+
+    bool tick_failed_with_bad_alloc = false;
+    bool tick_returned_wrong_status = false;
+    allocation_tracker::snapshot snapshot{};
+    {
+        fail_on_unwhitelisted_allocation_scope fail_scope;
+        try {
+            for (std::size_t i = 0; i < 64u; ++i) {
+                const run_status status = adapter.tick(*instance);
+                tick_returned_wrong_status = tick_returned_wrong_status || status != run_status::success;
+            }
+        } catch (const std::bad_alloc&) {
+            tick_failed_with_bad_alloc = true;
+        }
+        snapshot = allocation_tracker::read();
+    }
+
+    check(!tick_failed_with_bad_alloc, "precompiled hot-path tick allocated outside the logging whitelist");
+    check(!tick_returned_wrong_status, "strict allocation precompiled tick should return success");
+    check(snapshot.allocation_count == 0u, "precompiled hot-path tick should perform zero allocations");
+    check(snapshot.allocation_bytes == 0u, "precompiled hot-path tick should allocate zero bytes");
+    check(snapshot.allocation_failure_count == 0u, "precompiled hot-path tick should not hit allocation failures");
+    check(snapshot.whitelisted_allocation_count == 0u, "logging-off strict lane should not use the logging whitelist");
+}
+
 #if MUESLI_BT_BENCH_WITH_BTCPP
 void test_btcpp_runner_writes_expected_csv_files() {
     using namespace muesli_bt::bench;
@@ -243,13 +365,22 @@ void test_btcpp_rejects_unsupported_b6() {
 
 }  // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc == 2 && std::string(argv[1]) == "--strict-allocation") {
+        test_allocation_whitelist_allows_explicit_logging_paths_only();
+        test_precompiled_ticks_fail_on_unwhitelisted_allocations();
+        return 0;
+    }
+
     test_catalogue_contains_new_benchmarks();
     test_runner_writes_expected_csv_files();
     test_fulltrace_mode_emits_log_bytes();
     test_jitter_trace_is_written_for_a2();
     test_runner_emits_progress_events();
     test_b5_lifecycle_benchmarks_run();
+    test_b7_gc_memory_benchmark_runs();
+    test_allocation_whitelist_allows_explicit_logging_paths_only();
+    test_precompiled_ticks_fail_on_unwhitelisted_allocations();
 #if MUESLI_BT_BENCH_WITH_BTCPP
     test_btcpp_runner_writes_expected_csv_files();
     test_btcpp_reactive_and_b5_benchmarks_run();

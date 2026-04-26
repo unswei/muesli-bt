@@ -9,14 +9,15 @@
 
 namespace muesli_bt::bench {
 
-inline constexpr std::string_view kSchemaVersion = "2";
+inline constexpr std::string_view kSchemaVersion = "3";
 inline constexpr std::string_view kBenchmarkSuiteVersion = "0.1.0-m1";
 
 enum class benchmark_kind {
     single_leaf,
     static_tick,
     reactive_interrupt,
-    compile_lifecycle
+    compile_lifecycle,
+    memory_gc
 };
 
 enum class lifecycle_phase {
@@ -50,6 +51,13 @@ enum class schedule_kind {
     bursty
 };
 
+enum class gc_benchmark_mode {
+    none,
+    manual,
+    between_ticks,
+    forced_pressure
+};
+
 struct timing_config {
     std::chrono::milliseconds warmup{2000};
     std::chrono::milliseconds run{10000};
@@ -65,6 +73,7 @@ struct scenario_definition {
     logging_mode logging = logging_mode::off;
     schedule_kind schedule = schedule_kind::none;
     lifecycle_phase lifecycle = lifecycle_phase::none;
+    gc_benchmark_mode gc_mode = gc_benchmark_mode::none;
     std::string variant;
     timing_config timing{};
     std::uint64_t seed = 20260315ull;
