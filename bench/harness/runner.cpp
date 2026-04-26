@@ -11,6 +11,7 @@
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -23,6 +24,7 @@
 #include "bench_config.hpp"
 #include "fixtures/tree_factory.hpp"
 #include "muesli_bt/contract/events.hpp"
+#include "muesli_bt/contract/version.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/value.hpp"
 #include "runtimes/muesli_adapter.hpp"
@@ -93,6 +95,91 @@ std::string local_time_to_minute_now() {
     std::ostringstream out;
     out << std::put_time(&local_tm, "%Y-%m-%d %H:%M");
     return out.str();
+}
+
+std::string json_escape(std::string_view value) {
+    std::string escaped;
+    escaped.reserve(value.size() + 8u);
+    for (const char ch : value) {
+        switch (ch) {
+            case '\\':
+                escaped += "\\\\";
+                break;
+            case '"':
+                escaped += "\\\"";
+                break;
+            case '\n':
+                escaped += "\\n";
+                break;
+            case '\r':
+                escaped += "\\r";
+                break;
+            case '\t':
+                escaped += "\\t";
+                break;
+            default:
+                escaped.push_back(ch);
+                break;
+        }
+    }
+    return escaped;
+}
+
+std::string json_string(std::string_view value) {
+    return "\"" + json_escape(value) + "\"";
+}
+
+std::string optional_duration_ms_json(const std::optional<std::chrono::milliseconds>& value) {
+    if (!value.has_value()) {
+        return "null";
+    }
+    return std::to_string(value->count());
+}
+
+std::string optional_size_json(const std::optional<std::size_t>& value) {
+    if (!value.has_value()) {
+        return "null";
+    }
+    return std::to_string(*value);
+}
+
+std::string optional_u64_json(const std::optional<std::uint64_t>& value) {
+    if (!value.has_value()) {
+        return "null";
+    }
+    return std::to_string(*value);
+}
+
+std::string gc_mode_name(gc_benchmark_mode mode) {
+    switch (mode) {
+        case gc_benchmark_mode::none:
+            return "none";
+        case gc_benchmark_mode::manual:
+            return "manual";
+        case gc_benchmark_mode::between_ticks:
+            return "between_ticks";
+        case gc_benchmark_mode::forced_pressure:
+            return "forced_pressure";
+    }
+    return "unknown";
+}
+
+std::string async_case_name(async_contract_case async_case) {
+    switch (async_case) {
+        case async_contract_case::none:
+            return "none";
+        case async_contract_case::cancel_before_start:
+            return "cancel_before_start";
+        case async_contract_case::cancel_while_running:
+            return "cancel_while_running";
+        case async_contract_case::cancel_after_timeout:
+            return "cancel_after_timeout";
+        case async_contract_case::repeated_cancel:
+            return "repeated_cancel";
+        case async_contract_case::late_completion_after_cancel:
+            return "late_completion_after_cancel";
+    }
+    return "unknown";
 }
 
 std::string scenario_description(const scenario_definition& scenario) {
@@ -371,6 +458,9 @@ private:
 struct async_contract_sample {
     std::uint64_t latency_ns = 0u;
     std::uint64_t cancel_latency_ns = 0u;
+    std::uint64_t deadline_miss_count = 0u;
+    std::uint64_t fallback_activation_count = 0u;
+    std::uint64_t dropped_completion_count = 0u;
     std::uint64_t semantic_errors = 0u;
     std::uint64_t operations = 1u;
 };
@@ -428,6 +518,9 @@ async_contract_sample run_async_contract_operation(async_contract_case async_cas
             if (!cancelled_after_timeout || timeout_poll.status != bt::vla_job_status::timeout) {
                 ++sample.semantic_errors;
             }
+            if (timeout_poll.status == bt::vla_job_status::timeout) {
+                ++sample.deadline_miss_count;
+            }
         } else if (async_case == async_contract_case::repeated_cancel) {
             const bool first_cancel = service.cancel(job);
             const bool second_cancel = service.cancel(job);
@@ -452,6 +545,10 @@ async_contract_sample run_async_contract_operation(async_contract_case async_cas
                 const bool saw_drop = std::any_of(records.begin(), records.end(), [](const bt::vla_record& record) {
                     return record.completion_dropped;
                 });
+                sample.dropped_completion_count =
+                    static_cast<std::uint64_t>(std::count_if(records.begin(), records.end(), [](const bt::vla_record& record) {
+                        return record.completion_dropped;
+                    }));
                 if (!saw_drop) {
                     ++sample.semantic_errors;
                 }
@@ -634,6 +731,9 @@ run_summary_row run_async_contract_once(const environment_info& environment,
     std::vector<std::uint64_t> latencies_ns;
     std::vector<std::uint64_t> cancel_latencies_ns;
     std::uint64_t operations_total = 0u;
+    std::uint64_t deadline_miss_count = 0u;
+    std::uint64_t fallback_activation_count = 0u;
+    std::uint64_t dropped_completion_count = 0u;
     std::uint64_t semantic_errors = 0u;
 
     allocation_tracker::reset();
@@ -644,6 +744,9 @@ run_summary_row run_async_contract_once(const environment_info& environment,
             run_async_contract_operation(scenario.async_case, repetition * 100000u + operations_total + 1u);
         latencies_ns.push_back(sample.latency_ns);
         cancel_latencies_ns.push_back(sample.cancel_latency_ns);
+        deadline_miss_count += sample.deadline_miss_count;
+        fallback_activation_count += sample.fallback_activation_count;
+        dropped_completion_count += sample.dropped_completion_count;
         semantic_errors += sample.semantic_errors;
         operations_total += sample.operations;
     }
@@ -673,6 +776,11 @@ run_summary_row run_async_contract_once(const environment_info& environment,
     row.log_bytes_total = std::filesystem::file_size(event_path);
     row.event_log_bytes_per_tick =
         operations_total == 0u ? 0.0 : static_cast<double>(row.log_bytes_total) / static_cast<double>(operations_total);
+    row.deadline_miss_count = deadline_miss_count;
+    row.deadline_miss_rate =
+        operations_total == 0u ? 0.0 : static_cast<double>(deadline_miss_count) / static_cast<double>(operations_total);
+    row.fallback_activation_count = fallback_activation_count;
+    row.dropped_completion_count = dropped_completion_count;
     row.notes = "events=" + event_path.string() + "; fixture=fixtures/async-" + scenario.variant + "-case";
     return row;
 }
@@ -766,6 +874,9 @@ aggregate_summary_row build_aggregate_row(const environment_info& environment,
     std::vector<double> heap_slopes;
     std::vector<double> rss_slopes;
     std::vector<double> event_log_bytes_per_tick;
+    std::vector<double> deadline_miss_rates;
+    std::vector<std::uint64_t> fallback_activation_counts;
+    std::vector<std::uint64_t> dropped_completion_counts;
 
     std::size_t semantic_error_runs = 0u;
     for (const run_summary_row& row : rows) {
@@ -787,6 +898,9 @@ aggregate_summary_row build_aggregate_row(const environment_info& environment,
         heap_slopes.push_back(row.heap_live_bytes_slope_per_tick);
         rss_slopes.push_back(row.rss_bytes_slope_per_tick);
         event_log_bytes_per_tick.push_back(row.event_log_bytes_per_tick);
+        deadline_miss_rates.push_back(row.deadline_miss_rate);
+        fallback_activation_counts.push_back(row.fallback_activation_count);
+        dropped_completion_counts.push_back(row.dropped_completion_count);
         if (row.interrupt_latency_ns_median.has_value()) {
             interrupt_medians.push_back(*row.interrupt_latency_ns_median);
         }
@@ -835,6 +949,9 @@ aggregate_summary_row build_aggregate_row(const environment_info& environment,
     aggregate.heap_live_bytes_slope_per_tick_median = percentile_double(heap_slopes, 0.50);
     aggregate.rss_bytes_slope_per_tick_median = percentile_double(rss_slopes, 0.50);
     aggregate.event_log_bytes_per_tick_median = percentile_double(event_log_bytes_per_tick, 0.50);
+    aggregate.deadline_miss_rate_median = percentile_double(deadline_miss_rates, 0.50);
+    aggregate.fallback_activation_count_median = percentile_u64(fallback_activation_counts, 0.50);
+    aggregate.dropped_completion_count_median = percentile_u64(dropped_completion_counts, 0.50);
     aggregate.semantic_error_runs = semantic_error_runs;
     return aggregate;
 }
@@ -868,6 +985,93 @@ environment_metadata_row build_environment_row(const environment_info& environme
     row.allocator_mode = environment.allocator_mode;
     row.notes = environment.notes;
     return row;
+}
+
+void write_experiment_manifest(const std::filesystem::path& output_dir,
+                               const environment_info& environment,
+                               const runtime_adapter& adapter,
+                               const run_request& request,
+                               const std::vector<scenario_definition>& scenarios) {
+    std::ofstream out(output_dir / "experiment_manifest.json", std::ios::trunc);
+    if (!out) {
+        throw std::runtime_error("benchmark runner: failed to write experiment_manifest.json");
+    }
+
+    out << "{\n"
+        << "  \"schema_version\": \"benchmark.experiment_manifest.v1\",\n"
+        << "  \"benchmark_suite_version\": " << json_string(kBenchmarkSuiteVersion) << ",\n"
+        << "  \"created_utc\": " << json_string(timestamp_utc_now()) << ",\n"
+        << "  \"output_dir\": " << json_string(output_dir.string()) << ",\n"
+        << "  \"trace_schema_version\": " << json_string(muesli_bt::contract::kSchemaName) << ",\n"
+        << "  \"runtime_contract_version\": " << json_string(muesli_bt::contract::kRuntimeContractVersion) << ",\n"
+        << "  \"runtime\": {\n"
+        << "    \"requested_runtime\": " << json_string(request.runtime_name) << ",\n"
+        << "    \"name\": " << json_string(adapter.name()) << ",\n"
+        << "    \"version\": " << json_string(adapter.version()) << ",\n"
+        << "    \"commit\": " << json_string(adapter.commit()) << "\n"
+        << "  },\n"
+        << "  \"harness\": {\n"
+        << "    \"commit\": " << json_string(environment.harness_commit) << ",\n"
+        << "    \"schema_version\": " << json_string(kSchemaVersion) << "\n"
+        << "  },\n"
+        << "  \"platform\": {\n"
+        << "    \"machine_id\": " << json_string(environment.machine_id) << ",\n"
+        << "    \"hostname\": " << json_string(environment.hostname) << ",\n"
+        << "    \"os_name\": " << json_string(environment.os_name) << ",\n"
+        << "    \"os_version\": " << json_string(environment.os_version) << ",\n"
+        << "    \"kernel_version\": " << json_string(environment.kernel_version) << ",\n"
+        << "    \"cpu_model\": " << json_string(environment.cpu_model) << ",\n"
+        << "    \"cpu_arch\": " << json_string(environment.cpu_arch) << ",\n"
+        << "    \"physical_cores\": " << environment.physical_cores << ",\n"
+        << "    \"logical_cores\": " << environment.logical_cores << ",\n"
+        << "    \"cpu_governor\": " << json_string(environment.cpu_governor) << ",\n"
+        << "    \"cpu_pinning\": " << json_string(environment.cpu_pinning) << ",\n"
+        << "    \"ram_bytes_total\": " << environment.ram_bytes_total << "\n"
+        << "  },\n"
+        << "  \"build\": {\n"
+        << "    \"compiler_name\": " << json_string(environment.compiler_name) << ",\n"
+        << "    \"compiler_version\": " << json_string(environment.compiler_version) << ",\n"
+        << "    \"build_type\": " << json_string(environment.build_type) << ",\n"
+        << "    \"build_flags\": " << json_string(environment.build_flags) << "\n"
+        << "  },\n"
+        << "  \"runtime_flags\": {\n"
+        << "    \"warmup_override_ms\": " << optional_duration_ms_json(request.warmup_override) << ",\n"
+        << "    \"run_override_ms\": " << optional_duration_ms_json(request.run_override) << ",\n"
+        << "    \"repetitions_override\": " << optional_size_json(request.repetitions_override) << ",\n"
+        << "    \"seed_override\": " << optional_u64_json(request.seed_override) << ",\n"
+        << "    \"clock_source\": " << json_string(environment.clock_source) << ",\n"
+        << "    \"allocator_mode\": " << json_string(environment.allocator_mode) << "\n"
+        << "  },\n"
+        << "  \"scenarios\": [\n";
+
+    for (std::size_t index = 0; index < scenarios.size(); ++index) {
+        const scenario_definition& scenario = scenarios[index];
+        const tree_fixture fixture = make_fixture(scenario);
+        out << "    {\n"
+            << "      \"scenario_id\": " << json_string(scenario.scenario_id) << ",\n"
+            << "      \"group_id\": " << json_string(scenario.group_id) << ",\n"
+            << "      \"benchmark_kind\": " << json_string(benchmark_kind_name(scenario.kind)) << ",\n"
+            << "      \"tree_family\": " << json_string(tree_family_name(scenario.family)) << ",\n"
+            << "      \"tree_size_nodes\": " << scenario.tree_size_nodes << ",\n"
+            << "      \"fixture_node_count\": " << fixture.node_count << ",\n"
+            << "      \"leaf_count\": " << fixture.leaf_count << ",\n"
+            << "      \"async_leaf_count\": " << fixture.async_leaf_count << ",\n"
+            << "      \"logging_mode\": " << json_string(logging_mode_name(scenario.logging)) << ",\n"
+            << "      \"schedule\": " << json_string(schedule_kind_name(scenario.schedule)) << ",\n"
+            << "      \"lifecycle_phase\": " << json_string(lifecycle_phase_name(scenario.lifecycle)) << ",\n"
+            << "      \"gc_mode\": " << json_string(gc_mode_name(scenario.gc_mode)) << ",\n"
+            << "      \"async_case\": " << json_string(async_case_name(scenario.async_case)) << ",\n"
+            << "      \"variant\": " << json_string(scenario.variant) << ",\n"
+            << "      \"seed\": " << scenario.seed << ",\n"
+            << "      \"warmup_ms\": " << scenario.timing.warmup.count() << ",\n"
+            << "      \"run_ms\": " << scenario.timing.run.count() << ",\n"
+            << "      \"repetitions\": " << scenario.timing.repetitions << ",\n"
+            << "      \"capture_tick_trace\": " << (scenario.capture_tick_trace ? "true" : "false") << "\n"
+            << "    }" << (index + 1u == scenarios.size() ? "\n" : ",\n");
+    }
+
+    out << "  ]\n"
+        << "}\n";
 }
 
 }  // namespace
@@ -1091,6 +1295,7 @@ run_result benchmark_runner::run(const run_request& request) const {
     }
 
     writer.write_summaries(result.output_dir, result.run_rows, result.aggregate_rows, result.environment_row);
+    write_experiment_manifest(result.output_dir, environment, *adapter, request, scenarios);
     return result;
 }
 

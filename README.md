@@ -27,7 +27,6 @@ The optional benchmark harness lives under [`bench/`](bench/README.md). It cover
 
 Current benchmark interpretation lives in [runtime performance](docs/internals/runtime-performance.md). Keep detailed benchmark claims there or in release artefacts rather than scattering result snapshots through this README.
 
-
 ## Runtime Contract In One Minute
 
 Guarantees:
@@ -173,6 +172,20 @@ For the flagship comparison story itself, use:
 - [PyBullet: e-puck-style goal seeking](docs/examples/pybullet-epuck-goal.md)
 - [Isaac Sim: TurtleBot3 ROS2 demo](docs/examples/isaac-wheeled-ros2-showcase.md)
 
+## v0.7 Development Evidence
+
+The active `v0.7.0` work is focused on runtime defensibility, async correctness, and benchmark evidence. The codebase now has the main evidence lanes in place:
+
+- `tick_audit` can emit per-tick allocation, heap, GC-delta, node-path, and logging-mode evidence through the canonical event stream.
+- GC lifecycle events and GC policy switches are exposed through the runtime and Lisp builtins.
+- strict precompiled-tick allocation tests fail unexpected allocations outside explicit logging whitelist scopes.
+- deterministic async fixtures and `B8` benchmarks cover cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation.
+- `B7` benchmark scenarios keep canonical GC/memory evidence and summarise GC pause, heap-live slope, RSS slope, and event-log bytes per tick in the CSV schema.
+- each benchmark result directory now includes `experiment_manifest.json` so environment, build, runtime flags, seed, scenario, and trace schema metadata travel with the CSV summaries.
+- trace comparison reports precise first-divergence context, including tick, event type, field path, node id, blackboard key, async job id, planner id, or host capability where those fields exist.
+
+The roadmap tracks remaining release work in [Roadmap to 1.0](docs/roadmap-to-1.0.md). The benchmark command reference lives in [bench/README.md](bench/README.md).
+
 ## package and tooling integration
 
 `muesli-bt` installs a CMake package for runtime consumers and tooling such as [`muesli-studio`](https://github.com/unswei/muesli-studio). Start with the [runtime contract](docs/contracts/runtime-contract-v1.md), the [tooling integration profile](docs/contracts/muesli-studio-integration.md), and the [package consumption guide](docs/getting-started-consume.md).
@@ -242,8 +255,10 @@ Current first-milestone coverage:
 - `B2` reactive interruption
 - `B5` parse, compile, load, and instantiate cost
 - `B6` logging overhead
+- `B7` GC and memory evidence smoke runs
+- `B8` async cancellation contract edge smoke runs
 
-Use the `bench-release` preset for meaningful numbers, then run the generated `bench` executable from `build/bench-release/bench/`.
+Use the `bench-release` preset for meaningful numbers, then run the generated `bench` executable from `build/bench-release/bench/`. `run-all` is the reasonable whole-catalogue runner. Use `bench/scripts/run_publication_benchmarks.py` for publication-quality bundles with stronger durations, repetitions, manifests, and generated figure/report artefacts.
 
 ## Isaac Sim H1 Demo
 
@@ -417,7 +432,7 @@ Serve docs locally:
 Run the suite:
 
 ```bash
-ctest --test-dir build/dev --output-on-failure
+ctest --preset dev --output-on-failure
 ```
 
 ## Repository Layout

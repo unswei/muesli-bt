@@ -67,6 +67,8 @@ void test_runner_writes_expected_csv_files() {
     check(std::filesystem::exists(result.output_dir / "aggregate_summary.csv"), "aggregate_summary.csv was not written");
     check(std::filesystem::exists(result.output_dir / "environment_metadata.csv"),
           "environment_metadata.csv was not written");
+    check(std::filesystem::exists(result.output_dir / "experiment_manifest.json"),
+          "experiment_manifest.json was not written");
 
     const std::string run_summary = read_text(result.output_dir / "run_summary.csv");
     check(run_summary.find("A1-single-leaf-off") != std::string::npos, "run summary missing scenario id");
@@ -74,6 +76,21 @@ void test_runner_writes_expected_csv_files() {
     const std::string environment_metadata = read_text(result.output_dir / "environment_metadata.csv");
     check(environment_metadata.find("clock_source") != std::string::npos, "environment metadata header missing");
     check(environment_metadata.find("muesli-bt") != std::string::npos, "environment metadata missing runtime name");
+
+    const std::string manifest = read_text(result.output_dir / "experiment_manifest.json");
+    for (const std::string& required : {
+             "\"schema_version\": \"benchmark.experiment_manifest.v1\"",
+             "\"compiler_name\"",
+             "\"build_type\"",
+             "\"platform\"",
+             "\"cpu_model\"",
+             "\"runtime_flags\"",
+             "\"seed\": 20260315",
+             "\"trace_schema_version\": \"mbt.evt.v1\"",
+             "\"scenario_id\": \"A1-single-leaf-off\"",
+         }) {
+        check(manifest.find(required) != std::string::npos, "experiment manifest missing field: " + required);
+    }
 }
 
 void test_fulltrace_mode_emits_log_bytes() {
@@ -228,6 +245,7 @@ void test_b8_async_contract_benchmarks_run() {
     run_request request;
     request.output_dir = output_dir;
     request.scenarios.push_back(*find_scenario("B8-async-cancel-before-start"));
+    request.scenarios.push_back(*find_scenario("B8-async-cancel-after-timeout"));
     request.scenarios.push_back(*find_scenario("B8-async-late-completion-after-cancel"));
     request.warmup_override = std::chrono::milliseconds(0);
     request.run_override = std::chrono::milliseconds(5);
@@ -236,13 +254,25 @@ void test_b8_async_contract_benchmarks_run() {
     benchmark_runner runner;
     const run_result result = runner.run(request);
 
-    check(result.run_rows.size() == 2u, "expected two B8 run rows");
-    check(result.aggregate_rows.size() == 2u, "expected two B8 aggregate rows");
+    check(result.run_rows.size() == 3u, "expected three B8 run rows");
+    check(result.aggregate_rows.size() == 3u, "expected three B8 aggregate rows");
     for (const run_summary_row& row : result.run_rows) {
         check(row.group_id == "B8", "B8 row should use B8 group id");
         check(row.ticks_total > 0u, "B8 should record operation count");
         check(row.latency_ns_median > 0u, "B8 should record contract latency");
         check(row.cancel_latency_ns_median.has_value(), "B8 should record cancellation latency");
+        if (row.scenario_id == "B8-async-cancel-before-start") {
+            check(row.deadline_miss_rate == 0.0, "B8 cancel-before-start should record zero deadline miss rate");
+            check(row.fallback_activation_count == 0u, "B8 cancel-before-start should record zero fallback activations");
+            check(row.dropped_completion_count == 0u, "B8 cancel-before-start should record zero dropped completions");
+        }
+        if (row.scenario_id == "B8-async-cancel-after-timeout") {
+            check(row.deadline_miss_rate > 0.0, "B8 cancel-after-timeout should record deadline miss rate");
+            check(row.deadline_miss_count > 0u, "B8 cancel-after-timeout should record deadline misses");
+        }
+        if (row.scenario_id == "B8-async-late-completion-after-cancel") {
+            check(row.dropped_completion_count > 0u, "B8 late-completion scenario should count dropped completions");
+        }
         check(row.semantic_errors == 0u, "B8 async contract scenario should be semantically clean");
         check(row.log_bytes_total > 0u, "B8 should keep canonical async event-log evidence bytes");
         check(row.event_log_bytes_per_tick > 0.0, "B8 should record async event-log bytes per operation");
@@ -250,6 +280,23 @@ void test_b8_async_contract_benchmarks_run() {
               "B8 should copy canonical async events.jsonl evidence");
         check(row.notes.find("events=") != std::string::npos, "B8 should point at copied canonical events");
         check(row.notes.find("fixtures/async-") != std::string::npos, "B8 should point at the matching fixture bundle");
+    }
+    const std::string run_summary = read_text(result.output_dir / "run_summary.csv");
+    const std::string aggregate_summary = read_text(result.output_dir / "aggregate_summary.csv");
+    for (const std::string& column : {
+             "deadline_miss_rate",
+             "fallback_activation_count",
+             "dropped_completion_count",
+         }) {
+        check(first_line(run_summary).find(column) != std::string::npos, "run summary missing async outcome column: " + column);
+    }
+    for (const std::string& column : {
+             "deadline_miss_rate_median",
+             "fallback_activation_count_median",
+             "dropped_completion_count_median",
+         }) {
+        check(first_line(aggregate_summary).find(column) != std::string::npos,
+              "aggregate summary missing async outcome column: " + column);
     }
 }
 
@@ -342,6 +389,72 @@ void test_precompiled_ticks_fail_on_unwhitelisted_allocations() {
     check(snapshot.whitelisted_allocation_count == 0u, "logging-off strict lane should not use the logging whitelist");
 }
 
+void assert_precompiled_ticks_have_no_unwhitelisted_allocations(const std::string& scenario_id, std::size_t tick_count) {
+    using namespace muesli_bt::bench;
+
+    const scenario_definition* scenario = find_scenario(scenario_id);
+    check(scenario != nullptr, "missing strict allocation scenario: " + scenario_id);
+
+    muesli_adapter adapter;
+    const tree_fixture fixture = make_fixture(*scenario);
+    std::unique_ptr<runtime_adapter::compiled_tree> compiled = adapter.compile_tree(fixture);
+    std::unique_ptr<runtime_adapter::instance_handle> instance = adapter.new_instance(*compiled, *scenario);
+    adapter.prepare_for_timed_run(*instance, 1024u, 0u);
+
+    bool tick_failed_with_bad_alloc = false;
+    bool tick_returned_wrong_status = false;
+    allocation_tracker::snapshot snapshot{};
+    {
+        fail_on_unwhitelisted_allocation_scope fail_scope;
+        try {
+            for (std::size_t i = 0; i < tick_count; ++i) {
+                const run_status status = adapter.tick(*instance);
+                if (scenario->kind == benchmark_kind::reactive_interrupt) {
+                    tick_returned_wrong_status = tick_returned_wrong_status || status == run_status::failure;
+                } else {
+                    tick_returned_wrong_status = tick_returned_wrong_status || status != run_status::success;
+                }
+            }
+        } catch (const std::bad_alloc&) {
+            tick_failed_with_bad_alloc = true;
+        }
+        snapshot = allocation_tracker::read();
+    }
+
+    check(!tick_failed_with_bad_alloc, scenario_id + " allocated outside the logging whitelist");
+    check(!tick_returned_wrong_status, scenario_id + " returned an unexpected status during strict allocation ticks");
+    check(snapshot.allocation_failure_count == 0u, scenario_id + " should not hit allocation failures");
+    check(snapshot.allocation_count == snapshot.whitelisted_allocation_count,
+          scenario_id + " should only allocate inside explicit logging whitelist paths: total=" +
+              std::to_string(snapshot.allocation_count) + " whitelisted=" +
+              std::to_string(snapshot.whitelisted_allocation_count));
+    check(snapshot.allocation_bytes == snapshot.whitelisted_allocation_bytes,
+          scenario_id + " should only allocate bytes inside explicit logging whitelist paths: total=" +
+              std::to_string(snapshot.allocation_bytes) + " whitelisted=" +
+              std::to_string(snapshot.whitelisted_allocation_bytes));
+}
+
+void test_precompiled_strict_allocation_covers_static_shapes() {
+    for (const std::string& scenario_id : {
+             "B1-seq-31-base-off",
+             "B1-sel-31-base-off",
+             "B1-alt-31-base-off",
+             "B1-seq-255-base-off",
+             "B1-sel-255-base-off",
+             "B1-alt-255-base-off",
+         }) {
+        assert_precompiled_ticks_have_no_unwhitelisted_allocations(scenario_id, 64u);
+    }
+}
+
+void test_precompiled_strict_allocation_covers_reactive_shape() {
+    assert_precompiled_ticks_have_no_unwhitelisted_allocations("B2-reactive-31-flip20-off", 128u);
+}
+
+void test_precompiled_strict_allocation_covers_logging_on_shape() {
+    assert_precompiled_ticks_have_no_unwhitelisted_allocations("B6-alt-31-base-fulltrace", 64u);
+}
+
 #if MUESLI_BT_BENCH_WITH_BTCPP
 void test_btcpp_runner_writes_expected_csv_files() {
     using namespace muesli_bt::bench;
@@ -366,6 +479,8 @@ void test_btcpp_runner_writes_expected_csv_files() {
           "btcpp aggregate_summary.csv was not written");
     check(std::filesystem::exists(result.output_dir / "environment_metadata.csv"),
           "btcpp environment_metadata.csv was not written");
+    check(std::filesystem::exists(result.output_dir / "experiment_manifest.json"),
+          "btcpp experiment_manifest.json was not written");
 
     check(result.run_rows.size() == 1u, "expected one btcpp run row");
     check(result.run_rows.front().runtime_name == "BehaviorTree.CPP", "unexpected btcpp runtime name");
@@ -374,6 +489,9 @@ void test_btcpp_runner_writes_expected_csv_files() {
     const std::string environment_metadata = read_text(result.output_dir / "environment_metadata.csv");
     check(environment_metadata.find("BehaviorTree.CPP") != std::string::npos,
           "btcpp environment metadata missing runtime name");
+    const std::string manifest = read_text(result.output_dir / "experiment_manifest.json");
+    check(manifest.find("\"name\": \"BehaviorTree.CPP\"") != std::string::npos,
+          "btcpp manifest missing runtime name");
 }
 
 void test_btcpp_reactive_and_b5_benchmarks_run() {
@@ -431,6 +549,9 @@ int main(int argc, char** argv) {
     if (argc == 2 && std::string(argv[1]) == "--strict-allocation") {
         test_allocation_whitelist_allows_explicit_logging_paths_only();
         test_precompiled_ticks_fail_on_unwhitelisted_allocations();
+        test_precompiled_strict_allocation_covers_static_shapes();
+        test_precompiled_strict_allocation_covers_reactive_shape();
+        test_precompiled_strict_allocation_covers_logging_on_shape();
         return 0;
     }
 
@@ -444,6 +565,9 @@ int main(int argc, char** argv) {
     test_b8_async_contract_benchmarks_run();
     test_allocation_whitelist_allows_explicit_logging_paths_only();
     test_precompiled_ticks_fail_on_unwhitelisted_allocations();
+    test_precompiled_strict_allocation_covers_static_shapes();
+    test_precompiled_strict_allocation_covers_reactive_shape();
+    test_precompiled_strict_allocation_covers_logging_on_shape();
 #if MUESLI_BT_BENCH_WITH_BTCPP
     test_btcpp_runner_writes_expected_csv_files();
     test_btcpp_reactive_and_b5_benchmarks_run();

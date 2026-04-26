@@ -67,6 +67,7 @@
 - `bt::event_log::set_line_listener(...)`: consume canonical pre-serialised JSON lines for streaming transports.
 - `bt::event_log::serialise_event_line(...)`: canonical serialiser for `mbt.evt.v1` envelopes.
 - `bt::event_log::set_deterministic_time(...)`: fixed timestamp progression for deterministic fixture/test runs.
+- `bt::event_log::set_allocation_whitelist_hooks(...)`: benchmark-only hook pair for marking canonical logging allocation paths during strict allocation tests.
 - `bt::runtime_host::enable_deterministic_test_mode(...)`: one-call deterministic mode (fixed planner seed + deterministic event timestamps).
 
 ## Notes
@@ -93,6 +94,7 @@ Current trace-level checks include:
 - over-budget tick evidence via `deadline_exceeded`
 - async cancellation evidence after deadline overrun
 - async lifecycle ordering checks such as cancel acknowledgement before request or terminal async events before submit
+- first-divergence comparison reports with the divergent event index, tick, event type, field path, and any visible node id, blackboard key, async job id, planner id, or host capability
 
 Examples:
 
@@ -104,6 +106,19 @@ python3 tools/validate_trace.py compare \
   fixtures/determinism-replay-case/events.jsonl \
   --profile deterministic
 ```
+
+Comparison reports keep the raw divergent events and context windows under
+`comparison.first_divergence.event_a`, `event_b`, `context_a`, and `context_b`.
+They also expose compact lookup fields when the event payload carries them:
+
+- `tick`, or `tick_a` / `tick_b` when the traces diverge on tick id
+- `event_type`, or `event_type_a` / `event_type_b`
+- `field_path`, for example `data.status` or `data.preview.source`
+- `node_id`
+- `blackboard_key`
+- `async_job_id`
+- `host_capability`
+- `planner`
 
 Example normalisation configs live under:
 

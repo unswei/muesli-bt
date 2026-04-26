@@ -173,7 +173,7 @@ def append_manifest_run(path: Path, spec: RunSpec, output_dir: Path, cmd: list[s
     with path.open("a", encoding="utf-8") as handle:
         handle.write(f"- `{spec.name}`: `{display_dir}`\n")
         handle.write(f"  - command: `{' '.join(cmd)}`\n")
-        handle.write("  - outputs: `run_summary.csv`, `aggregate_summary.csv`, `environment_metadata.csv`\n")
+        handle.write("  - outputs: `run_summary.csv`, `aggregate_summary.csv`, `environment_metadata.csv`, `experiment_manifest.json`\n")
         if spec.make_tail_figure:
             handle.write("  - figure: `tail_latency.svg`\n")
         if spec.make_memory_figure:

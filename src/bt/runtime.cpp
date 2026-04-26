@@ -1037,6 +1037,7 @@ public:
 
         event_log* events = resolve_event_log(ctx_);
         if (events) {
+            event_log_allocation_scope allocation_scope(events);
             std::ostringstream data;
             data << "{\"root_status\":" << status_json(status_) << ",\"tick_ms\":" << elapsed_ms;
             if (configured_budget.count() > 0) {
@@ -1062,13 +1063,17 @@ public:
     node_scope(tick_context& ctx, const node& n)
         : ctx_(ctx), node_(n), prev_node_(ctx.current_node), started_at_(tick_now(ctx_)) {
         ctx_.current_node = node_.id;
-        ctx_.node_path.push_back(node_.id);
+        track_node_path_ = ctx_.svc.obs.events && ctx_.svc.obs.events->tick_audit_enabled();
+        if (track_node_path_) {
+            ctx_.node_path.push_back(node_.id);
+        }
         trace_event ev = make_trace_event(trace_event_kind::node_enter);
         ev.node = node_.id;
         emit_trace(ctx_, std::move(ev));
 
         event_log* events = resolve_event_log(ctx_);
         if (events) {
+            event_log_allocation_scope allocation_scope(events);
             std::ostringstream data;
             data << "{\"node_id\":" << node_.id << '}';
             (void)events->emit(muesli_bt::contract::kEventNodeEnter, ctx_.tick_index, data.str());
@@ -1103,6 +1108,7 @@ public:
 
         event_log* events = resolve_event_log(ctx_);
         if (events) {
+            event_log_allocation_scope allocation_scope(events);
             std::ostringstream data;
             data << "{\"node_id\":" << node_.id << ",\"status\":" << status_json(status_)
                  << ",\"dur_ms\":" << (static_cast<double>(elapsed.count()) / 1'000'000.0) << '}';
@@ -1111,7 +1117,7 @@ public:
         }
 
         ctx_.current_node = prev_node_;
-        if (!ctx_.node_path.empty()) {
+        if (track_node_path_ && !ctx_.node_path.empty()) {
             ctx_.node_path.pop_back();
         }
     }
@@ -1122,6 +1128,7 @@ private:
     node_id prev_node_ = 0;
     std::chrono::steady_clock::time_point started_at_{};
     status status_ = status::failure;
+    bool track_node_path_ = false;
 };
 
 status execute_plan_action(const node& n, tick_context& ctx, const std::vector<muslisp::value>& args) {
@@ -2518,6 +2525,7 @@ status tick(instance& inst, registry& reg, services& svc) {
 
     if (svc.obs.events) {
         svc.obs.events->ensure_run_started();
+        event_log_allocation_scope allocation_scope(svc.obs.events);
         std::ostringstream data;
         const auto budget_ms =
             std::chrono::duration_cast<std::chrono::milliseconds>(inst.tree_stats.configured_tick_budget).count();

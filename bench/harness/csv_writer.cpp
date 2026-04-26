@@ -138,6 +138,10 @@ void csv_writer::write_summaries(const std::filesystem::path& output_dir,
                         "rss_bytes_end",
                         "rss_bytes_slope_per_tick",
                         "event_log_bytes_per_tick",
+                        "deadline_miss_count",
+                        "deadline_miss_rate",
+                        "fallback_activation_count",
+                        "dropped_completion_count",
                         "semantic_errors",
                         "notes"});
 
@@ -204,6 +208,10 @@ void csv_writer::write_summaries(const std::filesystem::path& output_dir,
                             format_value(row.rss_bytes_end),
                             format_value(row.rss_bytes_slope_per_tick),
                             format_value(row.event_log_bytes_per_tick),
+                            format_value(row.deadline_miss_count),
+                            format_value(row.deadline_miss_rate),
+                            format_value(row.fallback_activation_count),
+                            format_value(row.dropped_completion_count),
                             format_value(row.semantic_errors),
                             row.notes});
         }
@@ -244,6 +252,9 @@ void csv_writer::write_summaries(const std::filesystem::path& output_dir,
                         "heap_live_bytes_slope_per_tick_median",
                         "rss_bytes_slope_per_tick_median",
                         "event_log_bytes_per_tick_median",
+                        "deadline_miss_rate_median",
+                        "fallback_activation_count_median",
+                        "dropped_completion_count_median",
                         "semantic_error_runs",
                         "notes"});
 
@@ -281,6 +292,9 @@ void csv_writer::write_summaries(const std::filesystem::path& output_dir,
                             format_value(row.heap_live_bytes_slope_per_tick_median),
                             format_value(row.rss_bytes_slope_per_tick_median),
                             format_value(row.event_log_bytes_per_tick_median),
+                            format_value(row.deadline_miss_rate_median),
+                            format_value(row.fallback_activation_count_median),
+                            format_value(row.dropped_completion_count_median),
                             format_value(row.semantic_error_runs),
                             row.notes});
         }

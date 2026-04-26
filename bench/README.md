@@ -45,12 +45,12 @@ Each run:
 - warms the scenario
 - primes the hot path once outside timing
 - records per-tick latency with `std::chrono::steady_clock`
-- writes `run_summary.csv`, `aggregate_summary.csv`, and `environment_metadata.csv`
+- writes `run_summary.csv`, `aggregate_summary.csv`, `environment_metadata.csv`, and `experiment_manifest.json`
 - writes `jitter_trace.csv` for `A2`
 
 For `B6`, the current harness records full-trace capture with deferred JSONL serialisation when no file or ring sink is enabled. `log_bytes_total` still reports the canonical `mbt.evt.v1` line size that would be emitted.
 
-`schema_version=3` adds GC and memory evidence columns for `B7`, including GC pause quantiles, collection count, heap-live slope, RSS slope, and event-log bytes per tick. `B8` reuses the existing latency, cancellation-latency, allocation, RSS, and semantic-error columns for async contract edge evidence.
+`schema_version=4` adds first-class async outcome columns for deadline miss rate, fallback activation count, and dropped-completion count. `schema_version=3` added GC and memory evidence columns for `B7`, including GC pause quantiles, collection count, heap-live slope, RSS slope, and event-log bytes per tick.
 
 `schema_version=2` added two latency interpretation columns:
 
@@ -97,7 +97,7 @@ Run the strict allocation CTest lane for precompiled BT ticks:
 ctest --preset bench-release -R muesli_bt_bench_precompiled_tick_allocation_strict --output-on-failure
 ```
 
-The strict lane warms and primes a precompiled `B1` tree before enabling allocation failure for the measured tick loop. Allocations are only allowed inside explicit benchmark allocation whitelist scopes reserved for logging paths. The current logging-off case expects zero total allocations and zero whitelist usage.
+The strict lane warms and primes precompiled static and reactive BT shapes before enabling allocation failure for the measured tick loop. It covers the `B1` `seq`, `sel`, and `alt` shapes, a representative `B2` reactive shape, and a logging-on `B6` full-trace shape. Allocations are only allowed inside explicit benchmark allocation whitelist scopes reserved for canonical logging paths. Logging-off cases expect zero total allocations and zero whitelist usage.
 
 Run the curated publication suite:
 
@@ -207,7 +207,7 @@ python3 bench/scripts/write_evidence_report.py \
 ```
 
 If you omit the path, the script picks the latest result directory under `bench/results/`.
-The summary currently covers `A1`, `A2`, `B1`, `B2`, `B5`, and `B6`.
+The summary covers `A1`, `A2`, `B1`, `B2`, `B5`, `B6`, `B7`, and `B8` when those rows are present.
 The same script also summarises `BehaviorTree.CPP` result sets; unsupported groups simply report as absent.
 
 Compare two completed result sets directly:
@@ -243,6 +243,7 @@ The output directory will contain:
 - `run_summary.csv`
 - `aggregate_summary.csv`
 - `environment_metadata.csv`
+- `experiment_manifest.json`
 - `jitter_trace.csv` when the selected scenarios include `A2`
 - `B7-*/rep-*/events.jsonl` when the selected scenarios include `B7`
 - `B8-*/rep-*/events.jsonl` when the selected scenarios include `B8`

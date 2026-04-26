@@ -144,6 +144,8 @@ public:
         event_log.set_git_sha(MUESLI_BT_BENCH_GIT_COMMIT);
         event_log.set_host_info("muesli-bt-bench", MUESLI_BT_BENCH_PROJECT_VERSION, "bench");
         event_log.set_run_id(scenario.scenario_id + "-warmup");
+        event_log.set_allocation_whitelist_hooks(&allocation_tracker::enter_whitelisted_allocation_path,
+                                                 &allocation_tracker::leave_whitelisted_allocation_path);
 
         owner.instance_index_.emplace(&runtime_instance, this);
         (void)registry_value;
@@ -464,10 +466,23 @@ void muesli_adapter::prepare_for_timed_run(runtime_adapter::instance_handle& ins
     typed.event_log.clear_line_listener();
 
     (void)bt::tick(typed.runtime_instance, *registry(), typed.services);
+    if (typed.scenario.kind == benchmark_kind::reactive_interrupt) {
+        bool saw_active_guard = false;
+        bool saw_inactive_guard_after_active = false;
+        for (std::size_t i = 0; i < 512u && !saw_inactive_guard_after_active; ++i) {
+            (void)bt::tick(typed.runtime_instance, *registry(), typed.services);
+            const bool active =
+                schedule_active(typed.scenario.schedule, typed.runtime_instance.tick_index, typed.scenario.seed);
+            saw_active_guard = saw_active_guard || active;
+            saw_inactive_guard_after_active = saw_active_guard && !active;
+        }
+    }
 
     typed.runtime_instance.tick_index = 0u;
     typed.clear_measurement_counters_only();
     typed.event_log.set_run_id(typed.scenario.scenario_id + "-rep-" + std::to_string(repetition_index));
+    typed.event_log.ensure_run_started();
+    typed.event_log.clear_capture_stats();
 }
 
 run_status muesli_adapter::tick(runtime_adapter::instance_handle& instance) {

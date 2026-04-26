@@ -77,6 +77,35 @@ def print_compare_summary(report) -> None:
     )
     if report.first_divergence is not None:
         print(f"  first divergence: index {report.first_divergence['event_index']}")
+        details = []
+        for key in (
+            "tick",
+            "tick_a",
+            "tick_b",
+            "event_type",
+            "event_type_a",
+            "event_type_b",
+            "node_id",
+            "node_id_a",
+            "node_id_b",
+            "blackboard_key",
+            "blackboard_key_a",
+            "blackboard_key_b",
+            "async_job_id",
+            "async_job_id_a",
+            "async_job_id_b",
+            "host_capability",
+            "host_capability_a",
+            "host_capability_b",
+            "planner",
+            "planner_a",
+            "planner_b",
+            "field_path",
+        ):
+            if key in report.first_divergence:
+                details.append(f"{key}={report.first_divergence[key]}")
+        if details:
+            print(f"  context: {', '.join(details)}")
         if report.mismatch_code is not None:
             print(f"  reason: {report.mismatch_code}")
 

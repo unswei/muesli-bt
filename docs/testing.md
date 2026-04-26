@@ -1,6 +1,6 @@
-# Testing And Verification
+# testing and verification
 
-## Test Layout
+## test layout
 
 Core test binaries:
 
@@ -51,7 +51,7 @@ Runtime-contract fixture bundles for reproducibility are stored under `fixtures/
 - `fixtures/async-repeated-cancel-case/`
 - `fixtures/async-late-completion-after-cancel-case/`
 
-## Run Tests
+## run tests
 
 ```bash
 ctest --preset dev
@@ -103,8 +103,9 @@ python3 tools/validate_log.py build/linux-ros2-l2/ros2_l2_artifacts/ros2_h1_succ
 
 `tools/validate_log.py` checks per-record schema conformance only.
 `tools/validate_trace.py` checks cross-event properties such as `seq` ordering, completed tick delimitation, terminal `node_exit` uniqueness, `deadline_exceeded` evidence for over-budget ticks, async lifecycle ordering, and deterministic replay comparison after configured normalisation.
+Replay comparison reports the first divergence with the event index, tick, event type, field path, and any available node id, blackboard key, async job id, planner id, or host capability.
 
-## Deterministic BT Tests
+## deterministic BT tests
 
 For deterministic BT tests:
 
@@ -158,13 +159,14 @@ Run the comparable subset against `BehaviorTree.CPP`:
 python3 bench/scripts/run_publication_benchmarks.py
 ```
 
-Add `--with-btcpp` when the optional comparison preset is available. The script writes one timestamped bundle under `bench/results/`, including per-run summaries and generated figure/report artefacts.
+Add `--with-btcpp` when the optional comparison preset is available. The script writes one timestamped bundle under `bench/results/`, including per-run summaries, per-benchmark manifests, and generated figure/report artefacts.
 
-The first milestone writes:
+Each benchmark result directory writes:
 
 - `run_summary.csv`
 - `aggregate_summary.csv`
 - `environment_metadata.csv`
+- `experiment_manifest.json`
 - `jitter_trace.csv` for the `A2` scheduler jitter run
 
 Current harness coverage includes:
@@ -212,7 +214,7 @@ Run the async cancellation contract edge benchmark group:
 ./build/bench-release/bench/bench run-group B8
 ```
 
-`B8` covers cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. These scenarios mirror the checked-in `fixtures/async-*` bundles and record cancellation latency plus semantic-error counts in the normal benchmark CSV files. Each repetition also keeps the matching canonical `events.jsonl` under the scenario result directory.
+`B8` covers cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. These scenarios mirror the checked-in `fixtures/async-*` bundles and record cancellation latency, deadline miss rate, fallback activation count, dropped-completion count, and semantic-error counts in the normal benchmark CSV files. Each repetition also keeps the matching canonical `events.jsonl` under the scenario result directory.
 
 Run the strict precompiled-tick allocation lane:
 
@@ -220,7 +222,7 @@ Run the strict precompiled-tick allocation lane:
 ctest --preset bench-release -R muesli_bt_bench_precompiled_tick_allocation_strict --output-on-failure
 ```
 
-This lane warms and primes a precompiled `B1` tree, enables allocation failure for the steady-state tick loop, and only permits allocations inside explicitly whitelisted logging paths. The current strict case runs with logging disabled, so the expected whitelist count is zero.
+This lane warms and primes precompiled static and reactive BT shapes, enables allocation failure for the steady-state tick loop, and only permits allocations inside explicitly whitelisted logging paths. It covers all `B1` static shapes, a representative `B2` reactive shape, and a logging-on `B6` full-trace shape. Logging-off cases expect zero total allocations and zero whitelist usage.
 
 The current `B6` full-trace benchmark path uses deferred event-log serialisation when no file sink is enabled. The reported `log_bytes_total` still reflects canonical `mbt.evt.v1` line size.
 

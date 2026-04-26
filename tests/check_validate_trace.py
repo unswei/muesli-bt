@@ -13,6 +13,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "tools" / "validate_trace.py"
 FIXTURE = REPO_ROOT / "fixtures" / "determinism-replay-case" / "events.jsonl"
 DEADLINE_FIXTURE = REPO_ROOT / "fixtures" / "deadline-cancel-case" / "events.jsonl"
+ROS2_OBSERVE_ACT_STEP_FIXTURE = REPO_ROOT / "fixtures" / "ros2-observe-act-step-case" / "events.jsonl"
+VLA_FIXTURE = REPO_ROOT / "tests" / "fixtures" / "mbt.evt.v1" / "vla_run.jsonl"
 
 
 def load_events(path: Path) -> list[dict]:
@@ -256,13 +258,96 @@ def main() -> int:
             raise AssertionError("deterministic comparison should report MATCH")
 
         mismatch_trace = tmp / "mismatch.jsonl"
+        mismatch_report = tmp / "mismatch_report.json"
         mismatch_events = load_events(FIXTURE)
         mismatch_events[4]["data"]["status"] = "failed"
         write_events(mismatch_trace, mismatch_events)
-        completed = run_cli("compare", str(FIXTURE), str(mismatch_trace), "--profile", "deterministic")
+        completed = run_cli(
+            "compare",
+            str(FIXTURE),
+            str(mismatch_trace),
+            "--profile",
+            "deterministic",
+            "--report",
+            str(mismatch_report),
+        )
         assert_exit(completed, 3, "comparison mismatch")
         if "event_mismatch" not in completed.stdout:
             raise AssertionError("comparison mismatch should report event_mismatch")
+        if "node_id=2" not in completed.stdout or "tick=1" not in completed.stdout:
+            raise AssertionError("comparison mismatch summary should include precise node and tick context")
+        mismatch_payload = json.loads(mismatch_report.read_text(encoding="utf-8"))
+        first_divergence = mismatch_payload["comparison"]["first_divergence"]
+        if first_divergence["tick"] != 1:
+            raise AssertionError("comparison report should include divergent tick")
+        if first_divergence["node_id"] != 2:
+            raise AssertionError("comparison report should include divergent node id")
+        if first_divergence["field_path"] != "data.status":
+            raise AssertionError("comparison report should include divergent field path")
+
+        bb_mismatch_trace = tmp / "bb_mismatch.jsonl"
+        bb_mismatch_report = tmp / "bb_mismatch_report.json"
+        bb_mismatch_events = load_events(ROS2_OBSERVE_ACT_STEP_FIXTURE)
+        bb_mismatch_events[2]["data"]["preview"]["source"] = "different-source"
+        write_events(bb_mismatch_trace, bb_mismatch_events)
+        completed = run_cli(
+            "compare",
+            str(ROS2_OBSERVE_ACT_STEP_FIXTURE),
+            str(bb_mismatch_trace),
+            "--profile",
+            "deterministic",
+            "--report",
+            str(bb_mismatch_report),
+        )
+        assert_exit(completed, 3, "blackboard comparison mismatch")
+        bb_payload = json.loads(bb_mismatch_report.read_text(encoding="utf-8"))
+        bb_divergence = bb_payload["comparison"]["first_divergence"]
+        if bb_divergence["blackboard_key"] != "obs":
+            raise AssertionError("blackboard comparison report should include divergent blackboard key")
+        if bb_divergence["field_path"] != "data.preview.source":
+            raise AssertionError("blackboard comparison report should include nested divergent field path")
+
+        async_mismatch_trace = tmp / "async_mismatch.jsonl"
+        async_mismatch_report = tmp / "async_mismatch_report.json"
+        async_mismatch_events = load_events(DEADLINE_FIXTURE)
+        async_mismatch_events[2]["data"]["status"] = "queued"
+        write_events(async_mismatch_trace, async_mismatch_events)
+        completed = run_cli(
+            "compare",
+            str(DEADLINE_FIXTURE),
+            str(async_mismatch_trace),
+            "--profile",
+            "deterministic",
+            "--report",
+            str(async_mismatch_report),
+        )
+        assert_exit(completed, 3, "async comparison mismatch")
+        async_payload = json.loads(async_mismatch_report.read_text(encoding="utf-8"))
+        async_divergence = async_payload["comparison"]["first_divergence"]
+        if async_divergence["async_job_id"] != "17":
+            raise AssertionError("async comparison report should include divergent async job id")
+
+        capability_mismatch_trace = tmp / "capability_mismatch.jsonl"
+        capability_mismatch_report = tmp / "capability_mismatch_report.json"
+        capability_mismatch_events = load_events(VLA_FIXTURE)
+        capability_mismatch_events[1]["data"]["capability"] = "motion"
+        write_events(capability_mismatch_trace, capability_mismatch_events)
+        completed = run_cli(
+            "compare",
+            str(VLA_FIXTURE),
+            str(capability_mismatch_trace),
+            "--profile",
+            "deterministic",
+            "--report",
+            str(capability_mismatch_report),
+        )
+        assert_exit(completed, 3, "host capability comparison mismatch")
+        capability_payload = json.loads(capability_mismatch_report.read_text(encoding="utf-8"))
+        capability_divergence = capability_payload["comparison"]["first_divergence"]
+        if capability_divergence["host_capability_a"] != "vision":
+            raise AssertionError("capability comparison report should include left host capability")
+        if capability_divergence["host_capability_b"] != "motion":
+            raise AssertionError("capability comparison report should include right host capability")
 
         batch_report = tmp / "batch_report.json"
         completed = run_cli("batch", str(FIXTURE), str(duplicate_seq_trace), "--report", str(batch_report))

@@ -356,6 +356,7 @@ std::uint64_t event_log::emit(std::string_view type, std::optional<std::uint64_t
         needs_serialised_line = file_enabled || ring_capacity_ != 0u || static_cast<bool>(listener);
     }
 
+    event_log_allocation_scope allocation_scope(this);
     std::string line;
     std::size_t serialised_size = 0u;
     if (needs_serialised_line) {
@@ -440,6 +441,34 @@ event_log_stats event_log::capture_stats() const noexcept {
         .event_count = captured_event_count_,
         .byte_count = captured_byte_count_,
     };
+}
+
+void event_log::set_allocation_whitelist_hooks(allocation_whitelist_hook enter, allocation_whitelist_hook leave) noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    allocation_whitelist_enter_ = enter;
+    allocation_whitelist_leave_ = leave;
+}
+
+void event_log::enter_allocation_whitelist() const noexcept {
+    allocation_whitelist_hook hook = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        hook = allocation_whitelist_enter_;
+    }
+    if (hook) {
+        hook();
+    }
+}
+
+void event_log::leave_allocation_whitelist() const noexcept {
+    allocation_whitelist_hook hook = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        hook = allocation_whitelist_leave_;
+    }
+    if (hook) {
+        hook();
+    }
 }
 
 std::string_view event_log::runtime_contract_version() noexcept {
@@ -622,6 +651,18 @@ void event_log::append_file_line(const std::string& line, bool flush_now) {
             file_stream_.close();
             open_path_.clear();
         }
+    }
+}
+
+event_log_allocation_scope::event_log_allocation_scope(const event_log* events) noexcept : events_(events) {
+    if (events_) {
+        events_->enter_allocation_whitelist();
+    }
+}
+
+event_log_allocation_scope::~event_log_allocation_scope() {
+    if (events_) {
+        events_->leave_allocation_whitelist();
     }
 }
 

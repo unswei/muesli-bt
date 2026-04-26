@@ -888,6 +888,147 @@ def _context_window(events: list[dict[str, Any]], index: int) -> dict[str, Any]:
     }
 
 
+def _payload_data(payload: dict[str, Any] | None) -> dict[str, Any]:
+    if payload is None:
+        return {}
+    data = payload.get("data")
+    if isinstance(data, dict):
+        return data
+    return {}
+
+
+def _first_diff_path(left: Any, right: Any, prefix: str = "") -> str | None:
+    if left == right:
+        return None
+    if isinstance(left, dict) and isinstance(right, dict):
+        for key in sorted(set(left.keys()) | set(right.keys())):
+            next_prefix = f"{prefix}.{key}" if prefix else str(key)
+            if key not in left or key not in right:
+                return next_prefix
+            child = _first_diff_path(left[key], right[key], next_prefix)
+            if child is not None:
+                return child
+        return prefix or None
+    if isinstance(left, list) and isinstance(right, list):
+        common = min(len(left), len(right))
+        for index in range(common):
+            next_prefix = f"{prefix}[{index}]"
+            child = _first_diff_path(left[index], right[index], next_prefix)
+            if child is not None:
+                return child
+        if len(left) != len(right):
+            return f"{prefix}[{common}]"
+        return prefix or None
+    return prefix or "<root>"
+
+
+def _first_present_string(data: dict[str, Any], keys: tuple[str, ...]) -> str | None:
+    value = _first_present_value(data, keys)
+    if value is None:
+        return None
+    return str(value)
+
+
+def _first_present_value(data: dict[str, Any], keys: tuple[str, ...]) -> Any | None:
+    for key in keys:
+        value = data.get(key)
+        if value is not None:
+            return value
+    return None
+
+
+def _context_value_pair(value_a: Any, value_b: Any) -> dict[str, Any]:
+    if value_a is None and value_b is None:
+        return {}
+    if value_a == value_b:
+        return {"value": value_a}
+    out: dict[str, Any] = {}
+    if value_a is not None:
+        out["value_a"] = value_a
+    if value_b is not None:
+        out["value_b"] = value_b
+    return out
+
+
+def _add_context_pair(summary: dict[str, Any], key: str, value_a: Any, value_b: Any) -> None:
+    pair = _context_value_pair(value_a, value_b)
+    if "value" in pair:
+        summary[key] = pair["value"]
+    else:
+        if "value_a" in pair:
+            summary[f"{key}_a"] = pair["value_a"]
+        if "value_b" in pair:
+            summary[f"{key}_b"] = pair["value_b"]
+
+
+def _host_capability(data: dict[str, Any]) -> str | None:
+    direct = _first_present_string(
+        data,
+        ("capability", "capability_id", "capability_name", "host_capability", "cap"),
+    )
+    if direct is not None:
+        return direct
+    request = data.get("request")
+    if isinstance(request, dict):
+        return _first_present_string(
+            request,
+            ("capability", "capability_id", "capability_name", "host_capability", "cap"),
+        )
+    return None
+
+
+def _blackboard_key(event_type: str | None, data: dict[str, Any]) -> str | None:
+    if event_type not in {"bb_write", "bb_delete", "bb_snapshot"}:
+        return None
+    key = data.get("key")
+    if key is not None:
+        return str(key)
+    keys = data.get("keys")
+    if isinstance(keys, list):
+        return ",".join(str(item) for item in keys)
+    return None
+
+
+def _divergence_summary(
+    event_a: dict[str, Any] | None,
+    event_b: dict[str, Any] | None,
+) -> dict[str, Any]:
+    data_a = _payload_data(event_a)
+    data_b = _payload_data(event_b)
+    type_a = event_a.get("type") if event_a is not None else None
+    type_b = event_b.get("type") if event_b is not None else None
+
+    summary: dict[str, Any] = {}
+    _add_context_pair(
+        summary,
+        "tick",
+        event_a.get("tick") if event_a is not None else None,
+        event_b.get("tick") if event_b is not None else None,
+    )
+    _add_context_pair(summary, "event_type", type_a, type_b)
+
+    for output_key, keys in (
+        ("node_id", ("node_id", "node")),
+        ("async_job_id", ("job_id", "async_job_id")),
+        ("planner", ("planner",)),
+        ("request_id", ("request_id",)),
+    ):
+        _add_context_pair(
+            summary,
+            output_key,
+            _first_present_value(data_a, keys),
+            _first_present_value(data_b, keys),
+        )
+
+    _add_context_pair(summary, "blackboard_key", _blackboard_key(type_a, data_a), _blackboard_key(type_b, data_b))
+    _add_context_pair(summary, "host_capability", _host_capability(data_a), _host_capability(data_b))
+
+    diff_path = _first_diff_path(event_a, event_b)
+    if diff_path is not None:
+        summary["field_path"] = diff_path
+    return summary
+
+
 def compare_traces(trace_a: str, trace_b: str, config: CheckConfig) -> ComparisonReport:
     normalised_a = normalise_trace(trace_a, config)
     normalised_b = normalise_trace(trace_b, config)
@@ -908,6 +1049,7 @@ def compare_traces(trace_a: str, trace_b: str, config: CheckConfig) -> Compariso
         mismatch_code = "event_mismatch"
         first_divergence = {
             "event_index": mismatch_index,
+            **_divergence_summary(normalised_a[mismatch_index], normalised_b[mismatch_index]),
             "event_a": normalised_a[mismatch_index],
             "event_b": normalised_b[mismatch_index],
             "context_a": _context_window(normalised_a, mismatch_index),
@@ -926,10 +1068,13 @@ def compare_traces(trace_a: str, trace_b: str, config: CheckConfig) -> Compariso
     elif len(normalised_a) != len(normalised_b):
         matched = False
         mismatch_code = "trace_length_mismatch"
+        event_a = normalised_a[common] if common < len(normalised_a) else None
+        event_b = normalised_b[common] if common < len(normalised_b) else None
         first_divergence = {
             "event_index": common,
-            "event_a": normalised_a[common] if common < len(normalised_a) else None,
-            "event_b": normalised_b[common] if common < len(normalised_b) else None,
+            **_divergence_summary(event_a, event_b),
+            "event_a": event_a,
+            "event_b": event_b,
             "context_a": _context_window(normalised_a, min(common, max(len(normalised_a) - 1, 0))),
             "context_b": _context_window(normalised_b, min(common, max(len(normalised_b) - 1, 0))),
         }

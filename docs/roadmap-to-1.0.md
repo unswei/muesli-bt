@@ -249,6 +249,11 @@ Exit criteria:
 - any ROS-level cancellation coverage reuses the runtime semantics and does not introduce a second cancellation model
 - the release can generate at least one paper-quality tail-latency figure and one memory/GC figure from checked-in scripts
 
+Replay divergence reporting evidence:
+
+- `tools/validate_trace.py compare` emits `comparison.first_divergence` with the divergent event index, tick, event type, field path, raw event context windows, and any available node id, blackboard key, async job id, planner id, or host capability.
+- `tests/check_validate_trace.py` covers node, blackboard, async job, and host capability divergence reports.
+
 #### `v0.8.0`: model-backed async and VLA stress path
 
 Focus:

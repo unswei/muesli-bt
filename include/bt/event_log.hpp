@@ -22,6 +22,7 @@ struct event_log_stats {
 class event_log {
 public:
     using line_listener = std::function<void(const std::string&)>;
+    using allocation_whitelist_hook = void (*)() noexcept;
 
     explicit event_log(std::size_t ring_capacity = 4096);
 
@@ -73,6 +74,9 @@ public:
     [[nodiscard]] bool capture_stats_enabled() const noexcept;
     void clear_capture_stats() noexcept;
     [[nodiscard]] event_log_stats capture_stats() const noexcept;
+    void set_allocation_whitelist_hooks(allocation_whitelist_hook enter, allocation_whitelist_hook leave) noexcept;
+    void enter_allocation_whitelist() const noexcept;
+    void leave_allocation_whitelist() const noexcept;
     [[nodiscard]] static std::string_view runtime_contract_version() noexcept;
     [[nodiscard]] static std::string_view runtime_contract_id() noexcept;
     [[nodiscard]] static std::size_t serialise_event_line_size(std::string_view type,
@@ -138,9 +142,22 @@ private:
     std::uint64_t captured_event_count_ = 0;
     std::uint64_t captured_byte_count_ = 0;
     std::ofstream file_stream_{};
+    allocation_whitelist_hook allocation_whitelist_enter_ = nullptr;
+    allocation_whitelist_hook allocation_whitelist_leave_ = nullptr;
 
     bool snapshot_bb_requested_ = false;
     bool snapshot_bb_full_ = false;
+};
+
+class event_log_allocation_scope final {
+public:
+    explicit event_log_allocation_scope(const event_log* events) noexcept;
+    event_log_allocation_scope(const event_log_allocation_scope&) = delete;
+    event_log_allocation_scope& operator=(const event_log_allocation_scope&) = delete;
+    ~event_log_allocation_scope();
+
+private:
+    const event_log* events_ = nullptr;
 };
 
 }  // namespace bt

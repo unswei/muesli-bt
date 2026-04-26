@@ -140,7 +140,7 @@ Keep running:
 ctest --preset bench-release -R muesli_bt_bench_precompiled_tick_allocation_strict --output-on-failure
 ```
 
-The strict lane warms and primes a precompiled tree, then fails on allocations during the measured tick loop except inside explicitly whitelisted logging paths.
+The strict lane warms and primes precompiled static and reactive trees, then fails on allocations during the measured tick loop except inside explicitly whitelisted logging paths. It includes logging-off `B1` shapes, a representative logging-off `B2` reactive shape, and a logging-on `B6` full-trace shape.
 
 ### priority 2: add GC and long-run memory evidence
 
