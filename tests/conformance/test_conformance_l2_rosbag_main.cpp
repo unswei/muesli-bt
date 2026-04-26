@@ -1091,14 +1091,6 @@ void test_ros2_rosbag_preemption_fallback_conformance() {
             env));
     check_close(final_obs_x, 0.9, 1e-6, "ros2 rosbag preemption: final_obs pose.x mismatch");
 
-    geometry_msgs::msg::Twist command;
-    command.linear.x = float_value(eval_text("(map.get (env.info) 'last_action_linear_x 999.0)", env));
-    command.linear.y = float_value(eval_text("(map.get (env.info) 'last_action_linear_y 999.0)", env));
-    command.angular.z = float_value(eval_text("(map.get (env.info) 'last_action_angular_z 999.0)", env));
-    check_close(command.linear.x, 0.0, 1e-6, "ros2 rosbag preemption: safe linear.x mismatch");
-    check_close(command.linear.y, 0.0, 1e-6, "ros2 rosbag preemption: safe linear.y mismatch");
-    check_close(command.angular.z, 0.0, 1e-6, "ros2 rosbag preemption: safe angular.z mismatch");
-
     const auto lines = read_non_empty_lines(paths.event_log_path);
     check(lines.size() == 11, "ros2 rosbag preemption: expected eleven canonical events");
     const auto events = decode_json_lines(lines, env);
@@ -1123,8 +1115,14 @@ void test_ros2_rosbag_preemption_fallback_conformance() {
     verify_common_record_shape(record2, "ros2.l2.preempt.v1", 2, 1'700'000'300'040LL, true, false);
     verify_action_components(require_map_field(record1, "action", "ros2 rosbag preemption record1"), 0.25, 0.0, 0.05,
                              "ros2 rosbag preemption record1 action");
-    verify_action_components(require_map_field(record2, "action", "ros2 rosbag preemption record2"), 0.0, 0.0, 0.0,
-                             "ros2 rosbag preemption record2 action");
+    const muslisp::value safe_action = require_map_field(record2, "action", "ros2 rosbag preemption record2");
+    verify_action_components(safe_action, 0.0, 0.0, 0.0, "ros2 rosbag preemption record2 action");
+
+    const muslisp::value safe_u = require_map_field(safe_action, "u", "ros2 rosbag preemption record2 action");
+    geometry_msgs::msg::Twist command;
+    command.linear.x = require_number_field(safe_u, "linear_x", "ros2 rosbag preemption record2 action.u");
+    command.linear.y = require_number_field(safe_u, "linear_y", "ros2 rosbag preemption record2 action.u");
+    command.angular.z = require_number_field(safe_u, "angular_z", "ros2 rosbag preemption record2 action.u");
 
     write_summary(
         paths.summary_path,
