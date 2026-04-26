@@ -98,7 +98,34 @@ The remaining path is:
 - build a fair comparison engine against BehaviorTree.CPP rather than relying only on internal microbenchmarks
 - add ROS2 host capability bridges, especially Nav2 and, if still feasible, MoveIt, without widening core runtime semantics
 - keep the existing Isaac showcase as supporting evidence rather than a second semantic surface
+- make the Lisp-as-DSL argument explicit and testable: Lisp is used as a compact structured representation for BTs, not as arbitrary scripting; before `v1.0.0`, include at least one implemented demonstration where a BT fragment is generated as Lisp data, validated, compiled, serialised, safely installed at a tick boundary, logged, and replayed
 - finish paper-facing evaluation, trace bundles, and release hygiene
+
+### paper-facing Lisp DSL argument
+
+The paper and release documentation should defend Lisp as a technical choice, not as a matter of taste.
+
+The argument is:
+
+- Behaviour Trees are trees.
+- Lisp S-expressions are executable structured tree data.
+- A Lisp BT DSL can therefore serve as human-authored source, generated intermediate representation, validation input, serialisation format, replay artefact, and runtime patch format.
+- This is useful for robotics because task logic can be generated or transformed without becoming opaque host code.
+- The runtime can validate the generated tree against BT grammar, host capability contracts, budget rules, fallback requirements, and safety restrictions before it is allowed to execute.
+- The same canonical event stream can record which generated tree was used, when it was validated, when it was installed, and how it behaved during replay.
+
+The paper-facing claim should be narrow:
+
+> `muesli-bt` uses Lisp as an inspectable, executable tree representation for robot task logic. This lets the same representation support authored BTs, generated BT fragments, validation, serialisation, replay, and safe tick-boundary installation under the runtime contract.
+
+The claim should not be:
+
+- Lisp is generally better than C++, XML, YAML, or Python.
+- Lisp makes the system hard real-time.
+- Lisp is required for all BT systems.
+- Generated BTs are automatically safe without validation.
+
+The release must include one concrete demonstration that makes this argument visible.
 
 ### milestone plan
 
@@ -229,6 +256,16 @@ Scope:
 - add one ROS-level cancellation or pre-emption scenario only if it reuses the same runtime events and does not introduce a separate ROS-specific cancellation model
 - document explicitly that `muesli-bt` is a task-level control runtime, not a hard real-time servo-loop runtime
 
+Additional scope: Lisp DSL defensibility baseline:
+
+- document the intended role of Lisp as a structured BT DSL rather than arbitrary scripting inside the control loop
+- add a short `why Lisp as DSL?` page that explains the tree-as-data argument, the safety boundary, and the difference between generated BT fragments and host-side robot code
+- add a canonical DSL round-trip check for representative BTs: source DSL -> parsed form -> compiled `bt_def` -> canonical DSL -> parsed form -> compiled `bt_def`, with stable structure or an explicitly documented normalisation difference
+- add source hash and canonical DSL hash support where practical, so generated or loaded BT definitions can be identified in logs and replay reports
+- add tests for `bt.to-dsl`, `bt.save-dsl`, and `bt.load-dsl` on representative sequence, selector, reactive, planner, and async/VLA-shaped trees, if these paths are already part of the public surface
+- add validation fixtures for rejected generated fragments: unknown node type, unknown host callback, unsupported capability, missing fallback around a long-running async/model call, invalid budget, and malformed subtree shape
+- keep this work within the existing runtime contract and validation tooling; do not introduce a second macro system or a general-purpose plugin language for `v0.7.0`
+
 Benchmark and evidence requirements:
 
 - report per-tick allocation count and allocation bytes under representative BTs, with and without canonical logging enabled
@@ -238,6 +275,9 @@ Benchmark and evidence requirements:
 - add a long-run memory benchmark that reports resident-set-size slope, heap-live-byte slope, and event-log size per tick
 - add `B8` async contract benchmarks for cancellation before start, cancellation while running, cancellation after timeout, repeated cancellation, and late completion after cancellation
 - make every `v0.7.0` benchmark emit an experiment manifest with compiler, build type, platform, CPU, runtime flags, scenario seed, and trace schema version
+- report DSL round-trip pass/fail counts for representative BT shapes
+- include at least one canonical log where the BT definition is identified by source hash or canonical DSL hash
+- include at least one negative fixture where a generated fragment is rejected before execution and the rejection is logged or reported deterministically
 
 Exit criteria:
 
@@ -248,6 +288,10 @@ Exit criteria:
 - replay validation reports first divergence precisely, including divergent tick index, node id, blackboard key, async job id, or host capability call where applicable
 - any ROS-level cancellation coverage reuses the runtime semantics and does not introduce a second cancellation model
 - the release can generate at least one paper-quality tail-latency figure and one memory/GC figure from checked-in scripts
+- the docs state clearly that Lisp is used as a compact structured BT representation, not as an excuse to run arbitrary unbounded code inside the tick loop
+- representative BTs can be serialised to canonical DSL and loaded again without changing intended execution semantics
+- invalid generated BT fragments are rejected before execution by deterministic validation tests
+- the release has enough DSL round-trip and validation evidence to support the later `v0.9.0` generated-subtree demonstration
 
 GC contract evidence:
 
@@ -287,6 +331,14 @@ Scope:
 - keep the flagship wheeled demo polished, but make the paper-facing novelty in this milestone the model-latency and cancellation behaviour, not visual demo quality
 - keep the existing Isaac Sim / ROS2 showcase as supporting evidence, not as a required semantic surface or CI dependency
 
+Additional scope: constrained model or template-produced BT fragments:
+
+- keep the main `v0.8.0` model-backed evidence focused on asynchronous model calls, stale-result rejection, validation, and fallback
+- add an optional low-risk path where a model backend or deterministic template proposes a BT fragment as Lisp DSL data, but only for validation and rejection/acceptance testing; execution of generated fragments can remain a `v0.9.0` requirement
+- ensure model-proposed or template-produced fragments go through the same parser, normaliser, validator, capability checks, budget checks, and fallback checks as hand-authored fragments
+- log generated-fragment metadata without treating model text as trusted code: source, source hash, canonical DSL hash, validation status, rejection reason, and associated async/model job id
+- prefer deterministic template-produced fragments for the main CI path; use real model-produced fragments only as supporting evidence unless reproducibility is strong
+
 Benchmark and evidence requirements:
 
 - report VLA latency distributions under real backend execution and under seeded injected-latency profiles
@@ -294,6 +346,9 @@ Benchmark and evidence requirements:
 - report task success under at least three VLA/planner latency conditions: nominal, heavy-tail latency, and failure-injected latency
 - report the effect of runtime validation by comparing invalid model outputs produced, invalid model outputs rejected, and invalid model outputs reaching the host, which should be zero for the supported path
 - include one trace bundle where a model result arrives late and is correctly dropped rather than committed
+- include accepted and rejected generated-fragment examples in the trace corpus
+- include at least one rejection caused by an unsafe or unsupported host capability request
+- include at least one rejection caused by a missing timeout, missing fallback, or invalid budget around a long-running model/planner call
 
 Exit criteria:
 
@@ -304,6 +359,10 @@ Exit criteria:
 - the release can generate a paper-quality “tail latency under injected model lag” figure
 - the release can generate a paper-quality “stale result, cancellation, and fallback outcomes” table
 - the wheeled flagship demo remains reproducible with canonical log validation and does not depend on simulator-specific semantics
+- generated BT fragments are never executed directly from raw model text
+- every accepted fragment has a canonical DSL form and hash
+- every rejected fragment has a deterministic rejection reason
+- the model/VLA path strengthens the Lisp-as-DSL argument without making the paper depend on LLM-generated control logic
 
 #### `v0.9.0`: baselines, ROS capability bridges, and evaluation hardening
 
@@ -321,7 +380,6 @@ Scope:
 - make the BehaviorTree.CPP baseline a strong baseline, using non-blocking/stateful action nodes and proper halt handling rather than blocking actions inside `tick`
 - add a neutral comparison event schema or adapter layer so both systems can report tick start/end, node status, async submit, async cancel, async result, deadline miss, stale commit, fallback, and action commit events
 - extend the benchmark harness beyond microbenchmarks with contract benchmarks for async timeout, late cancellation, invalid action, hot subtree swap, replay parity, VLA latency sweep, ROS callback pressure, and long-run memory behaviour
-- add live subtree patching as the Lisp-specific evidence path, with compile, validate, and swap only at tick boundaries; failed validation must leave the old tree active and emit a canonical event
 - implement a Nav2 host capability adapter as the main ROS2 bridge for the wheeled demo, with capability surfaces for navigate-to-pose, follow-waypoints if needed, cancel-goal, status, and clear-costmaps if needed
 - map Nav2 action feedback, result codes, cancellation acknowledgement, transform age, and planner/controller timing into canonical host capability events
 - keep the existing thin `Odometry` -> `Twist` lane as the baseline transport path; Nav2 is a host capability bundle, not a replacement for `env.*`
@@ -331,6 +389,111 @@ Scope:
 - add a perception scene normaliser before BT logic consumes perception outputs, preferably using a YOLO-compatible detector or another reproducible detector path feeding stable scene state rather than raw detections
 - choose Isaac Sim, Webots + ROS, or another simulator for the non-wheeled path based on reproducibility, MoveIt compatibility, and perception support, not appearance
 
+Lisp-specific evidence path: generated guarded recovery subtree:
+
+- add one paper-facing demonstration where Lisp clearly enables useful runtime task-logic handling beyond hand-written BT execution
+- recommended demo: `generated guarded recovery subtree`
+- start with a normal wheeled goal-seeking BT used in the existing cross-transport path
+- when a deterministic blocked-path or degraded-model condition is observed, generate a guarded recovery subtree as Lisp data using either quasiquote/templates or a deterministic generator
+- the generated subtree should include at least:
+  - a precondition guard
+  - a bounded async planner or model call
+  - a timeout
+  - an explicit fallback action
+  - a host capability call or `env.*` action that already belongs to the released support surface
+  - a recovery exit condition
+- validate the generated subtree before execution against:
+  - BT grammar
+  - known node types
+  - known host callbacks or capabilities
+  - action schema
+  - budget and timeout constraints
+  - required fallback policy
+  - optional capability availability from `cap.list` / `cap.describe`
+- compile the validated subtree into a `bt_def`
+- install the subtree only at a tick boundary
+- failed validation must leave the old tree active and emit a canonical rejection event
+- successful installation must emit canonical events that identify the old subtree hash, new source hash, new canonical DSL hash, validation result, compile time, validate time, install tick, and install mode
+- save the canonical generated DSL form as an artefact so that the same subtree can be inspected, diffed, reloaded, and replayed
+- add a replay fixture proving that a run containing the generated subtree can be validated and compared with first-divergence reporting
+- include a small comparison against a non-generated fixed-recovery BT to show what the dynamic path adds; this comparison should be framed as evidence of runtime task-logic handling, not as a claim that Lisp is universally superior
+
+Implementation artefacts:
+
+Add or equivalent:
+
+```text
+examples/bt/generated_guarded_recovery.lisp
+docs/tutorials/generated-guarded-recovery.md
+docs/getting-oriented/why-lisp-dsl.md
+docs/evidence/lisp-dsl-generated-subtree.md
+tools/validate_generated_bt_fragment.py       # if validation is Python-side
+# or equivalent C++/runtime validation command if implemented there
+fixtures/dsl/generated_guarded_recovery/
+```
+
+The exact file names may change, but the release should contain:
+
+- one runnable example
+- one tutorial
+- one evidence page
+- one trace fixture
+- one generated canonical DSL artefact
+- one rejection fixture
+- one replay/compare command
+
+The `docs/getting-oriented/why-lisp-dsl.md` page should include at least:
+
+```md
+# why Lisp as the BT DSL?
+
+`muesli-bt` uses Lisp because Behaviour Trees are tree-structured task logic, and Lisp S-expressions are compact structured tree data.
+
+This lets one representation serve several roles:
+
+- hand-authored BT source;
+- generated BT fragment;
+- validation input;
+- canonical serialisation format;
+- replay artefact;
+- safe runtime patch format.
+
+The Lisp layer is not a replacement for robot drivers, ROS2, Nav2, MoveIt, or hard real-time control. Host capabilities own robot IO and safety-critical execution. The Lisp DSL owns task-level decision structure under the runtime contract.
+```
+
+The page should include the generated guarded recovery demo as the main example.
+
+Canonical events for the demo:
+
+Add canonical events or documented equivalents for:
+
+```text
+dsl_fragment_generated
+dsl_fragment_normalised
+dsl_fragment_validation_ok
+dsl_fragment_validation_failed
+dsl_fragment_compiled
+subtree_install_requested
+subtree_installed
+subtree_install_rejected
+subtree_replay_loaded
+```
+
+Each event should include enough context for replay and paper artefacts:
+
+- run id
+- tick id where applicable
+- tree id
+- old subtree hash
+- new source hash
+- new canonical DSL hash
+- validation rule set
+- rejection reason, if applicable
+- compile latency
+- validation latency
+- install mode
+- associated async/model/planner job id, if generated from such a job
+
 Benchmark and evidence requirements:
 
 - report matched `muesli-bt` versus BehaviorTree.CPP results for tick latency, deadline miss rate, stale-result count, fallback count, cancellation acknowledgement latency, and trace completeness under identical scenario seeds
@@ -339,6 +502,12 @@ Benchmark and evidence requirements:
 - if the physical robot path is available, report success rate, recovery latency, stale-result suppression count, fallback count, and failure classifications across repeated runs
 - if the manipulator path is available, report planning latency, stale-scene rejection, trajectory validity, execution cancellation latency, and task success
 - keep every comparison reproducible from a checked-in manifest, not from hand-run shell history
+- report generation, normalisation, validation, compile, and tick-boundary install latency versus subtree size
+- report accepted versus rejected generated fragments across deterministic fixtures
+- report replay parity for at least one run containing an installed generated subtree
+- report first-divergence behaviour when the generated subtree artefact is deliberately changed
+- report task outcome for fixed-recovery BT versus generated guarded recovery BT under the same blocked-path or degraded-model scenario
+- report any additional allocations caused by generated-subtree installation separately from the normal tick hot path
 
 Exit criteria:
 
@@ -349,6 +518,12 @@ Exit criteria:
 - one ROS-backed row or slice exists in the evaluation outputs, preferably Nav2-backed; if not physical, it must at least be rosbag-backed and replay-validated
 - two distinct scenarios exist with clear rationale, or the roadmap records why the second scenario was deferred to preserve the paper’s core claim
 - all baseline and ROS evidence uses the same canonical event-log discipline as the core runtime experiments
+- at least one generated guarded recovery subtree demonstration is runnable from documented commands
+- the demonstration proves the full Lisp-as-DSL path: generate as Lisp data, normalise, validate, compile, serialise, install at tick boundary, execute, log, and replay
+- invalid generated fragments are rejected before execution and leave the previous tree active
+- accepted generated fragments are identified in logs by canonical DSL hash
+- the documentation explains why this demonstration depends on Lisp as structured tree data rather than treating Lisp as a cosmetic syntax choice
+- the paper artefact set includes at least one figure, table, or trace excerpt from this demonstration
 
 #### `v1.0.0`: paper artefacts and release baseline
 
@@ -366,6 +541,11 @@ Scope:
 - publish scripts that regenerate all paper tables and figures from checked-in or archived artefacts
 - include memory, GC, allocation, tail-latency, cancellation, fallback, replay, baseline, and ROS evidence in the release artefact set
 - document the exact claim boundaries: task-level deadlines rather than hard real time, host capabilities rather than ROS semantics, and model orchestration rather than a new VLA model
+- publish the Lisp-as-DSL technical argument in the README or documentation entry path, with careful wording that presents Lisp as structured BT data rather than arbitrary scripting
+- publish the generated guarded recovery subtree demonstration as a supported paper artefact or clearly labelled paper-evidence example
+- include the generated canonical DSL artefacts, rejection fixtures, trace files, replay reports, and scripts needed to reproduce the demonstration
+- ensure the generated-subtree demo is referenced from the evidence index, runtime contract material, and documentation path for new users
+- ensure the paper text can cite the release for the claim that Lisp supports authored, generated, validated, serialised, replayed, and safely installed BT fragments
 
 Exit criteria:
 
@@ -379,6 +559,12 @@ Exit criteria:
 - preferred outcome: at least one Nav2-backed or physical wheeled run is included with `events.jsonl`, rosbag, replay report, and failure classification
 - acceptable fallback: if physical hardware is not stable enough by the tag, the release includes a rosbag-backed Nav2 or equivalent ROS action-capability run and states the physical limitation plainly
 - the core claim is demonstrably true: BT semantics stay stable while transport changes, asynchronous planner/model work is deadline-aware and cancellable, and canonical event logs support replay and inspection across supported transports
+- the tagged release contains one implemented demonstration where Lisp clearly enables useful runtime BT handling beyond hand-authored static trees
+- the demonstration is reproducible from a clean checkout or archived release artefact using documented commands
+- the demonstration includes at least one accepted generated fragment and at least one rejected unsafe or invalid generated fragment
+- the generated fragment path is covered by canonical logs and replay validation
+- the documentation states the Lisp argument explicitly and honestly: Lisp is used because BTs are tree-structured task logic and S-expressions give a compact inspectable representation for generation, validation, serialisation, replay, and tick-boundary installation
+- the documentation also states the boundary: host-side robot IO, safety-critical control, and real-time servo loops remain outside the Lisp DSL
 
 ## api / syntax
 
@@ -410,6 +596,14 @@ If the BehaviorTree.CPP comparison uses blocking action nodes or a weaker hand-w
 
 If the hot-path benchmark reports only mean tick time and not allocations, GC pauses, and tail latency, the Lisp runtime defensibility story is incomplete.
 
+Example interpretation for the Lisp DSL evidence path:
+
+If the release only shows hand-authored Lisp BTs, the Lisp argument is incomplete. The release must include at least one generated or transformed BT fragment that is validated, compiled, serialised, installed safely, logged, and replayed.
+
+If generated fragments are executed directly from raw model text, the path is not acceptable. Generated fragments must pass through parser, normaliser, validator, capability checks, budget checks, and fallback checks before execution.
+
+If live subtree installation can occur mid-tick, the path is not acceptable. Installation must occur at a tick boundary or another documented safe point.
+
 ## gotchas
 
 - Do not let ROS2 scope expand into a second semantic runtime.
@@ -422,6 +616,11 @@ If the hot-path benchmark reports only mean tick time and not allocations, GC pa
 - Do not compare against a deliberately weak BehaviorTree.CPP baseline. The baseline must use proper non-blocking actions and halt/pre-emption handling.
 - Do not let a real model, Nav2, MoveIt, or Isaac integration leak new semantics into the Lisp or BT core. They remain host capabilities.
 - Do not lock the second flagship too early if the strongest reproducible evidence points elsewhere.
+- Do not present Lisp as a virtue by itself. The argument is structured tree data for generated, validated, serialised, replayed, and safely installed BT fragments.
+- Do not execute raw model-generated text as robot control logic. Treat generated Lisp fragments as untrusted input until parsed, normalised, validated, and checked against capability and fallback rules.
+- Do not let the generated-subtree demonstration bypass the same runtime contract, canonical logging, or replay validation used by hand-authored BTs.
+- Do not let dynamic subtree installation mutate the active tree during a tick. Use tick-boundary installation or another explicitly documented safe point.
+- Do not claim that Lisp makes runtime task generation safe by itself. Safety comes from validation, host capability contracts, action validation, fallback policy, and replayable event logs.
 
 ## see also
 
