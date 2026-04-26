@@ -194,6 +194,7 @@ Published pre-Linux ROS2 surrogate bundles:
 - `fixtures/ros2-invalid-action-fallback-case`
 - `fixtures/ros2-reset-unsupported-case`
 - `fixtures/ros2-deadline-fallback-case`
+- `fixtures/ros2-preemption-fallback-case`
 
 ## gotchas
 

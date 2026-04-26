@@ -423,7 +423,7 @@ Implementation artefacts:
 Add or equivalent:
 
 ```text
-examples/bt/generated_guarded_recovery.lisp
+generated_guarded_recovery.lisp under examples/bt/
 docs/tutorials/generated-guarded-recovery.md
 docs/getting-oriented/why-lisp-dsl.md
 docs/evidence/lisp-dsl-generated-subtree.md

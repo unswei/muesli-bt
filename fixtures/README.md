@@ -23,6 +23,7 @@ Current bundles:
 - `ros2-invalid-action-fallback-case`
 - `ros2-reset-unsupported-case`
 - `ros2-deadline-fallback-case`
+- `ros2-preemption-fallback-case`
 
 The `async-*` bundles cover deterministic cancellation edges: cancellation before start, cancellation while running, cancellation after timeout, repeated cancellation, and late completion after cancellation.
 

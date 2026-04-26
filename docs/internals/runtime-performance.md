@@ -43,13 +43,75 @@ The benchmark-driven view is simple:
 - static traversal cost scales cleanly
 - static jitter is already good
 - full-trace logging is still too expensive
-- GC and long-run heap-live evidence still need a GC-producing run
+- GC lifecycle evidence now exists for smoke workloads, but the memory result is still not a production leak or hard real-time claim
 
 That means the runtime should not try to optimise every hot path at once.
 
-### benchmark-driven summary
+### publication bundle: 2026-04-26
 
-The current local `bench-release` result set `bench/results/20260425T115357Z` was generated on:
+The paper-facing benchmark bundle is:
+
+```text
+bench/results/publication-publication-20260426T230137Z
+```
+
+A compressed copy was collected at:
+
+```text
+bench/results/publication-publication-20260426T230137Z.tar.gz
+```
+
+SHA-256:
+
+```text
+155d426311f389bdf1b748505d93c377e9283ff8dd4d801b4de1a1f1d5d17f5d
+```
+
+The bundle contains `8` run directories. Each run has an `experiment_manifest.json`, `aggregate_summary.csv`, `run_summary.csv`, `environment_metadata.csv`, `analysis.txt`, and `tail_latency.svg`. The `B7` memory/GC run also has `memory_gc.svg` and `evidence_report.md`.
+
+The run was generated on:
+
+- `muesli-bt` commit `ea080940230a951b0725cb094cc52d0c62e0881b`
+- Apple M3
+- Darwin `25.4.0`
+- `8` physical / `8` logical cores
+- AppleClang `17.0.0.17000604`
+- Release build with `-O3 -DNDEBUG`
+- benchmark suite `0.1.0-m1`
+
+Checks performed after collection:
+
+- all `8` run manifests are present
+- tail-latency figures were regenerated for all `8` runs
+- the `B7` memory/GC figure and evidence report were regenerated
+- `B7` and `B8` canonical event logs passed `mbt.evt.v1` schema validation
+- the full `B8` async-contract group produced `10` event logs for each of the five scenarios: cancel before start, cancel while running, cancel after timeout, repeated cancellation, and late completion after cancellation
+
+Headline observations:
+
+- single-leaf baseline: `125 ns` median, `292 ns` p99.9
+- sequence traversal: `1.42 us` at `31` nodes, `11.50 us` at `255` nodes, about `45.01 ns/node`
+- selector traversal: `1.42 us` at `31` nodes, `11.33 us` at `255` nodes, about `44.27 ns/node`
+- alternating traversal: `1.38 us` at `31` nodes, `11.12 us` at `255` nodes, about `43.53 ns/node`
+- `A2` jitter run: `11.12 us` median, `19.33 us` p99, `55.62 us` p99.9
+- slowest reactive interruption case: `B2-reactive-255-flip100-off` at `5.58 us` median interruption latency
+- full-trace logging is still the main overhead: about `18.48x` static slowdown and `18.27x` reactive slowdown in the representative `B6` rows
+- `B7` generated canonical GC lifecycle logs: `1,259,109` `gc_begin` events and `1,259,109` matching `gc_end` events across the smoke scenarios
+- `B7` GC p99 pause summaries ranged from `774.88 us` to `3.32 ms` across the three smoke scenarios
+- `B8` confirms all five async-contract evidence scenarios have benchmark artefacts and canonical logs
+
+Interpretation limits:
+
+- this is a paper-facing evidence bundle, not a tagged release artefact
+- the run is Apple M3 / Darwin / AppleClang evidence; do not generalise the exact numbers to Linux, ROS2, or other CPUs without a matching run
+- CPU pinning was off, so tail latency remains operating-system and scheduler sensitive
+- `B7` is a GC smoke and pressure workload; it demonstrates canonical GC lifecycle logging and bounded measurement, not a proof of leak-freedom
+- `B8` uses deterministic async fixtures; it validates cancellation, timeout, and late-result-drop evidence paths, not real network or model-provider latency
+- benchmark paths under `bench/results/` are ignored by git, so publish the tarball or an archived evidence bundle before citing exact files externally
+
+### previous local benchmark-driven summary
+
+The earlier local `bench-release` result set `bench/results/20260425T115357Z` was generated on:
 
 - `muesli-bt` commit `654a1e43cd`
 - Apple M3

@@ -5,13 +5,11 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 
 ## next
 
-- `v0.7.0`: complete async cancellation and late-completion-drop evidence for the runtime contract
 - `v0.7.0`: decide whether canonical capability call events are needed once a real capability can affect runtime behaviour
 - `post-release`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
 
 ## later
 
-- `v0.7.0`: add extended fixture coverage for async cancellation edge cases and optional ROS-level pre-emption coverage only if it stays thin
 - `v0.8.0`: polish the flagship wheeled demo flow, assets, and reproducible run/log inspection steps
 - `v0.8.0`: add one current Isaac Sim demo through ROS before `v1.0.0`, but keep it as a deployability/demo lane rather than a new semantic surface
 - `v0.8.0`: finish the checked-in H1 Isaac demo with one Ubuntu 22.04 + Humble + NVIDIA smoke run, then freeze scope unless a concrete demo bug appears
@@ -39,3 +37,6 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 - `v0.6.0`: audit ROS2 `L2` evidence and defer expansion until there is a concrete new ROS-backed planner, capability, transport, or failure-mode path to cover
 - `v0.6.0`: add release notes and release checklist
 - `v0.6.0`: confirm the tiny `cap.call` / `cap.echo.v1` registry path is enough for the release without canonical capability call events
+- `v0.7.0`: confirm deterministic fixture and test coverage for async cancellation before start, cancellation while running, cancellation after timeout, repeated cancellation, and late completion after cancellation
+- `v0.7.0`: add a thin ROS-level pre-emption fixture that reuses canonical `host_action_invalid` and `fallback_used` runtime events without introducing a ROS-specific cancellation model
+- `v0.7.0`: collect the paper-facing benchmark bundle and confirm the full `B8` group produced artefacts for all five async cancellation scenarios
