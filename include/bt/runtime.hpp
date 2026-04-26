@@ -1,9 +1,11 @@
 #pragma once
 
 #include <chrono>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "bt/instance.hpp"
 #include "bt/registry.hpp"
@@ -25,6 +27,12 @@ struct tick_context {
     std::chrono::steady_clock::time_point tick_started_at{};
     std::chrono::steady_clock::time_point tick_deadline{};
     node_id current_node = 0;
+    std::vector<node_id> node_path{};
+    std::vector<node_id> last_node_path{};
+    std::optional<node_id> terminal_node_id{};
+    std::uint64_t planner_calls = 0;
+    std::uint64_t vla_submits = 0;
+    std::uint64_t vla_polls = 0;
 
     void bb_put(std::string key, bb_value value, std::string writer_name = "");
     const bb_entry* bb_get(std::string_view key);

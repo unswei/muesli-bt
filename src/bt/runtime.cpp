@@ -157,6 +157,151 @@ std::string status_json(status st) {
     return std::string("\"") + status_name(st) + "\"";
 }
 
+const char* event_log_sink_name(const event_log& events) {
+    const bool enabled = events.enabled();
+    if (!enabled) {
+        return "disabled";
+    }
+    const bool file = events.file_enabled();
+    const bool listener = events.has_line_listener();
+    if (file && listener) {
+        return "file+listener";
+    }
+    if (file) {
+        return "file";
+    }
+    if (listener) {
+        return "listener";
+    }
+    if (events.ring_capacity() > 0) {
+        return "ring";
+    }
+    return "disabled";
+}
+
+const char* event_log_flush_policy_name(const event_log& events) {
+    if (!events.enabled()) {
+        return "none";
+    }
+    if (events.flush_each_message()) {
+        return "each_message";
+    }
+    if (events.flush_on_tick_end()) {
+        return "tick_end";
+    }
+    return "manual";
+}
+
+void append_node_path_json(std::ostringstream& out, const std::vector<node_id>& path) {
+    out << '[';
+    for (std::size_t i = 0; i < path.size(); ++i) {
+        if (i != 0) {
+            out << ',';
+        }
+        out << path[i];
+    }
+    out << ']';
+}
+
+std::int64_t signed_delta(std::size_t after, std::size_t before) {
+    return static_cast<std::int64_t>(after) - static_cast<std::int64_t>(before);
+}
+
+void emit_tick_audit_event(tick_context& ctx,
+                           status root_status,
+                           std::chrono::nanoseconds elapsed,
+                           std::chrono::nanoseconds configured_budget,
+                           double budget_ms,
+                           bool deadline_missed,
+                           const muslisp::gc_stats_snapshot& gc_start,
+                           const muslisp::gc_stats_snapshot& gc_end) {
+    event_log* events = resolve_event_log(ctx);
+    if (!events || !events->tick_audit_enabled()) {
+        return;
+    }
+
+    const auto allocation_count = gc_end.total_allocated_objects >= gc_start.total_allocated_objects
+                                      ? gc_end.total_allocated_objects - gc_start.total_allocated_objects
+                                      : 0u;
+    const std::int64_t heap_live_bytes_delta = signed_delta(gc_end.bytes_allocated, gc_start.bytes_allocated);
+    const auto allocation_bytes = heap_live_bytes_delta > 0 ? static_cast<std::uint64_t>(heap_live_bytes_delta) : 0u;
+    const auto gc_collections_delta = gc_end.collection_count >= gc_start.collection_count
+                                          ? gc_end.collection_count - gc_start.collection_count
+                                          : 0u;
+    const auto gc_pause_ns_delta =
+        gc_end.total_pause_ns >= gc_start.total_pause_ns ? gc_end.total_pause_ns - gc_start.total_pause_ns : 0u;
+    const auto gc_freed_objects_delta = gc_end.freed_objects_total >= gc_start.freed_objects_total
+                                            ? gc_end.freed_objects_total - gc_start.freed_objects_total
+                                            : 0u;
+    const auto gc_forced_delta = gc_end.forced_collection_count >= gc_start.forced_collection_count
+                                     ? gc_end.forced_collection_count - gc_start.forced_collection_count
+                                     : 0u;
+
+    const muslisp::gc_policy policy = muslisp::default_gc().policy();
+    const bool strict_gc = policy == muslisp::gc_policy::fail_on_tick_gc;
+    const bool strict_allocations = events->tick_audit_strict_allocations();
+    const bool warmup_complete = events->tick_audit_warmup_complete();
+
+    std::string violation = "none";
+    if (strict_allocations && warmup_complete && (allocation_count > 0 || allocation_bytes > 0)) {
+        violation = "allocation";
+    } else if (gc_collections_delta > 0 && strict_gc) {
+        violation = "tick_gc";
+    } else if (deadline_missed) {
+        violation = "deadline";
+    }
+
+    std::ostringstream data;
+    data << "{\"schema_version\":\"tick_audit.v1\","
+         << "\"tick_id\":" << ctx.tick_index << ','
+         << "\"measurement_window\":\"tick_pre_begin_to_tick_end_pre_audit\","
+         << "\"allocation_count\":" << allocation_count << ','
+         << "\"allocation_bytes\":" << allocation_bytes << ','
+         << "\"heap_live_bytes_before\":" << gc_start.bytes_allocated << ','
+         << "\"heap_live_bytes_after\":" << gc_end.bytes_allocated << ','
+         << "\"heap_live_bytes_delta\":" << heap_live_bytes_delta << ','
+         << "\"gc_collections_delta\":" << gc_collections_delta << ','
+         << "\"gc_pause_ns_delta\":" << gc_pause_ns_delta << ','
+         << "\"gc_live_objects_after\":" << gc_end.live_objects_after_last_gc << ','
+         << "\"gc_freed_objects_delta\":" << gc_freed_objects_delta << ','
+         << "\"gc_forced\":" << (gc_forced_delta > 0 ? "true" : "false") << ','
+         << "\"root_node_id\":" << (ctx.inst.def ? ctx.inst.def->root : 0) << ','
+         << "\"root_status\":" << status_json(root_status) << ','
+         << "\"node_path\":";
+    append_node_path_json(data, ctx.last_node_path.empty() ? ctx.node_path : ctx.last_node_path);
+    if (ctx.terminal_node_id.has_value()) {
+        data << ",\"terminal_node_id\":" << *ctx.terminal_node_id;
+    }
+    data << ",\"active_async_jobs\":" << ctx.inst.active_vla_jobs.size()
+         << ",\"planner_calls\":" << ctx.planner_calls << ",\"vla_submits\":" << ctx.vla_submits
+         << ",\"vla_polls\":" << ctx.vla_polls << ",\"fallback_used\":false"
+         << ",\"deadline_missed\":" << (deadline_missed ? "true" : "false");
+    if (configured_budget.count() > 0) {
+        data << ",\"tick_budget_ms\":" << budget_ms;
+    }
+    data << ",\"tick_elapsed_ns\":" << elapsed.count() << ",\"violation\":\"" << violation << "\",";
+
+    data << "\"logging_mode\":{\"enabled\":" << (events->enabled() ? "true" : "false")
+         << ",\"sink\":\"" << event_log_sink_name(*events) << "\","
+         << "\"flush_policy\":\"" << event_log_flush_policy_name(*events) << "\","
+         << "\"includes_canonical_events_in_window\":true";
+    if (events->ring_capacity() > 0) {
+        data << ",\"ring_size\":" << events->ring_capacity();
+    }
+    if (events->file_enabled()) {
+        data << ",\"event_log_path\":\"" << event_log::json_escape(events->path()) << "\"";
+    }
+    data << "},\"audit_mode\":{\"enabled\":true,"
+         << "\"strict_allocations\":" << (strict_allocations ? "true" : "false") << ','
+         << "\"strict_gc\":" << (strict_gc ? "true" : "false") << ','
+         << "\"warmup_complete\":" << (warmup_complete ? "true" : "false") << ','
+         << "\"allowed_allocation_count\":0,"
+         << "\"allowed_allocation_bytes\":0,"
+         << "\"gc_policy\":\"" << muslisp::gc::policy_name(policy) << "\"}}";
+
+    (void)events->emit("tick_audit", ctx.tick_index, data.str());
+}
+
 void emit_event_error(tick_context& ctx,
                       std::string_view severity,
                       std::string_view component,
@@ -821,7 +966,10 @@ void clear_job_key_if_present(tick_context& ctx, const std::string& key, const s
 
 class tick_scope {
 public:
-    tick_scope(tick_context& ctx, std::chrono::steady_clock::time_point started_at) : ctx_(ctx), started_at_(started_at) {}
+    tick_scope(tick_context& ctx,
+               std::chrono::steady_clock::time_point started_at,
+               muslisp::gc_stats_snapshot gc_start)
+        : ctx_(ctx), started_at_(started_at), gc_start_(gc_start) {}
 
     void set_status(status st) { status_ = st; }
 
@@ -835,8 +983,9 @@ public:
 
         ctx_.inst.tree_stats.tick_duration.observe(elapsed, ctx_.inst.tree_stats.configured_tick_budget);
         ++ctx_.inst.tree_stats.tick_count;
-        if (ctx_.inst.tree_stats.configured_tick_budget.count() > 0 &&
-            elapsed > ctx_.inst.tree_stats.configured_tick_budget) {
+        const bool deadline_missed =
+            ctx_.inst.tree_stats.configured_tick_budget.count() > 0 && elapsed > ctx_.inst.tree_stats.configured_tick_budget;
+        if (deadline_missed) {
             ++ctx_.inst.tree_stats.tick_overrun_count;
 
             trace_event warning = make_trace_event(trace_event_kind::warning);
@@ -896,11 +1045,15 @@ public:
             data << '}';
             (void)events->emit("tick_end", ctx_.tick_index, data.str());
         }
+
+        const muslisp::gc_stats_snapshot gc_end = muslisp::default_gc().stats();
+        emit_tick_audit_event(ctx_, status_, elapsed, configured_budget, budget_ms, deadline_missed, gc_start_, gc_end);
     }
 
 private:
     tick_context& ctx_;
     std::chrono::steady_clock::time_point started_at_;
+    muslisp::gc_stats_snapshot gc_start_{};
     status status_ = status::failure;
 };
 
@@ -909,6 +1062,7 @@ public:
     node_scope(tick_context& ctx, const node& n)
         : ctx_(ctx), node_(n), prev_node_(ctx.current_node), started_at_(tick_now(ctx_)) {
         ctx_.current_node = node_.id;
+        ctx_.node_path.push_back(node_.id);
         trace_event ev = make_trace_event(trace_event_kind::node_enter);
         ev.node = node_.id;
         emit_trace(ctx_, std::move(ev));
@@ -957,6 +1111,9 @@ public:
         }
 
         ctx_.current_node = prev_node_;
+        if (!ctx_.node_path.empty()) {
+            ctx_.node_path.pop_back();
+        }
     }
 
 private:
@@ -1262,6 +1419,7 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
 
     planner_result result;
     try {
+        ++ctx.planner_calls;
         result = ctx.svc.planner->plan(request);
     } catch (const std::exception& e) {
         if (events) {
@@ -1511,6 +1669,7 @@ status execute_vla_request(const node& n, tick_context& ctx, const std::vector<m
         return status::failure;
     }
 
+    ++ctx.vla_submits;
     const vla_service::vla_job_id id = ctx.svc.vla->submit(request);
     ctx.inst.active_vla_jobs[n.id] = id;
     ctx.bb_put(opts.job_key, bb_value{static_cast<std::int64_t>(id)}, opts.node_name);
@@ -1554,6 +1713,7 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
     }
 
     const auto id = static_cast<vla_service::vla_job_id>(*id_raw);
+    ++ctx.vla_polls;
     const vla_poll poll = ctx.svc.vla->poll(id);
 
     if (event_log* events = resolve_event_log(ctx); events) {
@@ -1985,7 +2145,11 @@ status tick_node(node_id id, tick_context& ctx) {
     const node& n = get_node(*ctx.inst.def, id);
     node_scope scope(ctx, n);
 
-    auto finalize = [&scope](status st) {
+    auto finalize = [&ctx, &n, &scope](status st) {
+        if (ctx.node_path.size() >= ctx.last_node_path.size()) {
+            ctx.last_node_path = ctx.node_path;
+            ctx.terminal_node_id = n.id;
+        }
         scope.set_status(st);
         return st;
     };
@@ -2338,6 +2502,7 @@ status tick(instance& inst, registry& reg, services& svc) {
     ++inst.tick_index;
     const auto tick_start = svc.clock ? svc.clock->now() : std::chrono::steady_clock::now();
     muslisp::gc_tick_scope gc_tick(muslisp::default_gc());
+    const muslisp::gc_stats_snapshot gc_start = muslisp::default_gc().stats();
     auto tick_deadline = std::chrono::steady_clock::time_point::max();
     if (inst.tree_stats.configured_tick_budget.count() > 0) {
         tick_deadline = tick_start + inst.tree_stats.configured_tick_budget;
@@ -2386,7 +2551,7 @@ status tick(instance& inst, registry& reg, services& svc) {
     ev.node = inst.def->root;
     emit_trace(ctx, std::move(ev));
 
-    tick_scope scope(ctx, tick_start);
+    tick_scope scope(ctx, tick_start, gc_start);
     const status result = tick_node(inst.def->root, ctx);
     scope.set_status(result);
     return result;

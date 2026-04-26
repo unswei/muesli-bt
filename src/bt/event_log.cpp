@@ -187,6 +187,36 @@ bool event_log::flush_each_message() const noexcept {
     return flush_each_message_;
 }
 
+void event_log::set_tick_audit_enabled(bool enabled) noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    tick_audit_enabled_ = enabled;
+}
+
+bool event_log::tick_audit_enabled() const noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return tick_audit_enabled_;
+}
+
+void event_log::set_tick_audit_warmup_complete(bool complete) noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    tick_audit_warmup_complete_ = complete;
+}
+
+bool event_log::tick_audit_warmup_complete() const noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return tick_audit_warmup_complete_;
+}
+
+void event_log::set_tick_audit_strict_allocations(bool strict) noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    tick_audit_strict_allocations_ = strict;
+}
+
+bool event_log::tick_audit_strict_allocations() const noexcept {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return tick_audit_strict_allocations_;
+}
+
 void event_log::set_run_id(std::string run_id) {
     if (run_id.empty()) {
         throw std::invalid_argument("set_run_id: run_id must not be empty");

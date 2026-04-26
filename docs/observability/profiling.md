@@ -8,7 +8,8 @@ Runtime profiling remains available via:
 
 Observability output (tick/node/blackboard/planner/vla/errors) is unified into the canonical event stream. Use `(events.dump [n])` for recent event inspection.
 
-The planned `v0.7.0` per-tick audit payload is defined in [tick audit record](tick-audit.md).
+The opt-in `v0.7.0` per-tick audit payload is defined in [tick audit record](tick-audit.md).
+Enable it with `(events.enable-tick-audit #t)` before calling `bt.tick`.
 
 See [Canonical Event Log](event-log.md).
 

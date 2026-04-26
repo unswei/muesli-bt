@@ -2786,6 +2786,57 @@ void test_canonical_event_stream_builtins() {
     check(saw_bb_snapshot, "events should include bb_snapshot");
 }
 
+void test_tick_audit_event_emission() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    check(is_nil(eval_text("(events.enable #t)", env)), "events.enable should return nil for tick audit test");
+    check(is_nil(eval_text("(events.enable-tick-audit #t)", env)),
+          "events.enable-tick-audit should return nil when enabling");
+    check(is_nil(eval_text("(events.set-ring-size 128)", env)), "events.set-ring-size should return nil");
+
+    (void)eval_text("(define tree (bt.compile '(seq (act bb-put-int foo 42) (cond bb-has foo))))", env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "success", "tick audit test tree should succeed");
+
+    value dumped = eval_text("(events.dump 80)", env);
+    check(is_proper_list(dumped), "events.dump should return list for tick audit test");
+    bool saw_tick_audit = false;
+    bool saw_schema = false;
+    bool saw_tick_id = false;
+    bool saw_root_status = false;
+    bool saw_node_path = false;
+    bool saw_logging_mode = false;
+    bool saw_audit_mode = false;
+    for (const auto& row : vector_from_list(dumped)) {
+        check(is_string(row), "tick audit events.dump rows should be JSON strings");
+        const std::string line = string_value(row);
+        if (line.find("\"type\":\"tick_audit\"") == std::string::npos) {
+            continue;
+        }
+        saw_tick_audit = true;
+        saw_schema = saw_schema || line.find("\"schema_version\":\"tick_audit.v1\"") != std::string::npos;
+        saw_tick_id = saw_tick_id || line.find("\"tick_id\":1") != std::string::npos;
+        saw_root_status = saw_root_status || line.find("\"root_status\":\"success\"") != std::string::npos;
+        saw_node_path = saw_node_path || line.find("\"node_path\":[") != std::string::npos;
+        saw_logging_mode = saw_logging_mode || line.find("\"logging_mode\":{") != std::string::npos;
+        saw_audit_mode = saw_audit_mode || line.find("\"audit_mode\":{") != std::string::npos;
+    }
+
+    check(saw_tick_audit, "events should include tick_audit when enabled");
+    check(saw_schema, "tick_audit should include schema version");
+    check(saw_tick_id, "tick_audit should include tick_id");
+    check(saw_root_status, "tick_audit should include root status");
+    check(saw_node_path, "tick_audit should include node_path");
+    check(saw_logging_mode, "tick_audit should include logging_mode");
+    check(saw_audit_mode, "tick_audit should include audit_mode");
+
+    check(is_nil(eval_text("(events.enable-tick-audit #f)", env)),
+          "events.enable-tick-audit should return nil when disabling");
+}
+
 void test_bt_tick_with_blackboard_input() {
     using namespace muslisp;
 
@@ -4510,6 +4561,7 @@ int main() {
         {"bt blackboard.get builtin", test_bt_blackboard_get_builtin},
         {"bt scheduler-backed action", test_bt_scheduler_backed_action},
         {"canonical event stream builtins", test_canonical_event_stream_builtins},
+        {"tick audit event emission", test_tick_audit_event_emission},
         {"bt tick with blackboard input", test_bt_tick_with_blackboard_input},
         {"env core interface unattached", test_env_core_interface_unattached},
         {"env run-loop multi-episode reset=true", test_env_run_loop_multi_episode_reset_true},

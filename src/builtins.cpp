@@ -906,6 +906,7 @@ void print_gc_snapshot(const gc_stats_snapshot& snapshot) {
     std::cout << "collection count: " << snapshot.collection_count << '\n';
     std::cout << "total GC pause ns: " << snapshot.total_pause_ns << '\n';
     std::cout << "freed objects total: " << snapshot.freed_objects_total << '\n';
+    std::cout << "forced collection count: " << snapshot.forced_collection_count << '\n';
 }
 
 value builtin_heap_stats(const std::vector<value>& args) {
@@ -2235,6 +2236,15 @@ value builtin_events_set_flush_each_message(const std::vector<value>& args) {
     return make_nil();
 }
 
+value builtin_events_enable_tick_audit(const std::vector<value>& args) {
+    require_arity("events.enable-tick-audit", args, 1);
+    if (!is_boolean(args[0])) {
+        throw lisp_error("events.enable-tick-audit: expected boolean");
+    }
+    bt::default_runtime_host().events().set_tick_audit_enabled(boolean_value(args[0]));
+    return make_nil();
+}
+
 value builtin_events_dump(const std::vector<value>& args) {
     if (args.size() > 1) {
         throw lisp_error("events.dump: expected 0 or 1 arguments");
@@ -3010,6 +3020,7 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "events.set-path", builtin_events_set_path);
     bind_primitive(global_env, "events.set-ring-size", builtin_events_set_ring_size);
     bind_primitive(global_env, "events.set-flush-each-message", builtin_events_set_flush_each_message);
+    bind_primitive(global_env, "events.enable-tick-audit", builtin_events_enable_tick_audit);
     bind_primitive(global_env, "events.dump", builtin_events_dump);
     bind_primitive(global_env, "events.snapshot-bb", builtin_events_snapshot_bb);
     install_env_capability_builtins(global_env);

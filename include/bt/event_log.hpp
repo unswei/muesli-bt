@@ -41,6 +41,12 @@ public:
     [[nodiscard]] bool flush_on_tick_end() const noexcept;
     void set_flush_each_message(bool enabled) noexcept;
     [[nodiscard]] bool flush_each_message() const noexcept;
+    void set_tick_audit_enabled(bool enabled) noexcept;
+    [[nodiscard]] bool tick_audit_enabled() const noexcept;
+    void set_tick_audit_warmup_complete(bool complete) noexcept;
+    [[nodiscard]] bool tick_audit_warmup_complete() const noexcept;
+    void set_tick_audit_strict_allocations(bool strict) noexcept;
+    [[nodiscard]] bool tick_audit_strict_allocations() const noexcept;
 
     void set_run_id(std::string run_id);
     [[nodiscard]] std::string run_id() const;
@@ -104,6 +110,9 @@ private:
     bool file_enabled_ = false;
     bool flush_on_tick_end_ = true;
     bool flush_each_message_ = false;
+    bool tick_audit_enabled_ = false;
+    bool tick_audit_warmup_complete_ = true;
+    bool tick_audit_strict_allocations_ = false;
     bool run_started_ = false;
 
     std::size_t ring_capacity_ = 4096;

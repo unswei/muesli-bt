@@ -35,6 +35,7 @@ struct gc_stats_snapshot {
     std::uint64_t collection_count = 0;
     std::uint64_t total_pause_ns = 0;
     std::size_t freed_objects_total = 0;
+    std::uint64_t forced_collection_count = 0;
 };
 
 enum class gc_policy {
@@ -137,6 +138,7 @@ private:
     std::uint64_t collection_count_ = 0;
     std::uint64_t total_pause_ns_ = 0;
     std::size_t freed_objects_total_ = 0;
+    std::uint64_t forced_collection_count_ = 0;
     lifecycle_listener lifecycle_listener_{};
 
     std::vector<value*> root_slots_;

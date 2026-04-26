@@ -176,6 +176,7 @@ Audit language/runtime surfaces against code before updating this checklist:
 
 ### Event stream
 - [x] `events.enable` -> [page](language/reference/builtins/events/events-enable.md)
+- [x] `events.enable-tick-audit` -> [page](language/reference/builtins/events/events-enable-tick-audit.md)
 - [x] `events.set-flush-each-message` -> [page](language/reference/builtins/events/events-set-flush-each-message.md)
 - [x] `events.set-path` -> [page](language/reference/builtins/events/events-set-path.md)
 - [x] `events.set-ring-size` -> [page](language/reference/builtins/events/events-set-ring-size.md)

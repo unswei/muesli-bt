@@ -2,13 +2,12 @@
 
 ## what this is
 
-The tick audit record is the planned `v0.7.0` measurement payload for proving tick hot-path allocation, heap, garbage collection (GC), node-path, and logging behaviour.
+The tick audit record is the `v0.7.0` measurement payload for proving tick hot-path allocation, heap, garbage collection (GC), node-path, and logging behaviour.
 
 The target canonical event type is `tick_audit`.
 The target payload schema is `tick_audit.v1`.
 
-This page defines the record before implementation so runtime code, benchmarks, fixtures, and paper artefacts use one shape.
-It is not a released `v0.6.0` event yet.
+The runtime emits this event from `bt.tick` when tick audit mode is enabled.
 
 ## when to use it
 
@@ -43,6 +42,18 @@ The audit record should be emitted only after warm-up when strict zero-allocatio
 Warm-up includes parsing, BT compilation, instance creation, symbol interning, node-state allocation, blackboard setup, and expected buffer preallocation.
 
 ## api / syntax
+
+Enable runtime emission with:
+
+```lisp
+(events.enable-tick-audit #t)
+```
+
+Disable it with:
+
+```lisp
+(events.enable-tick-audit #f)
+```
 
 ### event envelope
 
@@ -181,8 +192,8 @@ Optional fields:
 
 ## gotchas
 
-- `allocation_count` and `allocation_bytes` must come from one runtime-wide allocation tracker, not from ad hoc counters around selected containers.
-- `heap_live_bytes_after` must not mean total bytes ever allocated. It means currently live heap bytes.
+- Current `allocation_count` and `allocation_bytes` values come from the Lisp GC heap counters. They are useful runtime evidence, but full C++ allocation enforcement still needs the benchmark lane's allocation tracker.
+- Current `heap_live_bytes_after` follows the Lisp GC heap counter exposed as `bytes_allocated`.
 - `gc_pause_ns_delta` is cumulative for collections completed during the tick. A later `gc_begin` / `gc_end` event pair can provide per-collection detail.
 - `gc_begin` and `gc_end` are implemented before `tick_audit`; use them first to verify GC policy and pause measurement.
 - `node_path` is a compact tick summary. It does not replace `node_enter` and `node_exit` events.

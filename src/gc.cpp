@@ -105,6 +105,9 @@ void gc::collect_impl(gc_collection_reason reason, bool forced) {
     collection_count_ = collection_id;
     total_pause_ns_ += static_cast<std::uint64_t>(pause_ns);
     freed_objects_total_ += swept.freed_count;
+    if (forced) {
+        ++forced_collection_count_;
+    }
 
     gc_lifecycle_event end;
     end.begin = false;
@@ -213,6 +216,7 @@ gc_stats_snapshot gc::stats() const noexcept {
     snapshot.collection_count = collection_count_;
     snapshot.total_pause_ns = total_pause_ns_;
     snapshot.freed_objects_total = freed_objects_total_;
+    snapshot.forced_collection_count = forced_collection_count_;
     return snapshot;
 }
 

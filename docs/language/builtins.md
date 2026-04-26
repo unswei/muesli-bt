@@ -35,7 +35,7 @@ This page is a summary and link hub for built-ins. Detailed behaviour, errors, a
 ## Planning Services
 
 - planning call: `planner.plan`
-- canonical event stream: `events.enable`, `events.set-path`, `events.set-flush-each-message`, `events.set-ring-size`, `events.dump`, `events.snapshot-bb`
+- canonical event stream: `events.enable`, `events.enable-tick-audit`, `events.set-path`, `events.set-flush-each-message`, `events.set-ring-size`, `events.dump`, `events.snapshot-bb`
 - planner seed controls: `planner.set-base-seed`, `planner.get-base-seed`
 - capabilities: `cap.list`, `cap.describe`, `cap.call`
 - async VLA jobs: `vla.submit`, `vla.poll`, `vla.cancel`
