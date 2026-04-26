@@ -249,6 +249,12 @@ Exit criteria:
 - any ROS-level cancellation coverage reuses the runtime semantics and does not introduce a second cancellation model
 - the release can generate at least one paper-quality tail-latency figure and one memory/GC figure from checked-in scripts
 
+GC contract evidence:
+
+- `test_tick_audit_marks_in_tick_gc_as_violation` forces a GC inside a tick under the default policy and checks that `gc_begin` and `gc_end` carry `"in_tick":true` while `tick_audit` reports `"violation":"tick_gc"`
+- `test_fail_on_tick_gc_prevents_in_tick_gc_lifecycle` forces the same path under `fail-on-tick-gc` and checks that the runtime logs the rejection while no in-tick GC lifecycle event is emitted
+- `test_strict_gc_representative_ticks_have_zero_gc_delta` runs representative sequence, selector, and reactive shapes under `fail-on-tick-gc` and checks that every audit row reports `"strict_gc":true`, `"gc_policy":"fail-on-tick-gc"`, and `"gc_collections_delta":0`
+
 Replay divergence reporting evidence:
 
 - `tools/validate_trace.py compare` emits `comparison.first_divergence` with the divergent event index, tick, event type, field path, raw event context windows, and any available node id, blackboard key, async job id, planner id, or host capability.

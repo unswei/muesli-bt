@@ -2857,6 +2857,175 @@ void test_tick_audit_event_emission() {
           "events.enable-tick-audit should return nil when disabling");
 }
 
+void test_tick_audit_marks_in_tick_gc_as_violation() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    default_gc().set_policy(gc_policy::default_policy);
+    bt::runtime_host& host = bt::default_runtime_host();
+    host.callbacks().register_action(
+        "test-force-gc",
+        [](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+            muslisp::default_gc().collect();
+            return bt::status::success;
+        });
+
+    env_ptr env = create_global_env();
+    check(is_nil(eval_text("(events.enable #t)", env)), "events.enable should return nil for in-tick GC audit test");
+    check(is_nil(eval_text("(events.enable-tick-audit #t)", env)),
+          "events.enable-tick-audit should return nil for in-tick GC audit test");
+    check(is_nil(eval_text("(events.set-ring-size 256)", env)), "events.set-ring-size should return nil");
+
+    (void)eval_text("(define tree (bt.compile '(seq (act test-force-gc) (succeed))))", env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "success", "forced-GC tick should complete in default policy");
+
+    bool saw_gc_begin_in_tick = false;
+    bool saw_gc_end_in_tick = false;
+    bool saw_tick_gc_violation = false;
+    for (const auto& row : vector_from_list(eval_text("(events.dump 120)", env))) {
+        check(is_string(row), "in-tick GC audit rows should be strings");
+        const std::string line = string_value(row);
+        if (line.find("\"type\":\"gc_begin\"") != std::string::npos &&
+            line.find("\"in_tick\":true") != std::string::npos) {
+            saw_gc_begin_in_tick = true;
+        }
+        if (line.find("\"type\":\"gc_end\"") != std::string::npos &&
+            line.find("\"in_tick\":true") != std::string::npos) {
+            saw_gc_end_in_tick = true;
+        }
+        if (line.find("\"type\":\"tick_audit\"") != std::string::npos &&
+            line.find("\"gc_collections_delta\":1") != std::string::npos &&
+            line.find("\"violation\":\"tick_gc\"") != std::string::npos) {
+            saw_tick_gc_violation = true;
+        }
+    }
+
+    check(saw_gc_begin_in_tick, "forced GC should emit gc_begin with in_tick=true");
+    check(saw_gc_end_in_tick, "forced GC should emit gc_end with in_tick=true");
+    check(saw_tick_gc_violation, "tick_audit should classify in-tick GC as tick_gc violation");
+    default_gc().set_policy(gc_policy::default_policy);
+}
+
+void test_fail_on_tick_gc_prevents_in_tick_gc_lifecycle() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    default_gc().set_policy(gc_policy::default_policy);
+    bt::runtime_host& host = bt::default_runtime_host();
+    host.callbacks().register_action(
+        "test-force-gc-strict",
+        [](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+            muslisp::default_gc().collect();
+            return bt::status::success;
+        });
+
+    env_ptr env = create_global_env();
+    check(is_nil(eval_text("(events.enable #t)", env)), "events.enable should return nil for strict GC test");
+    check(is_nil(eval_text("(events.enable-tick-audit #t)", env)),
+          "events.enable-tick-audit should return nil for strict GC test");
+    check(is_nil(eval_text("(events.set-ring-size 256)", env)), "events.set-ring-size should return nil");
+    (void)eval_text("(define tree (bt.compile '(seq (act test-force-gc-strict) (succeed))))", env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+
+    default_gc().collect();
+    host.events().clear_ring();
+    default_gc().set_policy(gc_policy::fail_on_tick_gc);
+
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "failure",
+          "fail-on-tick-gc callback error should fail the tick");
+    default_gc().set_policy(gc_policy::default_policy);
+
+    bool saw_in_tick_gc_lifecycle = false;
+    bool saw_strict_audit = false;
+    bool saw_gc_contract_error = false;
+    for (const auto& row : vector_from_list(eval_text("(events.dump 120)", env))) {
+        check(is_string(row), "strict GC audit rows should be strings");
+        const std::string line = string_value(row);
+        if ((line.find("\"type\":\"gc_begin\"") != std::string::npos ||
+             line.find("\"type\":\"gc_end\"") != std::string::npos) &&
+            line.find("\"in_tick\":true") != std::string::npos) {
+            saw_in_tick_gc_lifecycle = true;
+        }
+        if (line.find("\"type\":\"tick_audit\"") != std::string::npos &&
+            line.find("\"strict_gc\":true") != std::string::npos &&
+            line.find("\"gc_policy\":\"fail-on-tick-gc\"") != std::string::npos &&
+            line.find("\"gc_collections_delta\":0") != std::string::npos) {
+            saw_strict_audit = true;
+        }
+        if (line.find("\"type\":\"error\"") != std::string::npos &&
+            line.find("forced collection during tick under fail-on-tick-gc policy") != std::string::npos) {
+            saw_gc_contract_error = true;
+        }
+    }
+
+    check(saw_gc_contract_error, "fail-on-tick-gc rejection should be logged as a runtime error");
+    check(!saw_in_tick_gc_lifecycle, "fail-on-tick-gc must prevent in-tick GC lifecycle events");
+    check(saw_strict_audit, "strict GC rejection should still leave a zero-GC tick_audit record");
+}
+
+void test_strict_gc_representative_ticks_have_zero_gc_delta() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    default_gc().set_policy(gc_policy::default_policy);
+    bt::runtime_host& host = bt::default_runtime_host();
+    env_ptr env = create_global_env();
+    check(is_nil(eval_text("(events.enable #t)", env)), "events.enable should return nil for strict representative test");
+    check(is_nil(eval_text("(events.enable-tick-audit #t)", env)),
+          "events.enable-tick-audit should return nil for strict representative test");
+    check(is_nil(eval_text("(events.set-ring-size 512)", env)), "events.set-ring-size should return nil");
+
+    (void)eval_text("(define seq-tree (bt.compile '(seq (act always-success) (cond always-true) (succeed))))", env);
+    (void)eval_text("(define sel-tree (bt.compile '(sel (cond always-false) (act always-success))))", env);
+    (void)eval_text(
+        "(define reactive-tree "
+        "  (bt.compile '(reactive-seq (cond always-true) (mem-sel (act always-fail) (act always-success)))))",
+        env);
+    (void)eval_text("(define seq-inst (bt.new-instance seq-tree))", env);
+    (void)eval_text("(define sel-inst (bt.new-instance sel-tree))", env);
+    (void)eval_text("(define reactive-inst (bt.new-instance reactive-tree))", env);
+
+    default_gc().collect();
+    host.events().clear_ring();
+    default_gc().set_policy(gc_policy::fail_on_tick_gc);
+    check(symbol_name(eval_text("(bt.tick seq-inst)", env)) == "success", "strict seq representative tick should succeed");
+    check(symbol_name(eval_text("(bt.tick sel-inst)", env)) == "success", "strict sel representative tick should succeed");
+    check(symbol_name(eval_text("(bt.tick reactive-inst)", env)) == "success",
+          "strict reactive representative tick should succeed");
+    default_gc().set_policy(gc_policy::default_policy);
+
+    std::size_t audit_count = 0;
+    bool saw_in_tick_gc_lifecycle = false;
+    bool saw_tick_gc_violation = false;
+    bool all_strict_zero_delta = true;
+    for (const auto& row : vector_from_list(eval_text("(events.dump 200)", env))) {
+        check(is_string(row), "strict representative event rows should be strings");
+        const std::string line = string_value(row);
+        if ((line.find("\"type\":\"gc_begin\"") != std::string::npos ||
+             line.find("\"type\":\"gc_end\"") != std::string::npos) &&
+            line.find("\"in_tick\":true") != std::string::npos) {
+            saw_in_tick_gc_lifecycle = true;
+        }
+        if (line.find("\"type\":\"tick_audit\"") == std::string::npos) {
+            continue;
+        }
+        ++audit_count;
+        if (line.find("\"violation\":\"tick_gc\"") != std::string::npos) {
+            saw_tick_gc_violation = true;
+        }
+        all_strict_zero_delta = all_strict_zero_delta &&
+                                line.find("\"strict_gc\":true") != std::string::npos &&
+                                line.find("\"gc_policy\":\"fail-on-tick-gc\"") != std::string::npos &&
+                                line.find("\"gc_collections_delta\":0") != std::string::npos;
+    }
+
+    check(audit_count == 3, "strict representative run should emit one tick_audit per tick");
+    check(!saw_in_tick_gc_lifecycle, "strict representative run should not emit in-tick GC lifecycle events");
+    check(!saw_tick_gc_violation, "strict representative run should not report tick_gc violations");
+    check(all_strict_zero_delta, "strict representative tick_audit rows should report zero GC delta");
+}
+
 void test_bt_tick_with_blackboard_input() {
     using namespace muslisp;
 
@@ -4582,6 +4751,9 @@ int main() {
         {"bt scheduler-backed action", test_bt_scheduler_backed_action},
         {"canonical event stream builtins", test_canonical_event_stream_builtins},
         {"tick audit event emission", test_tick_audit_event_emission},
+        {"tick audit marks in-tick GC as violation", test_tick_audit_marks_in_tick_gc_as_violation},
+        {"fail-on-tick-gc prevents in-tick GC lifecycle", test_fail_on_tick_gc_prevents_in_tick_gc_lifecycle},
+        {"strict GC representative ticks have zero GC delta", test_strict_gc_representative_ticks_have_zero_gc_delta},
         {"bt tick with blackboard input", test_bt_tick_with_blackboard_input},
         {"env core interface unattached", test_env_core_interface_unattached},
         {"env run-loop multi-episode reset=true", test_env_run_loop_multi_episode_reset_true},

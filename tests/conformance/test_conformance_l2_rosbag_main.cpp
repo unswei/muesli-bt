@@ -1058,7 +1058,7 @@ void test_ros2_rosbag_preemption_fallback_conformance() {
         "              (map.set! u 'linear_y 0.0) "
         "              (map.set! u 'angular_z 0.05) "
         "              (map.set! a 'u u) "
-        "              a))))) "
+        "              a)))))) "
         "  rosbag-run-result)";
     const value run_result = eval_text(run_expr, env);
     check(is_map(run_result), "ros2 rosbag preemption: env.run-loop should return a map");

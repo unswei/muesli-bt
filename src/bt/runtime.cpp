@@ -273,7 +273,7 @@ void emit_tick_audit_event(tick_context& ctx,
     std::string violation = "none";
     if (strict_allocations && warmup_complete && (allocation_count > 0 || allocation_bytes > 0)) {
         violation = "allocation";
-    } else if (gc_collections_delta > 0 && strict_gc) {
+    } else if (gc_collections_delta > 0) {
         violation = "tick_gc";
     } else if (deadline_missed) {
         violation = "deadline";

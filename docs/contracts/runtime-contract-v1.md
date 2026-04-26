@@ -183,7 +183,10 @@ GC policy:
 - `default`: automatic collection uses the normal runtime policy
 - `between-ticks`: automatic collection requested during a BT tick is deferred until the tick exits
 - `manual`: automatic `maybe_collect` checks do not collect; explicit collection can still run
-- `fail-on-tick-gc`: collection during a BT tick is a contract violation and raises an error
+- `fail-on-tick-gc`: collection during a BT tick is a contract violation and raises an error before `gc_begin`
+
+When tick audit mode is enabled, any collection completed inside the measured tick window is reported as `tick_audit.violation = "tick_gc"`.
+Strict-mode runs prove the stronger condition by showing no `gc_begin` or `gc_end` events with `in_tick = true` and zero `gc_collections_delta` in representative `tick_audit` rows.
 
 Determinism scope:
 

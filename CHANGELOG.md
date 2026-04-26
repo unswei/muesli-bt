@@ -24,6 +24,7 @@ muesli-bt
 - Extended the canonical event schema to accept GC lifecycle and planned tick-audit event types.
 - Extended fixture verification with exact per-event-type count checks through `expected_metrics.type_counts`.
 - Extended strict allocation coverage beyond the narrow logging-off lane to representative reactive and logging-on precompiled tick shapes.
+- Tightened tick audit GC contract evidence so any completed in-tick GC is classified as `tick_gc`, while `fail-on-tick-gc` tests prove collection is rejected before lifecycle emission across representative BT shapes.
 - Updated benchmark result handling so CSV files remain summaries while canonical `events.jsonl` files stay as inspectable evidence for GC and async lifecycle claims.
 - Updated the publication benchmark script to produce checked result bundles with manifests, summaries, and figure/report artefacts.
 - The BT runtime now emits compact outcome events alongside detailed lifecycle events for implemented tick, planner timeout, VLA timeout, late-result-drop, and cancellation cases.

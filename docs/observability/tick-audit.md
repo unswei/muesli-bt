@@ -107,6 +107,11 @@ The canonical envelope uses the normal `mbt.evt.v1` fields:
 - `violation`: short string such as `"allocation"`, `"tick_gc"`, `"deadline"`, or `"none"`
 - `notes`: short human-readable diagnostic string
 
+`violation` is ordered by contract severity.
+Allocation violations take precedence when strict allocation mode is active and warm-up is complete.
+Any GC collection completed inside the measured tick window is reported as `"tick_gc"`.
+Deadline misses are reported after allocation and GC checks.
+
 ### logging mode
 
 `logging_mode` is a map.
@@ -196,6 +201,8 @@ Optional fields:
 - Current `heap_live_bytes_after` follows the Lisp GC heap counter exposed as `bytes_allocated`.
 - `gc_pause_ns_delta` is cumulative for collections completed during the tick. A later `gc_begin` / `gc_end` event pair can provide per-collection detail.
 - `gc_begin` and `gc_end` are implemented before `tick_audit`; use them first to verify GC policy and pause measurement.
+- Under `fail-on-tick-gc`, forced or requested collection inside a tick raises before `gc_begin`.
+  The strict-mode proof is therefore the absence of any `gc_begin` or `gc_end` event with `"in_tick":true`, plus `tick_audit` rows with `"strict_gc":true` and `"gc_collections_delta":0`.
 - `node_path` is a compact tick summary. It does not replace `node_enter` and `node_exit` events.
 - Logging mode must be recorded because canonical logging can be the dominant source of allocation if buffers are not preallocated.
 - Strict zero-allocation claims only apply after warm-up. The audit record must say whether warm-up is complete.
