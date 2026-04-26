@@ -17,7 +17,8 @@ enum class benchmark_kind {
     static_tick,
     reactive_interrupt,
     compile_lifecycle,
-    memory_gc
+    memory_gc,
+    async_contract
 };
 
 enum class lifecycle_phase {
@@ -58,6 +59,15 @@ enum class gc_benchmark_mode {
     forced_pressure
 };
 
+enum class async_contract_case {
+    none,
+    cancel_before_start,
+    cancel_while_running,
+    cancel_after_timeout,
+    repeated_cancel,
+    late_completion_after_cancel
+};
+
 struct timing_config {
     std::chrono::milliseconds warmup{2000};
     std::chrono::milliseconds run{10000};
@@ -74,6 +84,7 @@ struct scenario_definition {
     schedule_kind schedule = schedule_kind::none;
     lifecycle_phase lifecycle = lifecycle_phase::none;
     gc_benchmark_mode gc_mode = gc_benchmark_mode::none;
+    async_contract_case async_case = async_contract_case::none;
     std::string variant;
     timing_config timing{};
     std::uint64_t seed = 20260315ull;

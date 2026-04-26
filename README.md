@@ -23,7 +23,7 @@ muesli-bt keeps those concerns in one place with explicit runtime semantics and 
 
 ### Benchmarks
 
-The optional benchmark harness lives under [`bench/`](bench/README.md). It covers runtime latency, lifecycle costs, logging overhead, strict allocation checks, GC/memory evidence, and the optional shared-subset comparison against BehaviorTree.CPP 4.9.0.
+The optional benchmark harness lives under [`bench/`](bench/README.md). It covers runtime latency, lifecycle costs, logging overhead, strict allocation checks, GC/memory evidence, async cancellation contract edges, and the optional shared-subset comparison against BehaviorTree.CPP 4.9.0.
 
 Current benchmark interpretation lives in [runtime performance](docs/internals/runtime-performance.md). Keep detailed benchmark claims there or in release artefacts rather than scattering result snapshots through this README.
 

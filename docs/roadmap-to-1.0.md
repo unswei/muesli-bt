@@ -236,6 +236,7 @@ Benchmark and evidence requirements:
 - report tick latency distributions under no-GC, between-ticks-GC, and forced-GC-pressure conditions
 - report deadline miss rate, fallback activation count, late-completion count, and dropped-completion count under deterministic injected async delays
 - add a long-run memory benchmark that reports resident-set-size slope, heap-live-byte slope, and event-log size per tick
+- add `B8` async contract benchmarks for cancellation before start, cancellation while running, cancellation after timeout, repeated cancellation, and late completion after cancellation
 - make every `v0.7.0` benchmark emit an experiment manifest with compiler, build type, platform, CPU, runtime flags, scenario seed, and trace schema version
 
 Exit criteria:

@@ -168,6 +168,7 @@ Current harness coverage includes:
 - `B5` parse, compile, load, and instantiate cost
 - `B6` logging overhead
 - `B7` GC and memory evidence smoke runs
+- `B8` async cancellation contract edge smoke runs
 
 For `BehaviorTree.CPP`, the harness currently covers:
 
@@ -197,6 +198,14 @@ Run the GC and memory benchmark group:
 ./build/bench-release/bench/bench run-group B7 --run-ms 30000 --repetitions 5
 ```
 
+Run the async cancellation contract edge benchmark group:
+
+```bash
+./build/bench-release/bench/bench run-group B8
+```
+
+`B8` covers cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. These scenarios mirror the checked-in `fixtures/async-*` bundles and record cancellation latency plus semantic-error counts in the normal benchmark CSV files.
+
 Run the strict precompiled-tick allocation lane:
 
 ```bash
@@ -223,7 +232,7 @@ python3 bench/scripts/write_evidence_report.py bench/results/my-run --event-log 
 
 The tail-latency script reads `aggregate_summary.csv` and writes `tail_latency.svg`. The memory/GC script reads benchmark allocation/RSS columns and canonical `gc_end` lifecycle events when supplied or found under the result directory. `B7` result directories already contain those GC event logs. The evidence report records which figures exist and lists missing GC or long-run heap-live evidence explicitly.
 
-The analysis summary reports `A1`, `A2`, `B1`, `B2`, `B5`, and `B6` when those rows are present.
+The analysis summary reports `A1`, `A2`, `B1`, `B2`, `B5`, `B6`, `B7`, and `B8` when those rows are present.
 That same summary works for the optional `btcpp` result sets; absent groups are reported as absent rather than treated as failures.
 
 Compare two benchmark result sets directly:

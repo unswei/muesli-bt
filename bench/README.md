@@ -13,13 +13,14 @@ The current milestone covers:
 - `B5` parse, compile, load, and instantiate cost
 - `B6` logging overhead for one static and one reactive scenario
 - `B7` GC and memory evidence smoke runs
+- `B8` async cancellation contract edge smoke runs
 
 The harness currently supports:
 
 - native `muesli-bt`
 - optional `BehaviorTree.CPP` comparison runs, pinned to `4.9.0`
 
-The comparison runtime is limited to the shared subset for `A1`, `A2`, `B1`, `B2`, and the comparable `B5` phases (`compile`, `inst1`, `inst100`, `loaddsl`). `B6` remains `muesli-bt` only.
+The comparison runtime is limited to the shared subset for `A1`, `A2`, `B1`, `B2`, and the comparable `B5` phases (`compile`, `inst1`, `inst100`, `loaddsl`). `B6`, `B7`, and `B8` remain `muesli-bt` only.
 
 ## when to use it
 
@@ -49,7 +50,7 @@ Each run:
 
 For `B6`, the current harness records full-trace capture with deferred JSONL serialisation when no file or ring sink is enabled. `log_bytes_total` still reports the canonical `mbt.evt.v1` line size that would be emitted.
 
-`schema_version=3` adds GC and memory evidence columns for `B7`, including GC pause quantiles, collection count, heap-live slope, RSS slope, and event-log bytes per tick.
+`schema_version=3` adds GC and memory evidence columns for `B7`, including GC pause quantiles, collection count, heap-live slope, RSS slope, and event-log bytes per tick. `B8` reuses the existing latency, cancellation-latency, allocation, RSS, and semantic-error columns for async contract edge evidence.
 
 `schema_version=2` added two latency interpretation columns:
 
@@ -119,6 +120,14 @@ Run the GC and memory evidence smoke group:
 ```bash
 ./build/bench-release/bench/bench run-group B7 --run-ms 30000 --repetitions 5
 ```
+
+Run the async cancellation contract edge smoke group:
+
+```bash
+./build/bench-release/bench/bench run-group B8
+```
+
+`B8` covers the five checked-in async fixture edges: cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. The benchmark records operation latency and cancellation latency while checking that each edge finishes without semantic errors.
 
 Run one group against `BehaviorTree.CPP`:
 
@@ -251,6 +260,7 @@ python3 bench/scripts/compare_results.py \
 - `B6` full-trace rows currently measure capture overhead with deferred serialisation, not forced inline file output.
 - The strict allocation CTest lane is a guardrail for precompiled steady-state ticks. Warm-up, compilation, instantiation, and ordinary benchmark CSV writing happen outside the guarded section.
 - `B7` default scenarios are smoke runs. Use longer `--run-ms` and more repetitions before treating heap-live or RSS slope as paper evidence.
+- `B8` default scenarios are smoke runs. Use longer `--run-ms` and more repetitions before treating async cancellation latency as paper evidence.
 - `BehaviorTree.CPP` comparison runs are pinned to release `4.9.0` and the common semantic subset. Do not treat skipped groups as missing data bugs.
 - `compare_results.py` assumes both result sets were collected under meaningfully similar machine and build settings. It prints a warning when the recorded environment metadata differ.
 

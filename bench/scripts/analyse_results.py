@@ -332,6 +332,19 @@ def print_report(result_dir: Path) -> int:
         print("- no B7 scenarios present in this result set")
     print()
 
+    print("async contract edges")
+    b8_rows = available_rows(aggregate_rows, "B8-")
+    if b8_rows:
+        for row in b8_rows:
+            print(
+                f"- {row['scenario_id']}: "
+                f"{format_latency_ns(scenario_metric(row, 'latency_ns_median_of_medians'))} median operation, "
+                f"cancel median {format_latency_ns(scenario_metric(row, 'cancel_latency_ns_median_of_medians'))}"
+            )
+    else:
+        print("- no B8 scenarios present in this result set")
+    print()
+
     recommendations: list[str] = []
     if semantic_error_runs > 0:
         recommendations.append("Fix semantic mismatches before using these numbers for optimisation work.")
@@ -364,6 +377,8 @@ def print_report(result_dir: Path) -> int:
         )
     if not b7_rows:
         recommendations.append("Run B7 when memory/GC pause or heap-live evidence is needed.")
+    if not b8_rows:
+        recommendations.append("Run B8 when async cancellation contract edge evidence is needed.")
 
     print("recommended next work")
     if recommendations:

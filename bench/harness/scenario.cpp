@@ -93,10 +93,32 @@ scenario_definition make_memory_gc_scenario(std::string scenario_id,
     };
 }
 
+scenario_definition make_async_contract_scenario(std::string scenario_id,
+                                                 async_contract_case async_case,
+                                                 std::string variant,
+                                                 timing_config timing) {
+    return scenario_definition{
+        .scenario_id = std::move(scenario_id),
+        .group_id = "B8",
+        .kind = benchmark_kind::async_contract,
+        .family = tree_family::single_leaf,
+        .tree_size_nodes = 1,
+        .logging = logging_mode::off,
+        .schedule = schedule_kind::none,
+        .lifecycle = lifecycle_phase::none,
+        .gc_mode = gc_benchmark_mode::none,
+        .async_case = async_case,
+        .variant = std::move(variant),
+        .timing = timing,
+        .seed = 20260315ull,
+        .capture_tick_trace = false,
+    };
+}
+
 const std::vector<scenario_definition>& scenario_catalogue() {
     static const std::vector<scenario_definition> catalogue = [] {
         std::vector<scenario_definition> scenarios;
-        scenarios.reserve(44);
+        scenarios.reserve(49);
 
         scenarios.push_back(
             make_static_scenario("A1-single-leaf-off", "A1", tree_family::single_leaf, 1, logging_mode::off, "base"));
@@ -205,6 +227,32 @@ const std::vector<scenario_definition>& scenario_catalogue() {
                                                     "forced-pressure",
                                                     b7_timing));
 
+        const timing_config b8_timing{
+            .warmup = std::chrono::milliseconds(25),
+            .run = std::chrono::milliseconds(150),
+            .repetitions = 3,
+        };
+        scenarios.push_back(make_async_contract_scenario("B8-async-cancel-before-start",
+                                                         async_contract_case::cancel_before_start,
+                                                         "cancel-before-start",
+                                                         b8_timing));
+        scenarios.push_back(make_async_contract_scenario("B8-async-cancel-while-running",
+                                                         async_contract_case::cancel_while_running,
+                                                         "cancel-while-running",
+                                                         b8_timing));
+        scenarios.push_back(make_async_contract_scenario("B8-async-cancel-after-timeout",
+                                                         async_contract_case::cancel_after_timeout,
+                                                         "cancel-after-timeout",
+                                                         b8_timing));
+        scenarios.push_back(make_async_contract_scenario("B8-async-repeated-cancel",
+                                                         async_contract_case::repeated_cancel,
+                                                         "repeated-cancel",
+                                                         b8_timing));
+        scenarios.push_back(make_async_contract_scenario("B8-async-late-completion-after-cancel",
+                                                         async_contract_case::late_completion_after_cancel,
+                                                         "late-completion-after-cancel",
+                                                         b8_timing));
+
         timing_config jitter_timing;
         jitter_timing.warmup = std::chrono::milliseconds(2000);
         jitter_timing.run = std::chrono::milliseconds(60000);
@@ -231,6 +279,8 @@ std::string_view benchmark_kind_name(benchmark_kind kind) noexcept {
             return "compile_lifecycle";
         case benchmark_kind::memory_gc:
             return "memory_gc";
+        case benchmark_kind::async_contract:
+            return "async_contract";
     }
     return "unknown";
 }

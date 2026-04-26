@@ -1,15 +1,21 @@
 #include "harness/runner.hpp"
 
 #include <algorithm>
+#include <atomic>
+#include <condition_variable>
 #include <ctime>
 #include <fstream>
 #include <iomanip>
 #include <memory>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 #include "bt/event_log.hpp"
+#include "bt/scheduler.hpp"
+#include "bt/vla.hpp"
 #include "harness/allocation_tracker.hpp"
 #include "harness/metadata.hpp"
 #include "harness/stats.hpp"
@@ -156,6 +162,9 @@ std::string scenario_description(const scenario_definition& scenario) {
             if (scenario.group_id == "B7") {
                 return "GC and memory evidence (" + scenario.variant + ")";
             }
+            if (scenario.group_id == "B8") {
+                return "async contract edge (" + scenario.variant + ")";
+            }
             break;
     }
     return scenario.scenario_id;
@@ -213,6 +222,246 @@ void allocate_gc_pressure_batch(std::uint64_t tick_index, muslisp::value& retain
     if ((tick_index % 8u) == 0u) {
         retained = muslisp::make_cons(muslisp::make_integer(static_cast<std::int64_t>(tick_index)), retained);
     }
+}
+
+bt::vla_request make_async_contract_request(std::uint64_t operation_index, std::int64_t deadline_ms = 200) {
+    bt::vla_request request;
+    request.capability = "vla.rt2";
+    request.task_id = "b8-task-" + std::to_string(operation_index);
+    request.instruction = "follow the deterministic B8 contract path";
+    request.observation.state = {0.0, 0.0, 0.1, -0.1};
+    request.observation.timestamp_ms = static_cast<std::int64_t>(operation_index);
+    request.action_space.type = "continuous";
+    request.action_space.dims = 2;
+    request.action_space.bounds = {{-1.0, 1.0}, {-1.0, 1.0}};
+    request.constraints.max_abs_value = 1.0;
+    request.constraints.max_delta = 1.0;
+    request.deadline_ms = deadline_ms;
+    request.seed = operation_index;
+    request.run_id = "B8";
+    request.tick_index = operation_index;
+    request.node_name = "b8-async-node";
+    request.model.name = "b8-contract";
+    request.model.version = "1";
+    return request;
+}
+
+bool is_vla_terminal(bt::vla_job_status status) {
+    return status == bt::vla_job_status::done || status == bt::vla_job_status::error ||
+           status == bt::vla_job_status::timeout || status == bt::vla_job_status::cancelled;
+}
+
+bt::vla_poll wait_for_vla_status(bt::vla_service& service,
+                                 bt::vla_service::vla_job_id job,
+                                 bt::vla_job_status target,
+                                 std::chrono::milliseconds timeout) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    bt::vla_poll poll;
+    while (std::chrono::steady_clock::now() < deadline) {
+        poll = service.poll(job);
+        if (poll.status == target) {
+            return poll;
+        }
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+    return poll;
+}
+
+bt::vla_poll wait_for_vla_terminal(bt::vla_service& service,
+                                   bt::vla_service::vla_job_id job,
+                                   std::chrono::milliseconds timeout) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    bt::vla_poll poll;
+    while (std::chrono::steady_clock::now() < deadline) {
+        poll = service.poll(job);
+        if (is_vla_terminal(poll.status)) {
+            return poll;
+        }
+        std::this_thread::sleep_for(std::chrono::microseconds(100));
+    }
+    return poll;
+}
+
+bt::vla_response make_contract_response(const bt::vla_request& request, bt::vla_status status) {
+    bt::vla_response response;
+    response.status = status;
+    response.model = request.model;
+    response.action.type = bt::vla_action_type::continuous;
+    response.action.u = {0.0, 0.0};
+    response.confidence = status == bt::vla_status::ok ? 0.9 : 0.0;
+    if (status == bt::vla_status::ok) {
+        response.explanation = "b8 ok";
+    } else if (status == bt::vla_status::timeout) {
+        response.explanation = "b8 timeout";
+    } else {
+        response.explanation = "b8 cancelled";
+    }
+    return response;
+}
+
+class cancellable_contract_backend final : public bt::vla_backend {
+public:
+    explicit cancellable_contract_backend(bool ignore_cancel = false) : ignore_cancel_(ignore_cancel) {}
+
+    bt::vla_response infer(const bt::vla_request& request,
+                           std::function<bool(const bt::vla_partial&)> on_partial,
+                           std::atomic<bool>& cancel_flag) override {
+        bt::vla_partial partial;
+        partial.sequence = 1u;
+        partial.text_chunk = "b8 running";
+        partial.confidence = 0.25;
+        (void)on_partial(partial);
+
+        if (request.deadline_ms <= 1) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(25));
+            return make_contract_response(request, bt::vla_status::timeout);
+        }
+
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(25);
+        while (std::chrono::steady_clock::now() < deadline) {
+            if (cancel_flag.load() && !ignore_cancel_) {
+                return make_contract_response(request, bt::vla_status::cancelled);
+            }
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+        }
+        return make_contract_response(request, bt::vla_status::ok);
+    }
+
+private:
+    bool ignore_cancel_ = false;
+};
+
+class blocking_contract_backend final : public bt::vla_backend {
+public:
+    bt::vla_response infer(const bt::vla_request& request,
+                           std::function<bool(const bt::vla_partial&)>,
+                           std::atomic<bool>& cancel_flag) override {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            started_ = true;
+        }
+        cv_.notify_all();
+
+        std::unique_lock<std::mutex> lock(mutex_);
+        cv_.wait(lock, [this, &cancel_flag] { return released_ || cancel_flag.load(); });
+        return make_contract_response(request, cancel_flag.load() ? bt::vla_status::cancelled : bt::vla_status::ok);
+    }
+
+    bool wait_started(std::chrono::milliseconds timeout) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return cv_.wait_for(lock, timeout, [this] { return started_; });
+    }
+
+    void release() {
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            released_ = true;
+        }
+        cv_.notify_all();
+    }
+
+private:
+    std::mutex mutex_;
+    std::condition_variable cv_;
+    bool started_ = false;
+    bool released_ = false;
+};
+
+struct async_contract_sample {
+    std::uint64_t latency_ns = 0u;
+    std::uint64_t cancel_latency_ns = 0u;
+    std::uint64_t semantic_errors = 0u;
+    std::uint64_t operations = 1u;
+};
+
+async_contract_sample run_async_contract_operation(async_contract_case async_case, std::uint64_t operation_index) {
+    const auto started = std::chrono::steady_clock::now();
+    async_contract_sample sample;
+
+    if (async_case == async_contract_case::cancel_before_start) {
+        bt::thread_pool_scheduler scheduler(1u);
+        bt::vla_service service(&scheduler);
+        auto blocker = std::make_shared<blocking_contract_backend>();
+        service.register_backend("b8-blocking", blocker);
+        service.set_default_backend("b8-blocking");
+
+        const auto blocking_job = service.submit(make_async_contract_request(operation_index * 2u));
+        if (!blocker->wait_started(std::chrono::milliseconds(100))) {
+            ++sample.semantic_errors;
+        }
+        const auto target = service.submit(make_async_contract_request(operation_index * 2u + 1u));
+        const auto cancel_started = std::chrono::steady_clock::now();
+        const bool cancelled = service.cancel(target);
+        const auto cancel_finished = std::chrono::steady_clock::now();
+        sample.cancel_latency_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(cancel_finished - cancel_started).count());
+        const bt::vla_poll target_poll = wait_for_vla_terminal(service, target, std::chrono::milliseconds(100));
+        blocker->release();
+        (void)wait_for_vla_terminal(service, blocking_job, std::chrono::milliseconds(100));
+        if (!cancelled || target_poll.status != bt::vla_job_status::cancelled) {
+            ++sample.semantic_errors;
+        }
+    } else {
+        bt::thread_pool_scheduler scheduler(1u);
+        bt::vla_service service(&scheduler);
+        service.set_cache_capacity(0u);
+        service.set_cache_ttl_ms(0);
+        service.register_backend(
+            "b8-contract",
+            std::make_shared<cancellable_contract_backend>(
+                async_case == async_contract_case::late_completion_after_cancel));
+        service.set_default_backend("b8-contract");
+
+        const std::int64_t deadline_ms = async_case == async_contract_case::cancel_after_timeout ? 1 : 200;
+        const auto job = service.submit(make_async_contract_request(operation_index, deadline_ms));
+        (void)wait_for_vla_status(service, job, bt::vla_job_status::streaming, std::chrono::milliseconds(100));
+
+        const auto cancel_started = std::chrono::steady_clock::now();
+        if (async_case == async_contract_case::cancel_after_timeout) {
+            const bt::vla_poll timeout_poll =
+                wait_for_vla_status(service, job, bt::vla_job_status::timeout, std::chrono::milliseconds(100));
+            const bool cancelled_after_timeout = service.cancel(job);
+            const auto cancel_finished = std::chrono::steady_clock::now();
+            sample.cancel_latency_ns = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(cancel_finished - cancel_started).count());
+            if (!cancelled_after_timeout || timeout_poll.status != bt::vla_job_status::timeout) {
+                ++sample.semantic_errors;
+            }
+        } else if (async_case == async_contract_case::repeated_cancel) {
+            const bool first_cancel = service.cancel(job);
+            const bool second_cancel = service.cancel(job);
+            const auto cancel_finished = std::chrono::steady_clock::now();
+            sample.cancel_latency_ns = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(cancel_finished - cancel_started).count());
+            const bt::vla_poll final_poll = wait_for_vla_terminal(service, job, std::chrono::milliseconds(100));
+            if (!first_cancel || !second_cancel || final_poll.status != bt::vla_job_status::cancelled) {
+                ++sample.semantic_errors;
+            }
+        } else {
+            const bool cancelled = service.cancel(job);
+            const auto cancel_finished = std::chrono::steady_clock::now();
+            sample.cancel_latency_ns = static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(cancel_finished - cancel_started).count());
+            const bt::vla_poll final_poll = wait_for_vla_terminal(service, job, std::chrono::milliseconds(100));
+            if (!cancelled || final_poll.status != bt::vla_job_status::cancelled) {
+                ++sample.semantic_errors;
+            }
+            if (async_case == async_contract_case::late_completion_after_cancel) {
+                const std::vector<bt::vla_record> records = service.recent_records();
+                const bool saw_drop = std::any_of(records.begin(), records.end(), [](const bt::vla_record& record) {
+                    return record.completion_dropped;
+                });
+                if (!saw_drop) {
+                    ++sample.semantic_errors;
+                }
+            }
+        }
+    }
+
+    const auto finished = std::chrono::steady_clock::now();
+    sample.latency_ns = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(finished - started).count());
+    return sample;
 }
 
 run_summary_row run_memory_gc_once(const environment_info& environment,
@@ -341,6 +590,63 @@ run_summary_row run_memory_gc_once(const environment_info& environment,
     row.event_log_bytes_per_tick =
         ticks_total == 0u ? 0.0 : static_cast<double>(event_stats.byte_count) / static_cast<double>(ticks_total);
     row.notes = "events=" + (event_dir / "events.jsonl").string();
+    return row;
+}
+
+run_summary_row run_async_contract_once(const environment_info& environment,
+                                        const runtime_adapter& adapter,
+                                        const scenario_definition& scenario,
+                                        const tree_fixture& fixture,
+                                        std::size_t repetition) {
+    const auto warmup_started = std::chrono::steady_clock::now();
+    std::uint64_t warmup_operations = 0u;
+    while (std::chrono::steady_clock::now() - warmup_started < scenario.timing.warmup) {
+        const async_contract_sample sample = run_async_contract_operation(scenario.async_case, warmup_operations + 1u);
+        if (sample.semantic_errors != 0u) {
+            break;
+        }
+        ++warmup_operations;
+    }
+    const auto warmup_finished = std::chrono::steady_clock::now();
+
+    std::vector<std::uint64_t> latencies_ns;
+    std::vector<std::uint64_t> cancel_latencies_ns;
+    std::uint64_t operations_total = 0u;
+    std::uint64_t semantic_errors = 0u;
+
+    allocation_tracker::reset();
+    allocation_tracker::set_enabled(true);
+    const auto run_started = std::chrono::steady_clock::now();
+    while (std::chrono::steady_clock::now() - run_started < scenario.timing.run || operations_total == 0u) {
+        const async_contract_sample sample =
+            run_async_contract_operation(scenario.async_case, repetition * 100000u + operations_total + 1u);
+        latencies_ns.push_back(sample.latency_ns);
+        cancel_latencies_ns.push_back(sample.cancel_latency_ns);
+        semantic_errors += sample.semantic_errors;
+        operations_total += sample.operations;
+    }
+    const auto run_finished = std::chrono::steady_clock::now();
+    allocation_tracker::set_enabled(false);
+
+    const auto allocations = allocation_tracker::read();
+    const latency_summary latency = summarise_latencies(latencies_ns);
+    run_summary_row row = make_base_run_row(environment, adapter, scenario, fixture, repetition);
+    row.warmup_seconds = std::chrono::duration<double>(warmup_finished - warmup_started).count();
+    row.run_seconds = std::chrono::duration<double>(run_finished - run_started).count();
+    row.ticks_total = operations_total;
+    row.ticks_per_second = row.run_seconds > 0.0 ? static_cast<double>(operations_total) / row.run_seconds : 0.0;
+    row.latency_ns_median = latency.median;
+    row.latency_ns_p95 = latency.p95;
+    row.latency_ns_p99 = latency.p99;
+    row.latency_ns_p999 = latency.p999;
+    row.latency_ns_max = latency.max;
+    row.jitter_ratio_p99_over_median = latency.jitter_ratio_p99_over_median;
+    row.cancel_latency_ns_median = percentile_u64(cancel_latencies_ns, 0.50);
+    row.alloc_count_total = allocations.allocation_count;
+    row.alloc_bytes_total = allocations.allocation_bytes;
+    row.rss_bytes_peak = peak_rss_bytes();
+    row.semantic_errors = semantic_errors;
+    row.notes = "fixture=fixtures/async-" + scenario.variant + "-case";
     return row;
 }
 
@@ -608,6 +914,19 @@ run_result benchmark_runner::run(const run_request& request) const {
             }
             for (std::size_t repetition = 0; repetition < scenario.timing.repetitions; ++repetition) {
                 run_summary_row row = run_memory_gc_once(environment, *adapter, scenario, fixture, result.output_dir, repetition);
+                scenario_rows.push_back(row);
+                result.run_rows.push_back(row);
+            }
+            result.aggregate_rows.push_back(build_aggregate_row(environment, scenario, scenario_rows));
+            continue;
+        }
+
+        if (scenario.kind == benchmark_kind::async_contract) {
+            if (adapter->name() != "muesli-bt") {
+                throw std::invalid_argument("B8 async contract benchmarks are muesli-bt only");
+            }
+            for (std::size_t repetition = 0; repetition < scenario.timing.repetitions; ++repetition) {
+                run_summary_row row = run_async_contract_once(environment, *adapter, scenario, fixture, repetition);
                 scenario_rows.push_back(row);
                 result.run_rows.push_back(row);
             }

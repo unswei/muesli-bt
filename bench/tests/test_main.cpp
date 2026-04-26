@@ -33,6 +33,9 @@ void test_catalogue_contains_new_benchmarks() {
     check(find_scenario("B5-alt-31-compile-off") != nullptr, "missing B5 compile scenario");
     check(find_scenario("B6-reactive-31-flip20-fulltrace") != nullptr, "missing B6 logging scenario");
     check(find_scenario("B7-gc-between-ticks-smoke") != nullptr, "missing B7 GC/memory scenario");
+    check(find_scenario("B8-async-cancel-before-start") != nullptr, "missing B8 cancel-before-start scenario");
+    check(find_scenario("B8-async-late-completion-after-cancel") != nullptr,
+          "missing B8 late-completion-after-cancel scenario");
 }
 
 void test_runner_writes_expected_csv_files() {
@@ -189,6 +192,36 @@ void test_b7_gc_memory_benchmark_runs() {
     check(row.event_log_bytes_per_tick > 0.0, "B7 should record event-log bytes per tick");
     check(std::filesystem::exists(output_dir / "B7-gc-between-ticks-smoke" / "rep-0" / "events.jsonl"),
           "B7 should write canonical GC events.jsonl");
+}
+
+void test_b8_async_contract_benchmarks_run() {
+    using namespace muesli_bt::bench;
+
+    const std::filesystem::path output_dir =
+        std::filesystem::temp_directory_path() / "muesli_bt_bench_b8_smoke";
+    std::filesystem::remove_all(output_dir);
+
+    run_request request;
+    request.output_dir = output_dir;
+    request.scenarios.push_back(*find_scenario("B8-async-cancel-before-start"));
+    request.scenarios.push_back(*find_scenario("B8-async-late-completion-after-cancel"));
+    request.warmup_override = std::chrono::milliseconds(0);
+    request.run_override = std::chrono::milliseconds(5);
+    request.repetitions_override = 1u;
+
+    benchmark_runner runner;
+    const run_result result = runner.run(request);
+
+    check(result.run_rows.size() == 2u, "expected two B8 run rows");
+    check(result.aggregate_rows.size() == 2u, "expected two B8 aggregate rows");
+    for (const run_summary_row& row : result.run_rows) {
+        check(row.group_id == "B8", "B8 row should use B8 group id");
+        check(row.ticks_total > 0u, "B8 should record operation count");
+        check(row.latency_ns_median > 0u, "B8 should record contract latency");
+        check(row.cancel_latency_ns_median.has_value(), "B8 should record cancellation latency");
+        check(row.semantic_errors == 0u, "B8 async contract scenario should be semantically clean");
+        check(row.notes.find("fixtures/async-") != std::string::npos, "B8 should point at the matching fixture bundle");
+    }
 }
 
 class fail_on_unwhitelisted_allocation_scope final {
@@ -379,6 +412,7 @@ int main(int argc, char** argv) {
     test_runner_emits_progress_events();
     test_b5_lifecycle_benchmarks_run();
     test_b7_gc_memory_benchmark_runs();
+    test_b8_async_contract_benchmarks_run();
     test_allocation_whitelist_allows_explicit_logging_paths_only();
     test_precompiled_ticks_fail_on_unwhitelisted_allocations();
 #if MUESLI_BT_BENCH_WITH_BTCPP
