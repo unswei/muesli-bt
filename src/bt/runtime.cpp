@@ -137,6 +137,34 @@ void emit_deadline_exceeded_event(tick_context& ctx,
     (void)events->emit(muesli_bt::contract::kEventDeadlineExceeded, ctx.tick_index, data.str());
 }
 
+void emit_outcome_event(tick_context& ctx,
+                        std::string_view type,
+                        std::string_view source,
+                        std::optional<node_id> node = std::nullopt,
+                        std::optional<std::string_view> job = std::nullopt,
+                        std::optional<std::string_view> reason = std::nullopt) {
+    event_log* events = resolve_event_log(ctx);
+    if (!events) {
+        return;
+    }
+    event_log_allocation_scope allocation_scope(events);
+    std::ostringstream data;
+    data << "{\"schema_version\":\"runtime_outcome.v1\","
+         << "\"outcome\":\"" << event_log::json_escape(type) << "\","
+         << "\"source\":\"" << event_log::json_escape(source) << "\"";
+    if (node.has_value()) {
+        data << ",\"node_id\":" << *node;
+    }
+    if (job.has_value()) {
+        data << ",\"job_id\":\"" << event_log::json_escape(*job) << "\"";
+    }
+    if (reason.has_value()) {
+        data << ",\"reason\":\"" << event_log::json_escape(*reason) << "\"";
+    }
+    data << '}';
+    (void)events->emit(type, ctx.tick_index, data.str());
+}
+
 bool budget_allows_decision_point(tick_context& ctx, node_id node, std::string_view decision_point, double threshold_ms = 0.25) {
     const std::optional<double> remaining = tick_remaining_ms(ctx);
     if (!remaining.has_value()) {
@@ -1022,6 +1050,13 @@ public:
                              << (accepted ? "true" : "false") << ",\"reason\":\"tick_deadline_exceeded\"}";
                         (void)events->emit(muesli_bt::contract::kEventAsyncCancelAcknowledged, ctx_.tick_index, data.str());
                     }
+                    emit_outcome_event(ctx_,
+                                       accepted ? muesli_bt::contract::kEventCancelAcknowledged
+                                                : muesli_bt::contract::kEventCancelLate,
+                                       "tick_deadline_exceeded",
+                                       node,
+                                       std::to_string(job),
+                                       "tick_deadline_exceeded");
                     to_erase.push_back(node);
                 }
                 for (node_id node : to_erase) {
@@ -1046,6 +1081,14 @@ public:
             data << '}';
             (void)events->emit("tick_end", ctx_.tick_index, data.str());
         }
+
+        emit_outcome_event(ctx_,
+                           deadline_missed ? muesli_bt::contract::kEventTickDeadlineMissed
+                                           : muesli_bt::contract::kEventTickOk,
+                           "bt.tick",
+                           ctx_.terminal_node_id,
+                           std::nullopt,
+                           deadline_missed ? std::optional<std::string_view>("tick_budget_overrun") : std::nullopt);
 
         const muslisp::gc_stats_snapshot gc_end = muslisp::default_gc().stats();
         emit_tick_audit_event(ctx_, status_, elapsed, configured_budget, budget_ms, deadline_missed, gc_start_, gc_end);
@@ -1459,6 +1502,9 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
              << ",\"work_done\":" << result.stats.work_done << "}";
         (void)events->emit(muesli_bt::contract::kEventPlannerCallEnd, ctx.tick_index, data.str());
     }
+    if (result.status == planner_status::timeout) {
+        emit_outcome_event(ctx, muesli_bt::contract::kEventPlannerTimeout, "plan-action", n.id, std::nullopt, "timeout");
+    }
 
     if (result.action.u.empty()) {
         std::string message = "plan-action: planner returned empty action";
@@ -1749,6 +1795,13 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
                 ack_data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"accepted\":"
                          << (accepted ? "true" : "false") << "}";
                 (void)events->emit(muesli_bt::contract::kEventAsyncCancelAcknowledged, ctx.tick_index, ack_data.str());
+                emit_outcome_event(ctx,
+                                   accepted ? muesli_bt::contract::kEventCancelAcknowledged
+                                            : muesli_bt::contract::kEventCancelLate,
+                                   "vla_wait_early_commit",
+                                   n.id,
+                                   std::to_string(id),
+                                   "early_commit");
             } else {
                 (void)ctx.svc.vla->cancel(id);
             }
@@ -1792,6 +1845,16 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
             data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"reason\":\"completion_after_cancel\"}";
             (void)events->emit(muesli_bt::contract::kEventAsyncCompletionDropped, ctx.tick_index, data.str());
         }
+        emit_outcome_event(ctx,
+                           muesli_bt::contract::kEventLateResultDropped,
+                           "vla_wait",
+                           n.id,
+                           std::to_string(id),
+                           "completion_after_cancel");
+    }
+    if (poll.status == vla_job_status::timeout ||
+        (poll.final.has_value() && poll.final->status == vla_status::timeout)) {
+        emit_outcome_event(ctx, muesli_bt::contract::kEventVlaTimeout, "vla_wait", n.id, std::to_string(id), "timeout");
     }
 
     if (opts.clear_job) {
@@ -1847,6 +1910,13 @@ status execute_vla_cancel(const node& n, tick_context& ctx, const std::vector<mu
         ack_data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"accepted\":"
                  << (accepted ? "true" : "false") << "}";
         (void)events->emit(muesli_bt::contract::kEventAsyncCancelAcknowledged, ctx.tick_index, ack_data.str());
+        emit_outcome_event(ctx,
+                           accepted ? muesli_bt::contract::kEventCancelAcknowledged
+                                    : muesli_bt::contract::kEventCancelLate,
+                           "vla_cancel",
+                           n.id,
+                           std::to_string(id),
+                           "explicit_cancel");
 
         std::ostringstream data;
         data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"status\":\"cancelled\",\"accepted\":"

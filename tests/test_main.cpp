@@ -2225,6 +2225,21 @@ void test_vla_bt_nodes_flow_and_cancel() {
     check(is_symbol(first) && symbol_name(first) == "running", "cancel tree first tick should run request");
     value second = eval_text("(bt.tick cancel-inst '((state 0.0) (stop #t)))", env);
     check(is_symbol(second) && symbol_name(second) == "success", "cancel tree second tick should cancel and succeed");
+
+    value cancel_events = eval_text("(events.dump 120)", env);
+    check(is_proper_list(cancel_events), "events.dump should return list for cancel outcome test");
+    bool saw_cancel_acknowledged = false;
+    for (const value& row : vector_from_list(cancel_events)) {
+        if (!is_string(row)) {
+            continue;
+        }
+        const std::string line = string_value(row);
+        if (line.find("\"type\":\"cancel_acknowledged\"") != std::string::npos &&
+            line.find("\"schema_version\":\"runtime_outcome.v1\"") != std::string::npos) {
+            saw_cancel_acknowledged = true;
+        }
+    }
+    check(saw_cancel_acknowledged, "VLA cancel should emit compact cancel_acknowledged outcome");
 }
 
 void test_bt_compile_checks() {
@@ -2810,9 +2825,13 @@ void test_tick_audit_event_emission() {
     bool saw_node_path = false;
     bool saw_logging_mode = false;
     bool saw_audit_mode = false;
+    bool saw_tick_ok = false;
     for (const auto& row : vector_from_list(dumped)) {
         check(is_string(row), "tick audit events.dump rows should be JSON strings");
         const std::string line = string_value(row);
+        if (line.find("\"type\":\"tick_ok\"") != std::string::npos) {
+            saw_tick_ok = true;
+        }
         if (line.find("\"type\":\"tick_audit\"") == std::string::npos) {
             continue;
         }
@@ -2832,6 +2851,7 @@ void test_tick_audit_event_emission() {
     check(saw_node_path, "tick_audit should include node_path");
     check(saw_logging_mode, "tick_audit should include logging_mode");
     check(saw_audit_mode, "tick_audit should include audit_mode");
+    check(saw_tick_ok, "events should include compact tick_ok outcome");
 
     check(is_nil(eval_text("(events.enable-tick-audit #f)", env)),
           "events.enable-tick-audit should return nil when disabling");

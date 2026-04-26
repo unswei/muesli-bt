@@ -43,7 +43,7 @@ What is implemented today:
     - `reset_mode="stub"` is retained for deterministic harnesses and tests only
 
 - Linux ROS-backed tests, installed-package consumer smoke coverage, and live runner validation via `muslisp_ros2`
-- Linux `L2` replay corpus covering nominal replay, clamped actions, invalid-action fallback, and reset-unsupported artefacts
+- Linux `L2` replay corpus covering nominal replay, clamped actions, invalid-action fallback, safe-action pre-emption, and reset-unsupported artefacts
 
 What is still intentionally incomplete:
 

@@ -924,7 +924,7 @@ void test_ros2_rosbag_invalid_action_fallback_conformance() {
     check_close(command.angular.z, 0.0, 1e-6, "ros2 rosbag invalid-action: safe angular.z mismatch");
 
     const auto lines = read_non_empty_lines(paths.event_log_path);
-    check(lines.size() == 7, "ros2 rosbag invalid-action: expected seven canonical events");
+    check(lines.size() == 9, "ros2 rosbag invalid-action: expected nine canonical events");
     const auto events = decode_json_lines(lines, env);
     const auto run_start_events = select_events_by_type(events, "run_start");
     const auto episode_begin_events = select_events_by_type(events, "episode_begin");
@@ -933,16 +933,26 @@ void test_ros2_rosbag_invalid_action_fallback_conformance() {
     verify_run_start_time_policy(run_start_events[0], "ros2 rosbag invalid-action run_start");
     const auto tick_begin_events = select_events_by_type(events, "tick_begin");
     const auto tick_end_events = select_events_by_type(events, "tick_end");
+    const auto host_action_invalid_events = select_events_by_type(events, "host_action_invalid");
+    const auto fallback_used_events = select_events_by_type(events, "fallback_used");
     const auto error_events = select_events_by_type(events, "error");
     const auto episode_end_events = select_events_by_type(events, "episode_end");
     const auto run_end_events = select_events_by_type(events, "run_end");
     check(tick_begin_events.size() == 1, "ros2 rosbag invalid-action: expected one tick_begin event");
     check(tick_end_events.size() == 1, "ros2 rosbag invalid-action: expected one tick_end event");
+    check(host_action_invalid_events.size() == 1,
+          "ros2 rosbag invalid-action: expected one host_action_invalid event");
+    check(fallback_used_events.size() == 1, "ros2 rosbag invalid-action: expected one fallback_used event");
     check(error_events.size() == 1, "ros2 rosbag invalid-action: expected one error event");
     check(episode_end_events.size() == 1, "ros2 rosbag invalid-action: expected one episode_end event");
     check(run_end_events.size() == 1, "ros2 rosbag invalid-action: expected one run_end event");
     verify_canonical_event_envelope(tick_begin_events[0], "tick_begin", "ros2 rosbag invalid-action tick_begin", 1);
     verify_canonical_event_envelope(tick_end_events[0], "tick_end", "ros2 rosbag invalid-action tick_end", 1);
+    verify_canonical_event_envelope(host_action_invalid_events[0],
+                                    "host_action_invalid",
+                                    "ros2 rosbag invalid-action host_action_invalid",
+                                    1);
+    verify_canonical_event_envelope(fallback_used_events[0], "fallback_used", "ros2 rosbag invalid-action fallback_used", 1);
     verify_canonical_event_envelope(error_events[0], "error", "ros2 rosbag invalid-action error");
     verify_canonical_event_envelope(episode_end_events[0], "episode_end", "ros2 rosbag invalid-action episode_end", 1);
     verify_canonical_event_envelope(run_end_events[0], "run_end", "ros2 rosbag invalid-action run_end", 1);
@@ -985,6 +995,149 @@ void test_ros2_rosbag_invalid_action_fallback_conformance() {
             .final_obs_x = final_obs_x,
         });
     check(std::filesystem::exists(paths.summary_path), "ros2 rosbag invalid-action: missing summary artefact");
+}
+
+void test_ros2_rosbag_preemption_fallback_conformance() {
+    using namespace muslisp;
+
+    const scenario_paths paths = prepare_scenario("rosbag-preemption-fallback-case");
+    const std::string topic_ns = "/l2preempt";
+    const std::string odom_topic = resolve_topic_name(topic_ns, "odom");
+    const std::vector<odom_sample> samples = {
+        {.t_ns = 1'700'000'300'000'000'000LL, .x = 0.2, .y = 0.0, .yaw = 0.0, .vx = 0.02, .vy = 0.0, .wz = 0.0},
+        {.t_ns = 1'700'000'300'040'000'000LL, .x = 0.9, .y = 0.0, .yaw = 0.0, .vx = 0.02, .vy = 0.0, .wz = 0.0},
+    };
+    write_odometry_bag(paths.bag_dir, odom_topic, samples);
+    check(std::filesystem::exists(paths.bag_dir / "metadata.yaml"),
+          "ros2 rosbag preemption: missing bag metadata");
+
+    test_support::ros2_test_harness harness(topic_ns);
+    env_ptr env = create_env_with_ros2_extension();
+    (void)eval_text("(env.attach \"ros2\")", env);
+    (void)eval_text(ros2_configure_script(topic_ns), env);
+    check(harness.wait_for_transport_ready(std::chrono::milliseconds(1000)),
+          "ros2 rosbag preemption: transport should be ready after configure");
+
+    ros2_bag_replayer player(paths.bag_dir, odom_topic);
+    player.start();
+
+    const std::string run_expr =
+        "(begin "
+        + safe_action_snippet() +
+        "  (define rosbag-run-result "
+        "    (env.run-loop "
+        "      (begin "
+        "        (define cfg (map.make)) "
+        "        (map.set! cfg 'tick_hz 5) "
+        "        (map.set! cfg 'max_ticks 2) "
+        "        (map.set! cfg 'step_max 2) "
+        "        (map.set! cfg 'realtime #t) "
+        "        (map.set! cfg 'safe_action safe) "
+        "        (map.set! cfg 'schema_version \"ros2.l2.preempt.v1\") "
+        "        (map.set! cfg 'event_log_path " +
+        lisp_string_literal(paths.event_log_path.string()) +
+        ") "
+        "        cfg) "
+        "      (lambda (obs) "
+        "        (begin "
+        "          (define state (map.get obs 'state (map.make))) "
+        "          (define pose (map.get state 'pose (map.make))) "
+        "          (if (> (map.get pose 'x 0.0) 0.5) "
+        "            (begin "
+        "              (define bad (map.make)) "
+        "              (map.set! bad 'action_schema \"ros2.action.v1\") "
+        "              (map.set! bad 't_ms (map.get obs 't_ms 0)) "
+        "              (map.set! bad 'u 1) "
+        "              bad) "
+        "            (begin "
+        "              (define a (map.make)) "
+        "              (define u (map.make)) "
+        "              (map.set! a 'action_schema \"ros2.action.v1\") "
+        "              (map.set! a 't_ms (map.get obs 't_ms 0)) "
+        "              (map.set! u 'linear_x 0.25) "
+        "              (map.set! u 'linear_y 0.0) "
+        "              (map.set! u 'angular_z 0.05) "
+        "              (map.set! a 'u u) "
+        "              a))))) "
+        "  rosbag-run-result)";
+    const value run_result = eval_text(run_expr, env);
+    check(is_map(run_result), "ros2 rosbag preemption: env.run-loop should return a map");
+
+    check(player.wait_for_completion(std::chrono::seconds(3)),
+          "ros2 rosbag preemption: timed out waiting for rosbag playback");
+    check(harness.wait_for_command_count(2, std::chrono::milliseconds(1000)),
+          "ros2 rosbag preemption: expected normal command then pre-empting safe command");
+
+    const std::string status = symbol_name(eval_text("(map.get rosbag-run-result 'status ':none)", env));
+    check(status == ":error", "ros2 rosbag preemption: expected :error status, got " + status);
+    const std::string message = result_message(env);
+    check(message.find("u must be a map") != std::string::npos,
+          "ros2 rosbag preemption: unexpected message: " + message);
+    const std::int64_t ticks = integer_value(eval_text("(map.get rosbag-run-result 'ticks -1)", env));
+    check(ticks == 2, "ros2 rosbag preemption: expected two ticks");
+    const std::int64_t fallback_count = integer_value(eval_text("(map.get rosbag-run-result 'fallback_count -1)", env));
+    check(fallback_count == 1, "ros2 rosbag preemption: expected fallback_count=1");
+    const std::int64_t overrun_count = integer_value(eval_text("(map.get rosbag-run-result 'overrun_count -1)", env));
+    check(overrun_count == 0, "ros2 rosbag preemption: unexpected overrun_count");
+    const std::int64_t backend_published_actions =
+        integer_value(eval_text("(map.get (env.info) 'published_actions -1)", env));
+    check(backend_published_actions == 2, "ros2 rosbag preemption: backend should report two published actions");
+
+    const double final_obs_x =
+        float_value(eval_text(
+            "(map.get (map.get (map.get (map.get rosbag-run-result 'final_obs (map.make)) "
+            "'state (map.make)) 'pose (map.make)) 'x 0.0)",
+            env));
+    check_close(final_obs_x, 0.9, 1e-6, "ros2 rosbag preemption: final_obs pose.x mismatch");
+
+    const auto command = harness.last_command();
+    check_close(command.linear.x, 0.0, 1e-6, "ros2 rosbag preemption: safe linear.x mismatch");
+    check_close(command.linear.y, 0.0, 1e-6, "ros2 rosbag preemption: safe linear.y mismatch");
+    check_close(command.angular.z, 0.0, 1e-6, "ros2 rosbag preemption: safe angular.z mismatch");
+
+    const auto lines = read_non_empty_lines(paths.event_log_path);
+    check(lines.size() == 11, "ros2 rosbag preemption: expected eleven canonical events");
+    const auto events = decode_json_lines(lines, env);
+    const auto tick_begin_events = select_events_by_type(events, "tick_begin");
+    const auto tick_end_events = select_events_by_type(events, "tick_end");
+    const auto host_action_invalid_events = select_events_by_type(events, "host_action_invalid");
+    const auto fallback_used_events = select_events_by_type(events, "fallback_used");
+    const auto error_events = select_events_by_type(events, "error");
+    check(tick_begin_events.size() == 2, "ros2 rosbag preemption: expected two tick_begin events");
+    check(tick_end_events.size() == 2, "ros2 rosbag preemption: expected two tick_end events");
+    check(host_action_invalid_events.size() == 1, "ros2 rosbag preemption: expected one host_action_invalid event");
+    check(fallback_used_events.size() == 1, "ros2 rosbag preemption: expected one fallback_used event");
+    check(error_events.size() == 1, "ros2 rosbag preemption: expected one error event");
+    verify_canonical_event_envelope(host_action_invalid_events[0],
+                                    "host_action_invalid",
+                                    "ros2 rosbag preemption host_action_invalid",
+                                    2);
+    verify_canonical_event_envelope(fallback_used_events[0], "fallback_used", "ros2 rosbag preemption fallback_used", 2);
+    const value record1 = require_event_data(tick_end_events[0], "ros2 rosbag preemption tick_end1");
+    const value record2 = require_event_data(tick_end_events[1], "ros2 rosbag preemption tick_end2");
+    verify_common_record_shape(record1, "ros2.l2.preempt.v1", 1, 1'700'000'300'000LL, false, false);
+    verify_common_record_shape(record2, "ros2.l2.preempt.v1", 2, 1'700'000'300'040LL, true, false);
+    verify_action_components(require_map_field(record1, "action", "ros2 rosbag preemption record1"), 0.25, 0.0, 0.05,
+                             "ros2 rosbag preemption record1 action");
+    verify_action_components(require_map_field(record2, "action", "ros2 rosbag preemption record2"), 0.0, 0.0, 0.0,
+                             "ros2 rosbag preemption record2 action");
+
+    write_summary(
+        paths.summary_path,
+        {
+            .scenario = "rosbag-preemption-fallback-case",
+            .status = status,
+            .message = message,
+            .ticks = ticks,
+            .fallback_count = fallback_count,
+            .overrun_count = overrun_count,
+            .backend_published_actions = backend_published_actions,
+            .command_count = harness.command_count(),
+            .last_command = command,
+            .event_log_lines = lines.size(),
+            .final_obs_x = final_obs_x,
+        });
+    check(std::filesystem::exists(paths.summary_path), "ros2 rosbag preemption: missing summary artefact");
 }
 
 void test_ros2_reset_unsupported_policy_artifact() {
@@ -1088,6 +1241,7 @@ int main() {
         run_case("ros2 rosbag replay conformance", test_ros2_rosbag_replay_conformance);
         run_case("ros2 rosbag clamp conformance", test_ros2_rosbag_clamp_conformance);
         run_case("ros2 rosbag invalid-action fallback conformance", test_ros2_rosbag_invalid_action_fallback_conformance);
+        run_case("ros2 rosbag preemption fallback conformance", test_ros2_rosbag_preemption_fallback_conformance);
         run_case("ros2 reset policy artefact", test_ros2_reset_unsupported_policy_artifact);
         return 0;
     } catch (const std::exception& e) {

@@ -690,6 +690,19 @@ void emit_canonical_error(bt::event_log& events,
     (void)events.emit("error", tick, data.str());
 }
 
+void emit_canonical_outcome(bt::event_log& events,
+                            std::string_view type,
+                            std::uint64_t tick,
+                            std::string_view source,
+                            std::string_view reason) {
+    std::ostringstream data;
+    data << "{\"schema_version\":\"runtime_outcome.v1\","
+         << "\"outcome\":\"" << json_escape(type) << "\","
+         << "\"source\":\"" << json_escape(source) << "\","
+         << "\"reason\":\"" << json_escape(reason) << "\"}";
+    (void)events.emit(type, tick, data.str());
+}
+
 void emit_canonical_episode_begin(bt::event_log& events,
                                   std::int64_t episode_index,
                                   std::int64_t episode_max,
@@ -1275,6 +1288,13 @@ value builtin_env_run_loop(const std::vector<value>& args) {
                 } else {
                     throw lisp_error("env.run-loop: no action returned and safe_action is not configured");
                 }
+                if (used_fallback) {
+                    emit_canonical_outcome(canonical_events,
+                                           muesli_bt::contract::kEventFallbackUsed,
+                                           static_cast<std::uint64_t>(steps_total + 1),
+                                           "env.run-loop",
+                                           overrun ? "tick_deadline_missed" : "missing_action");
+                }
 
                 backend->act(chosen_action);
                 if (action_from_on_tick) {
@@ -1367,11 +1387,20 @@ value builtin_env_run_loop(const std::vector<value>& args) {
 
                 if (!is_nil(safety_action)) {
                     ++fallback_count;
+                    bool fallback_published = false;
                     try {
                         backend->act(safety_action);
                         (void)perform_step_and_pacing(*backend, tick_hz, realtime);
+                        fallback_published = true;
                     } catch (const std::exception&) {
                         // best effort
+                    }
+                    if (!fallback_published) {
+                        emit_canonical_outcome(canonical_events,
+                                               muesli_bt::contract::kEventFallbackFailed,
+                                               static_cast<std::uint64_t>(steps_total + 1),
+                                               "env.run-loop",
+                                               error_reason);
                     }
                 }
 
@@ -1412,6 +1441,18 @@ value builtin_env_run_loop(const std::vector<value>& args) {
                                         overrun,
                                         "error",
                                         error_reason);
+                emit_canonical_outcome(canonical_events,
+                                       muesli_bt::contract::kEventHostActionInvalid,
+                                       static_cast<std::uint64_t>(steps_total),
+                                       "env.run-loop",
+                                       error_reason);
+                if (!is_nil(safety_action)) {
+                    emit_canonical_outcome(canonical_events,
+                                           muesli_bt::contract::kEventFallbackUsed,
+                                           static_cast<std::uint64_t>(steps_total),
+                                           "env.run-loop",
+                                           error_reason);
+                }
                 emit_canonical_error(canonical_events,
                                      "env.run-loop",
                                      error_reason,

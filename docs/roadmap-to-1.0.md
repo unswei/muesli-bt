@@ -254,6 +254,12 @@ Replay divergence reporting evidence:
 - `tools/validate_trace.py compare` emits `comparison.first_divergence` with the divergent event index, tick, event type, field path, raw event context windows, and any available node id, blackboard key, async job id, planner id, or host capability.
 - `tests/check_validate_trace.py` covers node, blackboard, async job, and host capability divergence reports.
 
+Outcome taxonomy evidence:
+
+- the canonical schema accepts compact `runtime_outcome.v1` events for `tick_ok`, `tick_deadline_missed`, `planner_timeout`, `vla_timeout`, `host_action_invalid`, `fallback_used`, `fallback_failed`, `late_result_dropped`, `cancel_acknowledged`, and `cancel_late`
+- the BT runtime emits the implemented tick, planner timeout, VLA timeout, late-result-drop, and cancellation outcome events alongside the detailed lifecycle events
+- the ROS2 `L2` rosbag corpus includes a safe-action pre-emption case that reuses `host_action_invalid` and `fallback_used`; it does not add a ROS-specific cancellation model
+
 #### `v0.8.0`: model-backed async and VLA stress path
 
 Focus:

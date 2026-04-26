@@ -36,7 +36,7 @@ Use this page when:
     - true ROS2 transport, executor, distro, and packaging validation belongs here
     - backend scope and deliverables tracked in [ROS2 backend scope](../integration/ros2-backend-scope.md)
     - the current automated `L2` lane runs the ROS-backed contract tests plus a small rosbag-backed replay corpus
-    - the current corpus covers nominal replay, clamped actions, invalid-action fallback, and explicit reset-unsupported policy artefacts
+    - the current corpus covers nominal replay, clamped actions, invalid-action fallback, ROS-level safe-action pre-emption, and explicit reset-unsupported policy artefacts
     - `v0.6.0` keeps this lane unchanged unless a concrete new ROS-backed planner, capability, transport, or failure-mode path needs coverage
 
 ### required artefacts

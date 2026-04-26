@@ -17,6 +17,8 @@ muesli-bt
 - Added first-class async outcome columns to benchmark CSV output for deadline miss rate, fallback activation count, and dropped-completion count.
 - Added per-benchmark `experiment_manifest.json` output with build, platform, runtime flag, scenario seed, and trace schema metadata.
 - Added precise replay comparison divergence fields for tick, event type, field path, node id, blackboard key, async job id, planner id, and host capability.
+- Added compact `runtime_outcome.v1` taxonomy event types for tick, planner timeout, VLA timeout, fallback, late-result-drop, and cancellation outcomes.
+- Added a ROS2 L2 rosbag pre-emption/fallback scenario that reuses canonical `host_action_invalid` and `fallback_used` outcome events.
 
 ### Changed
 - Extended the canonical event schema to accept GC lifecycle and planned tick-audit event types.
@@ -24,6 +26,8 @@ muesli-bt
 - Extended strict allocation coverage beyond the narrow logging-off lane to representative reactive and logging-on precompiled tick shapes.
 - Updated benchmark result handling so CSV files remain summaries while canonical `events.jsonl` files stay as inspectable evidence for GC and async lifecycle claims.
 - Updated the publication benchmark script to produce checked result bundles with manifests, summaries, and figure/report artefacts.
+- The BT runtime now emits compact outcome events alongside detailed lifecycle events for implemented tick, planner timeout, VLA timeout, late-result-drop, and cancellation cases.
+- `env.run-loop` now emits compact fallback outcome events when host action validation fails and a safe action pre-empts the requested command.
 
 ## [0.6.0] - 2026-04-25
 
