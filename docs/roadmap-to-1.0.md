@@ -99,7 +99,40 @@ The remaining path is:
 - add ROS2 host capability bridges, especially Nav2 and, if still feasible, MoveIt, without widening core runtime semantics
 - keep the existing Isaac showcase as supporting evidence rather than a second semantic surface
 - make the Lisp-as-DSL argument explicit and testable: Lisp is used as a compact structured representation for BTs, not as arbitrary scripting; before `v1.0.0`, include at least one implemented demonstration where a BT fragment is generated as Lisp data, validated, compiled, serialised, safely installed at a tick boundary, logged, and replayed
+- keep expected engine features inside `muesli-bt` itself: host capability authoring, blackboard/schema validation, diagnostics, CLI validation, metadata export, embedding, and replayable artefacts belong in the runtime rather than requiring a visual tool
 - finish paper-facing evaluation, trace bundles, and release hygiene
+
+### engine and studio boundary
+
+The remaining roadmap should keep the boundary between the engine and visual tooling explicit.
+
+`muesli-bt` should provide:
+
+- runtime execution and engine APIs
+- the Lisp BT authoring surface
+- validation, diagnostics, and CLI workflows
+- canonical event emission and replayable artefacts
+- blackboard/schema and capability integration points
+- tree metadata exports for external tools
+- embedding and host integration examples
+
+`muesli-studio` should provide:
+
+- visual inspection
+- tick scrubbing
+- timelines
+- replay UI
+- live monitoring
+- later visual authoring
+
+The practical engine-side gaps to close before `v1.0.0` are:
+
+- a clean host-capability and custom-node authoring workflow
+- a clear dataflow and blackboard schema story
+- useful error diagnostics for BT, Lisp, blackboard, capability, and validation failures
+- safety, fallback, and watchdog hooks at the task-runtime boundary
+- stable embedding and CLI workflows for larger robot stacks
+- canonical engine metadata for tools such as `muesli-studio`, without implementing the UI in `muesli-bt`
 
 ### paper-facing Lisp DSL argument
 
@@ -252,6 +285,7 @@ Focus:
 - close the most obvious rejection gap: a custom Lisp runtime inside C++ must not look like an unmeasured real-time liability
 - finish the correctness story for cancellable async work
 - make the runtime contract measurable through `mbt.evt.v1`, not only described in prose
+- make the core engine usable and debuggable without a visual tool: errors, blackboard access, capability validation, and runtime diagnostics must be understandable from CLI output and canonical logs
 
 Scope:
 
@@ -265,6 +299,34 @@ Scope:
 - complete runtime-level async cancellation edge coverage, including cancellation before start, cancellation while running, cancellation after timeout, late completion after cancellation, and repeated cancellation
 - add one ROS-level cancellation or pre-emption scenario only if it reuses the same runtime events and does not introduce a separate ROS-specific cancellation model
 - document explicitly that `muesli-bt` is a task-level control runtime, not a hard real-time servo-loop runtime
+
+Additional scope: engine diagnostics and usability baseline:
+
+- add structured diagnostics for common user mistakes:
+  - Lisp parse error with file, line, column, and nearby source context
+  - unknown BT node type
+  - malformed BT node arity or shape
+  - unknown condition/action callback
+  - unknown blackboard key
+  - blackboard type mismatch
+  - missing required blackboard key
+  - unknown host capability
+  - invalid capability payload
+  - missing timeout for long-running async/model/planner calls where policy requires one
+  - missing fallback where a fallback policy is required
+  - rejected generated DSL fragment
+- expose diagnostics as both human-readable CLI error text and structured canonical diagnostic events or validation reports
+- use canonical diagnostic event families such as `engine_diagnostic.v1`, `bt_validation_error.v1`, `blackboard_error.v1`, `capability_validation_error.v1`, and `dsl_validation_error.v1`, or existing equivalents if they fit the schema better
+- add a minimal documented blackboard/schema contract for examples and capability calls, covering required keys, optional keys, simple value types, defaults where appropriate, readable missing-key or wrong-type errors, and schema name or hash in logs where practical
+- if Lisp syntax for blackboard schemas is too much for `v0.7.0`, start with a host-side schema declaration and validation command; the important user-facing result is that users can see what data a BT expects
+- extend the host capability registry direction so `cap.describe` exposes request and result shape where available
+- make `cap.call` reject malformed payloads before dispatch, with failures that include capability name, missing field, bad type, or unsupported value
+- record capability validation success/failure in canonical logs where practical
+- add a CLI validation path, such as `muslisp --check path/to/safe_goal.lisp` and optionally `muslisp --check path/to/safe_goal.lisp --schema path/to/safe_goal.yaml`, that validates BT source without connecting to a simulator or robot
+- make the check path catch Lisp syntax errors, BT shape errors, unknown node types, missing required metadata, unavailable capabilities when a capability manifest is supplied, and timeout/fallback policy violations
+- add a headless tree-introspection export for external tools, owned by the engine rather than `muesli-studio`
+- include minimum export artefacts or equivalents for `bt_definition.v1`, `bt_instance.v1`, `node_metadata.v1`, and `blackboard_schema.v1` when available
+- include tree id, node ids, node type, source location where available, canonical DSL hash, child relationships, capability or callback names used by leaves, and declared blackboard keys where known
 
 Additional scope: Lisp DSL defensibility baseline:
 
@@ -288,6 +350,11 @@ Benchmark and evidence requirements:
 - report DSL round-trip pass/fail counts for representative BT shapes
 - include at least one canonical log where the BT definition is identified by source hash or canonical DSL hash
 - include at least one negative fixture where a generated fragment is rejected before execution and the rejection is logged or reported deterministically
+- report validation time for representative BT source files
+- report diagnostic coverage count for known invalid fixtures
+- add blackboard schema validation success/failure fixtures
+- add capability payload validation success/failure fixtures
+- add a tree-introspection export round-trip check
 
 Exit criteria:
 
@@ -302,6 +369,11 @@ Exit criteria:
 - representative BTs can be serialised to canonical DSL and loaded again without changing intended execution semantics
 - invalid generated BT fragments are rejected before execution by deterministic validation tests
 - the release has enough DSL round-trip and validation evidence to support the later `v0.9.0` generated-subtree demonstration
+- common user mistakes produce actionable errors rather than generic Lisp/runtime failures
+- a BT source file can be checked without connecting to a simulator or robot
+- representative BTs emit enough tree metadata for external tools to reconstruct the tree structure
+- blackboard and capability validation failures are deterministic and covered by tests
+- no feature in this engine-usability section requires `muesli-studio` to understand what went wrong
 
 GC contract evidence:
 
@@ -327,10 +399,12 @@ Focus:
 - move VLA support from stubbed orchestration to a real model-backed asynchronous service
 - prove that deadlines, cancellation, stale-result rejection, and fallback matter under model latency
 - keep the model integration behind host capability contracts rather than turning VLA into a special runtime case
+- make asynchronous model/VLA integration look like ordinary host-capability use, so the BT source is independent of whether a service runs in-process, as a subprocess, on an edge server, through ROS2, or over HTTP
 
 Scope:
 
 - implement at least one real model backend behind the existing VLA service interface, preferably as a local process or HTTP backend that can be replayed deterministically from stored request and response records
+- integrate VLA as a transport-transparent asynchronous host capability, using SmolVLA through the LeRobot async inference path as the primary practical backend and OpenVLA-OFT as the heavyweight VLA backend; the BT source must remain independent of whether inference runs locally, on an edge server, over HTTP/ROS2, or from a replay cache
 - keep the current stub backend as a deterministic unit-test backend, not as the paper-facing VLA evidence path
 - support submit, poll, timeout, cancellation, partial response, final response, response hashing, request hashing, replay from stored records, and backend failure reporting
 - define first capability names for model-backed perception or action proposal, for example `cap.perception.scene.v1`, `cap.vla.select_target.v1`, or `cap.vla.propose_nav_goal.v1`
@@ -340,6 +414,54 @@ Scope:
 - extend canonical logs with `vla_submit`, `vla_partial`, `vla_result`, `vla_cancel`, `vla_timeout`, `action_validation`, and `model_result_dropped` events, or their existing canonical equivalents if already named differently
 - keep the flagship wheeled demo polished, but make the paper-facing novelty in this milestone the model-latency and cancellation behaviour, not visual demo quality
 - keep the existing Isaac Sim / ROS2 showcase as supporting evidence, not as a required semantic surface or CI dependency
+
+Additional scope: capability authoring and backend usability:
+
+- add a small but complete developer path for adding a new host capability
+- include public capability authoring material such as:
+
+```text
+include/muesli_bt/capability_api.hpp      # or equivalent public header
+examples/capabilities/minimal_action/
+examples/capabilities/http_backend/
+docs/tutorials/writing-a-host-capability.md
+docs/reference/capability-authoring.md
+```
+
+- show how to define a capability name, request schema, result schema, registration path, execution implementation, request validation, structured success/error/timeout outcomes, canonical event emission, and replay from recorded request/result data where relevant
+- include both a synchronous toy capability and an asynchronous capability
+- make the VLA/model backend path explicitly transport-transparent: BTs should depend on capability name, request schema, result schema, deadline, validation rule, and fallback policy, not HTTP, gRPC, subprocess layout, ROS2 actions, cloud endpoints, GPU placement, or credentials
+- configure backend placement outside BT syntax, for example:
+
+```yaml
+capabilities:
+  cap.vla.propose_nav_goal.v1:
+    backend: http
+    endpoint: http://edge-gpu.local:8080/v1/propose_nav_goal
+    timeout_ms: 500
+    replay_cache: runs/vla-cache/
+```
+
+and:
+
+```yaml
+capabilities:
+  cap.vla.propose_nav_goal.v1:
+    backend: local_process
+    command: ./serve_vla --model example-model
+    timeout_ms: 500
+```
+
+- make the same BT runnable against different backend configurations where feasible
+- add a documented capability configuration loader with backend type, endpoint or command, timeout defaults, retry policy where supported, replay cache path, schema path, validation policy, and redaction policy for sensitive fields
+- validate capability configuration before runtime execution
+- expose validation as a reusable engine concept for VLA/model outputs, planner outputs, host capability results, generated BT fragments, and command outputs before `env.act` where appropriate
+- provide validation result objects with valid/invalid status, reason code, field path, source capability or node, selected fallback, and whether the result was allowed to reach the host
+- add a standard replay record format for asynchronous capability calls, including request hash, request summary, response hash, response summary, backend identity, latency, deadline, validation outcome, cancellation outcome, stale-result status, and redaction markers where needed
+
+See also: [VLA backend integration plan](integration/vla-backend-integration-plan.md).
+
+The VLA backend integration plan is a temporary planning document. Once the SmolVLA/OpenVLA-OFT path is implemented, documented through normal user-facing pages, covered by fixtures, and represented in release evidence, delete the planning page and replace roadmap links with the implementation docs and evidence pages.
 
 Additional scope: constrained model or template-produced BT fragments:
 
@@ -359,6 +481,12 @@ Benchmark and evidence requirements:
 - include accepted and rejected generated-fragment examples in the trace corpus
 - include at least one rejection caused by an unsafe or unsupported host capability request
 - include at least one rejection caused by a missing timeout, missing fallback, or invalid budget around a long-running model/planner call
+- include one synchronous custom capability example
+- include one asynchronous custom capability example
+- include one HTTP or local-process model/VLA backend example
+- run the same BT against at least two backend configurations if feasible
+- include invalid capability request and invalid capability result fixtures
+- include a replayed async capability fixture
 
 Exit criteria:
 
@@ -373,6 +501,13 @@ Exit criteria:
 - every accepted fragment has a canonical DSL form and hash
 - every rejected fragment has a deterministic rejection reason
 - the model/VLA path strengthens the Lisp-as-DSL argument without making the paper depend on LLM-generated control logic
+- a new user can add a simple host capability by following one tutorial
+- model/VLA execution is configured outside the BT source
+- the same BT can use different backend placements without source changes
+- the same BT source can run against at least one live VLA backend and one replay backend by changing only capability configuration
+- capability request and result validation failures produce useful diagnostics
+- async capability calls are replayable from recorded request/result metadata
+- no visual tool is required to understand capability registration, validation, or failure
 
 #### `v0.9.0`: baselines, ROS capability bridges, and evaluation hardening
 
@@ -382,6 +517,7 @@ Focus:
 - build a fair comparison path against BehaviorTree.CPP
 - add the ROS2 glue needed for a physical or physical-like validation run without contaminating core runtime semantics
 - reduce the risk that the paper rests on one example only
+- make `muesli-bt` usable as an engine inside a normal robot software stack, not only as a standalone executable or paper benchmark harness
 
 Scope:
 
@@ -398,6 +534,49 @@ Scope:
 - treat MoveIt as the first concrete manipulation host capability bundle if the non-wheeled scenario proceeds
 - add a perception scene normaliser before BT logic consumes perception outputs, preferably using a YOLO-compatible detector or another reproducible detector path feeding stable scene state rather than raw detections
 - choose Isaac Sim, Webots + ROS, or another simulator for the non-wheeled path based on reproducibility, MoveIt compatibility, and perception support, not appearance
+
+Additional scope: practical ROS2, embedding, and safety expectations:
+
+- add a pattern for writing ROS2-backed capabilities in addition to the specific Nav2 adapter
+- keep ROS2 capability examples as wrappers, not a second semantic layer
+- cover practical wrappers users expect:
+  - ROS2 action client capability
+  - ROS2 service client capability
+  - ROS2 topic subscriber state feed
+  - ROS2 publisher or command capability
+  - lifecycle/shutdown handling
+  - timeout and cancellation mapping
+  - canonical event mapping
+- include artefacts such as:
+
+```text
+integrations/ros2_examples/action_capability/
+integrations/ros2_examples/service_capability/
+docs/tutorials/writing-a-ros2-capability.md
+```
+
+- add a minimal external C++ embedding example showing whether `muesli-bt` is only `muslisp` or can be used as a library
+- include artefacts such as:
+
+```text
+examples/embedding/cpp_minimal/
+docs/tutorials/embedding-muesli-bt.md
+```
+
+- show how to create a runtime, load/compile a BT, register callbacks or capabilities, set blackboard values, run a tick loop, emit an event log, and shut down cleanly
+- add a practical BT authoring cookbook for engine-level patterns, such as `docs/tutorials/bt-authoring-cookbook.md`
+- cover guarded action, retry with timeout, async action with cancellation, planner call with fallback, VLA/model request with validation, Nav2 goal with cancel, blackboard read/write pattern, subtree reuse, generated guarded recovery subtree, and safe stop / last-safe-action fallback
+- start a public API stability report before `v1.0.0`, such as `docs/project/api-compatibility.md`
+- identify stability for the Lisp BT DSL surface, event schema, capability registry API, capability backend API, blackboard/schema validation API, embedding API, ROS2 adapter API where present, and generated-subtree validation/install API where released
+- add task-runtime safety hooks that are not replacements for low-level robot safety:
+  - heartbeat/watchdog event
+  - command age limit
+  - last-safe-command policy
+  - safe-stop fallback policy
+  - capability unavailable policy
+  - stale observation policy
+  - shutdown fallback policy
+- document these safety hooks as host/runtime boundary hooks
 
 Lisp-specific evidence path: generated guarded recovery subtree:
 
@@ -518,6 +697,12 @@ Benchmark and evidence requirements:
 - report first-divergence behaviour when the generated subtree artefact is deliberately changed
 - report task outcome for fixed-recovery BT versus generated guarded recovery BT under the same blocked-path or degraded-model scenario
 - report any additional allocations caused by generated-subtree installation separately from the normal tick hot path
+- build one external C++ embedding example in CI
+- build/test one ROS2 action-capability example or Nav2 capability example where ROS2 CI is available
+- cover one cookbook pattern with a runnable example
+- include one watchdog or stale-observation fixture
+- include one safe-stop or last-safe-command fallback fixture
+- include one compatibility report listing stable and unstable APIs
 
 Exit criteria:
 
@@ -534,6 +719,12 @@ Exit criteria:
 - accepted generated fragments are identified in logs by canonical DSL hash
 - the documentation explains why this demonstration depends on Lisp as structured tree data rather than treating Lisp as a cosmetic syntax choice
 - the paper artefact set includes at least one figure, table, or trace excerpt from this demonstration
+- users can see how to embed `muesli-bt` as an engine rather than only invoke `muslisp`
+- users can see how to implement a ROS2-backed capability without changing core BT semantics
+- common BT design patterns are documented as copyable recipes
+- the release identifies which APIs are stable, experimental, or internal
+- task-level safety hooks are documented and covered by at least one fixture
+- none of these engine features require `muesli-studio`
 
 #### `v1.0.0`: paper artefacts and release baseline
 
@@ -541,6 +732,7 @@ Focus:
 
 - cut the first paper-ready, tool-builder-friendly, release-quality baseline
 - make the `v1.0.0` release match the paper exactly, including traces, scripts, manifests, and benchmark outputs
+- make the `v1.0.0` release usable as a BT engine by early adopters, not only as a paper artefact
 
 Scope:
 
@@ -556,6 +748,34 @@ Scope:
 - include the generated canonical DSL artefacts, rejection fixtures, trace files, replay reports, and scripts needed to reproduce the demonstration
 - ensure the generated-subtree demo is referenced from the evidence index, runtime contract material, and documentation path for new users
 - ensure the paper text can cite the release for the claim that Lisp supports authored, generated, validated, serialised, replayed, and safely installed BT fragments
+- freeze the supported `v1.0.0` engine surface explicitly:
+  - Lisp BT DSL subset
+  - runtime contract version
+  - canonical event schema version
+  - conformance levels
+  - blackboard/schema validation behaviour
+  - capability registry and call API
+  - async capability lifecycle
+  - validation result structure
+  - embedding API, if released
+  - ROS2 adapter support level
+  - generated-subtree support level
+  - benchmark/evidence artefact layout
+- mark everything outside that surface as experimental or internal
+- complete the practical user path so docs support users who need to build and run the engine, write a small BT, validate a BT before running it, define blackboard inputs, add custom and async host capabilities, configure model/VLA backends without changing BT source, embed the runtime in C++, connect a ROS2-backed capability, emit and validate canonical logs, replay or compare a run, and inspect the run in `muesli-studio` if desired
+- keep visual inspection as a `muesli-studio` concern, while ensuring `muesli-bt` emits all canonical artefacts required for that inspection
+- provide starter material that users can copy, such as:
+
+```text
+examples/starter/core_bt_project/
+examples/starter/cpp_embedded_project/
+examples/starter/custom_capability_project/
+examples/starter/ros2_capability_project/
+```
+
+- keep starter projects minimal but buildable
+- package engine artefacts cleanly, including executable, public headers if embedding is supported, CMake package config if library consumption is supported, schemas, example BTs, capability examples, validation tools, trace validation tools, compatibility docs, release notes, and evidence manifest
+- define what remains outside the `v1.0.0` engine release unless already implemented: visual editor, timeline UI, live replay UI, graphical debugging, large-scale VLA provider management, hard real-time control, low-level safety controller, and broad ROS2 replacement layer
 
 Exit criteria:
 
@@ -564,6 +784,7 @@ Exit criteria:
 - hot-path allocation, GC pause, and long-run memory evidence are generated from the tagged codebase
 - async cancellation, timeout, late-completion-drop, fallback, and action-validation behaviour are covered by deterministic fixtures and trace validation
 - at least one real model-backed VLA or model-mediated async experiment is included, not only stub output
+- the release includes replayable trace bundles for at least one SmolVLA-backed or OpenVLA-OFT-backed run, with model-call lifecycle events, validation outcomes, stale-result handling, and fallback behaviour visible in `mbt.evt.v1`
 - at least one fair BehaviorTree.CPP baseline comparison is included with public baseline code and matched scenario manifests
 - at least one paper figure, table row, or evaluation slice includes ROS-backed evidence
 - preferred outcome: at least one Nav2-backed or physical wheeled run is included with `events.jsonl`, rosbag, replay report, and failure classification
@@ -575,6 +796,14 @@ Exit criteria:
 - the generated fragment path is covered by canonical logs and replay validation
 - the documentation states the Lisp argument explicitly and honestly: Lisp is used because BTs are tree-structured task logic and S-expressions give a compact inspectable representation for generation, validation, serialisation, replay, and tick-boundary installation
 - the documentation also states the boundary: host-side robot IO, safety-critical control, and real-time servo loops remain outside the Lisp DSL
+- a new user can implement and run a simple custom capability without reading the C++ internals
+- a new user can validate a BT and understand common errors from CLI output
+- a new user can define or inspect expected blackboard inputs for a BT
+- a new user can run an asynchronous capability and see timeout, cancellation, validation, and fallback behaviour in logs
+- a C++ user can embed the runtime using a documented minimal example, or the release explicitly states that embedding is not yet supported
+- a ROS2 user can follow one documented capability-backed path without changing core runtime semantics
+- all public APIs that users are expected to depend on are listed as supported, experimental, or internal
+- `muesli-bt` emits sufficient canonical metadata for `muesli-studio` to visualise runs, but the engine does not depend on the Studio UI
 
 ## api / syntax
 
@@ -614,6 +843,18 @@ If generated fragments are executed directly from raw model text, the path is no
 
 If live subtree installation can occur mid-tick, the path is not acceptable. Installation must occur at a tick boundary or another documented safe point.
 
+Example interpretation for engine usability:
+
+If users need `muesli-studio` to understand a BT validation failure, the engine diagnostics are incomplete. The CLI and canonical reports must explain the failure.
+
+If a custom capability can only be added by copying internal source files or reading private implementation details, the capability authoring path is incomplete.
+
+If a BT source file cannot be checked without connecting to a simulator or robot, the engine workflow is incomplete.
+
+If model/VLA backend placement leaks into BT syntax, the capability abstraction is too weak. Backend placement belongs in validated configuration.
+
+If `muesli-bt` emits traces that a tool can display only by reverse-engineering runtime internals, the metadata export is incomplete.
+
 ## gotchas
 
 - Do not let ROS2 scope expand into a second semantic runtime.
@@ -631,6 +872,25 @@ If live subtree installation can occur mid-tick, the path is not acceptable. Ins
 - Do not let the generated-subtree demonstration bypass the same runtime contract, canonical logging, or replay validation used by hand-authored BTs.
 - Do not let dynamic subtree installation mutate the active tree during a tick. Use tick-boundary installation or another explicitly documented safe point.
 - Do not claim that Lisp makes runtime task generation safe by itself. Safety comes from validation, host capability contracts, action validation, fallback policy, and replayable event logs.
+- Do not move engine responsibilities into `muesli-studio`. Studio may visualise and inspect, but `muesli-bt` must own validation, diagnostics, metadata, logs, and replayable artefacts.
+- Do not make model/VLA transport choices part of BT syntax. Keep placement and credentials in validated backend configuration.
+- Do not let custom-capability authoring depend on undocumented internals.
+- Do not present task-level watchdogs or safe-stop hooks as replacements for low-level robot safety systems.
+- Do not leave public API stability implicit before `v1.0.0`; mark APIs as supported, experimental, or internal.
+
+## priority if scope has to be cut
+
+If the remaining roadmap becomes too large, prioritise practical engine usability in this order:
+
+1. structured diagnostics and `muslisp --check`
+2. capability authoring tutorial and minimal SDK
+3. blackboard/schema validation baseline
+4. transport-transparent async capability backend config
+5. embedding example
+6. ROS2 action/service capability pattern
+7. BT authoring cookbook
+8. task-level safety hooks
+9. starter project templates
 
 ## see also
 

@@ -122,6 +122,7 @@ nav:
   - Integrations:
       - Overview: integration/overview.md
       - Writing A Backend: integration/writing-a-backend.md
+      - VLA Backend Integration Plan: integration/vla-backend-integration-plan.md
       - ROS2 Backend Scope: integration/ros2-backend-scope.md
       - ROS2 Tutorial: integration/ros2-tutorial.md
       - ROS2 Flagship Source: integration/ros2-flagship-source.md

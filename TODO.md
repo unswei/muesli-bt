@@ -6,6 +6,7 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 ## next
 
 - `v0.8.0`: implement canonical host capability lifecycle events for real runtime-affecting capability calls; use `cap_call_start` and `cap_call_end` in `mbt.evt.v1`, including request id, capability name, operation, status, latency, rejection/error reason where applicable, and enough tick/job context for replay and first-divergence reports
+- `v0.8.0`: implement the VLA backend integration plan for transport-transparent async host capabilities, with SmolVLA/LeRobot as the primary practical backend, OpenVLA-OFT as the heavyweight backend, replay-cache mode, validation, redaction, canonical lifecycle events, and evidence outputs
 - `post-release`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
 
 ## status notes
@@ -21,6 +22,7 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 - `v0.8.0`: add one current Isaac Sim demo through ROS before `v1.0.0`, but keep it as a deployability/demo lane rather than a new semantic surface
 - `v0.8.0`: finish the checked-in H1 Isaac demo with one Ubuntu 22.04 + Humble + NVIDIA smoke run, then freeze scope unless a concrete demo bug appears
 - `v0.8.0`: keep the H1 Isaac demo as a bounded deployability lane and do not let it displace `v0.4.0` replay parity or `v0.5.0` cross-transport evidence
+- `v0.8.0`: after the VLA backend path is implemented and covered by normal docs/evidence, delete `docs/integration/vla-backend-integration-plan.md` and replace temporary roadmap links with the final implementation pages
 - `v0.9.0`: prefer a second serious scenario built around a simulated robot arm, with Towers of Hanoi as the preferred target if the simulator, MoveIt path, and perception stack stay reproducible
 - `v0.9.0`: add a usable perception path for the manipulator scenario rather than relying on hidden oracle state in the paper-facing demo
 - `v0.9.0`: likely first concrete perception adapter, if it stays reproducible enough, is a YOLO-compatible detector feeding a scene-state normaliser rather than raw detections

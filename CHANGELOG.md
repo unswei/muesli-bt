@@ -51,6 +51,8 @@ muesli-bt
 - Removed user-facing documentation wording that presented development branches as a separate support surface.
 - Replaced local absolute paths in benchmark and comparison documentation with repository-relative links and environment-variable examples.
 - Fixed runtime fixture verification so helper fixture namespaces such as `fixtures/dsl` are not mistaken for canonical runtime-contract bundles during default CI scans.
+- Expanded the `v0.7.0` to `v1.0.0` roadmap with engine-side usability expectations for diagnostics, BT checking, blackboard/schema validation, capability authoring, embedding, ROS2 capability patterns, safety hooks, and tool metadata.
+- Added a planned VLA backend integration document for SmolVLA/LeRobot and OpenVLA-OFT, with roadmap and TODO links that mark the plan as temporary until implementation docs and evidence supersede it.
 
 ## [0.6.0] - 2026-04-25
 
