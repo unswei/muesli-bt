@@ -61,6 +61,9 @@ struct node {
 struct definition {
     std::vector<node> nodes;
     node_id root = 0;
+    std::string source_hash;
+    std::string canonical_dsl_hash;
+    std::string canonical_dsl;
 };
 
 }  // namespace bt

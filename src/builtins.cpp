@@ -16,6 +16,7 @@
 
 #include "bt/blackboard.hpp"
 #include "bt/compiler.hpp"
+#include "bt/event_log.hpp"
 #include "bt/planner.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/serialisation.hpp"
@@ -2018,10 +2019,18 @@ value bt_definition_to_dsl(const bt::definition& def) {
     return bt_node_to_dsl(def, def.root);
 }
 
+void attach_dsl_identity_metadata(bt::definition& def, std::string_view source_text) {
+    const value canonical_dsl = bt_definition_to_dsl(def);
+    def.source_hash = bt::event_log::hash64_hex(source_text);
+    def.canonical_dsl = write_value(canonical_dsl);
+    def.canonical_dsl_hash = bt::event_log::hash64_hex(def.canonical_dsl);
+}
+
 value builtin_bt_compile(const std::vector<value>& args) {
     require_arity("bt.compile", args, 1);
     try {
         bt::definition def = bt::compile_definition(args[0]);
+        attach_dsl_identity_metadata(def, write_value(args[0]));
         const std::int64_t handle = bt::default_runtime_host().store_definition(std::move(def));
         return make_bt_def(handle);
     } catch (const bt::bt_compile_error& e) {
@@ -2075,6 +2084,7 @@ value builtin_bt_load_dsl(const std::vector<value>& args) {
         const std::string source = read_text_file(path, "bt.load-dsl");
         value form = read_one(source);
         bt::definition def = bt::compile_definition(form);
+        attach_dsl_identity_metadata(def, source);
         const std::int64_t handle = bt::default_runtime_host().store_definition(std::move(def));
         return make_bt_def(handle);
     } catch (const parse_error& e) {

@@ -25,6 +25,12 @@ muesli-bt
 - Added precise replay comparison divergence fields for tick, event type, field path, node id, blackboard key, async job id, planner id, and host capability.
 - Added compact `runtime_outcome.v1` taxonomy event types for tick, planner timeout, VLA timeout, fallback, late-result-drop, and cancellation outcomes.
 - Added a ROS2 L2 rosbag pre-emption/fallback scenario that reuses canonical `host_action_invalid` and `fallback_used` outcome events.
+- Added `v0.7.0` release-candidate notes covering async correctness, Lisp DSL defensibility, hash logging, generated-fragment rejection fixtures, and remaining tag checks.
+- Added a `why Lisp as DSL?` page that frames Lisp as structured BT data rather than arbitrary scripting.
+- Added representative DSL round-trip checks for sequence, selector, reactive, planner, and async/VLA-shaped BTs.
+- Added source and canonical DSL hash support for DSL-backed `bt_def` canonical log events.
+- Added deterministic negative generated-fragment fixtures for unknown node type, unknown callback, unsupported capability, invalid budget, malformed subtree, and missing fallback around long-running async/model work.
+- Added `tools/validate_generated_bt_fragment.py` and CTest coverage for the generated-fragment negative fixtures.
 
 ### Changed
 - Reorganised MkDocs navigation around reader journeys, concepts, reference, integrations, evidence, internals, and project material.
@@ -40,6 +46,8 @@ muesli-bt
 - Updated the publication benchmark script to produce checked result bundles with manifests, summaries, and figure/report artefacts.
 - The BT runtime now emits compact outcome events alongside detailed lifecycle events for implemented tick, planner timeout, VLA timeout, late-result-drop, and cancellation cases.
 - `env.run-loop` now emits compact fallback outcome events when host action validation fails and a safe action pre-empts the requested command.
+- Aligned README, roadmap, TODO, and release-candidate notes around the status vocabulary `released`, `experimental`, `contract-only`, and `planned`.
+- Recorded the capability-event decision: real runtime-affecting host capability calls should emit `cap_call_start` and `cap_call_end`, while `cap.echo.v1` remains a no-extra-event registry smoke path.
 
 ## [0.6.0] - 2026-04-25
 

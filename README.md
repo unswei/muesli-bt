@@ -65,12 +65,17 @@ Status vocabulary used in this repository:
 | Behaviour Trees | released | [BT introduction](docs/bt/intro.md) |
 | Bounded planning | released | [planning overview](docs/planning/overview.md) |
 | Canonical event logs | released | [event log](docs/observability/event-log.md) |
-| Conformance L0/L1/L2 | released and CI-backed where applicable | [conformance levels](docs/contracts/conformance.md) |
-| PyBullet/Webots examples | released examples | [examples overview](docs/examples/index.md) |
-| ROS2 thin transport | released baseline, Humble-focused | [ROS2 tutorial](docs/integration/ros2-tutorial.md) |
-| Host capability bundles | contract-only / emerging | [host capability bundles](docs/integration/host-capability-bundles.md) |
-| VLA backends | released hooks and stubs unless a real backend is documented | [VLA integration](docs/bt/vla-integration.md) |
-| Nav2/MoveIt adapters | planned unless listed in release notes | [roadmap to 1.0](docs/roadmap-to-1.0.md) |
+| Conformance L0/L1/L2 | released | [conformance levels](docs/contracts/conformance.md) |
+| PyBullet/Webots examples | released | [examples overview](docs/examples/index.md) |
+| ROS2 thin transport | released | [ROS2 tutorial](docs/integration/ros2-tutorial.md) |
+| Async cancellation lifecycle | released | [event log](docs/observability/event-log.md) |
+| Lisp DSL round-trip and hash evidence | experimental | [why Lisp as DSL?](docs/getting-oriented/why-lisp-dsl.md) |
+| Generated-fragment rejection fixtures | experimental | [why Lisp as DSL?](docs/getting-oriented/why-lisp-dsl.md) |
+| Host capability bundles | contract-only | [host capability bundles](docs/integration/host-capability-bundles.md) |
+| `cap.echo.v1` registry smoke path | released | [cap.call](docs/language/reference/builtins/cap/cap-call.md) |
+| VLA lifecycle hooks and stubs | experimental | [VLA integration](docs/bt/vla-integration.md) |
+| Production VLA providers | planned | [roadmap to 1.0](docs/roadmap-to-1.0.md) |
+| Nav2/MoveIt adapters | planned | [roadmap to 1.0](docs/roadmap-to-1.0.md) |
 
 ## at a glance
 
@@ -133,7 +138,7 @@ Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md), then read [RO
 
 ## VLA status
 
-VLA/model support is currently released as lifecycle infrastructure: submit, poll, cancel, timeout handling, BT node semantics, and canonical logging. Production provider transport, credentials, and safety validation belong behind host-side capability layers unless a concrete backend is documented and tested.
+VLA/model support is currently experimental lifecycle infrastructure: submit, poll, cancel, timeout handling, BT node semantics, and canonical logging. Production provider transport, credentials, and safety validation are planned work behind host-side capability layers unless a concrete backend is documented and tested in release notes.
 
 See [VLA integration](docs/bt/vla-integration.md), [VLA nodes](docs/bt/vla-nodes.md), and [known limitations](docs/known-limitations.md).
 

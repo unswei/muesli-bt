@@ -28,6 +28,27 @@ std::uint64_t fnv1a_64(std::string_view text) noexcept {
     return hash;
 }
 
+void append_arg_signature(std::ostringstream& out, const arg_value& arg) {
+    out << "|arg-kind=" << static_cast<int>(arg.kind);
+    switch (arg.kind) {
+        case arg_kind::nil:
+            break;
+        case arg_kind::boolean:
+            out << "|bool=" << (arg.bool_v ? "true" : "false");
+            break;
+        case arg_kind::integer:
+            out << "|int=" << arg.int_v;
+            break;
+        case arg_kind::floating:
+            out << "|float=" << arg.float_v;
+            break;
+        case arg_kind::symbol:
+        case arg_kind::string:
+            out << "|text=" << arg.text;
+            break;
+    }
+}
+
 void append_json_escaped(std::string& out, std::string_view text) {
     for (const char c : text) {
         switch (c) {
@@ -289,18 +310,30 @@ void event_log::emit_bt_def(const definition& def) {
     std::ostringstream graph;
     graph << "root=" << def.root;
     for (const node& n : def.nodes) {
-        graph << "|id=" << n.id << "|kind=" << static_cast<int>(n.kind) << "|name=" << n.leaf_name;
+        graph << "|id=" << n.id << "|kind=" << static_cast<int>(n.kind) << "|name=" << n.leaf_name
+              << "|int=" << n.int_param;
+        for (const arg_value& arg : n.args) {
+            append_arg_signature(graph, arg);
+        }
         for (node_id child : n.children) {
             graph << "->" << child;
         }
     }
-    const std::string tree_hash = hash64_hex(graph.str());
+    const std::string fallback_tree_hash = hash64_hex(graph.str());
+    const std::string tree_hash = def.canonical_dsl_hash.empty() ? fallback_tree_hash : def.canonical_dsl_hash;
+    const std::string dsl = def.canonical_dsl.empty() ? "<runtime-definition>" : def.canonical_dsl;
 
     std::ostringstream data;
     data << "{\"tree_name\":\"bt\","
-         << "\"dsl\":\"" << json_escape("<runtime-definition>") << "\","
-         << "\"tree_hash\":\"" << tree_hash << "\","
-         << "\"nodes\":[";
+         << "\"dsl\":\"" << json_escape(dsl) << "\","
+         << "\"tree_hash\":\"" << json_escape(tree_hash) << "\"";
+    if (!def.source_hash.empty()) {
+        data << ",\"source_hash\":\"" << json_escape(def.source_hash) << "\"";
+    }
+    if (!def.canonical_dsl_hash.empty()) {
+        data << ",\"canonical_dsl_hash\":\"" << json_escape(def.canonical_dsl_hash) << "\"";
+    }
+    data << ",\"nodes\":[";
     for (std::size_t i = 0; i < def.nodes.size(); ++i) {
         if (i != 0) {
             data << ',';

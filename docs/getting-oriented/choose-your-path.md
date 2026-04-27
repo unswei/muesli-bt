@@ -11,9 +11,10 @@ Use this page when you know what you want to do, but not which part of the docum
 ## I know Behaviour Trees and want the semantics
 
 1. [Behaviour Trees: introduction](../bt/intro.md)
-2. [BehaviorTree.CPP crosswalk](../bt/cpp-crosswalk.md)
-3. [runtime contract v1](../contracts/runtime-contract-v1.md)
-4. [conformance levels](../contracts/conformance.md)
+2. [why Lisp as the BT DSL?](why-lisp-dsl.md)
+3. [BehaviorTree.CPP crosswalk](../bt/cpp-crosswalk.md)
+4. [runtime contract v1](../contracts/runtime-contract-v1.md)
+5. [conformance levels](../contracts/conformance.md)
 
 ## I want to connect a robot or simulator
 

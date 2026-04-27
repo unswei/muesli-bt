@@ -155,6 +155,7 @@ The release must include one concrete demonstration that makes this argument vis
 - host capability bundle boundaries are documented for future manipulation, navigation, and perception services
 - `cap.motion.v1` and `cap.perception.scene.v1` are specified as host-level contracts, not released robot adapters
 - `cap.list`, `cap.describe`, and `cap.call` provide the first registry/API path with deterministic `cap.echo.v1` smoke coverage
+- the current decision for real runtime-affecting capability calls is to emit canonical `cap_call_start` and `cap_call_end` events once a real adapter lands, while keeping `cap.echo.v1` as a no-extra-event smoke path
 - `planner.plan` request/result documentation now states success, timeout, error, fallback, budget, work cap, and `planner_v1` logging behaviour explicitly
 - ROS2 `L2` remains focused on the released thin `Odometry` -> `Twist` lane because no concrete new ROS-backed path was added
 
@@ -236,6 +237,15 @@ Exit criteria:
 - ROS2 `L2` remains focused on the released thin `Odometry` -> `Twist` lane until a concrete new ROS-backed path is added
 
 #### `v0.7.0`: core defensibility and async correctness
+
+Status: in progress on `main`; release-candidate notes live in [v0.7.0 release notes](releases/v0.7.0.md).
+
+Status vocabulary for this milestone:
+
+- released: async cancellation lifecycle evidence, ROS-level pre-emption fixture, and `cap.echo.v1` registry smoke coverage
+- experimental: Lisp DSL round-trip/hash evidence and generated-fragment rejection fixtures
+- contract-only: host capability bundle contracts
+- planned: real capability lifecycle events, production VLA providers, generated subtree execution, Nav2 adapters, and MoveIt adapters
 
 Focus:
 

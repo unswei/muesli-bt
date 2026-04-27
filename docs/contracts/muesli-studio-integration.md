@@ -76,6 +76,8 @@ A `bt_def` event must be available for each runtime definition load/store lifecy
 Required payload semantics:
 
 - stable tree identity (`tree_hash`)
+- source identity for DSL-backed definitions when available (`source_hash`)
+- canonical DSL identity for DSL-backed definitions when available (`canonical_dsl_hash`)
 - node list with ids/kinds/names
 - edge list with parent/child/index
 

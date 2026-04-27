@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "code": "malformed_subtree",
+  "message_contains": "subtree must be a list"
+}

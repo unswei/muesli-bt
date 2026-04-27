@@ -119,7 +119,7 @@ The BT does not read:
 
 - This is not a commitment to the built-in name `(cap.call ...)`.
 - A real implementation must define how request ids, cancellation, and event logging work.
-- A real implementation must emit relevant canonical events if host capability calls affect runtime behaviour.
+- A real implementation must emit canonical `cap_call_start` and `cap_call_end` events when host capability calls affect runtime behaviour. This is the most convenient shape for users because traces can show which capability ran, which request id it used, how long it took, whether it was rejected or failed, and where replay first diverged.
 - Keep task policy in the BT and adapter mechanics in the host.
 
 ## see also

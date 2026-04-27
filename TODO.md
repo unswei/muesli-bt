@@ -5,8 +5,15 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 
 ## next
 
-- `v0.7.0`: decide whether canonical capability call events are needed once a real capability can affect runtime behaviour
+- `v0.8.0`: implement canonical host capability lifecycle events for real runtime-affecting capability calls; use `cap_call_start` and `cap_call_end` in `mbt.evt.v1`, including request id, capability name, operation, status, latency, rejection/error reason where applicable, and enough tick/job context for replay and first-divergence reports
 - `post-release`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
+
+## status notes
+
+- released: supported runtime/API/example surfaces from tagged releases, plus release-candidate items explicitly marked complete for `v0.7.0`
+- experimental: implemented evidence paths that are not yet a stable external dependency surface, including Lisp DSL round-trip/hash evidence and generated-fragment rejection fixtures
+- contract-only: documented host capability boundaries such as `cap.motion.v1` and `cap.perception.scene.v1`
+- planned: roadmap work that is not released, including real `cap_call_start` / `cap_call_end` emission, production VLA providers, Nav2 adapters, MoveIt adapters, and generated subtree execution
 
 ## later
 
@@ -40,3 +47,5 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 - `v0.7.0`: confirm deterministic fixture and test coverage for async cancellation before start, cancellation while running, cancellation after timeout, repeated cancellation, and late completion after cancellation
 - `v0.7.0`: add a thin ROS-level pre-emption fixture that reuses canonical `host_action_invalid` and `fallback_used` runtime events without introducing a ROS-specific cancellation model
 - `v0.7.0`: collect the paper-facing benchmark bundle and confirm the full `B8` group produced artefacts for all five async cancellation scenarios
+- `v0.7.0`: decide that real host capability calls which can affect runtime behaviour must emit canonical capability lifecycle events; keep `cap.echo.v1` as a smoke path without extra events until a real adapter lands
+- `v0.7.0`: add the `why Lisp as DSL?` page, representative DSL round-trip checks, source/canonical DSL hash logging for DSL-backed `bt_def` events, and deterministic negative generated-fragment fixtures

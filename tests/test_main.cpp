@@ -913,6 +913,144 @@ void test_bt_dsl_save_load_roundtrip() {
     check(symbol_name(eval_text("(bt.tick inst3)", env)) == "success", "bt.load-dsl tree tick should succeed");
 }
 
+void test_bt_dsl_roundtrip_representative_shapes() {
+    using namespace muslisp;
+
+    struct roundtrip_case {
+        std::string name;
+        std::string source;
+        std::vector<std::string> expected_fragments;
+    };
+
+    const std::vector<roundtrip_case> cases = {
+        {
+            "sequence",
+            "(seq (act bb-put-int foo 42) (cond bb-has foo))",
+            {"seq", "act", "cond"},
+        },
+        {
+            "selector",
+            "(sel (cond bb-has missing) (act bb-put-int recovered 1) (succeed))",
+            {"sel", "cond", "succeed"},
+        },
+        {
+            "reactive",
+            "(reactive-sel "
+            "  (reactive-seq (cond always-true) (async-seq (act always-success) (running))) "
+            "  (act always-success))",
+            {"reactive-sel", "reactive-seq", "async-seq"},
+        },
+        {
+            "planner",
+            "(seq "
+            "  (plan-action :name \"toy-plan\" :planner :mcts :budget_ms 20 :work_max 64 "
+            "               :model_service \"toy-1d\" :state_key state :action_key action :meta_key plan-meta) "
+            "  (succeed))",
+            {"plan-action", ":planner", ":model_service"},
+        },
+        {
+            "async-vla",
+            "(reactive-sel "
+            "  (seq (vla-wait :name \"policy\" :job_key policy-job :action_key policy-action :meta_key policy-meta) "
+            "       (succeed)) "
+            "  (seq (vla-request :name \"policy\" :job_key policy-job :instruction \"move\" "
+            "                    :state_key state :deadline_ms 50 :dims 2) "
+            "       (running)) "
+            "  (vla-cancel :name \"policy\" :job_key policy-job))",
+            {"vla-request", "vla-wait", "vla-cancel"},
+        },
+    };
+
+    std::size_t pass_count = 0;
+    for (const roundtrip_case& tc : cases) {
+        reset_bt_runtime_host();
+        env_ptr env = create_global_env();
+
+        (void)eval_text("(define source-dsl (quote " + tc.source + "))", env);
+        (void)eval_text("(define tree (bt.compile source-dsl))", env);
+        const std::string canonical = string_value(eval_text("(write-to-string (bt.to-dsl tree))", env));
+        check(!canonical.empty(), tc.name + ": canonical DSL should not be empty");
+        for (const std::string& fragment : tc.expected_fragments) {
+            check(canonical.find(fragment) != std::string::npos,
+                  tc.name + ": canonical DSL missing fragment: " + fragment + " in " + canonical);
+        }
+
+        (void)eval_text("(define tree-from-canonical (bt.compile (bt.to-dsl tree)))", env);
+        const std::string canonical_again =
+            string_value(eval_text("(write-to-string (bt.to-dsl tree-from-canonical))", env));
+        check(canonical_again == canonical,
+              tc.name + ": source DSL -> parsed form -> compiled bt_def -> canonical DSL -> compiled bt_def changed");
+
+        const std::filesystem::path dsl_path = temp_file_path("bt_dsl_roundtrip_" + tc.name, ".lisp");
+        const std::string dsl_literal = lisp_string_literal(dsl_path.string());
+        value save_ok = eval_text("(bt.save-dsl tree " + dsl_literal + ")", env);
+        check(is_boolean(save_ok) && boolean_value(save_ok), tc.name + ": bt.save-dsl should return #t");
+
+        (void)eval_text("(define tree-from-file (bt.load-dsl " + dsl_literal + "))", env);
+        const std::string canonical_from_file =
+            string_value(eval_text("(write-to-string (bt.to-dsl tree-from-file))", env));
+        check(canonical_from_file == canonical,
+              tc.name + ": bt.save-dsl/bt.load-dsl changed canonical DSL structure");
+
+        std::error_code ec;
+        std::filesystem::remove(dsl_path, ec);
+        ++pass_count;
+    }
+
+    check(pass_count == cases.size(), "representative DSL roundtrip pass count mismatch");
+}
+
+void test_bt_dsl_hashes_are_logged_for_compiled_and_loaded_definitions() {
+    using namespace muslisp;
+
+    auto first_bt_def_event = [](value dumped) -> std::string {
+        for (const value& row : vector_from_list(dumped)) {
+            check(is_string(row), "events.dump rows should be JSON strings");
+            const std::string line = string_value(row);
+            if (line.find("\"type\":\"bt_def\"") != std::string::npos) {
+                return line;
+            }
+        }
+        return {};
+    };
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    (void)eval_text("(define tree (bt.compile '(seq (act bb-put-int foo 42) (cond bb-has foo))))", env);
+    (void)eval_text("(define inst (bt.new-instance tree))", env);
+    const std::string compiled_event = first_bt_def_event(eval_text("(events.dump 20)", env));
+    check(!compiled_event.empty(), "compiled DSL should emit a bt_def event");
+    check(compiled_event.find("\"source_hash\":\"fnv1a64:") != std::string::npos,
+          "compiled DSL bt_def should include source_hash");
+    check(compiled_event.find("\"canonical_dsl_hash\":\"fnv1a64:") != std::string::npos,
+          "compiled DSL bt_def should include canonical_dsl_hash");
+    check(compiled_event.find("\"tree_hash\":\"fnv1a64:") != std::string::npos,
+          "compiled DSL bt_def should include tree_hash");
+    check(compiled_event.find("\"dsl\":\"(seq (act bb-put-int foo 42) (cond bb-has foo))\"") != std::string::npos,
+          "compiled DSL bt_def should include canonical DSL");
+
+    reset_bt_runtime_host();
+    env = create_global_env();
+    const std::filesystem::path dsl_path = temp_file_path("bt_loaded_hash_identity", ".lisp");
+    write_text_file(dsl_path, "(sel (cond bb-has ready) (succeed))");
+    const std::string dsl_literal = lisp_string_literal(dsl_path.string());
+    (void)eval_text("(define loaded-tree (bt.load-dsl " + dsl_literal + "))", env);
+    (void)eval_text("(define loaded-inst (bt.new-instance loaded-tree))", env);
+    const std::string loaded_event = first_bt_def_event(eval_text("(events.dump 20)", env));
+    check(!loaded_event.empty(), "loaded DSL should emit a bt_def event");
+    check(loaded_event.find("\"source_hash\":\"fnv1a64:") != std::string::npos,
+          "loaded DSL bt_def should include source_hash");
+    check(loaded_event.find("\"canonical_dsl_hash\":\"fnv1a64:") != std::string::npos,
+          "loaded DSL bt_def should include canonical_dsl_hash");
+    check(loaded_event.find("\"tree_hash\":\"fnv1a64:") != std::string::npos,
+          "loaded DSL bt_def should include tree_hash");
+    check(loaded_event.find("\"dsl\":\"(sel (cond bb-has ready) (succeed))\"") != std::string::npos,
+          "loaded DSL bt_def should include canonical DSL");
+
+    std::error_code ec;
+    std::filesystem::remove(dsl_path, ec);
+}
+
 void test_bt_export_dot_builtin() {
     using namespace muslisp;
 
@@ -4717,6 +4855,9 @@ int main() {
         {"load/write/save and roundtrip", test_load_write_save_and_roundtrip},
         {"load resolves nested relative paths", test_load_resolves_nested_relative_paths_from_loaded_file},
         {"bt dsl save/load roundtrip", test_bt_dsl_save_load_roundtrip},
+        {"bt representative dsl roundtrip shapes", test_bt_dsl_roundtrip_representative_shapes},
+        {"bt dsl hashes logged for compiled and loaded definitions",
+         test_bt_dsl_hashes_are_logged_for_compiled_and_loaded_definitions},
         {"bt export-dot builtin", test_bt_export_dot_builtin},
         {"bt binary save/load roundtrip and validation", test_bt_binary_save_load_roundtrip_and_validation},
         {"list and predicate builtins", test_list_and_predicate_builtins},

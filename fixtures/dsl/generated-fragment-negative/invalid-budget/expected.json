@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "code": "invalid_budget",
+  "message_contains": ":budget_ms must be a positive number"
+}

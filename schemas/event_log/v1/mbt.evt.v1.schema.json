@@ -185,6 +185,12 @@
               "tree_hash": {
                 "type": "string"
               },
+              "source_hash": {
+                "type": "string"
+              },
+              "canonical_dsl_hash": {
+                "type": "string"
+              },
               "nodes": {
                 "type": "array",
                 "items": {

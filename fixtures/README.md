@@ -29,9 +29,12 @@ The `async-*` bundles cover deterministic cancellation edges: cancellation befor
 
 The `ros2-*` bundles are pre-Linux surrogate fixtures. They define the canonical event-log expectations for ROS2-shaped scenarios before real ROS2 transport and rosbag-backed `L2` conformance exist.
 
+The `dsl/generated-fragment-negative` fixtures cover generated Lisp BT fragments that must be rejected before execution. They are validated with `tools/validate_generated_bt_fragment.py` and cover unknown node types, unknown callbacks, unsupported capabilities, invalid budgets, malformed subtrees, and missing fallbacks around long-running async/model calls.
+
 Update and verify using:
 
 ```bash
 python3 tools/fixtures/update_fixture.py
 python3 tools/fixtures/verify_fixture.py
+python3 tools/validate_generated_bt_fragment.py fixtures/dsl/generated-fragment-negative
 ```

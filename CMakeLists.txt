@@ -417,6 +417,12 @@ if (Python3_Interpreter_FOUND)
     NAME muesli_bt_flagship_same_robot_compare_smoke
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_flagship_same_robot_compare_runs.py"
   )
+  add_test(
+    NAME muesli_bt_generated_fragment_negative_fixtures
+    COMMAND
+      "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_generated_bt_fragment.py"
+      "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/dsl/generated-fragment-negative"
+  )
 endif ()
 
 if (MUESLI_BT_BUILD_BENCHMARKS)

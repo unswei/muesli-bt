@@ -56,6 +56,28 @@
 - `async_cancel_requested`, `async_cancel_acknowledged`, `async_completion_dropped`
 - `error`
 
+## BT definition identity
+
+The `bt_def` event identifies the compiled tree that a run used.
+
+For DSL-backed definitions created through `bt.compile` or `bt.load-dsl`, the payload includes:
+
+- `source_hash`: FNV-1a 64-bit hash of the loaded or generated source DSL text;
+- `canonical_dsl_hash`: FNV-1a 64-bit hash of the canonical DSL returned by `bt.to-dsl`;
+- `tree_hash`: the canonical DSL hash when available, otherwise a structural fallback hash;
+- `dsl`: the canonical DSL string when available.
+
+Binary-loaded or host-created definitions may not have source DSL text. Those definitions still emit `tree_hash`, node metadata, and edge metadata.
+
+Use these fields to connect runtime evidence back to the BT source:
+
+- link a generated fragment proposal to the canonical event stream;
+- distinguish source-format changes from canonical tree changes;
+- identify which normalised BT definition was replayed;
+- compare paper artefacts without relying on file names or prose labels.
+
+The hashes are not a security boundary. Generated fragments still need parser, normaliser, validator, capability, budget, fallback, and replay checks before execution.
+
 ## Lisp controls
 
 - `(events.enable #t/#f)`
