@@ -81,6 +81,8 @@ Status vocabulary used in this repository:
 
 ![muesli-bt architecture](docs/assets/architecture-at-a-glance.svg)
 
+In the diagram, arrows show the primary runtime data/control flow. Two-headed arrows mean the runtime sends a request and later observes result, state, or acknowledgement.
+
 `muesli-bt` runs task-level BT logic in a compact Lisp runtime. Host backends provide robot or simulator IO. Long-running planners and model calls are submitted, polled, cancelled, and logged through the runtime contract. Each run can emit canonical `mbt.evt.v1` traces for replay and inspection.
 
 Small canonical event-log excerpt:
