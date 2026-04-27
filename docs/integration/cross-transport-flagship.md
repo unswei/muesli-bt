@@ -16,7 +16,7 @@ The same high-level BT can run across those transports while backend-specific se
 
 For a stricter “almost identical decisions under the same circumstances” claim, the project should use a same-robot comparison track rather than the current e-puck versus racecar pairing.
 
-This page describes the current flagship lane on `main`.
+This page describes the current flagship lane.
 It is not a new runtime contract.
 
 The concrete shared blackboard and command specification lives in [cross-transport shared contract](cross-transport-shared-contract.md).
@@ -168,7 +168,7 @@ This keeps existing demo directories intact while giving the flagship its own ba
 
 ### current status
 
-The current `v0.5` baseline on `main` now includes:
+The current `v0.5` baseline now includes:
 
 1. one shared BT file loaded by Webots, PyBullet, and ROS2 wrappers
 2. backend wrappers that stay mostly limited to normalisation and command conversion

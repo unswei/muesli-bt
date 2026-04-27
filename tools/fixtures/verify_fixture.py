@@ -141,6 +141,10 @@ def verify_fixture_dir(path: pathlib.Path, validator) -> None:
             raise RuntimeError(f"{path}: events_sha256 mismatch: expected {expected_digest}, got {actual_digest}")
 
 
+def is_fixture_bundle(path: pathlib.Path) -> bool:
+    return all((path / name).is_file() for name in REQUIRED_FILES)
+
+
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
     schema_path = pathlib.Path(args.schema)
@@ -162,13 +166,15 @@ def main(argv: list[str]) -> int:
     validator = Draft202012Validator(schema)
 
     selected = set(args.fixture)
-    candidates = sorted(p for p in FIXTURE_ROOT.iterdir() if p.is_dir())
+    all_fixture_dirs = sorted(p for p in FIXTURE_ROOT.iterdir() if p.is_dir())
     if selected:
-        candidates = [p for p in candidates if p.name in selected]
+        candidates = [p for p in all_fixture_dirs if p.name in selected]
         unknown = selected - {p.name for p in candidates}
         if unknown:
             print(f"error: unknown fixture(s): {', '.join(sorted(unknown))}", file=sys.stderr)
             return 2
+    else:
+        candidates = [p for p in all_fixture_dirs if is_fixture_bundle(p)]
 
     for fixture_dir in candidates:
         try:

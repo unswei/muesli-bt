@@ -295,6 +295,6 @@ python3 bench/scripts/compare_results.py \
 
 ## see also
 
-- [README.md](/Users/z3550628/Code/2026/muesli-bt/README.md)
-- [docs/testing.md](/Users/z3550628/Code/2026/muesli-bt/docs/testing.md)
-- [docs/internals/code-map.md](/Users/z3550628/Code/2026/muesli-bt/docs/internals/code-map.md)
+- [project README](../README.md)
+- [testing guide](../docs/testing.md)
+- [code map](../docs/internals/code-map.md)

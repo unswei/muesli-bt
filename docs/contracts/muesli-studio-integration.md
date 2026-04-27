@@ -160,8 +160,8 @@ Runtime API and schema-affecting changes must follow explicit compatibility rule
 
 Required:
 
-- `muesli-studio` consumes tagged `muesli-bt` releases; optional scheduled CI may test `main`
-- compatibility expectations across tags and `main` are tracked in [studio compatibility matrix](studio-compatibility-matrix.md)
+- `muesli-studio` consumes documented `muesli-bt` release surfaces
+- compatibility expectations are tracked in [studio compatibility matrix](studio-compatibility-matrix.md)
 - breaking inspector-facing C++ API changes require explicit changelog entries
 - event schema-affecting changes require schema/version update plus fixture and validator updates in the same change
 - contract changes must be acknowledged by changelog update (enforced in CI)

@@ -10,7 +10,7 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 
 ## status notes
 
-- released: supported runtime/API/example surfaces from tagged releases, plus release-candidate items explicitly marked complete for `v0.7.0`
+- released: supported runtime/API/example surfaces, plus items explicitly marked complete for `v0.7.0`
 - experimental: implemented evidence paths that are not yet a stable external dependency surface, including Lisp DSL round-trip/hash evidence and generated-fragment rejection fixtures
 - contract-only: documented host capability boundaries such as `cap.motion.v1` and `cap.perception.scene.v1`
 - planned: roadmap work that is not released, including real `cap_call_start` / `cap_call_end` emission, production VLA providers, Nav2 adapters, MoveIt adapters, and generated subtree execution
@@ -32,7 +32,7 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 
 ## done
 
-- `v0.5.0`: cut the release from the current green `main` baseline and publish the final release notes
+- `v0.5.0`: publish the final release notes from the green release baseline
 - `v0.6.0`: define host capability bundle naming and registration rules without changing BT or Lisp semantics
 - `v0.6.0`: make the boundary between `env.*`, `planner.plan`, and external host capabilities explicit in docs and examples
 - `v0.6.0`: define the first motion/manipulation capability contract as a generic host bundle, with MoveIt as the intended first adapter rather than a core semantic surface

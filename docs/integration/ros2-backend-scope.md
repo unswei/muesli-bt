@@ -167,7 +167,7 @@ Delivered baseline:
 
 `phase 8: v0.4.0 observability parity`
 
-Delivered on `main`:
+Delivered baseline:
 
 - ROS-backed runs now emit direct canonical `mbt.evt.v1` logs through `event_log_path`
 - ROS-backed replay and conformance now treat the canonical event log as the primary artefact

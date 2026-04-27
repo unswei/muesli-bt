@@ -79,7 +79,7 @@ Already shipped in `v0.4.0`:
 The repository also now includes a checked-in benchmark harness and a documented Isaac Sim / ROS2 H1 showcase path.
 Those help evidence gathering, but they do not replace the remaining release gates for `v1.0.0`.
 
-The current `main` branch also now carries the `v0.5.0` cross-transport flagship baseline:
+The current release path also carries the `v0.5.0` cross-transport flagship baseline:
 
 - one shared wheeled BT reused across Webots, PyBullet, and ROS2
 - a supported ROS2 tutorial from build through canonical log validation
@@ -143,7 +143,7 @@ The release must include one concrete demonstration that makes this argument vis
 - released trace-level replay validation and one shared canonical artefact layout across simulator and ROS-backed runs
 - documented canonical lifecycle anchors and ROS timing metadata in the released log surface
 
-`v0.5.0`: same BT, different IO transport landed on `main`
+`v0.5.0`: same BT, different IO transport landed
 
 - one shared wheeled flagship BT now runs across Webots, PyBullet, and ROS2 with adapter-only differences
 - scripted comparison checks now cover both the cross-transport lane and the stricter same-robot PyBullet/Webots lane
@@ -165,7 +165,7 @@ Further work should now move to correctness hardening, runtime measurement, asyn
 
 Status:
 
-- complete on `main`; retained here as the release record for scope and exit criteria
+- complete; retained here as the release record for scope and exit criteria
 
 Focus:
 
@@ -238,7 +238,7 @@ Exit criteria:
 
 #### `v0.7.0`: core defensibility and async correctness
 
-Status: in progress on `main`; release-candidate notes live in [v0.7.0 release notes](releases/v0.7.0.md).
+Status: in progress for `v0.7.0`; release notes live in [v0.7.0 release notes](releases/v0.7.0.md).
 
 Status vocabulary for this milestone:
 
@@ -540,7 +540,7 @@ Exit criteria:
 Focus:
 
 - cut the first paper-ready, tool-builder-friendly, release-quality baseline
-- make the tagged release match the paper exactly, including traces, scripts, manifests, and benchmark outputs
+- make the `v1.0.0` release match the paper exactly, including traces, scripts, manifests, and benchmark outputs
 
 Scope:
 
@@ -569,7 +569,7 @@ Exit criteria:
 - preferred outcome: at least one Nav2-backed or physical wheeled run is included with `events.jsonl`, rosbag, replay report, and failure classification
 - acceptable fallback: if physical hardware is not stable enough by the tag, the release includes a rosbag-backed Nav2 or equivalent ROS action-capability run and states the physical limitation plainly
 - the core claim is demonstrably true: BT semantics stay stable while transport changes, asynchronous planner/model work is deadline-aware and cancellable, and canonical event logs support replay and inspection across supported transports
-- the tagged release contains one implemented demonstration where Lisp clearly enables useful runtime BT handling beyond hand-authored static trees
+- the `v1.0.0` release contains one implemented demonstration where Lisp clearly enables useful runtime BT handling beyond hand-authored static trees
 - the demonstration is reproducible from a clean checkout or archived release artefact using documented commands
 - the demonstration includes at least one accepted generated fragment and at least one rejected unsafe or invalid generated fragment
 - the generated fragment path is covered by canonical logs and replay validation

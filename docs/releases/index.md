@@ -2,9 +2,7 @@
 
 ## what this is
 
-This section keeps per-tag release notes that summarise stable surfaces, contract compatibility, and migration notes for released versions of `muesli-bt`.
-
-The `v0.7.0` page is currently marked as in preparation on `main`; treat it as release-candidate documentation until the tag is cut.
+This section keeps release notes that summarise stable surfaces, contract compatibility, and migration notes for released versions of `muesli-bt`.
 
 ## when to use it
 
@@ -16,7 +14,7 @@ Use these pages when you:
 
 ## how it works
 
-Each tagged release note should record:
+Each release note should record:
 
 - release date
 - stable surfaces for that tag
@@ -45,8 +43,7 @@ If you are deciding which runtime tag to pin in `muesli-studio`, use the release
 ## gotchas
 
 - Release notes do not replace the changelog.
-- Rolling `main` changes belong in `CHANGELOG.md`, not in a future release note page.
-- Pages marked "in preparation" describe release-candidate state, not a tagged release.
+- Unreleased changes belong in `CHANGELOG.md`, not in a future release note page.
 - Contract-affecting release notes should stay aligned with the compatibility policy.
 
 ## see also

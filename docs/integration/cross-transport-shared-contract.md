@@ -13,7 +13,7 @@ It exists so one high-level BT can run across:
 
 while each [host](../terminology.md#host) (backend) keeps its own sensing and actuation details.
 
-This page describes the checked-in contract used by the shared flagship examples on `main`.
+This page describes the checked-in contract used by the shared flagship examples.
 It is not a new external runtime schema and it does not change BT or Lisp semantics.
 
 ## when to use it

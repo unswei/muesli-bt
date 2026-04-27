@@ -2,15 +2,13 @@
 
 ## what this is
 
-This page records `muesli-bt` compatibility expectations for `muesli-studio`
-across release tags and `main`.
+This page records `muesli-bt` release compatibility expectations for `muesli-studio`.
 
 ## when to use it
 
 Use this page when you:
 
-- decide which runtime ref to pin in Studio
-- validate whether `main` is safe enough for exploratory integration
+- decide which runtime release to pin in Studio
 - review compatibility impact before a release
 
 ## how it works
@@ -20,7 +18,7 @@ The matrix tracks compatibility at the contract level:
 - runtime contract version
 - canonical event schema (`mbt.evt.v1`)
 - validation lane used to assert compatibility
-- support posture (release support vs rolling best-effort)
+- support posture
 
 ## api / syntax
 
@@ -33,21 +31,17 @@ The matrix tracks compatibility at the contract level:
 | `v0.4.0` tag | `1.0.0` | `mbt.evt.v1` | parser for `mbt.evt.v1` enabled and tolerant of additive runtime-contract events | release + CI contract/schema/fixture gates plus Ubuntu 22.04 + Humble ROS release validation, rosbag-backed `L2`, canonical ROS artefact verification through `events.jsonl`, and trace-level replay validation tooling | supported | same released ROS2 thin-adaptor baseline, now with direct canonical ROS-backed event-log parity, explicit lifecycle anchors (`episode_begin`, `episode_end`, `run_end`), and released trace-level validation (`tools/validate_trace.py`) |
 | `v0.5.0` tag | `1.0.0` | `mbt.evt.v1` | parser for `mbt.evt.v1` enabled and tolerant of additive runtime-contract events | release + CI contract/schema/fixture gates plus cross-transport flagship comparison, same-robot strict comparison, and ROS2 `L2` replay on Ubuntu 22.04 + Humble | supported | same BT, different IO transport baseline across Webots, PyBullet, and ROS2, with the ROS surface still limited to `Odometry` in and `Twist` out |
 | `v0.6.0` tag | `1.0.0` | `mbt.evt.v1` | parser for `mbt.evt.v1` enabled and tolerant of additive runtime-contract events | release + CI contract/schema/fixture gates plus host capability registry smoke coverage and unchanged ROS2 `L2` replay on Ubuntu 22.04 + Humble | supported | contract and boundary release: host capability bundle docs, `cap.motion.v1`, `cap.perception.scene.v1`, `cap.call`, and deterministic `cap.echo.v1`; no event schema bump and no new robot adapter surface |
-| `main` branch (rolling) | `1.0.0` until changed by contract versioning | `mbt.evt.v1` until schema bump | parser for active schema required | push/PR CI plus Linux ROS-backed checks, rosbag-backed `L2` replay on Ubuntu 22.04 + Humble, and canonical ROS artefact verification through `events.jsonl` | best-effort (non-stable) | rolling branch after the `v0.6.0` capability-boundary release baseline; tag-level support posture depends on the next release |
 
 ## example
 
 Pinning strategy:
 
-1. Studio production release pins latest supported runtime tag row.
-2. Studio development branch may test `main` row when investigating upcoming runtime changes.
-3. If runtime contract/schema changes, update this page and the matching page under `docs/releases/` in the same change.
+1. Studio release branches pin a supported runtime release row.
+2. If runtime contract/schema changes, update this page and the matching page under `docs/releases/` in the same change.
 
 ## gotchas
 
-- `main` compatibility is not a stability guarantee.
 - Contract/schema bumps require coordinated Studio parser updates.
-- A green CI run on one commit does not imply forward compatibility for later `main` commits.
 
 ## see also
 

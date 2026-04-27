@@ -123,7 +123,7 @@ For the shortest walkthrough, use [first 10 minutes](docs/getting-started-10min.
 
 ## benchmarks and evidence
 
-Benchmark numbers are reported for tagged evidence bundles. The README links to the current harness and interpretation, but untagged local runs are not treated as release evidence.
+Benchmark numbers are reported for curated evidence bundles. The README links to the current harness and interpretation, but ad hoc local runs are not treated as release evidence.
 
 - [benchmark harness](bench/README.md)
 - [runtime performance notes](docs/internals/runtime-performance.md)
@@ -144,7 +144,7 @@ See [VLA integration](docs/bt/vla-integration.md), [VLA nodes](docs/bt/vla-nodes
 
 ## citation / paper status
 
-Paper artefacts are in preparation. Until a preprint or accepted paper exists, cite the repository and the tagged release you used. Citation metadata is provided in [CITATION.cff](CITATION.cff).
+Paper artefacts are in preparation. Until a preprint or accepted paper exists, cite the repository version you used. Citation metadata is provided in [CITATION.cff](CITATION.cff).
 
 ## contributing
 

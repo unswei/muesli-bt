@@ -66,7 +66,7 @@ Webots e-puck:
 
 ```bash
 MUESLI_BT_WEBOTS_LISP_ENTRY=lisp/flagship_entry.lisp \
-  /Users/z3550628/Code/2026/webots/webots --batch --mode=fast --stdout --stderr \
+  "$WEBOTS_HOME/webots" --batch --mode=fast --stdout --stderr \
   examples/webots_epuck_goal/worlds/epuck_goal_cluttered.wbt
 ```
 

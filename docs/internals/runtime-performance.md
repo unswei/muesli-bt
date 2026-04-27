@@ -2,7 +2,7 @@
 
 !!! note "status"
     Status: experimental / evolving benchmark evidence.
-    Treat local benchmark numbers as current interpretation unless they are tied to a tagged release artefact bundle with hardware, commit, compiler, build flags, and commands.
+    Treat local benchmark numbers as current interpretation unless they are tied to a curated release artefact bundle with hardware, commit, compiler, build flags, and commands.
 
 ## what this is
 
@@ -102,7 +102,7 @@ Headline observations:
 
 Interpretation limits:
 
-- this is a paper-facing evidence bundle, not a tagged release artefact
+- this is a paper-facing evidence bundle, not a release artefact
 - the run is Apple M3 / Darwin / AppleClang evidence; do not generalise the exact numbers to Linux, ROS2, or other CPUs without a matching run
 - CPU pinning was off, so tail latency remains operating-system and scheduler sensitive
 - `B7` is a GC smoke and pressure workload; it demonstrates canonical GC lifecycle logging and bounded measurement, not a proof of leak-freedom
