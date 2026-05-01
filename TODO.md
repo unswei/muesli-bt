@@ -24,10 +24,10 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 - `v0.8.0`: keep the H1 Isaac demo as a bounded deployability lane and do not let it displace `v0.4.0` replay parity or `v0.5.0` cross-transport evidence
 - `v0.8.0`: after the VLA backend path is implemented and covered by normal docs/evidence, delete `docs/integration/vla-backend-integration-plan.md` and replace temporary roadmap links with the final implementation pages
 - `v0.9.0`: prefer a second serious scenario built around a simulated robot arm, with Towers of Hanoi as the preferred target if the simulator, MoveIt path, and perception stack stay reproducible
-- `v0.9.0`: add a usable perception path for the manipulator scenario rather than relying on hidden oracle state in the paper-facing demo
+- `v0.9.0`: add a usable perception path for the manipulator scenario rather than relying on hidden oracle state in the evaluation demo
 - `v0.9.0`: likely first concrete perception adapter, if it stays reproducible enough, is a YOLO-compatible detector feeding a scene-state normaliser rather than raw detections
 - `v0.9.0`: choose the simulator on reproducibility, MoveIt compatibility, and perception quality first; prefer Isaac Sim if it gives the cleanest ROS-backed manipulator path without blowing up scope
-- `v1.0.0`: finish paper artefacts, baseline comparisons, release hygiene, and exact `L0` / `L1` / `L2` runbooks
+- `v1.0.0`: finish evidence artefacts, baseline comparisons, release hygiene, and exact `L0` / `L1` / `L2` runbooks
 - `post-1.0`: extend ROS2 transport binding beyond the first `Odometry` / `Twist` path (`topics` / `actions` / `services`)
 - `post-1.0`: add a second supported Linux distro lane (Ubuntu 24.04 + Jazzy) after Humble is stable
 - `post-1.0`: add production-oriented backend adapters beyond simulator demos and the thin ROS2 adaptor
@@ -48,6 +48,6 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 - `v0.6.0`: confirm the tiny `cap.call` / `cap.echo.v1` registry path is enough for the release without canonical capability call events
 - `v0.7.0`: confirm deterministic fixture and test coverage for async cancellation before start, cancellation while running, cancellation after timeout, repeated cancellation, and late completion after cancellation
 - `v0.7.0`: add a thin ROS-level pre-emption fixture that reuses canonical `host_action_invalid` and `fallback_used` runtime events without introducing a ROS-specific cancellation model
-- `v0.7.0`: collect the paper-facing benchmark bundle and confirm the full `B8` group produced artefacts for all five async cancellation scenarios
+- `v0.7.0`: collect the curated benchmark bundle and confirm the full `B8` group produced artefacts for all five async cancellation scenarios
 - `v0.7.0`: decide that real host capability calls which can affect runtime behaviour must emit canonical capability lifecycle events; keep `cap.echo.v1` as a smoke path without extra events until a real adapter lands
 - `v0.7.0`: add the `why Lisp as DSL?` page, representative DSL round-trip checks, source/canonical DSL hash logging for DSL-backed `bt_def` events, and deterministic negative generated-fragment fixtures

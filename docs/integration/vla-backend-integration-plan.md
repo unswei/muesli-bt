@@ -480,7 +480,7 @@ Validation result object:
 
 ## failure injection
 
-The integration must support deterministic injected failures for tests and paper figures.
+The integration must support deterministic injected failures for tests and evaluation figures.
 
 Required failure modes:
 
@@ -573,7 +573,7 @@ Required plots or tables:
 [ ] connect at least one VLA capability to the comparison harness
 [ ] include VLA lifecycle events in neutral comparison traces where relevant
 [ ] test VLA behaviour under ROS callback pressure if used in ROS-backed demo
-[ ] include VLA trace bundle in paper evidence outputs
+[ ] include VLA trace bundle in evaluation evidence outputs
 [ ] add model backend failure classification to experiment manifests
 ```
 
@@ -584,7 +584,7 @@ Required plots or tables:
 [ ] freeze replay record schema version
 [ ] publish trace bundles for live and replay VLA runs
 [ ] publish scripts to regenerate VLA figures/tables
-[ ] document exact model/backend versions used for paper artefacts
+[ ] document exact model/backend versions used for evidence artefacts
 [ ] mark any non-reproducible model path as supporting evidence only
 [ ] clearly label production limitations
 ```
@@ -594,7 +594,7 @@ Required plots or tables:
 ### v0.8.0
 
 - At least one real VLA backend is callable through the host capability path.
-- The stub backend is no longer the only paper-facing VLA evidence path.
+- The stub backend is no longer the only release evidence path.
 - The same BT source can run against a live backend and a replay backend.
 - Model outputs are validated before execution.
 - Stale or invalid outputs are rejected deterministically.
@@ -613,7 +613,7 @@ Required plots or tables:
 - The release includes replayable request/response records.
 - The release includes clear documentation of model placement transparency.
 - The release includes honest limitations for production VLA control.
-- The paper can cite the release for transport-transparent async VLA integration under the runtime contract.
+- The release evidence supports transport-transparent async VLA integration under the runtime contract.
 
 ## non-goals
 

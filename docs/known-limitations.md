@@ -28,7 +28,7 @@ GC and allocation behaviour are measured and controlled at the task-runtime leve
 
 ## benchmarks
 
-Benchmark results depend on workload, hardware, compiler, and build flags. Use curated evidence bundles for paper or external comparison.
+Benchmark results depend on workload, hardware, compiler, and build flags. Use curated evidence bundles for external comparison.
 
 ## host-side safety
 

@@ -43,7 +43,7 @@ muesli-bt
 - Extended strict allocation coverage beyond the narrow logging-off lane to representative reactive and logging-on precompiled tick shapes.
 - Tightened tick audit GC contract evidence so any completed in-tick GC is classified as `tick_gc`, while `fail-on-tick-gc` tests prove collection is rejected before lifecycle emission across representative BT shapes.
 - Updated benchmark result handling so CSV files remain summaries while canonical `events.jsonl` files stay as inspectable evidence for GC and async lifecycle claims.
-- Updated the publication benchmark script to produce checked result bundles with manifests, summaries, and figure/report artefacts.
+- Updated the benchmark collection script to produce checked result bundles with manifests, summaries, and figure/report artefacts.
 - The BT runtime now emits compact outcome events alongside detailed lifecycle events for implemented tick, planner timeout, VLA timeout, late-result-drop, and cancellation cases.
 - `env.run-loop` now emits compact fallback outcome events when host action validation fails and a safe action pre-empts the requested command.
 - Aligned README, roadmap, TODO, and release notes around the status vocabulary `released`, `experimental`, `contract-only`, and `planned`.

@@ -74,7 +74,7 @@ Use these fields to connect runtime evidence back to the BT source:
 - link a generated fragment proposal to the canonical event stream;
 - distinguish source-format changes from canonical tree changes;
 - identify which normalised BT definition was replayed;
-- compare paper artefacts without relying on file names or prose labels.
+- compare evidence artefacts without relying on file names or prose labels.
 
 The hashes are not a security boundary. Generated fragments still need parser, normaliser, validator, capability, budget, fallback, and replay checks before execution.
 
@@ -101,7 +101,7 @@ The hashes are not a security boundary. Generated fragments still need parser, n
 - Blackboard `bb_write.preview` is size-limited (4KB JSON).
 - `seq` is the authoritative ordering key for replay/monitoring.
 - Existing planner/vla metadata is wrapped in canonical events (for example `planner_v1`).
-- Compact outcome events use `schema_version: "runtime_outcome.v1"`. They summarise paper-facing outcomes such as `tick_ok`, `tick_deadline_missed`, `planner_timeout`, `vla_timeout`, `late_result_dropped`, `cancel_acknowledged`, and `cancel_late` while the detailed lifecycle events remain the source of inspection detail.
+- Compact outcome events use `schema_version: "runtime_outcome.v1"`. They summarise evaluation outcomes such as `tick_ok`, `tick_deadline_missed`, `planner_timeout`, `vla_timeout`, `late_result_dropped`, `cancel_acknowledged`, and `cancel_late` while the detailed lifecycle events remain the source of inspection detail.
 - `gc_begin` and `gc_end` are emitted when the Lisp heap collector runs through the default runtime host. Payloads use `schema_version: "gc.lifecycle.v1"`.
 - The opt-in `tick_audit` event is defined in [tick audit record](tick-audit.md). The runtime emits it after `tick_end` when tick audit mode is enabled.
 - File-backed event output is buffered by default. Enable `(events.set-flush-each-message #t)` when durability after each emitted event matters more than throughput.

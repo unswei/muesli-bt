@@ -153,7 +153,7 @@ Run the comparable subset against `BehaviorTree.CPP`:
 ./build/bench-release-btcpp/bench/bench run-all --runtime btcpp
 ```
 
-`run-all` is the reasonable whole-catalogue runner. Use the publication script for paper-facing runs with longer durations and stronger repetition counts:
+`run-all` is the reasonable whole-catalogue runner. Use the benchmark collection script for curated evidence runs with longer durations and stronger repetition counts:
 
 ```bash
 python3 bench/scripts/run_publication_benchmarks.py

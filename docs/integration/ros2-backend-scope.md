@@ -148,7 +148,7 @@ This page now tracks two kinds of ROS work:
 
 These phases are complete for the first released ROS2 baseline.
 
-- phase `0`: lock the integration boundary on paper
+- phase `0`: lock the integration boundary in the written contract
 - phase `1`: finalise canonical schemas and config surface
 - phase `2`: strengthen generic backend semantics in core tests
 - phase `3`: define deterministic fixtures before real ROS

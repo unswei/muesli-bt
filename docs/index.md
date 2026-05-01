@@ -24,7 +24,7 @@ Lisp source defines inspectable BT task logic. Host backends provide robot or si
 - [I just want to run it](getting-oriented/choose-your-path.md#i-just-want-to-run-it)
 - [I know Behaviour Trees and want the semantics](getting-oriented/choose-your-path.md#i-know-behaviour-trees-and-want-the-semantics)
 - [I want to connect a robot or simulator](getting-oriented/choose-your-path.md#i-want-to-connect-a-robot-or-simulator)
-- [I care about publication evidence](getting-oriented/choose-your-path.md#i-care-about-publication-evidence)
+- [I care about reproducible evidence](getting-oriented/choose-your-path.md#i-care-about-reproducible-evidence)
 - [I want model or VLA integration](getting-oriented/choose-your-path.md#i-want-model-or-vla-integration)
 
 ## first runnable path

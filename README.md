@@ -22,7 +22,7 @@ Robotics task logic often needs more than a plain BT tick:
 
 - planner work must respect tick budgets;
 - model or VLA jobs can return late and need cancellation;
-- execution traces must be good enough for debugging, conformance, and publication;
+- execution traces must be good enough for debugging, conformance, and external evaluation;
 - simulator and ROS2 backends should not redefine the BT semantics.
 
 `muesli-bt` keeps these concerns explicit through the Lisp BT DSL, the runtime contract, and the canonical `mbt.evt.v1` event stream.
@@ -41,7 +41,7 @@ Use `muesli-bt` if you need task-level robot control where:
 - Behaviour Tree logic should remain editable and inspectable;
 - planners or model calls must respect tick budgets;
 - async jobs must be cancellable and replayable;
-- execution traces matter for debugging, evaluation, or publication.
+- execution traces matter for debugging, evaluation, or audit.
 
 Do not use it for:
 
@@ -144,9 +144,9 @@ VLA/model support is currently experimental lifecycle infrastructure: submit, po
 
 See [VLA integration](docs/bt/vla-integration.md), [VLA nodes](docs/bt/vla-nodes.md), and [known limitations](docs/known-limitations.md).
 
-## citation / paper status
+## citation
 
-Paper artefacts are in preparation. Until a preprint or accepted paper exists, cite the repository version you used. Citation metadata is provided in [CITATION.cff](CITATION.cff).
+If you use `muesli-bt`, cite the repository version you used. Citation metadata is provided in [CITATION.cff](CITATION.cff).
 
 ## contributing
 

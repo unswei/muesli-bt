@@ -2,7 +2,7 @@
 
 ## what this is
 
-This page turns the current backlog, ROS2 scope, conformance work, and paper-oriented release planning into one release roadmap from the current baseline to `v1.0.0`.
+This page turns the current backlog, ROS2 scope, conformance work, and evidence-oriented release planning into one release roadmap from the current baseline to `v1.0.0`.
 
 This page is release-oriented. The shorter [Roadmap](limitations-roadmap.md) page remains the theme-based backlog.
 
@@ -13,7 +13,7 @@ Use this page when you:
 - decide whether a change belongs before or after `v1.0.0`
 - scope release work for `v0.5.0+`
 - review whether ROS2 work is staying thin and bounded
-- check what evidence is still missing for a paper-ready release
+- check what evidence is still missing for a release-ready baseline
 
 ## how it works
 
@@ -92,15 +92,15 @@ The thin adaptor and observability baseline are already real enough that the nex
 
 The remaining path is:
 
-- preserve “same BT, different IO transport” as the first paper-facing evidence point
-- harden the Lisp/C++ runtime so the paper can defend allocation behaviour, GC pauses, deadline handling, cancellation, and deterministic replay
+- preserve “same BT, different IO transport” as the first release evidence point
+- harden the Lisp/C++ runtime so the evidence can defend allocation behaviour, GC pauses, deadline handling, cancellation, and deterministic replay
 - replace VLA stubs with at least one real model-backed asynchronous service and failure-injection path
 - build a fair comparison engine against BehaviorTree.CPP rather than relying only on internal microbenchmarks
 - add ROS2 host capability bridges, especially Nav2 and, if still feasible, MoveIt, without widening core runtime semantics
 - keep the existing Isaac showcase as supporting evidence rather than a second semantic surface
 - make the Lisp-as-DSL argument explicit and testable: Lisp is used as a compact structured representation for BTs, not as arbitrary scripting; before `v1.0.0`, include at least one implemented demonstration where a BT fragment is generated as Lisp data, validated, compiled, serialised, safely installed at a tick boundary, logged, and replayed
 - keep expected engine features inside `muesli-bt` itself: host capability authoring, blackboard/schema validation, diagnostics, CLI validation, metadata export, embedding, and replayable artefacts belong in the runtime rather than requiring a visual tool
-- finish paper-facing evaluation, trace bundles, and release hygiene
+- finish evaluation, trace bundles, and release hygiene
 
 ### engine and studio boundary
 
@@ -134,9 +134,9 @@ The practical engine-side gaps to close before `v1.0.0` are:
 - stable embedding and CLI workflows for larger robot stacks
 - canonical engine metadata for tools such as `muesli-studio`, without implementing the UI in `muesli-bt`
 
-### paper-facing Lisp DSL argument
+### Lisp DSL argument
 
-The paper and release documentation should defend Lisp as a technical choice, not as a matter of taste.
+The release documentation should explain Lisp as a technical choice, not as a matter of taste.
 
 The argument is:
 
@@ -147,7 +147,7 @@ The argument is:
 - The runtime can validate the generated tree against BT grammar, host capability contracts, budget rules, fallback requirements, and safety restrictions before it is allowed to execute.
 - The same canonical event stream can record which generated tree was used, when it was validated, when it was installed, and how it behaved during replay.
 
-The paper-facing claim should be narrow:
+The release claim should be narrow:
 
 > `muesli-bt` uses Lisp as an inspectable, executable tree representation for robot task logic. This lets the same representation support authored BTs, generated BT fragments, validation, serialisation, replay, and safe tick-boundary installation under the runtime contract.
 
@@ -203,7 +203,7 @@ Status:
 Focus:
 
 - prove that muesli-bt semantics stay stable while the transport changes
-- turn that result into one of the core paper evidence points, not just an integration smoke test
+- turn that result into one of the core evaluation evidence points, not just an integration smoke test
 
 Scope:
 
@@ -225,7 +225,7 @@ Exit criteria:
 - one integration tutorial shows the supported backend flow end-to-end, including canonical log validation
 - at least one scripted check compares key metrics or decision-trace invariants across the three transports
 - the ROS2 story is now clearly “same BT, different IO transport”, not “special ROS-only behaviour”
-- the cross-transport comparison is strong enough to support a paper-facing claim about stable semantics across transport changes
+- the cross-transport comparison is strong enough to support a release claim about stable semantics across transport changes
 
 #### `v0.6.0`: host capability bundles and planner boundary stabilisation
 
@@ -256,7 +256,7 @@ Scope:
 - keep `planner.plan` as the in-runtime bounded decision planner
 - document that higher-level ROS libraries such as MoveIt and Nav2 belong behind separate host capability contracts
 - define the first target capability families for manipulation and perception, but keep the public contracts generic rather than MoveIt-named or detector-named
-- freeze the user-facing planner request/result contract for the paper baseline
+- freeze the user-facing planner request/result contract for the evaluation baseline
 - keep existing planner and ROS-backed conformance evidence unchanged unless a concrete new ROS-backed planner, capability, transport, or failure-mode path needs coverage
 - keep planner time-budget behaviour explicit in docs and logs
 
@@ -266,7 +266,7 @@ Exit criteria:
 - at least one manipulation contract and one perception contract are specified at the host level without hard-coding ROS library names into core semantics
 - the split between `env.*`, `planner.plan`, and external host capabilities is explicit in docs and examples
 - planner request/result docs match released behaviour and fixtures
-- planner documentation covers the paper-critical success, timeout, error, fallback, `budget_ms`, `work_max`, and logging paths
+- planner documentation covers the evaluation-critical success, timeout, error, fallback, `budget_ms`, `work_max`, and logging paths
 - ROS2 `L2` remains focused on the released thin `Odometry` -> `Twist` lane until a concrete new ROS-backed path is added
 
 #### `v0.7.0`: core defensibility and async correctness
@@ -295,7 +295,7 @@ Scope:
 - add GC lifecycle telemetry for `gc_begin`, `gc_end`, forced collection, heap snapshots, mark time, sweep time, total pause time, live object count, freed object count, and triggering reason
 - add a runtime GC policy switch for at least `default`, `between-ticks`, `manual`, and `fail-on-tick-gc`
 - extend deterministic replay checks to cover async submit, poll, cancel, timeout, late completion, dropped completion, planner timeout, fallback, blackboard deltas, and host-action validation outcomes
-- add a compact runtime outcome taxonomy for paper-facing traces: `tick_ok`, `tick_deadline_missed`, `planner_timeout`, `vla_timeout`, `host_action_invalid`, `fallback_used`, `fallback_failed`, `late_result_dropped`, `cancel_acknowledged`, and `cancel_late`
+- add a compact runtime outcome taxonomy for evaluation traces: `tick_ok`, `tick_deadline_missed`, `planner_timeout`, `vla_timeout`, `host_action_invalid`, `fallback_used`, `fallback_failed`, `late_result_dropped`, `cancel_acknowledged`, and `cancel_late`
 - complete runtime-level async cancellation edge coverage, including cancellation before start, cancellation while running, cancellation after timeout, late completion after cancellation, and repeated cancellation
 - add one ROS-level cancellation or pre-emption scenario only if it reuses the same runtime events and does not introduce a separate ROS-specific cancellation model
 - document explicitly that `muesli-bt` is a task-level control runtime, not a hard real-time servo-loop runtime
@@ -364,7 +364,7 @@ Exit criteria:
 - canonical logs show the required cancellation, timeout, fallback, and late-result lifecycle events for the supported cases
 - replay validation reports first divergence precisely, including divergent tick index, node id, blackboard key, async job id, or host capability call where applicable
 - any ROS-level cancellation coverage reuses the runtime semantics and does not introduce a second cancellation model
-- the release can generate at least one paper-quality tail-latency figure and one memory/GC figure from checked-in scripts
+- the release can generate at least one reproducible tail-latency figure and one memory/GC figure from checked-in scripts
 - the docs state clearly that Lisp is used as a compact structured BT representation, not as an excuse to run arbitrary unbounded code inside the tick loop
 - representative BTs can be serialised to canonical DSL and loaded again without changing intended execution semantics
 - invalid generated BT fragments are rejected before execution by deterministic validation tests
@@ -405,14 +405,14 @@ Scope:
 
 - implement at least one real model backend behind the existing VLA service interface, preferably as a local process or HTTP backend that can be replayed deterministically from stored request and response records
 - integrate VLA as a transport-transparent asynchronous host capability, using SmolVLA through the LeRobot async inference path as the primary practical backend and OpenVLA-OFT as the heavyweight VLA backend; the BT source must remain independent of whether inference runs locally, on an edge server, over HTTP/ROS2, or from a replay cache
-- keep the current stub backend as a deterministic unit-test backend, not as the paper-facing VLA evidence path
+- keep the current stub backend as a deterministic unit-test backend, not as the release evidence path
 - support submit, poll, timeout, cancellation, partial response, final response, response hashing, request hashing, replay from stored records, and backend failure reporting
 - define first capability names for model-backed perception or action proposal, for example `cap.perception.scene.v1`, `cap.vla.select_target.v1`, or `cap.vla.propose_nav_goal.v1`
 - implement an injected latency and failure layer for VLA and planner backends, including delayed success, timeout, invalid action schema, unsafe action value, stale scene timestamp, dropped response, backend crash, and cancellation ignored until completion
 - implement first-class action validation before any VLA or planner output can reach `env.act` or a host capability execution call
 - include validators for continuous bounds, max command delta, timestamp freshness, target frame validity, forbidden zones, Nav2 goal validity where available, and host-declared capability schema compliance
 - extend canonical logs with `vla_submit`, `vla_partial`, `vla_result`, `vla_cancel`, `vla_timeout`, `action_validation`, and `model_result_dropped` events, or their existing canonical equivalents if already named differently
-- keep the flagship wheeled demo polished, but make the paper-facing novelty in this milestone the model-latency and cancellation behaviour, not visual demo quality
+- keep the flagship wheeled demo polished, but make the evaluation focus in this milestone the model-latency and cancellation behaviour, not visual demo quality
 - keep the existing Isaac Sim / ROS2 showcase as supporting evidence, not as a required semantic surface or CI dependency
 
 Additional scope: capability authoring and backend usability:
@@ -494,13 +494,13 @@ Exit criteria:
 - all VLA and planner outputs pass through a documented validator before execution
 - seeded latency and failure injection is reproducible across runs
 - the same VLA or planner fault schedule can be replayed from trace artefacts
-- the release can generate a paper-quality “tail latency under injected model lag” figure
-- the release can generate a paper-quality “stale result, cancellation, and fallback outcomes” table
+- the release can generate a reproducible “tail latency under injected model lag” figure
+- the release can generate a reproducible “stale result, cancellation, and fallback outcomes” table
 - the wheeled flagship demo remains reproducible with canonical log validation and does not depend on simulator-specific semantics
 - generated BT fragments are never executed directly from raw model text
 - every accepted fragment has a canonical DSL form and hash
 - every rejected fragment has a deterministic rejection reason
-- the model/VLA path strengthens the Lisp-as-DSL argument without making the paper depend on LLM-generated control logic
+- the model/VLA path strengthens the Lisp-as-DSL argument without depending on LLM-generated control logic
 - a new user can add a simple host capability by following one tutorial
 - model/VLA execution is configured outside the BT source
 - the same BT can use different backend placements without source changes
@@ -513,11 +513,11 @@ Exit criteria:
 
 Focus:
 
-- prevent the paper from looking like an implementation report with only internal benchmarks
+- prevent the evaluation from looking like an implementation report with only internal benchmarks
 - build a fair comparison path against BehaviorTree.CPP
 - add the ROS2 glue needed for a physical or physical-like validation run without contaminating core runtime semantics
-- reduce the risk that the paper rests on one example only
-- make `muesli-bt` usable as an engine inside a normal robot software stack, not only as a standalone executable or paper benchmark harness
+- reduce the risk that the evidence rests on one example only
+- make `muesli-bt` usable as an engine inside a normal robot software stack, not only as a standalone executable or benchmark harness
 
 Scope:
 
@@ -580,7 +580,7 @@ docs/tutorials/embedding-muesli-bt.md
 
 Lisp-specific evidence path: generated guarded recovery subtree:
 
-- add one paper-facing demonstration where Lisp clearly enables useful runtime task-logic handling beyond hand-written BT execution
+- add one evaluation demonstration where Lisp clearly enables useful runtime task-logic handling beyond hand-written BT execution
 - recommended demo: `generated guarded recovery subtree`
 - start with a normal wheeled goal-seeking BT used in the existing cross-transport path
 - when a deterministic blocked-path or degraded-model condition is observed, generate a guarded recovery subtree as Lisp data using either quasiquote/templates or a deterministic generator
@@ -668,7 +668,7 @@ subtree_install_rejected
 subtree_replay_loaded
 ```
 
-Each event should include enough context for replay and paper artefacts:
+Each event should include enough context for replay and evidence artefacts:
 
 - run id
 - tick id where applicable
@@ -711,14 +711,14 @@ Exit criteria:
 - at least one generated or live-patched subtree experiment demonstrates why a Lisp runtime is useful beyond implementation taste
 - the Nav2 adapter can run the wheeled scenario through a host capability boundary and emit canonical logs
 - one ROS-backed row or slice exists in the evaluation outputs, preferably Nav2-backed; if not physical, it must at least be rosbag-backed and replay-validated
-- two distinct scenarios exist with clear rationale, or the roadmap records why the second scenario was deferred to preserve the paper’s core claim
+- two distinct scenarios exist with clear rationale, or the roadmap records why the second scenario was deferred to preserve the core evaluation claim
 - all baseline and ROS evidence uses the same canonical event-log discipline as the core runtime experiments
 - at least one generated guarded recovery subtree demonstration is runnable from documented commands
 - the demonstration proves the full Lisp-as-DSL path: generate as Lisp data, normalise, validate, compile, serialise, install at tick boundary, execute, log, and replay
 - invalid generated fragments are rejected before execution and leave the previous tree active
 - accepted generated fragments are identified in logs by canonical DSL hash
 - the documentation explains why this demonstration depends on Lisp as structured tree data rather than treating Lisp as a cosmetic syntax choice
-- the paper artefact set includes at least one figure, table, or trace excerpt from this demonstration
+- the evidence artefact set includes at least one figure, table, or trace excerpt from this demonstration
 - users can see how to embed `muesli-bt` as an engine rather than only invoke `muslisp`
 - users can see how to implement a ROS2-backed capability without changing core BT semantics
 - common BT design patterns are documented as copyable recipes
@@ -726,28 +726,28 @@ Exit criteria:
 - task-level safety hooks are documented and covered by at least one fixture
 - none of these engine features require `muesli-studio`
 
-#### `v1.0.0`: paper artefacts and release baseline
+#### `v1.0.0`: evidence artefacts and release baseline
 
 Focus:
 
-- cut the first paper-ready, tool-builder-friendly, release-quality baseline
-- make the `v1.0.0` release match the paper exactly, including traces, scripts, manifests, and benchmark outputs
-- make the `v1.0.0` release usable as a BT engine by early adopters, not only as a paper artefact
+- cut the first release-ready, tool-builder-friendly, release-quality baseline
+- make the `v1.0.0` release internally consistent across traces, scripts, manifests, and benchmark outputs
+- make the `v1.0.0` release usable as a BT engine by early adopters, not only as an evidence artefact
 
 Scope:
 
-- freeze the paper-facing runtime contract, compatibility policy, event schema, conformance levels, benchmark manifests, and supported host capability contracts
+- freeze the release runtime contract, compatibility policy, event schema, conformance levels, benchmark manifests, and supported host capability contracts
 - ensure `L0`, `L1`, and `L2` are documented with exact run commands, expected artefacts, and failure interpretation
 - publish source release plus verified Ubuntu `x86_64`, Ubuntu ROS-enabled, and macOS `arm64` artefacts where still supported
 - publish trace bundles for the core runtime, VLA/model-latency path, BehaviorTree.CPP comparison path, and ROS-backed evaluation path
-- publish scripts that regenerate all paper tables and figures from checked-in or archived artefacts
+- publish scripts that regenerate all release evaluation tables and figures from checked-in or archived artefacts
 - include memory, GC, allocation, tail-latency, cancellation, fallback, replay, baseline, and ROS evidence in the release artefact set
 - document the exact claim boundaries: task-level deadlines rather than hard real time, host capabilities rather than ROS semantics, and model orchestration rather than a new VLA model
 - publish the Lisp-as-DSL technical argument in the README or documentation entry path, with careful wording that presents Lisp as structured BT data rather than arbitrary scripting
-- publish the generated guarded recovery subtree demonstration as a supported paper artefact or clearly labelled paper-evidence example
+- publish the generated guarded recovery subtree demonstration as a supported evidence artefact or clearly labelled evaluation example
 - include the generated canonical DSL artefacts, rejection fixtures, trace files, replay reports, and scripts needed to reproduce the demonstration
 - ensure the generated-subtree demo is referenced from the evidence index, runtime contract material, and documentation path for new users
-- ensure the paper text can cite the release for the claim that Lisp supports authored, generated, validated, serialised, replayed, and safely installed BT fragments
+- ensure the release documentation supports the claim that Lisp can represent authored, generated, validated, serialised, replayed, and safely installed BT fragments
 - freeze the supported `v1.0.0` engine surface explicitly:
   - Lisp BT DSL subset
   - runtime contract version
@@ -786,7 +786,7 @@ Exit criteria:
 - at least one real model-backed VLA or model-mediated async experiment is included, not only stub output
 - the release includes replayable trace bundles for at least one SmolVLA-backed or OpenVLA-OFT-backed run, with model-call lifecycle events, validation outcomes, stale-result handling, and fallback behaviour visible in `mbt.evt.v1`
 - at least one fair BehaviorTree.CPP baseline comparison is included with public baseline code and matched scenario manifests
-- at least one paper figure, table row, or evaluation slice includes ROS-backed evidence
+- at least one figure, table row, or evaluation slice includes ROS-backed evidence
 - preferred outcome: at least one Nav2-backed or physical wheeled run is included with `events.jsonl`, rosbag, replay report, and failure classification
 - acceptable fallback: if physical hardware is not stable enough by the tag, the release includes a rosbag-backed Nav2 or equivalent ROS action-capability run and states the physical limitation plainly
 - the core claim is demonstrably true: BT semantics stay stable while transport changes, asynchronous planner/model work is deadline-aware and cancellable, and canonical event logs support replay and inspection across supported transports
@@ -817,7 +817,7 @@ This roadmap also uses the following release terms:
 
 - `supported`: documented, tested in CI, and included in the release support posture
 - `baseline`: good enough to claim as part of the public release surface
-- `paper-ready`: stable enough to cite directly in paper artefacts and evaluation
+- `release-ready`: stable enough to cite directly in evidence artefacts and evaluation
 
 ## example
 
@@ -829,9 +829,9 @@ Example interpretation for `v1.0.0`:
 
 If a ROS-backed demo works but the same BT cannot be shown across simulator and ROS transport, the deployability story is still incomplete.
 
-If the VLA path still uses only the stub backend, the model-integration claim is not paper-ready.
+If the VLA path still uses only the stub backend, the model-integration claim is not release-ready.
 
-If the BehaviorTree.CPP comparison uses blocking action nodes or a weaker hand-written baseline, the comparison is not paper-ready.
+If the BehaviorTree.CPP comparison uses blocking action nodes or a weaker hand-written baseline, the comparison is not release-ready.
 
 If the hot-path benchmark reports only mean tick time and not allocations, GC pauses, and tail latency, the Lisp runtime defensibility story is incomplete.
 
@@ -857,26 +857,26 @@ If `muesli-bt` emits traces that a tool can display only by reverse-engineering 
 
 ## gotchas
 
-- Do not let ROS2 scope expand into a second semantic runtime.
-- Do not choose a flagship that depends on backend-specific line sensors, wall sensors, or other signals that the released ROS2 baseline does not expose.
-- Do not let “host capability bundles” turn into one giant catch-all ROS super-interface.
-- Do not treat ad hoc replay artefacts as a replacement for canonical `mbt.evt.v1` logs.
-- Do not use demo polish to hide missing conformance or observability guarantees.
-- Do not present stub VLA output as evidence for model-integrated robotics.
-- Do not present average tick speed as evidence of real-time suitability. Tail latency, allocation, GC, and long-run memory behaviour must be shown.
-- Do not compare against a deliberately weak BehaviorTree.CPP baseline. The baseline must use proper non-blocking actions and halt/pre-emption handling.
-- Do not let a real model, Nav2, MoveIt, or Isaac integration leak new semantics into the Lisp or BT core. They remain host capabilities.
-- Do not lock the second flagship too early if the strongest reproducible evidence points elsewhere.
-- Do not present Lisp as a virtue by itself. The argument is structured tree data for generated, validated, serialised, replayed, and safely installed BT fragments.
-- Do not execute raw model-generated text as robot control logic. Treat generated Lisp fragments as untrusted input until parsed, normalised, validated, and checked against capability and fallback rules.
-- Do not let the generated-subtree demonstration bypass the same runtime contract, canonical logging, or replay validation used by hand-authored BTs.
-- Do not let dynamic subtree installation mutate the active tree during a tick. Use tick-boundary installation or another explicitly documented safe point.
-- Do not claim that Lisp makes runtime task generation safe by itself. Safety comes from validation, host capability contracts, action validation, fallback policy, and replayable event logs.
-- Do not move engine responsibilities into `muesli-studio`. Studio may visualise and inspect, but `muesli-bt` must own validation, diagnostics, metadata, logs, and replayable artefacts.
-- Do not make model/VLA transport choices part of BT syntax. Keep placement and credentials in validated backend configuration.
-- Do not let custom-capability authoring depend on undocumented internals.
-- Do not present task-level watchdogs or safe-stop hooks as replacements for low-level robot safety systems.
-- Do not leave public API stability implicit before `v1.0.0`; mark APIs as supported, experimental, or internal.
+- ROS2 scope must not expand into a second semantic runtime.
+- Flagship scenarios should use signals exposed by the released ROS2 baseline, not backend-specific shortcuts.
+- Host capability bundles should stay narrow rather than becoming one catch-all ROS super-interface.
+- Canonical `mbt.evt.v1` logs are the replay artefact of record.
+- Demo polish is secondary to conformance and observability guarantees.
+- Stub VLA output is deterministic fixture evidence, not evidence for model-integrated robotics.
+- Real-time suitability depends on tail latency, allocation, GC, and long-run memory behaviour, not average tick speed alone.
+- BehaviorTree.CPP comparisons need proper non-blocking actions and halt/pre-emption handling.
+- Real model, Nav2, MoveIt, and Isaac integrations remain host capabilities. They must not add new Lisp or BT core semantics.
+- The second flagship should follow the strongest reproducible evidence rather than being locked too early.
+- Lisp is useful here as structured tree data for generated, validated, serialised, replayed, and safely installed BT fragments.
+- Generated Lisp fragments are untrusted input until parsed, normalised, validated, and checked against capability and fallback rules.
+- Generated-subtree demonstrations use the same runtime contract, canonical logging, and replay validation as hand-authored BTs.
+- Dynamic subtree installation happens at a tick boundary or another explicitly documented safe point.
+- Runtime task generation is safe only when validation, host capability contracts, action validation, fallback policy, and replayable event logs are in place.
+- `muesli-bt` owns validation, diagnostics, metadata, logs, and replayable artefacts. `muesli-studio` may visualise and inspect them.
+- Model/VLA placement and credentials belong in validated backend configuration, not BT syntax.
+- Custom-capability authoring should not depend on undocumented internals.
+- Task-level watchdogs and safe-stop hooks complement low-level robot safety systems; they do not replace them.
+- Public API stability should be explicit before `v1.0.0`; mark APIs as supported, experimental, or internal.
 
 ## priority if scope has to be cut
 

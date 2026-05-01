@@ -15,7 +15,7 @@ using one shared normalisation path, while the fixed collection window remains t
 This protocol is intentionally narrow.
 It is the first evidence protocol for the flagship, not the final evaluation design for `1.0`.
 It is a portability protocol, not the stricter same-robot comparison track.
-ROS2 support in the normalisation tooling does not, by itself, mean this fixed paper-facing collection protocol has expanded to a three-way parity claim.
+ROS2 support in the normalisation tooling does not, by itself, mean this fixed evidence collection protocol has expanded to a three-way parity claim.
 
 ## when to use it
 

@@ -47,9 +47,9 @@ Start with:
 
 The trace records what was ticked, which nodes returned which statuses, when work timed out, and where fallback happened. This helps identify whether a failure came from BT structure, planner latency, host action validation, or backend IO.
 
-## how this supports paper artefacts
+## how this supports evidence artefacts
 
-Paper evidence should come from reproducible artefacts: commands, manifests, logs, replay reports, and benchmark bundles. The event stream is the shared evidence format that lets those artefacts be inspected after the run.
+External evidence should come from reproducible artefacts: commands, manifests, logs, replay reports, and benchmark bundles. The event stream is the shared evidence format that lets those artefacts be inspected after the run.
 
 ## where muesli-studio fits
 

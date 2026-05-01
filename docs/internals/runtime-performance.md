@@ -47,9 +47,9 @@ The benchmark-driven view is simple:
 
 That means the runtime should not try to optimise every hot path at once.
 
-### publication bundle: 2026-04-26
+### curated benchmark bundle: 2026-04-26
 
-The paper-facing benchmark bundle is:
+The curated benchmark bundle is:
 
 ```text
 bench/results/publication-publication-20260426T230137Z
@@ -102,7 +102,7 @@ Headline observations:
 
 Interpretation limits:
 
-- this is a paper-facing evidence bundle, not a release artefact
+- this is a curated evidence bundle, not a release artefact
 - the run is Apple M3 / Darwin / AppleClang evidence; do not generalise the exact numbers to Linux, ROS2, or other CPUs without a matching run
 - CPU pinning was off, so tail latency remains operating-system and scheduler sensitive
 - `B7` is a GC smoke and pressure workload; it demonstrates canonical GC lifecycle logging and bounded measurement, not a proof of leak-freedom

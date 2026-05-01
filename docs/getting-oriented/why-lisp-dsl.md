@@ -91,7 +91,7 @@ These hashes are identity and replay aids, not a safety proof.
 - `canonical_dsl_hash` identifies the normalised DSL returned by `bt.to-dsl`.
 - `tree_hash` uses the canonical DSL hash when available, with a structural fallback for non-DSL definitions.
 
-Use the source hash to answer "which generated or loaded fragment was proposed?". Use the canonical DSL hash to answer "which normalised tree was accepted, logged, and replayed?". If the source hash changes but the canonical DSL hash stays the same, the difference was normalised away. If the canonical DSL hash changes, replay and paper artefacts can treat it as a different BT definition.
+Use the source hash to answer "which generated or loaded fragment was proposed?". Use the canonical DSL hash to answer "which normalised tree was accepted, logged, and replayed?". If the source hash changes but the canonical DSL hash stays the same, the difference was normalised away. If the canonical DSL hash changes, replay and evidence artefacts can treat it as a different BT definition.
 
 ## example
 
@@ -150,15 +150,15 @@ python3 tools/validate_generated_bt_fragment.py fixtures/dsl/generated-fragment-
 
 This is representative DSL evidence. It does not prove that every generated BT fragment is safe. Generated fragments still need grammar validation, capability checks, budget checks, fallback checks, canonical logging, and replay evidence before execution.
 
-The later paper-facing demonstration is a generated guarded recovery subtree. That demonstration is planned to show the full path: generate as Lisp data, normalise, validate, compile, serialise, install at a tick boundary, execute, log, and replay.
+A generated guarded recovery subtree is the intended demonstration for this path. It should show the full lifecycle: generate as Lisp data, normalise, validate, compile, serialise, install at a tick boundary, execute, log, and replay.
 
 ## gotchas
 
-- Do not present Lisp as a virtue by itself. The argument is structured tree data for BTs.
-- Do not execute raw model-generated text as robot control logic.
-- Do not bypass the same runtime contract, canonical logging, or replay validation used by hand-authored BTs.
-- Do not install generated subtrees in the middle of a tick.
-- Do not claim that Lisp makes runtime task generation safe by itself.
+- Lisp is useful here because it is structured tree data for BTs, not because Lisp syntax is intrinsically safer or better.
+- Raw model-generated text is untrusted input, not robot control logic.
+- Generated BT fragments must use the same runtime contract, canonical logging, and replay validation as hand-authored BTs.
+- Generated subtrees are installed at a tick boundary or another documented safe point.
+- Runtime task generation is safe only when validation, capability checks, fallback policy, and replayable logs are in place.
 
 ## see also
 

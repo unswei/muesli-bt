@@ -23,7 +23,7 @@ Use this page when you know what you want to do, but not which part of the docum
 3. [writing a backend](../integration/writing-a-backend.md)
 4. [ROS2 tutorial](../integration/ros2-tutorial.md)
 
-## I care about publication evidence
+## I care about reproducible evidence
 
 1. [runtime contract v1](../contracts/runtime-contract-v1.md)
 2. [conformance levels](../contracts/conformance.md)

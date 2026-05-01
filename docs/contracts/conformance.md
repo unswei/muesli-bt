@@ -9,7 +9,7 @@ This page defines the conformance matrix and how to run each level.
 Use this page when:
 
 - validating runtime-contract behaviour in CI
-- reproducing paper fixtures
+- reproducing evidence fixtures
 - integrating a new backend against the runtime contract
 
 ## how it works
