@@ -4,6 +4,8 @@ muesli-bt
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-05-05
+
 ### Added
 - Added a visitor-facing documentation entry path with a concise README, a reworked docs home page, a "choose your path" guide, a "first 10 minutes" quickstart, a known limitations page, an evidence index, and an observability-first guide.
 - Added a fair `BehaviorTree.CPP` comparison orientation page and a preserved feature inventory page so the README can stay short without dropping the detailed runtime surface map.
