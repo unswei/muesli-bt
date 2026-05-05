@@ -271,7 +271,7 @@ Exit criteria:
 
 #### `v0.7.0`: core defensibility and async correctness
 
-Status: in progress for `v0.7.0`; release notes live in [v0.7.0 release notes](releases/v0.7.0.md).
+Status: released in `v0.7.0`; release notes live in [v0.7.0 release notes](releases/v0.7.0.md).
 
 Status vocabulary for this milestone:
 

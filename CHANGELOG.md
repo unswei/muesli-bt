@@ -27,7 +27,7 @@ muesli-bt
 - Added precise replay comparison divergence fields for tick, event type, field path, node id, blackboard key, async job id, planner id, and host capability.
 - Added compact `runtime_outcome.v1` taxonomy event types for tick, planner timeout, VLA timeout, fallback, late-result-drop, and cancellation outcomes.
 - Added a ROS2 L2 rosbag pre-emption/fallback scenario that reuses canonical `host_action_invalid` and `fallback_used` outcome events.
-- Added `v0.7.0` release notes covering async correctness, Lisp DSL defensibility, hash logging, generated-fragment rejection fixtures, and remaining release checks.
+- Added `v0.7.0` release notes covering async correctness, Lisp DSL defensibility, hash logging, generated-fragment rejection fixtures, and release verification.
 - Added a `why Lisp as DSL?` page that frames Lisp as structured BT data rather than arbitrary scripting.
 - Added representative DSL round-trip checks for sequence, selector, reactive, planner, and async/VLA-shaped BTs.
 - Added source and canonical DSL hash support for DSL-backed `bt_def` canonical log events.
