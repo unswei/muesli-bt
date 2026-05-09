@@ -10,7 +10,7 @@ Use the public `v1.0` direction page under `docs/project/v1-direction.md` for th
 - `v0.8.0`: implement canonical host capability lifecycle events for real runtime-affecting capability calls; use `cap_call_start` and `cap_call_end` in `mbt.evt.v1`, including request id, capability name, operation, status, latency, rejection/error reason where applicable, and enough tick/job context for replay and first-divergence reports
 - `v0.8.0`: freeze the `MMSP v0.2` bridge profile that `muesli-bt` will accept: `describe` compatibility checks, public capability ids, `status: "action_chunk"` with `output.actions`, service-local `frame://` refs, timeout semantics, and no-service fallback behaviour
 - `v0.8.0`: deepen `describe` compatibility checks beyond the first capability-presence gate, including mode/schema/freshness/replay fields and incompatible descriptor diagnostics
-- `v0.8.0`: continue model-service capability paths after the first stateless `cap.call` world-model path: VLA session submit/poll/cancel adapter, replay-cache lookup, deterministic request/response hashing, redaction, and evidence outputs
+- `v0.8.0`: continue model-service capability paths after the first stateless `cap.call` world-model path: VLA session submit/poll/cancel adapter, redaction, richer replay reports, and evidence outputs
 - `v0.8.0`: add a host-side frame-ingest helper or documented adapter path for live VLA observations, so camera bytes are published through `PUT /v1/frames/{name}` and BT-visible model requests carry `frame://` refs rather than image payloads
 - `v0.8.0`: add action and capability validation gates so stale, invalid, or policy-violating outputs reach the host zero times in supported injected tests
 - `v0.8.0`: publish one real model-backed async capability path for the flagship lane, with deterministic fault injection schedules, replay parity checks, and outcome metrics for stale-result rejection, invalid-output rejection, fallback count, cancellation outcome, and host reach
@@ -52,6 +52,7 @@ Use the public `v1.0` direction page under `docs/project/v1-direction.md` for th
 - `v0.8.0`: add the first optional C++ `ws://` `MMSP v0.2` client for `muesli-model-service`; this covers one request/response at the transport layer but is not yet wired into `cap.call` or VLA builtins
 - `v0.8.0`: wire the optional model-service client into runtime configuration and route stateless world-model `cap.call` requests through it, with deterministic unavailable results and `cap_call_start` / `cap_call_end` events
 - `v0.8.0`: add the first `describe` compatibility gate for configured model-service endpoints, covering protocol version, successful describe, descriptor envelope shape, and required public capability ids
+- `v0.8.0`: add deterministic request/response hashes and the first request-hash keyed replay cache for stateless model-service `cap.call`
 - `v0.5.0`: publish the final release notes from the green release baseline
 - `v0.6.0`: define host capability bundle naming and registration rules without changing BT or Lisp semantics
 - `v0.6.0`: make the boundary between `env.*`, `planner.plan`, and external host capabilities explicit in docs and examples

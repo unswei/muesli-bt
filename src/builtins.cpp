@@ -2626,6 +2626,13 @@ value model_service_response_to_lisp(const bt::model_service_response& response,
     if (!response.error_message.empty()) {
         map_set_symbol(out, "error", make_string(response.error_message));
     }
+    if (!response.request_hash.empty()) {
+        map_set_symbol(out, "request_hash", make_string(response.request_hash));
+    }
+    if (!response.response_hash.empty()) {
+        map_set_symbol(out, "response_hash", make_string(response.response_hash));
+    }
+    map_set_symbol(out, "replay_cache_hit", make_boolean(response.replay_cache_hit));
     return out;
 }
 
@@ -2672,6 +2679,13 @@ void emit_cap_call_event(std::string_view event_type,
     if (response != nullptr) {
         data << ",\"status\":\"" << bt::event_log::json_escape(bt::model_service_status_name(response->status)) << "\","
              << "\"host_reached\":" << (response->host_reached ? "true" : "false");
+        if (!response->request_hash.empty()) {
+            data << ",\"request_hash\":\"" << bt::event_log::json_escape(response->request_hash) << "\"";
+        }
+        if (!response->response_hash.empty()) {
+            data << ",\"response_hash\":\"" << bt::event_log::json_escape(response->response_hash) << "\"";
+        }
+        data << ",\"replay_cache_hit\":" << (response->replay_cache_hit ? "true" : "false");
         if (!response->error_code.empty()) {
             data << ",\"error_code\":\"" << bt::event_log::json_escape(response->error_code) << "\"";
         }
@@ -2689,7 +2703,7 @@ value call_model_service_capability(value request_map, const std::string& capabi
     request.capability = capability;
     request.op = model_service_operation_from_text(map_lookup_text_or(request_map, "operation", "invoke", "cap.call operation"));
     request.deadline_ms = map_lookup_int_or(request_map, "deadline_ms", 0, "cap.call deadline_ms");
-    request.replay_mode = map_lookup_text_or(request_map, "replay_mode", "live", "cap.call replay_mode");
+    request.replay_mode = map_lookup_text_or_empty(request_map, "replay_mode", "cap.call replay_mode");
     if (const std::optional<value> input_v = map_lookup_option(request_map, "input"); input_v.has_value()) {
         request.input_json = value_to_json(*input_v);
     } else {
@@ -2771,6 +2785,8 @@ value builtin_model_service_configure(const std::vector<value>& args) {
                           "model-service.configure request_timeout_ms");
     config.replay_mode = map_lookup_text_or(config_map, "replay_mode", config.replay_mode,
                                             "model-service.configure replay_mode");
+    config.replay_cache_path = map_lookup_text_or(config_map, "replay_cache_path", config.replay_cache_path,
+                                                  "model-service.configure replay_cache_path");
     if (const std::optional<value> required_v = map_lookup_option(config_map, "required"); required_v.has_value()) {
         if (!is_boolean(*required_v)) {
             throw lisp_error("model-service.configure required: expected boolean");
@@ -2824,6 +2840,7 @@ value builtin_model_service_info(const std::vector<value>& args) {
     map_set_symbol(out, "request_timeout_ms", make_integer(config.request_timeout_ms));
     map_set_symbol(out, "required", make_boolean(config.required));
     map_set_symbol(out, "replay_mode", make_string(config.replay_mode));
+    map_set_symbol(out, "replay_cache_path", make_string(config.replay_cache_path));
     return out;
 }
 

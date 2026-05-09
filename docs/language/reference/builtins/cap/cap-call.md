@@ -57,6 +57,9 @@ The model-service result uses:
 - `output`: decoded response output when present
 - `metadata`: decoded response metadata when present
 - `host_reached`: always false at this boundary; model outputs are not host execution
+- `request_hash`: deterministic hash of the `MMSP v0.2` request envelope
+- `response_hash`: deterministic hash of the raw response envelope
+- `replay_cache_hit`: whether the result came from the local replay cache
 
 ## Errors And Edge Cases
 
@@ -131,6 +134,7 @@ The model-service result uses:
 - Bounded model-service calls such as `cap.model.world.rollout.v1` use the same capability-first shape once the optional bridge is configured.
 - Future motion and perception adapters should stay behind their capability contracts.
 - Model-service calls emit canonical `mbt.evt.v1` lifecycle events named `cap_call_start` and `cap_call_end`.
+- `cap_call_end` includes request and response hashes when available.
 - The deterministic `cap.echo.v1` smoke path does not need those events until it stops being a pure registry/API fixture.
 
 ## See Also

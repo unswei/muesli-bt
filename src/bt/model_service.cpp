@@ -259,6 +259,27 @@ model_service_response unavailable_model_service_client::call(const model_servic
     return out;
 }
 
+std::string model_service_response_to_json(const model_service_response& response) {
+    std::ostringstream out;
+    out << "{\"version\":" << json_quote(response.version) << ",\"id\":" << json_quote(response.id)
+        << ",\"status\":" << json_quote(model_service_status_name(response.status))
+        << ",\"output\":" << raw_json_or_empty_object(response.output_json);
+    if (response.session_id.empty()) {
+        out << ",\"session_id\":null";
+    } else {
+        out << ",\"session_id\":" << json_quote(response.session_id);
+    }
+    if (response.error_code.empty() && response.error_message.empty()) {
+        out << ",\"error\":null";
+    } else {
+        out << ",\"error\":{\"code\":" << json_quote(response.error_code)
+            << ",\"message\":" << json_quote(response.error_message)
+            << ",\"retryable\":" << (response.error_retryable ? "true" : "false") << '}';
+    }
+    out << ",\"metadata\":" << raw_json_or_empty_object(response.metadata_json) << '}';
+    return out.str();
+}
+
 std::string model_service_request_to_json(const model_service_request& request) {
     std::ostringstream out;
     out << "{\"version\":" << json_quote(request.version) << ",\"id\":" << json_quote(request.id)
@@ -293,6 +314,7 @@ std::string model_service_request_to_json(const model_service_request& request) 
 model_service_response model_service_response_from_json(const std::string& text) {
     const auto object = parse_top_level_object(text);
     model_service_response out;
+    out.raw_json = text;
     if (auto it = object.find("version"); it != object.end()) {
         out.version = unquote_json_string(it->second);
     }

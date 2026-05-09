@@ -28,6 +28,7 @@ Result fields:
 - `request_timeout_ms`
 - `required`
 - `replay_mode`
+- `replay_cache_path`
 
 ## example
 

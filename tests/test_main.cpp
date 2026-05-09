@@ -5,6 +5,7 @@
 #include <functional>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -2178,6 +2179,12 @@ void test_capability_registry_call_echo() {
           "unconfigured model-service cap.call should return :unavailable");
     check(string_value(eval_text("(map.get model_response 'error_code \"\")", env)) == "model_service_unconfigured",
           "unconfigured model-service cap.call error code mismatch");
+    check(!string_value(eval_text("(map.get model_response 'request_hash \"\")", env)).empty(),
+          "model-service cap.call should expose request_hash");
+    check(!string_value(eval_text("(map.get model_response 'response_hash \"\")", env)).empty(),
+          "model-service cap.call should expose response_hash");
+    check(!boolean_value(eval_text("(map.get model_response 'replay_cache_hit true)", env)),
+          "unconfigured model-service cap.call should not be a replay cache hit");
     check(!boolean_value(eval_text("(map.get model_response 'host_reached true)", env)),
           "unconfigured model-service cap.call must not reach host");
     const std::vector<std::string> cap_events = bt::default_runtime_host().events().snapshot();
@@ -2298,6 +2305,54 @@ void test_model_service_protocol_skeleton() {
     check(missing.error_code == "model_service_capability_missing",
           "missing describe response should report capability_missing");
     check(!missing.missing_capabilities.empty(), "missing describe response should list missing capabilities");
+
+    struct replay_fake_client final : bt::model_service_client {
+        int calls = 0;
+        bt::model_service_response call(const bt::model_service_request& req) override {
+            ++calls;
+            bt::model_service_response out;
+            out.id = req.id;
+            out.status = bt::model_service_status::success;
+            out.output_json = "{\"score\":1.0}";
+            out.metadata_json = "{\"backend\":\"fake\"}";
+            out.raw_json = bt::model_service_response_to_json(out);
+            return out;
+        }
+    };
+
+    bt::runtime_host host;
+    const std::filesystem::path cache_dir = temp_file_path("model_service_replay_cache", "");
+    std::filesystem::remove_all(cache_dir);
+    bt::model_service_config record_cfg;
+    record_cfg.replay_mode = "record";
+    record_cfg.replay_cache_path = cache_dir.string();
+    auto record_client = std::make_unique<replay_fake_client>();
+    replay_fake_client* record_client_ptr = record_client.get();
+    host.set_model_service_client(record_cfg, std::move(record_client));
+
+    bt::model_service_request cache_request;
+    cache_request.id = "cache-1";
+    cache_request.op = bt::model_service_operation::invoke;
+    cache_request.capability = "cap.model.world.rollout.v1";
+    cache_request.input_json = "{\"state\":{\"vector\":[0.0]},\"actions\":[]}";
+    const bt::model_service_response recorded = host.call_model_service(cache_request);
+    check(recorded.status == bt::model_service_status::success, "recorded model-service call should succeed");
+    check(!recorded.request_hash.empty(), "recorded model-service call should have request hash");
+    check(!recorded.response_hash.empty(), "recorded model-service call should have response hash");
+    check(record_client_ptr->calls == 1, "recording should call live model-service client once");
+    check(std::filesystem::exists(cache_dir / (recorded.request_hash + ".json")),
+          "recording should write replay cache file");
+
+    bt::model_service_config replay_cfg;
+    replay_cfg.replay_mode = "replay";
+    replay_cfg.replay_cache_path = cache_dir.string();
+    host.set_model_service_client(replay_cfg, nullptr);
+    const bt::model_service_response replayed = host.call_model_service(cache_request);
+    check(replayed.status == bt::model_service_status::success, "replayed model-service call should succeed");
+    check(replayed.replay_cache_hit, "replayed model-service call should report cache hit");
+    check(replayed.request_hash == recorded.request_hash, "replayed model-service request hash mismatch");
+    check(replayed.response_hash == recorded.response_hash, "replayed model-service response hash mismatch");
+    std::filesystem::remove_all(cache_dir);
 }
 
 void test_vla_builtins_submit_poll_cancel_and_caps() {

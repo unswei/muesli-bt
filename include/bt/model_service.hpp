@@ -49,6 +49,7 @@ struct model_service_config {
     std::int64_t request_timeout_ms = 500;
     bool required = false;
     std::string replay_mode = "live";
+    std::string replay_cache_path;
 };
 
 struct model_service_request {
@@ -60,7 +61,7 @@ struct model_service_request {
     std::optional<model_service_trace> trace;
     std::string input_json = "{}";
     std::vector<std::string> refs_json{};
-    std::string replay_mode = "live";
+    std::string replay_mode;
     std::string session_id;
 };
 
@@ -75,6 +76,10 @@ struct model_service_response {
     bool error_retryable = false;
     std::string metadata_json = "{}";
     bool host_reached = false;
+    std::string raw_json;
+    std::string request_hash;
+    std::string response_hash;
+    bool replay_cache_hit = false;
 };
 
 struct model_service_compatibility_result {
@@ -99,6 +104,7 @@ public:
 };
 
 [[nodiscard]] std::string model_service_request_to_json(const model_service_request& request);
+[[nodiscard]] std::string model_service_response_to_json(const model_service_response& response);
 [[nodiscard]] model_service_response model_service_response_from_json(const std::string& text);
 [[nodiscard]] std::vector<std::string> model_service_required_capabilities();
 [[nodiscard]] model_service_compatibility_result

@@ -29,7 +29,8 @@ Supported config fields:
 - `connect_timeout_ms`: non-negative integer
 - `request_timeout_ms`: non-negative integer
 - `required`: boolean
-- `replay_mode`: string, usually `"live"`
+- `replay_mode`: string; supported values are `"live"`, `"record"`, and `"replay"`
+- `replay_cache_path`: directory used for request-hash keyed response cache files
 - `check`: boolean; when true, run `model-service.check` immediately and fail if incompatible
 
 ## example
@@ -40,6 +41,8 @@ Supported config fields:
   (map.set! cfg 'endpoint "ws://127.0.0.1:8765/v1/ws")
   (map.set! cfg 'connect_timeout_ms 1000)
   (map.set! cfg 'request_timeout_ms 5000)
+  (map.set! cfg 'replay_mode "record")
+  (map.set! cfg 'replay_cache_path "runs/model-service-cache")
   (map.set! cfg 'check true)
   (model-service.configure cfg))
 ```
@@ -51,6 +54,8 @@ Supported config fields:
 - Model outputs are proposals. `cap.call` returns `host_reached=false`.
 - Configured but unavailable service calls return `:unavailable` results.
 - `check=true` verifies descriptor compatibility, not task-specific model quality.
+- `record` mode calls the live service and writes raw response envelopes to the replay cache.
+- `replay` mode reads from the replay cache by request hash and does not need a reachable service when the cache entry exists.
 
 ## see also
 

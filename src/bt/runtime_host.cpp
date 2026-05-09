@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <filesystem>
+#include <fstream>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
@@ -169,6 +171,68 @@ std::string gc_lifecycle_payload_json(const muslisp::gc_lifecycle_event& event) 
     return data.str();
 }
 
+std::filesystem::path model_service_cache_file(const model_service_config& config, const std::string& request_hash) {
+    return std::filesystem::path(config.replay_cache_path) / (request_hash + ".json");
+}
+
+std::optional<model_service_response> read_model_service_cache(const model_service_config& config,
+                                                               const std::string& request_hash) {
+    if (config.replay_cache_path.empty()) {
+        return std::nullopt;
+    }
+    const std::filesystem::path path = model_service_cache_file(config, request_hash);
+    std::ifstream in(path);
+    if (!in) {
+        return std::nullopt;
+    }
+    std::ostringstream buffer;
+    buffer << in.rdbuf();
+    std::string text = buffer.str();
+    while (!text.empty() && (text.back() == '\n' || text.back() == '\r')) {
+        text.pop_back();
+    }
+    model_service_response response = model_service_response_from_json(text);
+    response.request_hash = request_hash;
+    response.response_hash = event_log::hash64_hex(response.raw_json.empty() ? model_service_response_to_json(response)
+                                                                             : response.raw_json);
+    response.replay_cache_hit = true;
+    response.host_reached = false;
+    return response;
+}
+
+void write_model_service_cache(const model_service_config& config,
+                               const std::string& request_hash,
+                               const model_service_response& response) {
+    if (config.replay_cache_path.empty()) {
+        return;
+    }
+    std::error_code ec;
+    std::filesystem::create_directories(config.replay_cache_path, ec);
+    if (ec) {
+        return;
+    }
+    const std::filesystem::path path = model_service_cache_file(config, request_hash);
+    std::ofstream out(path);
+    if (!out) {
+        return;
+    }
+    out << (response.raw_json.empty() ? model_service_response_to_json(response) : response.raw_json);
+}
+
+model_service_response model_service_replay_miss(const model_service_request& request, const std::string& request_hash) {
+    model_service_response out;
+    out.id = request.id;
+    out.status = model_service_status::unavailable;
+    out.error_code = "model_service_replay_miss";
+    out.error_message = "model-service replay cache miss";
+    out.error_retryable = false;
+    out.host_reached = false;
+    out.request_hash = request_hash;
+    out.raw_json = model_service_response_to_json(out);
+    out.response_hash = event_log::hash64_hex(out.raw_json);
+    return out;
+}
+
 }  // namespace
 
 runtime_host::runtime_host()
@@ -333,11 +397,36 @@ const model_service_config& runtime_host::model_service_config_ref() const noexc
 }
 
 model_service_response runtime_host::call_model_service(const model_service_request& request) {
+    const std::string request_json = model_service_request_to_json(request);
+    const std::string request_hash = event_log::hash64_hex(request_json);
+    const std::string replay_mode = request.replay_mode.empty() ? model_service_config_.replay_mode
+                                                                : request.replay_mode;
+    if (replay_mode == "replay") {
+        if (std::optional<model_service_response> cached = read_model_service_cache(model_service_config_, request_hash);
+            cached.has_value()) {
+            return *cached;
+        }
+        return model_service_replay_miss(request, request_hash);
+    }
+
+    model_service_response response;
     if (!model_service_client_) {
         unavailable_model_service_client unavailable;
-        return unavailable.call(request);
+        response = unavailable.call(request);
+    } else {
+        response = model_service_client_->call(request);
     }
-    return model_service_client_->call(request);
+
+    response.request_hash = request_hash;
+    if (response.raw_json.empty()) {
+        response.raw_json = model_service_response_to_json(response);
+    }
+    response.response_hash = event_log::hash64_hex(response.raw_json);
+    response.replay_cache_hit = false;
+    if (replay_mode == "record") {
+        write_model_service_cache(model_service_config_, request_hash, response);
+    }
+    return response;
 }
 
 model_service_compatibility_result runtime_host::check_model_service_compatibility() {
