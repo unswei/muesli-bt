@@ -82,6 +82,64 @@ cmake -S . -B build/model-service \
 
 The default is `OFF`, so core users do not inherit a model-service or networking dependency.
 
+The `muslisp` command can also start the external service in the foreground:
+
+```bash
+MUESLI_MODEL_SERVICE_DIR=/Users/oliver/Code/2026/muesli-model-service \
+  ./build/core-model-service-test/muslisp --model-service-start
+```
+
+Equivalent explicit form:
+
+```bash
+./build/core-model-service-test/muslisp --model-service-start \
+  --model-service-dir /Users/oliver/Code/2026/muesli-model-service \
+  --host 127.0.0.1 \
+  --port 8765
+```
+
+Discovery order is:
+
+- `--model-service-dir`
+- `MUESLI_MODEL_SERVICE_DIR`
+- sibling checkout at `../muesli-model-service`
+- `muesli-model-service` executable already on `PATH`
+
+Use `--dry-run` to print the command without starting the service.
+
+Robot or simulator cameras should publish frames to the service separately from model calls:
+
+```bash
+curl -X PUT http://127.0.0.1:8765/v1/frames/camera1 \
+  -H 'Content-Type: image/jpeg' \
+  -H 'X-MMS-Timestamp-Ns: 1730000000000000000' \
+  --data-binary @camera1.jpg
+```
+
+The response includes both an immutable ref such as `frame://camera1/1730000000000000000`
+and `frame://camera1/latest`. The model call should use refs:
+
+```json
+{
+  "version": "0.2",
+  "id": "vla-1",
+  "op": "start",
+  "capability": "cap.vla.action_chunk.v1",
+  "deadline_ms": 100,
+  "input": {
+    "instruction": "move forward slowly",
+    "observation": {
+      "state": [0.0, 0.0, 0.0],
+      "images": {
+        "camera1": { "ref": "frame://camera1/latest" },
+        "camera2": { "ref": "frame://camera2/latest" },
+        "camera3": { "ref": "frame://camera3/latest" }
+      }
+    }
+  }
+}
+```
+
 ## example
 
 A bounded world-model request should use a stable capability id:
@@ -101,7 +159,9 @@ The host bridge maps the request to `MMSP v0.2`, validates the response, emits c
 ## gotchas
 
 - Missing service configuration means no model-service capability should be required.
+- `--model-service-start` is a convenience wrapper. It does not make the Python service part of the C++ runtime.
 - Configured but unreachable service must produce fallback-capable unavailable results.
+- `frame://.../latest` is a handle in the service frame cache. It does not itself transport bytes.
 - Backend metadata is not BT semantics.
 - Late, stale, invalid, unsafe, or policy-violating outputs must have `host_reached=false`.
 - A `step` timeout does not automatically cancel a service session.

@@ -143,6 +143,9 @@ Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md), then read [RO
 
 VLA/model support is currently experimental lifecycle infrastructure: submit, poll, cancel, timeout handling, BT node semantics, canonical logging, and an optional `muesli-model-service` bridge contract. The next release milestones are aimed at one real model-backed async capability path, host-side validation and rejection, deterministic replay cache support, and reproducible wheeled flagship evidence rather than broad provider coverage.
 
+To start the optional external service from the `muslisp` command, use `muslisp --model-service-start --model-service-dir /path/to/muesli-model-service`.
+Camera images for remote VLA calls should be staged with the service frame-ingest endpoint and referenced as `frame://camera/latest`, not copied into the model-call JSON.
+
 See [VLA integration](docs/bt/vla-integration.md), [model-service bridge](docs/integration/model-service-bridge.md), [VLA nodes](docs/bt/vla-nodes.md), and [known limitations](docs/known-limitations.md).
 
 ## citation
