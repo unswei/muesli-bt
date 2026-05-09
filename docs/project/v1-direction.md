@@ -42,6 +42,8 @@ The main `v1.0.0` scope should include:
 - one fair BehaviorTree.CPP comparison path for the flagship scenario
 - one reproducible evidence bundle contract for logs, manifests, replay reports, and supporting artefacts
 
+The concrete task and evidence contract for that scope is documented in [flagship task and evidence contract](flagship-task-contract.md).
+
 ## what is not the main v1.0 story
 
 The `v1.0.0` release should not be led by:
@@ -91,6 +93,7 @@ If a proposed feature does not improve one of those three areas, it should norma
 
 ## see also
 
+- [flagship task and evidence contract](flagship-task-contract.md)
 - [roadmap to 1.0](../roadmap-to-1.0.md)
 - [todo](../todo.md)
 - [known limitations](../known-limitations.md)

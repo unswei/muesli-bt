@@ -59,6 +59,7 @@ That means:
 - the acceptable fallback is a reproducible Nav2-backed or rosbag-backed ROS2 path for the same task family if hardware readiness slips
 
 The product direction behind this ordering is documented in [v1.0 direction](project/v1-direction.md).
+The concrete task and evidence contract for the flagship lane is documented in [flagship task and evidence contract](project/flagship-task-contract.md).
 
 Before `v1.0.0`, new work should normally be justified by how it strengthens the flagship task, the runtime contract, or reproducible release evidence.
 
@@ -225,6 +226,7 @@ Focus:
 Scope:
 
 - document the flagship direction in project docs and link it from the roadmap, TODO, and front-door pages
+- document the flagship task and evidence contract in project docs and link it from the roadmap, TODO, and direction page
 - define the required failure taxonomy for flagship evidence:
   - delay
   - timeout
@@ -246,6 +248,7 @@ Scope:
 Exit criteria:
 
 - the flagship task family is stated consistently in the roadmap, TODO, and front-door docs
+- the flagship task and evidence contract is documented and linked from the roadmap, TODO, and direction page
 - the physical-first, Nav2/rosbag fallback posture is stated consistently
 - the failure taxonomy is fixed in writing
 - the expected flagship artefact bundle is fixed in writing
@@ -964,6 +967,7 @@ If the remaining roadmap becomes too large, prioritise practical engine usabilit
 ## see also
 
 - [v1.0 direction](project/v1-direction.md)
+- [flagship task and evidence contract](project/flagship-task-contract.md)
 - [Roadmap](limitations-roadmap.md)
 - [todo](todo.md)
 - [conformance levels](contracts/conformance.md)
