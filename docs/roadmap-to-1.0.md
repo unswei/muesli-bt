@@ -112,6 +112,7 @@ The remaining path is:
 - freeze the wheeled flagship task family, failure taxonomy, and required artefact bundle before broader scope expansion
 - harden the Lisp/C++ runtime so the evidence can defend allocation behaviour, GC pauses, deadline handling, cancellation, and deterministic replay
 - replace VLA stubs with at least one real model-backed asynchronous service and failure-injection path
+- use `muesli-model-service` as the optional capability-native service boundary for world-model and VLA calls, while keeping `muesli-bt` usable without it
 - build a fair comparison engine against BehaviorTree.CPP rather than relying only on internal microbenchmarks
 - add ROS2 host capability bridges, especially Nav2 and, if still feasible, MoveIt, without widening core runtime semantics
 - keep the existing Isaac showcase as supporting evidence rather than a second semantic surface

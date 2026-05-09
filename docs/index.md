@@ -47,6 +47,7 @@ If you want the longer setup page, use [getting started](getting-started.md).
 | PyBullet/Webots examples | released examples | [examples overview](examples/index.md) |
 | ROS2 thin transport | released baseline, Humble-focused | [ROS2 tutorial](integration/ros2-tutorial.md) |
 | Host capability bundles | contract-only / emerging | [host capability bundles](integration/host-capability-bundles.md) |
+| VLA/model service bridge | optional skeleton and contract | [muesli-model-service bridge](integration/model-service-bridge.md) |
 | VLA backends | released hooks and stubs unless a real backend is documented | [VLA integration](bt/vla-integration.md) |
 | Nav2/MoveIt adapters | planned unless listed in release notes | [roadmap to 1.0](roadmap-to-1.0.md) |
 

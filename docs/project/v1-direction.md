@@ -36,6 +36,7 @@ This is a runtime and product claim. It is not a claim that model outputs are sa
 The main `v1.0.0` scope should include:
 
 - one real model-backed asynchronous capability path
+- one optional `muesli-model-service` bridge path for world-model or VLA capabilities
 - one physical wheeled runbook with required artefacts
 - one Nav2-backed host capability path for the same task family
 - one generated BT fragment demonstration that makes the Lisp DSL argument visible
@@ -98,4 +99,5 @@ If a proposed feature does not improve one of those three areas, it should norma
 - [todo](../todo.md)
 - [known limitations](../known-limitations.md)
 - [ROS2 backend scope](../integration/ros2-backend-scope.md)
+- [muesli-model-service bridge](../integration/model-service-bridge.md)
 - [cross-transport flagship](../integration/cross-transport-flagship.md)

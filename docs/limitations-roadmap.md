@@ -24,6 +24,7 @@ The `v1.0.0` effort is centred on dependable model-mediated wheeled robot behavi
 - richer [host](terminology.md#host) service adapters for production robotics systems
 - one physical wheeled flagship path with matching Nav2-backed or rosbag-backed evidence
 - host capability bundles for richer external services such as manipulation, navigation, and perception
+- optional `muesli-model-service` bridge for capability-native world-model and VLA calls
 - cross-transport evidence for the existing ROS2 thin adaptor as a foundation, not the whole `v1.0.0` headline
 - keep the existing Isaac Sim / ROS2 H1 showcase documented and reproducible
 - add one documented Isaac Sim wheeled showcase that reuses the released `Odometry -> Twist` path and yields website-ready capture artefacts

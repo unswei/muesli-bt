@@ -14,6 +14,7 @@
 
 #include "bt/instance.hpp"
 #include "bt/logging.hpp"
+#include "bt/model_service.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/trace.hpp"
 #include "../src/compiled_eval.hpp"
@@ -2173,6 +2174,27 @@ void test_capability_registry_call_echo() {
         env,
         "cap.call: unknown capability",
         "cap.call unknown capability");
+}
+
+void test_model_service_protocol_skeleton() {
+    bt::model_service_request request;
+    request.id = "req-1";
+    request.op = bt::model_service_operation::invoke;
+    request.capability = "cap.model.world.rollout.v1";
+    request.deadline_ms = 100;
+
+    bt::unavailable_model_service_client client;
+    bt::model_service_response response = client.call(request);
+
+    check(std::string(bt::model_service_operation_name(request.op)) == "invoke",
+          "model service operation name mismatch");
+    check(std::string(bt::model_service_status_name(response.status)) == "unavailable",
+          "model service unavailable status mismatch");
+    check(bt::model_service_status_terminal(response.status), "unavailable should be terminal");
+    check(response.id == "req-1", "model service response should preserve request id");
+    check(response.error_code == "model_service_unconfigured",
+          "model service unavailable error code mismatch");
+    check(!response.host_reached, "unconfigured model service must not reach host execution");
 }
 
 void test_vla_builtins_submit_poll_cancel_and_caps() {
@@ -4876,6 +4898,7 @@ int main() {
         {"hash64 builtin", test_hash64_builtin},
         {"json and handle builtins", test_json_and_handle_builtins},
         {"capability registry call echo", test_capability_registry_call_echo},
+        {"model service protocol skeleton", test_model_service_protocol_skeleton},
         {"vla builtins submit/poll/cancel/caps", test_vla_builtins_submit_poll_cancel_and_caps},
         {"vla bt nodes flow and cancel", test_vla_bt_nodes_flow_and_cancel},
         {"bt compile checks", test_bt_compile_checks},

@@ -42,6 +42,7 @@ If you only want to run the existing examples, you usually do not need backend-w
 2. ROS2 backend: backend maps ROS2 transport into `env.*` while keeping BT/runtime semantics in `muesli-bt`. Start with the [ROS2 tutorial](ros2-tutorial.md), then use [ROS2 backend scope](ros2-backend-scope.md) for the detailed plan and contract surface.
 3. Direct hardware backend: backend talks directly to drivers/SDKs without ROS.
 4. Host capability bundle: host exposes a higher-level service such as manipulation, navigation, or perception through its own stable contract instead of widening `env.*` or `planner.plan`.
+5. Model-service bridge: host exposes optional model-backed capabilities through `muesli-model-service` while `muesli-bt` keeps validation, fallback, replay, and dispatch authority. Start with [muesli-model-service bridge](model-service-bridge.md).
 
 ## End-To-End Data Flow
 
@@ -58,6 +59,7 @@ This flow is the same whether execution is simulated time or physical robot time
 
 - [Environment API (`env.*`)](env-api.md)
 - [Host Capability Bundles](host-capability-bundles.md)
+- [muesli-model-service Bridge](model-service-bridge.md)
 - [ROS2 tutorial](ros2-tutorial.md)
 - [Writing A Backend](writing-a-backend.md)
 - [ROS2 Backend Scope](ros2-backend-scope.md)

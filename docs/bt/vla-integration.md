@@ -14,10 +14,11 @@ Implemented now:
 - cancellation and timeout behaviour in runtime lifecycle
 - canonical `mbt.evt.v1` logging for VLA events
 
-Host-defined / placeholder in this repo:
+Host-defined / optional in this repo:
 
 - production model/provider transport and credentials
 - remote inference integration details beyond stub/replay adapters
+- `muesli-model-service` bridge transport, when the optional bridge is built and configured
 
 Key principles:
 
@@ -34,6 +35,8 @@ Capability metadata is host-registered and inspectable from Lisp:
 - `(cap.describe "vla.rt2")`
 
 A request is submitted with `(vla.submit request-map)`. The runtime executes it behind a registered backend (stub, replay, or custom host backend).
+
+The first external model-service bridge keeps the same lifecycle surface but uses stable capability ids such as `cap.vla.action_chunk.v1`. See [muesli-model-service bridge](../integration/model-service-bridge.md).
 
 ## Async Lifecycle
 
@@ -72,4 +75,5 @@ The selector lets `vla-wait` complete when ready, while fallback logic continues
 - [VLA BT Nodes](vla-nodes.md)
 - [VLA Request/Response Schema](vla-request-response.md)
 - [VLA Logging Schema](../observability/vla-logging.md)
+- [muesli-model-service Bridge](../integration/model-service-bridge.md)
 - [Bounded-Time Planning](bounded-time-planning.md)

@@ -18,6 +18,7 @@ option(MUESLI_BT_BUILD_WEBOTS_EXAMPLES "Build the Webots e-puck example controll
 option(MUESLI_BT_BUILD_INTEGRATION_PYBULLET "Build the PyBullet integration library" ON)
 option(MUESLI_BT_BUILD_INTEGRATION_WEBOTS "Build the Webots integration library" ON)
 option(MUESLI_BT_BUILD_INTEGRATION_ROS2 "Build the ROS2 integration library" OFF)
+option(MUESLI_BT_BUILD_MODEL_SERVICE_BRIDGE "Build the optional muesli-model-service bridge target" OFF)
 option(MUESLI_BT_BUILD_BENCHMARKS "Build the optional benchmark harness" OFF)
 option(MUESLI_BT_BENCH_WITH_BTCPP "Build the optional BehaviorTree.CPP benchmark adapter" OFF)
 
@@ -28,6 +29,7 @@ add_library(
   src/bt/event_log.cpp
   src/bt/instance.cpp
   src/bt/logging.cpp
+  src/bt/model_service.cpp
   src/bt/planner.cpp
   src/bt/profile.cpp
   src/bt/registry.cpp
@@ -84,6 +86,24 @@ if (MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
                                                  POSITION_INDEPENDENT_CODE ON
   )
   target_compile_features(muesli_bt_integration_pybullet PUBLIC cxx_std_20)
+endif ()
+
+if (MUESLI_BT_BUILD_MODEL_SERVICE_BRIDGE)
+  add_library(muesli_bt_integration_model_service integrations/model_service/bridge.cpp)
+  target_link_libraries(muesli_bt_integration_model_service PUBLIC muesli_bt_core)
+  target_include_directories(
+    muesli_bt_integration_model_service
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+           $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/integrations>
+           $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+  )
+  target_compile_features(muesli_bt_integration_model_service PUBLIC cxx_std_20)
+  set_target_properties(
+    muesli_bt_integration_model_service PROPERTIES EXPORT_NAME integration_model_service
+                                                   POSITION_INDEPENDENT_CODE ON
+  )
+  target_compile_definitions(muesli_bt_integration_model_service
+                             PUBLIC MUESLI_BT_WITH_MODEL_SERVICE_BRIDGE=1)
 endif ()
 
 set(MUESLI_BT_HAVE_WEBOTS OFF)
@@ -466,6 +486,16 @@ if (TARGET muesli_bt_integration_ros2)
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
   )
   install(TARGETS muslisp_ros2 RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif ()
+
+if (TARGET muesli_bt_integration_model_service)
+  install(
+    TARGETS muesli_bt_integration_model_service
+    EXPORT muesli_btTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
 endif ()
 
 install(DIRECTORY include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})

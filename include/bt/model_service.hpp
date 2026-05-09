@@ -1,0 +1,95 @@
+#pragma once
+
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <vector>
+
+namespace bt {
+
+inline constexpr const char* model_service_protocol_version = "0.2";
+
+enum class model_service_operation {
+    describe,
+    invoke,
+    start,
+    step,
+    cancel,
+    status,
+    close
+};
+
+enum class model_service_status {
+    success,
+    running,
+    action_chunk,
+    partial,
+    failure,
+    cancelled,
+    timeout,
+    invalid_request,
+    invalid_output,
+    unavailable,
+    unsafe_output,
+    resource_exhausted,
+    internal_error
+};
+
+struct model_service_trace {
+    std::string run_id;
+    std::string tree_id;
+    std::uint64_t tick_id = 0;
+    std::string node_id;
+};
+
+struct model_service_config {
+    std::string endpoint = "ws://127.0.0.1:8765/v1/ws";
+    std::int64_t connect_timeout_ms = 200;
+    std::int64_t request_timeout_ms = 500;
+    bool required = false;
+    std::string replay_mode = "live";
+};
+
+struct model_service_request {
+    std::string version = model_service_protocol_version;
+    std::string id;
+    model_service_operation op = model_service_operation::invoke;
+    std::string capability;
+    std::int64_t deadline_ms = 0;
+    std::optional<model_service_trace> trace;
+    std::string input_json = "{}";
+    std::vector<std::string> refs_json{};
+    std::string replay_mode = "live";
+    std::string session_id;
+};
+
+struct model_service_response {
+    std::string version = model_service_protocol_version;
+    std::string id;
+    model_service_status status = model_service_status::unavailable;
+    std::string output_json = "{}";
+    std::string session_id;
+    std::string error_code;
+    std::string error_message;
+    bool error_retryable = false;
+    std::string metadata_json = "{}";
+    bool host_reached = false;
+};
+
+class model_service_client {
+public:
+    virtual ~model_service_client() = default;
+
+    [[nodiscard]] virtual model_service_response call(const model_service_request& request) = 0;
+};
+
+class unavailable_model_service_client final : public model_service_client {
+public:
+    [[nodiscard]] model_service_response call(const model_service_request& request) override;
+};
+
+[[nodiscard]] const char* model_service_operation_name(model_service_operation op) noexcept;
+[[nodiscard]] const char* model_service_status_name(model_service_status status) noexcept;
+[[nodiscard]] bool model_service_status_terminal(model_service_status status) noexcept;
+
+}  // namespace bt

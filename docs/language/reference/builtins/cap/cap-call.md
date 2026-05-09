@@ -79,6 +79,7 @@ The echo result uses:
 
 - `cap.call` is intentionally generic and map-based.
 - The initial `cap.echo.v1` fixture exists to prove the registry and call path without adding real external service adapters.
+- Bounded model-service calls such as `cap.model.world.rollout.v1` should use the same capability-first shape once the optional bridge is configured.
 - Future motion and perception adapters should stay behind their capability contracts.
 - Once a real capability can affect runtime behaviour, calls should emit canonical `mbt.evt.v1` lifecycle events. The chosen user-facing shape is `cap_call_start` and `cap_call_end`, carrying request id, capability, operation, status, latency, rejection/error reason where applicable, and enough tick/job context for replay and first-divergence reports.
 - The deterministic `cap.echo.v1` smoke path does not need those events until it stops being a pure registry/API fixture.
@@ -89,3 +90,4 @@ The echo result uses:
 - [cap.list](cap-list.md)
 - [cap.describe](cap-describe.md)
 - [Host Capability Bundles](../../../../integration/host-capability-bundles.md)
+- [muesli-model-service Bridge](../../../../integration/model-service-bridge.md)
