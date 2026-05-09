@@ -2189,6 +2189,13 @@ void test_capability_registry_call_echo() {
     }
     check(saw_cap_start, "model-service cap.call should emit cap_call_start");
     check(saw_cap_end, "model-service cap.call should emit cap_call_end");
+    value check_result = eval_text("(model-service.check)", env);
+    check(is_map(check_result), "model-service.check should return map");
+    check(!boolean_value(eval_text("(map.get (model-service.check) 'compatible true)", env)),
+          "unconfigured model-service.check should be incompatible");
+    check(string_value(eval_text("(map.get (model-service.check) 'error_code \"\")", env)) ==
+              "model_service_unconfigured",
+          "unconfigured model-service.check should report model_service_unconfigured");
 
     value rejected = eval_text(
         "(begin "
@@ -2253,6 +2260,44 @@ void test_model_service_protocol_skeleton() {
     check(response.error_code == "model_service_unconfigured",
           "model service unavailable error code mismatch");
     check(!response.host_reached, "unconfigured model service must not reach host execution");
+
+    struct fake_describe_client final : bt::model_service_client {
+        bt::model_service_response call(const bt::model_service_request& req) override {
+            bt::model_service_response out;
+            out.id = req.id;
+            out.status = bt::model_service_status::success;
+            out.output_json =
+                "{\"capabilities\":["
+                "{\"id\":\"cap.model.world.rollout.v1\"},"
+                "{\"id\":\"cap.model.world.score_trajectory.v1\"},"
+                "{\"id\":\"cap.vla.action_chunk.v1\"},"
+                "{\"id\":\"cap.vla.propose_nav_goal.v1\"}"
+                "]}";
+            return out;
+        }
+    };
+    fake_describe_client compatible_client;
+    const bt::model_service_compatibility_result compatible =
+        bt::check_model_service_compatibility(compatible_client);
+    check(compatible.compatible, "complete describe response should be compatible");
+    check(compatible.missing_capabilities.empty(), "compatible describe should not report missing capabilities");
+
+    struct missing_describe_client final : bt::model_service_client {
+        bt::model_service_response call(const bt::model_service_request& req) override {
+            bt::model_service_response out;
+            out.id = req.id;
+            out.status = bt::model_service_status::success;
+            out.output_json = "{\"capabilities\":[{\"id\":\"cap.model.world.rollout.v1\"}]}";
+            return out;
+        }
+    };
+    missing_describe_client missing_client;
+    const bt::model_service_compatibility_result missing =
+        bt::check_model_service_compatibility(missing_client);
+    check(!missing.compatible, "missing describe response should be incompatible");
+    check(missing.error_code == "model_service_capability_missing",
+          "missing describe response should report capability_missing");
+    check(!missing.missing_capabilities.empty(), "missing describe response should list missing capabilities");
 }
 
 void test_vla_builtins_submit_poll_cancel_and_caps() {

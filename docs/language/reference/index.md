@@ -102,6 +102,7 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 - [`cap.describe`](builtins/cap/cap-describe.md)
 - [`cap.list`](builtins/cap/cap-list.md)
 - [`model-service.clear`](builtins/model-service/model-service-clear.md)
+- [`model-service.check`](builtins/model-service/model-service-check.md)
 - [`model-service.configure`](builtins/model-service/model-service-configure.md)
 - [`model-service.info`](builtins/model-service/model-service-info.md)
 - [`planner.get-base-seed`](builtins/planner/planner-get-base-seed.md)

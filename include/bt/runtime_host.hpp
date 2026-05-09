@@ -45,6 +45,7 @@ public:
     [[nodiscard]] bool model_service_configured() const noexcept;
     [[nodiscard]] const model_service_config& model_service_config_ref() const noexcept;
     [[nodiscard]] model_service_response call_model_service(const model_service_request& request);
+    [[nodiscard]] model_service_compatibility_result check_model_service_compatibility();
 
     memory_log_sink& logs() noexcept;
     const memory_log_sink& logs() const noexcept;

@@ -77,6 +77,15 @@ struct model_service_response {
     bool host_reached = false;
 };
 
+struct model_service_compatibility_result {
+    bool compatible = false;
+    std::string request_id;
+    std::string error_code;
+    std::string error_message;
+    std::vector<std::string> required_capabilities{};
+    std::vector<std::string> missing_capabilities{};
+};
+
 class model_service_client {
 public:
     virtual ~model_service_client() = default;
@@ -91,6 +100,11 @@ public:
 
 [[nodiscard]] std::string model_service_request_to_json(const model_service_request& request);
 [[nodiscard]] model_service_response model_service_response_from_json(const std::string& text);
+[[nodiscard]] std::vector<std::string> model_service_required_capabilities();
+[[nodiscard]] model_service_compatibility_result
+check_model_service_compatibility(model_service_client& client,
+                                  std::vector<std::string> required_capabilities = model_service_required_capabilities(),
+                                  std::int64_t deadline_ms = 500);
 
 [[nodiscard]] std::unique_ptr<model_service_client>
 make_websocket_model_service_client(model_service_config config);

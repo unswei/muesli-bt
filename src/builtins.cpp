@@ -2629,6 +2629,38 @@ value model_service_response_to_lisp(const bt::model_service_response& response,
     return out;
 }
 
+value string_vector_to_lisp_list(const std::vector<std::string>& values) {
+    std::vector<value> items;
+    items.reserve(values.size());
+    gc_root_scope roots(default_gc());
+    for (const std::string& item : values) {
+        items.push_back(make_string(item));
+        roots.add(&items.back());
+    }
+    return list_from_vector(items);
+}
+
+value model_service_compatibility_to_lisp(const bt::model_service_compatibility_result& result) {
+    value out = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&out);
+    map_set_symbol(out, "compatible", make_boolean(result.compatible));
+    map_set_symbol(out, "request_id", make_string(result.request_id));
+    if (!result.error_code.empty()) {
+        map_set_symbol(out, "error_code", make_string(result.error_code));
+    }
+    if (!result.error_message.empty()) {
+        map_set_symbol(out, "error", make_string(result.error_message));
+    }
+    value required = string_vector_to_lisp_list(result.required_capabilities);
+    roots.add(&required);
+    map_set_symbol(out, "required_capabilities", required);
+    value missing = string_vector_to_lisp_list(result.missing_capabilities);
+    roots.add(&missing);
+    map_set_symbol(out, "missing_capabilities", missing);
+    return out;
+}
+
 void emit_cap_call_event(std::string_view event_type,
                          const bt::model_service_request& request,
                          const bt::model_service_response* response = nullptr) {
@@ -2745,12 +2777,32 @@ value builtin_model_service_configure(const std::vector<value>& args) {
         }
         config.required = boolean_value(*required_v);
     }
+    bool check_compatibility = false;
+    if (const std::optional<value> check_v = map_lookup_option(config_map, "check"); check_v.has_value()) {
+        if (!is_boolean(*check_v)) {
+            throw lisp_error("model-service.configure check: expected boolean");
+        }
+        check_compatibility = boolean_value(*check_v);
+    }
     bt::default_runtime_host().set_model_service_client(config, bt::make_websocket_model_service_client(config));
+    if (check_compatibility) {
+        const bt::model_service_compatibility_result check =
+            bt::default_runtime_host().check_model_service_compatibility();
+        if (!check.compatible) {
+            throw lisp_error("model-service.configure: compatibility check failed: " +
+                             (check.error_code.empty() ? check.error_message : check.error_code));
+        }
+    }
     return make_boolean(true);
 #else
     (void)args;
     throw lisp_error("model-service.configure: optional model-service bridge is not built");
 #endif
+}
+
+value builtin_model_service_check(const std::vector<value>& args) {
+    require_arity("model-service.check", args, 0);
+    return model_service_compatibility_to_lisp(bt::default_runtime_host().check_model_service_compatibility());
 }
 
 value builtin_model_service_clear(const std::vector<value>& args) {
@@ -3240,6 +3292,7 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "cap.describe", builtin_cap_describe);
     bind_primitive(global_env, "cap.call", builtin_cap_call);
     bind_primitive(global_env, "model-service.configure", builtin_model_service_configure);
+    bind_primitive(global_env, "model-service.check", builtin_model_service_check);
     bind_primitive(global_env, "model-service.clear", builtin_model_service_clear);
     bind_primitive(global_env, "model-service.info", builtin_model_service_info);
     bind_primitive(global_env, "vla.submit", builtin_vla_submit);

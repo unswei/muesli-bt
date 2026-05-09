@@ -340,6 +340,16 @@ model_service_response runtime_host::call_model_service(const model_service_requ
     return model_service_client_->call(request);
 }
 
+model_service_compatibility_result runtime_host::check_model_service_compatibility() {
+    if (!model_service_client_) {
+        unavailable_model_service_client unavailable;
+        return bt::check_model_service_compatibility(unavailable, model_service_required_capabilities(),
+                                                     model_service_config_.request_timeout_ms);
+    }
+    return bt::check_model_service_compatibility(*model_service_client_, model_service_required_capabilities(),
+                                                 model_service_config_.request_timeout_ms);
+}
+
 memory_log_sink& runtime_host::logs() noexcept {
     return logs_;
 }

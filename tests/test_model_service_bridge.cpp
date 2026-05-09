@@ -47,6 +47,10 @@ int main() {
         check(live_response.status == bt::model_service_status::success, "live describe should succeed");
         check(live_response.output_json.find("cap.vla.action_chunk.v1") != std::string::npos,
               "live describe should include VLA action chunk capability");
+        const bt::model_service_compatibility_result compatibility =
+            bt::check_model_service_compatibility(*live_client);
+        check(compatibility.compatible, "live describe compatibility check should pass");
+        check(compatibility.missing_capabilities.empty(), "live compatibility check should not report missing caps");
     }
     return 0;
 }

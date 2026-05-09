@@ -42,10 +42,11 @@ Result fields:
 ## gotchas
 
 - `configured=true` means a client exists. It does not prove the service is reachable.
-- Use a bounded `cap.call` or `describe` compatibility check to prove service availability.
+- Use [`model-service.check`](model-service-check.md) to prove descriptor compatibility.
 
 ## see also
 
 - [`model-service.configure`](model-service-configure.md)
+- [`model-service.check`](model-service-check.md)
 - [`model-service.clear`](model-service-clear.md)
 - [`cap.call`](../cap/cap-call.md)

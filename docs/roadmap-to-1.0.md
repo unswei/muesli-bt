@@ -465,7 +465,7 @@ Focus:
 
 Scope:
 
-- complete the optional `muesli-model-service` bridge against `MMSP v0.2`: the first low-level `ws://` request/response client exists and stateless `cap.call` world-model requests can use it, but runtime hardening still needs `describe` compatibility gates, VLA `start` / `step` / `cancel` / `status` / `close`, replay cache, redaction, and evidence outputs
+- complete the optional `muesli-model-service` bridge against `MMSP v0.2`: the first low-level `ws://` request/response client exists, stateless `cap.call` world-model requests can use it, and the first `describe` compatibility gate checks required public capability ids; runtime hardening still needs deeper descriptor mode/schema checks, VLA `start` / `step` / `cancel` / `status` / `close`, replay cache, redaction, and evidence outputs
 - use the initial public model capability ids `cap.model.world.rollout.v1`, `cap.model.world.score_trajectory.v1`, `cap.vla.action_chunk.v1`, and `cap.vla.propose_nav_goal.v1`
 - support the current VLA session response shape: `step` returns `status: "action_chunk"` and places proposed host actions under `output.actions`; those actions remain untrusted until host-side validation accepts them
 - keep live camera bytes outside model-call JSON by using HTTP frame ingest on the service side and `frame://` refs in model requests; `frame://.../latest` is a service-local handle, not reproducible evidence by itself

@@ -105,6 +105,7 @@ Configure the bridge from host setup or a script:
   (map.set! cfg 'endpoint "ws://127.0.0.1:8765/v1/ws")
   (map.set! cfg 'connect_timeout_ms 1000)
   (map.set! cfg 'request_timeout_ms 5000)
+  (map.set! cfg 'check true)
   (model-service.configure cfg))
 ```
 
@@ -126,7 +127,9 @@ Then call a bounded model capability:
 
 `cap.call` emits `cap_call_start` and `cap_call_end` for model-service calls. Returned model outputs have `host_reached=false`; validation and host execution remain separate.
 
-Still planned: `describe` compatibility gates before runtime execution, replay caches, deterministic request/response hashing, redaction, and VLA session wiring.
+The `check` field sends a `describe` request and verifies the first required `MMSP v0.2` capability ids are present before runtime use. The same gate is available explicitly as `(model-service.check)`.
+
+Still planned: deeper descriptor schema/mode checks, replay caches, deterministic request/response hashing, redaction, and VLA session wiring.
 
 The `muslisp` command can also start the external service in the foreground:
 

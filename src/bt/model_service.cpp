@@ -1,9 +1,11 @@
 #include "bt/model_service.hpp"
 
 #include <cctype>
+#include <algorithm>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 
 namespace bt {
 namespace {
@@ -238,6 +240,12 @@ model_service_status status_from_name(const std::string& status) {
     return model_service_status::unavailable;
 }
 
+bool contains_json_string_field(std::string_view text, std::string_view field, std::string_view value) {
+    std::ostringstream needle;
+    needle << '"' << field << "\":\"" << value << '"';
+    return text.find(needle.str()) != std::string_view::npos;
+}
+
 }  // namespace
 
 model_service_response unavailable_model_service_client::call(const model_service_request& request) {
@@ -317,6 +325,62 @@ model_service_response model_service_response_from_json(const std::string& text)
     }
     out.host_reached = false;
     return out;
+}
+
+std::vector<std::string> model_service_required_capabilities() {
+    return {
+        "cap.model.world.rollout.v1",
+        "cap.model.world.score_trajectory.v1",
+        "cap.vla.action_chunk.v1",
+        "cap.vla.propose_nav_goal.v1",
+    };
+}
+
+model_service_compatibility_result
+check_model_service_compatibility(model_service_client& client,
+                                  std::vector<std::string> required_capabilities,
+                                  std::int64_t deadline_ms) {
+    model_service_compatibility_result result;
+    result.required_capabilities = std::move(required_capabilities);
+    result.request_id = "model-service-describe-compatibility";
+
+    model_service_request request;
+    request.id = result.request_id;
+    request.op = model_service_operation::describe;
+    request.deadline_ms = deadline_ms;
+
+    const model_service_response response = client.call(request);
+    if (response.version != model_service_protocol_version) {
+        result.error_code = "model_service_protocol_mismatch";
+        result.error_message = "describe returned protocol version '" + response.version + "', expected '" +
+                               model_service_protocol_version + "'";
+        return result;
+    }
+    if (response.status != model_service_status::success) {
+        result.error_code = response.error_code.empty() ? "model_service_describe_failed" : response.error_code;
+        result.error_message = response.error_message.empty() ? "model-service describe did not return success"
+                                                              : response.error_message;
+        return result;
+    }
+    if (response.output_json.find("\"capabilities\"") == std::string::npos) {
+        result.error_code = "model_service_descriptor_invalid";
+        result.error_message = "describe response is missing output.capabilities";
+        return result;
+    }
+
+    for (const std::string& capability : result.required_capabilities) {
+        if (!contains_json_string_field(response.output_json, "id", capability)) {
+            result.missing_capabilities.push_back(capability);
+        }
+    }
+    if (!result.missing_capabilities.empty()) {
+        result.error_code = "model_service_capability_missing";
+        result.error_message = "describe response is missing required model-service capabilities";
+        return result;
+    }
+
+    result.compatible = true;
+    return result;
 }
 
 const char* model_service_operation_name(model_service_operation op) noexcept {

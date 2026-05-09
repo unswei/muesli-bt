@@ -30,6 +30,7 @@ Supported config fields:
 - `request_timeout_ms`: non-negative integer
 - `required`: boolean
 - `replay_mode`: string, usually `"live"`
+- `check`: boolean; when true, run `model-service.check` immediately and fail if incompatible
 
 ## example
 
@@ -39,6 +40,7 @@ Supported config fields:
   (map.set! cfg 'endpoint "ws://127.0.0.1:8765/v1/ws")
   (map.set! cfg 'connect_timeout_ms 1000)
   (map.set! cfg 'request_timeout_ms 5000)
+  (map.set! cfg 'check true)
   (model-service.configure cfg))
 ```
 
@@ -48,10 +50,12 @@ Supported config fields:
 - `frame://` image refs are resolved by the service, not by this builtin.
 - Model outputs are proposals. `cap.call` returns `host_reached=false`.
 - Configured but unavailable service calls return `:unavailable` results.
+- `check=true` verifies descriptor compatibility, not task-specific model quality.
 
 ## see also
 
 - [`model-service.info`](model-service-info.md)
+- [`model-service.check`](model-service-check.md)
 - [`model-service.clear`](model-service-clear.md)
 - [`cap.call`](../cap/cap-call.md)
 - [muesli-model-service bridge](../../../../integration/model-service-bridge.md)
