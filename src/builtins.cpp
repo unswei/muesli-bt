@@ -2437,11 +2437,55 @@ std::optional<bt::capability_descriptor> describe_builtin_capability(const std::
     if (name == "cap.echo.v1") {
         return echo_capability_descriptor();
     }
+    if (name == "cap.model.world.rollout.v1") {
+        bt::capability_descriptor cap;
+        cap.name = name;
+        cap.safety_class = "model_proposal";
+        cap.cost_category = "model";
+        cap.request_schema = {
+            {"schema_version", "string", false},
+            {"capability", "string", true},
+            {"operation", "string", false},
+            {"request_id", "string", false},
+            {"deadline_ms", "int", false},
+            {"input", "map", true},
+        };
+        cap.response_schema = {
+            {"status", "keyword", true},
+            {"output", "map", false},
+            {"metadata", "map", false},
+            {"error_code", "string", false},
+            {"host_reached", "boolean", true},
+        };
+        return cap;
+    }
+    if (name == "cap.model.world.score_trajectory.v1") {
+        bt::capability_descriptor cap;
+        cap.name = name;
+        cap.safety_class = "model_proposal";
+        cap.cost_category = "model";
+        cap.request_schema = {
+            {"schema_version", "string", false},
+            {"capability", "string", true},
+            {"operation", "string", false},
+            {"request_id", "string", false},
+            {"deadline_ms", "int", false},
+            {"input", "map", true},
+        };
+        cap.response_schema = {
+            {"status", "keyword", true},
+            {"output", "map", false},
+            {"metadata", "map", false},
+            {"error_code", "string", false},
+            {"host_reached", "boolean", true},
+        };
+        return cap;
+    }
     return std::nullopt;
 }
 
 std::vector<std::string> builtin_capability_names() {
-    return {"cap.echo.v1"};
+    return {"cap.echo.v1", "cap.model.world.rollout.v1", "cap.model.world.score_trajectory.v1"};
 }
 
 value builtin_cap_list(const std::vector<value>& args) {
@@ -2504,6 +2548,128 @@ value builtin_cap_describe(const std::vector<value>& args) {
     return out;
 }
 
+bool is_model_service_capability(const std::string& capability) {
+    return capability == "cap.model.world.rollout.v1" || capability == "cap.model.world.score_trajectory.v1";
+}
+
+bt::model_service_operation model_service_operation_from_text(const std::string& op) {
+    if (op == "describe") {
+        return bt::model_service_operation::describe;
+    }
+    if (op == "invoke") {
+        return bt::model_service_operation::invoke;
+    }
+    if (op == "start") {
+        return bt::model_service_operation::start;
+    }
+    if (op == "step") {
+        return bt::model_service_operation::step;
+    }
+    if (op == "cancel") {
+        return bt::model_service_operation::cancel;
+    }
+    if (op == "status") {
+        return bt::model_service_operation::status;
+    }
+    if (op == "close") {
+        return bt::model_service_operation::close;
+    }
+    throw lisp_error("cap.call: unsupported model-service operation");
+}
+
+std::string map_lookup_text_or_empty(value map_obj, const std::string& key, const std::string& where) {
+    const std::optional<value> found = map_lookup_option(map_obj, key);
+    if (!found.has_value()) {
+        return {};
+    }
+    return require_text_value(*found, where);
+}
+
+value decode_json_or_string(const std::string& text) {
+    if (text.empty()) {
+        return make_nil();
+    }
+    try {
+        json_parser parser(text);
+        return parser.parse_document();
+    } catch (const lisp_error&) {
+        return make_string(text);
+    }
+}
+
+value model_service_response_to_lisp(const bt::model_service_response& response, const std::string& capability) {
+    value out = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&out);
+    map_set_symbol(out, "schema_version", make_string("cap.model_service.result.v1"));
+    map_set_symbol(out, "capability", make_string(capability));
+    map_set_symbol(out, "request_id", make_string(response.id));
+    map_set_symbol(out, "status", keyword_symbol(bt::model_service_status_name(response.status)));
+    map_set_symbol(out, "host_reached", make_boolean(response.host_reached));
+    if (!response.session_id.empty()) {
+        map_set_symbol(out, "session_id", make_string(response.session_id));
+    }
+    if (!response.output_json.empty()) {
+        value output = decode_json_or_string(response.output_json);
+        roots.add(&output);
+        map_set_symbol(out, "output", output);
+    }
+    if (!response.metadata_json.empty()) {
+        value metadata = decode_json_or_string(response.metadata_json);
+        roots.add(&metadata);
+        map_set_symbol(out, "metadata", metadata);
+    }
+    if (!response.error_code.empty()) {
+        map_set_symbol(out, "error_code", make_string(response.error_code));
+        map_set_symbol(out, "error_retryable", make_boolean(response.error_retryable));
+    }
+    if (!response.error_message.empty()) {
+        map_set_symbol(out, "error", make_string(response.error_message));
+    }
+    return out;
+}
+
+void emit_cap_call_event(std::string_view event_type,
+                         const bt::model_service_request& request,
+                         const bt::model_service_response* response = nullptr) {
+    std::ostringstream data;
+    data << "{\"request_id\":\"" << bt::event_log::json_escape(request.id) << "\","
+         << "\"capability\":\"" << bt::event_log::json_escape(request.capability) << "\","
+         << "\"operation\":\"" << bt::event_log::json_escape(bt::model_service_operation_name(request.op)) << "\","
+         << "\"deadline_ms\":" << request.deadline_ms;
+    if (response != nullptr) {
+        data << ",\"status\":\"" << bt::event_log::json_escape(bt::model_service_status_name(response->status)) << "\","
+             << "\"host_reached\":" << (response->host_reached ? "true" : "false");
+        if (!response->error_code.empty()) {
+            data << ",\"error_code\":\"" << bt::event_log::json_escape(response->error_code) << "\"";
+        }
+    }
+    data << '}';
+    (void)bt::default_runtime_host().events().emit(event_type, std::nullopt, data.str());
+}
+
+value call_model_service_capability(value request_map, const std::string& capability) {
+    bt::model_service_request request;
+    request.id = map_lookup_text_or_empty(request_map, "request_id", "cap.call request_id");
+    if (request.id.empty()) {
+        request.id = "cap-call-" + std::to_string(bt::planner_service::hash64(value_to_json(request_map)));
+    }
+    request.capability = capability;
+    request.op = model_service_operation_from_text(map_lookup_text_or(request_map, "operation", "invoke", "cap.call operation"));
+    request.deadline_ms = map_lookup_int_or(request_map, "deadline_ms", 0, "cap.call deadline_ms");
+    request.replay_mode = map_lookup_text_or(request_map, "replay_mode", "live", "cap.call replay_mode");
+    if (const std::optional<value> input_v = map_lookup_option(request_map, "input"); input_v.has_value()) {
+        request.input_json = value_to_json(*input_v);
+    } else {
+        request.input_json = value_to_json(request_map);
+    }
+
+    emit_cap_call_event("cap_call_start", request);
+    const bt::model_service_response response = bt::default_runtime_host().call_model_service(request);
+    emit_cap_call_event("cap_call_end", request, &response);
+    return model_service_response_to_lisp(response, capability);
+}
+
 value builtin_cap_call(const std::vector<value>& args) {
     require_arity("cap.call", args, 1);
     const value request_map = require_map_arg(args[0], "cap.call");
@@ -2512,6 +2678,9 @@ value builtin_cap_call(const std::vector<value>& args) {
         throw lisp_error("cap.call: missing required capability");
     }
     const std::string capability = require_text_value(*capability_v, "cap.call capability");
+    if (is_model_service_capability(capability)) {
+        return call_model_service_capability(request_map, capability);
+    }
     if (capability != "cap.echo.v1") {
         throw lisp_error("cap.call: unknown capability");
     }
@@ -2553,6 +2722,56 @@ value builtin_cap_call(const std::vector<value>& args) {
     } else {
         map_set_symbol(out, "echo", request_map);
     }
+    return out;
+}
+
+value builtin_model_service_configure(const std::vector<value>& args) {
+    require_arity("model-service.configure", args, 1);
+#if defined(MUESLI_BT_WITH_MODEL_SERVICE_BRIDGE) && MUESLI_BT_WITH_MODEL_SERVICE_BRIDGE
+    const value config_map = require_map_arg(args[0], "model-service.configure");
+    bt::model_service_config config;
+    config.endpoint = map_lookup_text_or(config_map, "endpoint", config.endpoint, "model-service.configure endpoint");
+    config.connect_timeout_ms =
+        map_lookup_int_or(config_map, "connect_timeout_ms", config.connect_timeout_ms,
+                          "model-service.configure connect_timeout_ms");
+    config.request_timeout_ms =
+        map_lookup_int_or(config_map, "request_timeout_ms", config.request_timeout_ms,
+                          "model-service.configure request_timeout_ms");
+    config.replay_mode = map_lookup_text_or(config_map, "replay_mode", config.replay_mode,
+                                            "model-service.configure replay_mode");
+    if (const std::optional<value> required_v = map_lookup_option(config_map, "required"); required_v.has_value()) {
+        if (!is_boolean(*required_v)) {
+            throw lisp_error("model-service.configure required: expected boolean");
+        }
+        config.required = boolean_value(*required_v);
+    }
+    bt::default_runtime_host().set_model_service_client(config, bt::make_websocket_model_service_client(config));
+    return make_boolean(true);
+#else
+    (void)args;
+    throw lisp_error("model-service.configure: optional model-service bridge is not built");
+#endif
+}
+
+value builtin_model_service_clear(const std::vector<value>& args) {
+    require_arity("model-service.clear", args, 0);
+    bt::default_runtime_host().clear_model_service_client();
+    return make_nil();
+}
+
+value builtin_model_service_info(const std::vector<value>& args) {
+    require_arity("model-service.info", args, 0);
+    const bt::runtime_host& host = bt::default_runtime_host();
+    value out = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&out);
+    map_set_symbol(out, "configured", make_boolean(host.model_service_configured()));
+    const bt::model_service_config& config = host.model_service_config_ref();
+    map_set_symbol(out, "endpoint", make_string(config.endpoint));
+    map_set_symbol(out, "connect_timeout_ms", make_integer(config.connect_timeout_ms));
+    map_set_symbol(out, "request_timeout_ms", make_integer(config.request_timeout_ms));
+    map_set_symbol(out, "required", make_boolean(config.required));
+    map_set_symbol(out, "replay_mode", make_string(config.replay_mode));
     return out;
 }
 
@@ -3020,6 +3239,9 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "cap.list", builtin_cap_list);
     bind_primitive(global_env, "cap.describe", builtin_cap_describe);
     bind_primitive(global_env, "cap.call", builtin_cap_call);
+    bind_primitive(global_env, "model-service.configure", builtin_model_service_configure);
+    bind_primitive(global_env, "model-service.clear", builtin_model_service_clear);
+    bind_primitive(global_env, "model-service.info", builtin_model_service_info);
     bind_primitive(global_env, "vla.submit", builtin_vla_submit);
     bind_primitive(global_env, "vla.poll", builtin_vla_poll);
     bind_primitive(global_env, "vla.cancel", builtin_vla_cancel);

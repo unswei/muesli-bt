@@ -100,6 +100,7 @@ Contract behaviour:
 - decision-point checks occur before:
 
     - planner calls (`planner_call_start`)
+    - host capability calls (`cap_call_start`)
     - async start (`vla_submit`)
     - async poll (`vla_poll`)
 
@@ -149,6 +150,7 @@ Safety rules:
 Canonical async events:
 
 - `vla_submit`, `vla_poll`, `vla_cancel`, `vla_result`
+- `cap_call_start`, `cap_call_end`
 - `async_cancel_requested`
 - `async_cancel_acknowledged`
 - `async_completion_dropped`

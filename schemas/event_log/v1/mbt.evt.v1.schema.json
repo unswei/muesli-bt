@@ -51,6 +51,8 @@
         "sched_cancel",
         "planner_call_start",
         "planner_call_end",
+        "cap_call_start",
+        "cap_call_end",
         "planner_v1",
         "planner_timeout",
         "vla_timeout",

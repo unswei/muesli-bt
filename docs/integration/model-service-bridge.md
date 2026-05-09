@@ -90,7 +90,43 @@ cfg.endpoint = "ws://127.0.0.1:8765/v1/ws";
 auto client = bt::make_websocket_model_service_client(cfg);
 ```
 
-This is the transport slice only. Runtime wiring into `cap.call`, VLA submit/poll/cancel, canonical capability lifecycle events, replay caches, and validation gates remains `v0.8.0` roadmap work.
+The client is intentionally small: it supports the first `ws://` request/response path. Broader runtime hardening, VLA submit/poll/cancel, replay caches, and validation gates remain `v0.8.0` roadmap work.
+
+The first runtime wiring is now the stateless `cap.call` path for:
+
+- `cap.model.world.rollout.v1`
+- `cap.model.world.score_trajectory.v1`
+
+Configure the bridge from host setup or a script:
+
+```lisp
+(begin
+  (define cfg (map.make))
+  (map.set! cfg 'endpoint "ws://127.0.0.1:8765/v1/ws")
+  (map.set! cfg 'connect_timeout_ms 1000)
+  (map.set! cfg 'request_timeout_ms 5000)
+  (model-service.configure cfg))
+```
+
+Then call a bounded model capability:
+
+```lisp
+(begin
+  (define input (map.make))
+  ;; Fill input according to the capability request schema.
+
+  (define req (map.make))
+  (map.set! req 'capability "cap.model.world.rollout.v1")
+  (map.set! req 'operation "invoke")
+  (map.set! req 'request_id "rollout-1")
+  (map.set! req 'deadline_ms 500)
+  (map.set! req 'input input)
+  (cap.call req))
+```
+
+`cap.call` emits `cap_call_start` and `cap_call_end` for model-service calls. Returned model outputs have `host_reached=false`; validation and host execution remain separate.
+
+Still planned: `describe` compatibility gates before runtime execution, replay caches, deterministic request/response hashing, redaction, and VLA session wiring.
 
 The `muslisp` command can also start the external service in the foreground:
 

@@ -314,6 +314,32 @@ const vla_service& runtime_host::vla_ref() const {
     return vla_;
 }
 
+void runtime_host::set_model_service_client(model_service_config config, std::unique_ptr<model_service_client> client) {
+    model_service_config_ = std::move(config);
+    model_service_client_ = std::move(client);
+}
+
+void runtime_host::clear_model_service_client() noexcept {
+    model_service_client_.reset();
+    model_service_config_ = model_service_config{};
+}
+
+bool runtime_host::model_service_configured() const noexcept {
+    return static_cast<bool>(model_service_client_);
+}
+
+const model_service_config& runtime_host::model_service_config_ref() const noexcept {
+    return model_service_config_;
+}
+
+model_service_response runtime_host::call_model_service(const model_service_request& request) {
+    if (!model_service_client_) {
+        unavailable_model_service_client unavailable;
+        return unavailable.call(request);
+    }
+    return model_service_client_->call(request);
+}
+
 memory_log_sink& runtime_host::logs() noexcept {
     return logs_;
 }
@@ -389,6 +415,7 @@ void runtime_host::clear_all() {
     events_.clear_ring();
     planner_.clear_records();
     vla_.clear_records();
+    clear_model_service_client();
 }
 
 std::string runtime_host::dump_instance_stats(std::int64_t handle) const {

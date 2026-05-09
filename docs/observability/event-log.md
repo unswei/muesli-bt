@@ -48,6 +48,7 @@
 - `bb_snapshot`
 - `sched_submit`, `sched_start`, `sched_finish`, `sched_cancel`
 - `planner_call_start`, `planner_call_end`
+- `cap_call_start`, `cap_call_end`
 - `planner_v1`
 - `planner_timeout`, `vla_timeout`
 - `host_action_invalid`, `fallback_used`, `fallback_failed`

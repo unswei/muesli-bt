@@ -8,6 +8,7 @@
 
 #include "bt/compiler.hpp"
 #include "bt/event_log.hpp"
+#include "bt/model_service.hpp"
 #include "bt/planner.hpp"
 #include "bt/runtime.hpp"
 #include "bt/vla.hpp"
@@ -39,6 +40,11 @@ public:
     const planner_service& planner_ref() const;
     vla_service& vla_ref();
     const vla_service& vla_ref() const;
+    void set_model_service_client(model_service_config config, std::unique_ptr<model_service_client> client);
+    void clear_model_service_client() noexcept;
+    [[nodiscard]] bool model_service_configured() const noexcept;
+    [[nodiscard]] const model_service_config& model_service_config_ref() const noexcept;
+    [[nodiscard]] model_service_response call_model_service(const model_service_request& request);
 
     memory_log_sink& logs() noexcept;
     const memory_log_sink& logs() const noexcept;
@@ -84,6 +90,8 @@ private:
     event_log events_;
     planner_service planner_;
     vla_service vla_;
+    model_service_config model_service_config_{};
+    std::unique_ptr<model_service_client> model_service_client_;
 
     std::unique_ptr<clock_interface> owned_clock_;
     std::unique_ptr<robot_interface> owned_robot_;

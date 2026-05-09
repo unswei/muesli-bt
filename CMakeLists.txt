@@ -89,6 +89,7 @@ if (MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
 endif ()
 
 if (MUESLI_BT_BUILD_MODEL_SERVICE_BRIDGE)
+  target_compile_definitions(muesli_bt_core PUBLIC MUESLI_BT_WITH_MODEL_SERVICE_BRIDGE=1)
   add_library(muesli_bt_integration_model_service integrations/model_service/bridge.cpp)
   target_link_libraries(muesli_bt_integration_model_service PUBLIC muesli_bt_core)
   target_include_directories(
@@ -232,6 +233,9 @@ endif ()
 
 add_executable(muslisp src/main.cpp src/repl_support.cpp)
 target_link_libraries(muslisp PRIVATE muesli_bt_core)
+if (TARGET muesli_bt_integration_model_service)
+  target_link_libraries(muslisp PRIVATE muesli_bt_integration_model_service)
+endif ()
 if (UNIX)
   target_sources(muslisp PRIVATE third_party/linenoise/linenoise.c)
   target_include_directories(muslisp PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/linenoise)
@@ -390,6 +394,10 @@ else ()
   target_compile_definitions(muslisp_tests PRIVATE MUESLI_BT_WITH_ROS2_INTEGRATION=0)
 endif ()
 
+if (TARGET muesli_bt_integration_model_service)
+  target_link_libraries(muslisp_tests PRIVATE muesli_bt_integration_model_service)
+endif ()
+
 add_test(NAME muslisp_tests COMMAND muslisp_tests)
 
 if (TARGET muesli_bt_integration_model_service)
@@ -402,6 +410,9 @@ add_executable(muesli_bt_conformance_tests tests/conformance/mock_backend.cpp
                                            tests/conformance/test_conformance_main.cpp)
 target_link_libraries(muesli_bt_conformance_tests PRIVATE muesli_bt_core)
 target_include_directories(muesli_bt_conformance_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+if (TARGET muesli_bt_integration_model_service)
+  target_link_libraries(muesli_bt_conformance_tests PRIVATE muesli_bt_integration_model_service)
+endif ()
 if (TARGET muesli_bt_integration_ros2)
   target_link_libraries(muesli_bt_conformance_tests PRIVATE muesli_bt_integration_ros2)
   target_compile_definitions(muesli_bt_conformance_tests PRIVATE MUESLI_BT_WITH_ROS2_INTEGRATION=1)

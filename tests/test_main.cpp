@@ -2151,6 +2151,45 @@ void test_capability_registry_call_echo() {
     check(integer_value(eval_text("(map.get (map.get response 'echo (map.make)) 'n -1)", env)) == 7,
           "cap.call should preserve payload fields");
 
+    value model_desc = eval_text("(cap.describe \"cap.model.world.rollout.v1\")", env);
+    check(is_map(model_desc), "cap.describe model rollout should return map");
+    check(string_value(eval_text("(map.get (cap.describe \"cap.model.world.rollout.v1\") 'name \"\")", env)) ==
+              "cap.model.world.rollout.v1",
+          "cap.describe model rollout name mismatch");
+
+    bt::default_runtime_host().events().clear_ring();
+    (void)eval_text(
+        "(define model_response "
+        " (begin "
+        "  (define input (map.make)) "
+        "  (map.set! input 'state (map.make)) "
+        "  (map.set! input 'actions (list)) "
+        "  (define req (map.make)) "
+        "  (map.set! req 'capability \"cap.model.world.rollout.v1\") "
+        "  (map.set! req 'operation \"invoke\") "
+        "  (map.set! req 'request_id \"rollout-1\") "
+        "  (map.set! req 'deadline_ms 25) "
+        "  (map.set! req 'input input) "
+        "  (cap.call req)))",
+        env);
+    value model_response = eval_text("model_response", env);
+    check(is_map(model_response), "model-service cap.call should return map");
+    check(symbol_name(eval_text("(map.get model_response 'status ':none)", env)) == ":unavailable",
+          "unconfigured model-service cap.call should return :unavailable");
+    check(string_value(eval_text("(map.get model_response 'error_code \"\")", env)) == "model_service_unconfigured",
+          "unconfigured model-service cap.call error code mismatch");
+    check(!boolean_value(eval_text("(map.get model_response 'host_reached true)", env)),
+          "unconfigured model-service cap.call must not reach host");
+    const std::vector<std::string> cap_events = bt::default_runtime_host().events().snapshot();
+    bool saw_cap_start = false;
+    bool saw_cap_end = false;
+    for (const std::string& line : cap_events) {
+        saw_cap_start = saw_cap_start || line.find("\"type\":\"cap_call_start\"") != std::string::npos;
+        saw_cap_end = saw_cap_end || line.find("\"type\":\"cap_call_end\"") != std::string::npos;
+    }
+    check(saw_cap_start, "model-service cap.call should emit cap_call_start");
+    check(saw_cap_end, "model-service cap.call should emit cap_call_end");
+
     value rejected = eval_text(
         "(begin "
         "  (define req (map.make)) "
