@@ -50,6 +50,7 @@ struct model_service_config {
     bool required = false;
     std::string replay_mode = "live";
     std::string replay_cache_path;
+    std::vector<std::string> fault_schedule;
 };
 
 struct model_service_request {

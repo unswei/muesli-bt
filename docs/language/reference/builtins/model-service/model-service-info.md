@@ -12,7 +12,7 @@ Use it to confirm whether the runtime host has a model-service client configured
 
 ## how it works
 
-The result reports whether a client is configured and echoes the current endpoint, timeout, required-mode, and replay-mode settings.
+The result reports whether a client is configured and echoes the current endpoint, timeout, required-mode, replay-mode, and deterministic fault-schedule settings.
 
 ## api / syntax
 
@@ -29,6 +29,7 @@ Result fields:
 - `required`
 - `replay_mode`
 - `replay_cache_path`
+- `fault_schedule`
 
 ## example
 

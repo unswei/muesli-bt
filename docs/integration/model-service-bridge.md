@@ -107,6 +107,7 @@ Configure the bridge from host setup or a script:
   (map.set! cfg 'request_timeout_ms 5000)
   (map.set! cfg 'replay_mode "record")
   (map.set! cfg 'replay_cache_path "runs/model-service-cache")
+  (map.set! cfg 'fault_schedule "none")
   (map.set! cfg 'check true)
   (model-service.configure cfg))
 ```
@@ -133,9 +134,11 @@ The first stateless validation gate runs on successful model-service proposals. 
 
 `cap_call_end` includes deterministic request/response hashes and validation status. In `record` mode, the raw response envelope is written under `replay_cache_path` using the request hash as the file name. In `replay` mode, `muesli-bt` reads that cached response, re-runs the validation gate, and reports `replay_cache_hit=true`.
 
+Deterministic fault injection is available through `fault_schedule`. Entries are consumed in order for non-replay calls. Supported entries are `none`, `delay:<ms>`, `timeout`, `unavailable`, `invalid_output`, `unsafe_output`, `stale_result`, and `policy_violation`. This is intended for reproducible validation and evidence runs, not as a production retry policy.
+
 The `check` field sends a `describe` request and verifies the first required `MMSP v0.2` capability ids are present before runtime use. The same gate is available explicitly as `(model-service.check)`.
 
-Still planned: deeper descriptor schema/mode checks, redaction, richer replay reports, VLA session wiring, and validation at host action dispatch.
+Still planned: deeper descriptor schema/mode checks, redaction, richer replay reports, VLA session wiring, fault schedules for session lifecycle calls, and validation at host action dispatch.
 
 The `muslisp` command can also start the external service in the foreground:
 

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cctype>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -175,6 +176,46 @@ std::filesystem::path model_service_cache_file(const model_service_config& confi
     return std::filesystem::path(config.replay_cache_path) / (request_hash + ".json");
 }
 
+std::string trim_ascii(std::string text) {
+    auto not_space = [](unsigned char ch) { return !std::isspace(ch); };
+    text.erase(text.begin(), std::find_if(text.begin(), text.end(), not_space));
+    text.erase(std::find_if(text.rbegin(), text.rend(), not_space).base(), text.end());
+    return text;
+}
+
+std::string json_escape_string_fragment(std::string_view text) {
+    std::ostringstream out;
+    for (unsigned char ch : text) {
+        switch (ch) {
+        case '\\':
+            out << "\\\\";
+            break;
+        case '"':
+            out << "\\\"";
+            break;
+        case '\n':
+            out << "\\n";
+            break;
+        case '\r':
+            out << "\\r";
+            break;
+        case '\t':
+            out << "\\t";
+            break;
+        default:
+            if (ch < 0x20) {
+                out << "\\u00";
+                constexpr char hex[] = "0123456789abcdef";
+                out << hex[(ch >> 4) & 0x0f] << hex[ch & 0x0f];
+            } else {
+                out << static_cast<char>(ch);
+            }
+            break;
+        }
+    }
+    return out.str();
+}
+
 std::optional<model_service_response> read_model_service_cache(const model_service_config& config,
                                                                const std::string& request_hash) {
     if (config.replay_cache_path.empty()) {
@@ -230,6 +271,111 @@ model_service_response model_service_replay_miss(const model_service_request& re
     out.request_hash = request_hash;
     out.raw_json = model_service_response_to_json(out);
     out.response_hash = event_log::hash64_hex(out.raw_json);
+    return out;
+}
+
+std::string model_service_fault_output_json(const model_service_request& request, std::string_view fault) {
+    if (fault == "invalid_output") {
+        return "{}";
+    }
+    if (request.capability == "cap.model.world.rollout.v1") {
+        if (fault == "unsafe_output") {
+            return "{\"predicted_states\":[],\"unsafe\":true}";
+        }
+        if (fault == "stale_result") {
+            return "{\"predicted_states\":[],\"stale\":true}";
+        }
+        if (fault == "policy_violation") {
+            return "{\"predicted_states\":[],\"policy_violation\":true}";
+        }
+        return "{\"predicted_states\":[]}";
+    }
+    if (request.capability == "cap.model.world.score_trajectory.v1") {
+        if (fault == "unsafe_output") {
+            return "{\"score\":0.0,\"unsafe\":true}";
+        }
+        if (fault == "stale_result") {
+            return "{\"score\":0.0,\"stale\":true}";
+        }
+        if (fault == "policy_violation") {
+            return "{\"score\":0.0,\"policy_violation\":true}";
+        }
+        return "{\"score\":0.0}";
+    }
+    if (request.capability == "cap.vla.action_chunk.v1") {
+        if (fault == "unsafe_output") {
+            return "{\"actions\":[],\"unsafe\":true}";
+        }
+        if (fault == "stale_result") {
+            return "{\"actions\":[],\"stale\":true}";
+        }
+        if (fault == "policy_violation") {
+            return "{\"actions\":[],\"policy_violation\":true}";
+        }
+        return "{\"actions\":[]}";
+    }
+    if (request.capability == "cap.vla.propose_nav_goal.v1") {
+        if (fault == "unsafe_output") {
+            return "{\"goal\":{},\"unsafe\":true}";
+        }
+        if (fault == "stale_result") {
+            return "{\"goal\":{},\"stale\":true}";
+        }
+        if (fault == "policy_violation") {
+            return "{\"goal\":{},\"policy_violation\":true}";
+        }
+        return "{\"goal\":{}}";
+    }
+    return "{}";
+}
+
+std::optional<model_service_response> injected_model_service_fault(const model_service_request& request,
+                                                                   std::string fault) {
+    fault = trim_ascii(std::move(fault));
+    if (fault.empty() || fault == "none" || fault == "pass") {
+        return std::nullopt;
+    }
+    if (fault.rfind("delay:", 0) == 0) {
+        const std::string raw_ms = trim_ascii(fault.substr(std::string("delay:").size()));
+        if (!raw_ms.empty()) {
+            long long delay_ms = 0;
+            try {
+                delay_ms = std::max<long long>(0, std::stoll(raw_ms));
+            } catch (...) {
+                delay_ms = 0;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+        }
+        return std::nullopt;
+    }
+
+    model_service_response out;
+    out.id = request.id;
+    out.host_reached = false;
+    out.metadata_json = "{\"fault_injected\":true,\"fault\":\"" + json_escape_string_fragment(fault) + "\"}";
+
+    if (fault == "timeout") {
+        out.status = model_service_status::timeout;
+        out.error_code = "model_service_fault_timeout";
+        out.error_message = "deterministic model-service timeout fault";
+        out.error_retryable = true;
+    } else if (fault == "unavailable" || fault == "backend_unavailable") {
+        out.status = model_service_status::unavailable;
+        out.error_code = "model_service_fault_unavailable";
+        out.error_message = "deterministic model-service unavailable fault";
+        out.error_retryable = true;
+    } else if (fault == "invalid_output" || fault == "unsafe_output" ||
+               fault == "stale_result" || fault == "policy_violation") {
+        out.status = model_service_status::success;
+        out.output_json = model_service_fault_output_json(request, fault);
+    } else {
+        out.status = model_service_status::internal_error;
+        out.error_code = "model_service_fault_unknown";
+        out.error_message = "unknown deterministic model-service fault: " + fault;
+        out.error_retryable = false;
+    }
+
+    out.raw_json = model_service_response_to_json(out);
     return out;
 }
 
@@ -381,11 +527,13 @@ const vla_service& runtime_host::vla_ref() const {
 void runtime_host::set_model_service_client(model_service_config config, std::unique_ptr<model_service_client> client) {
     model_service_config_ = std::move(config);
     model_service_client_ = std::move(client);
+    model_service_fault_index_ = 0;
 }
 
 void runtime_host::clear_model_service_client() noexcept {
     model_service_client_.reset();
     model_service_config_ = model_service_config{};
+    model_service_fault_index_ = 0;
 }
 
 bool runtime_host::model_service_configured() const noexcept {
@@ -411,10 +559,17 @@ model_service_response runtime_host::call_model_service(const model_service_requ
     }
 
     model_service_response response;
-    if (!model_service_client_) {
+    if (model_service_fault_index_ < model_service_config_.fault_schedule.size()) {
+        const std::string fault = model_service_config_.fault_schedule[model_service_fault_index_++];
+        if (std::optional<model_service_response> injected = injected_model_service_fault(request, fault);
+            injected.has_value()) {
+            response = std::move(*injected);
+        }
+    }
+    if (response.id.empty() && !model_service_client_) {
         unavailable_model_service_client unavailable;
         response = unavailable.call(request);
-    } else {
+    } else if (response.id.empty()) {
         response = model_service_client_->call(request);
     }
 

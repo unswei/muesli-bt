@@ -2397,6 +2397,67 @@ void test_model_service_protocol_skeleton() {
     check(unsafe.validation_reason_code == "model_service_unsafe_output",
           "unsafe model-service output reason mismatch");
     check(!unsafe.host_reached, "unsafe model-service output must not reach host");
+
+    struct fault_schedule_live_client final : bt::model_service_client {
+        int calls = 0;
+        bt::model_service_response call(const bt::model_service_request& req) override {
+            ++calls;
+            bt::model_service_response out;
+            out.id = req.id;
+            out.status = bt::model_service_status::success;
+            out.output_json = "{\"predicted_states\":[{\"vector\":[1.0]}]}";
+            out.raw_json = bt::model_service_response_to_json(out);
+            return out;
+        }
+    };
+    bt::model_service_config fault_cfg;
+    fault_cfg.fault_schedule = {
+        "invalid_output",
+        "unsafe_output",
+        "stale_result",
+        "timeout",
+        "unavailable",
+        "none",
+    };
+    auto fault_client = std::make_unique<fault_schedule_live_client>();
+    fault_schedule_live_client* fault_client_ptr = fault_client.get();
+    host.set_model_service_client(fault_cfg, std::move(fault_client));
+
+    const bt::model_service_response fault_invalid = host.call_model_service(cache_request);
+    check(fault_invalid.status == bt::model_service_status::invalid_output,
+          "fault invalid_output should produce invalid_output");
+    check(fault_invalid.validation_reason_code == "model_service_missing_predicted_states",
+          "fault invalid_output reason mismatch");
+
+    const bt::model_service_response fault_unsafe = host.call_model_service(cache_request);
+    check(fault_unsafe.status == bt::model_service_status::unsafe_output,
+          "fault unsafe_output should produce unsafe_output");
+    check(fault_unsafe.validation_reason_code == "model_service_unsafe_output",
+          "fault unsafe_output reason mismatch");
+
+    const bt::model_service_response fault_stale = host.call_model_service(cache_request);
+    check(fault_stale.status == bt::model_service_status::invalid_output,
+          "fault stale_result should produce invalid_output");
+    check(fault_stale.validation_reason_code == "model_service_stale_result",
+          "fault stale_result reason mismatch");
+
+    const bt::model_service_response fault_timeout = host.call_model_service(cache_request);
+    check(fault_timeout.status == bt::model_service_status::timeout,
+          "fault timeout should produce timeout");
+    check(fault_timeout.error_code == "model_service_fault_timeout",
+          "fault timeout error code mismatch");
+
+    const bt::model_service_response fault_unavailable = host.call_model_service(cache_request);
+    check(fault_unavailable.status == bt::model_service_status::unavailable,
+          "fault unavailable should produce unavailable");
+    check(fault_unavailable.error_code == "model_service_fault_unavailable",
+          "fault unavailable error code mismatch");
+
+    const bt::model_service_response fault_passthrough = host.call_model_service(cache_request);
+    check(fault_passthrough.status == bt::model_service_status::success,
+          "fault none should call live model-service client");
+    check(fault_passthrough.validation_ok, "fault none live result should validate");
+    check(fault_client_ptr->calls == 1, "fault schedule should only call live client for passthrough fault");
 }
 
 void test_vla_builtins_submit_poll_cancel_and_caps() {

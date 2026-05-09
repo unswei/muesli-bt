@@ -2585,6 +2585,35 @@ std::string map_lookup_text_or_empty(value map_obj, const std::string& key, cons
     return require_text_value(*found, where);
 }
 
+[[maybe_unused]] std::vector<std::string> split_csv_text(const std::string& text) {
+    std::vector<std::string> out;
+    std::string item;
+    std::istringstream input(text);
+    while (std::getline(input, item, ',')) {
+        item.erase(item.begin(), std::find_if(item.begin(), item.end(), [](unsigned char ch) {
+            return !std::isspace(ch);
+        }));
+        item.erase(std::find_if(item.rbegin(), item.rend(), [](unsigned char ch) {
+            return !std::isspace(ch);
+        }).base(), item.end());
+        if (!item.empty()) {
+            out.push_back(std::move(item));
+        }
+    }
+    return out;
+}
+
+[[maybe_unused]] std::string join_csv_text(const std::vector<std::string>& values) {
+    std::ostringstream out;
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        if (i != 0) {
+            out << ',';
+        }
+        out << values[i];
+    }
+    return out.str();
+}
+
 value decode_json_or_string(const std::string& text) {
     if (text.empty()) {
         return make_nil();
@@ -2805,6 +2834,10 @@ value builtin_model_service_configure(const std::vector<value>& args) {
                                             "model-service.configure replay_mode");
     config.replay_cache_path = map_lookup_text_or(config_map, "replay_cache_path", config.replay_cache_path,
                                                   "model-service.configure replay_cache_path");
+    config.fault_schedule = split_csv_text(map_lookup_text_or(config_map,
+                                                              "fault_schedule",
+                                                              join_csv_text(config.fault_schedule),
+                                                              "model-service.configure fault_schedule"));
     if (const std::optional<value> required_v = map_lookup_option(config_map, "required"); required_v.has_value()) {
         if (!is_boolean(*required_v)) {
             throw lisp_error("model-service.configure required: expected boolean");
@@ -2859,6 +2892,7 @@ value builtin_model_service_info(const std::vector<value>& args) {
     map_set_symbol(out, "required", make_boolean(config.required));
     map_set_symbol(out, "replay_mode", make_string(config.replay_mode));
     map_set_symbol(out, "replay_cache_path", make_string(config.replay_cache_path));
+    map_set_symbol(out, "fault_schedule", make_string(join_csv_text(config.fault_schedule)));
     return out;
 }
 

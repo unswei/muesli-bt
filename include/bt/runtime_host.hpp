@@ -93,6 +93,7 @@ private:
     vla_service vla_;
     model_service_config model_service_config_{};
     std::unique_ptr<model_service_client> model_service_client_;
+    std::size_t model_service_fault_index_ = 0;
 
     std::unique_ptr<clock_interface> owned_clock_;
     std::unique_ptr<robot_interface> owned_robot_;

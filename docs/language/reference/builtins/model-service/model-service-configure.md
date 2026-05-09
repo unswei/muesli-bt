@@ -31,6 +31,7 @@ Supported config fields:
 - `required`: boolean
 - `replay_mode`: string; supported values are `"live"`, `"record"`, and `"replay"`
 - `replay_cache_path`: directory used for request-hash keyed response cache files
+- `fault_schedule`: comma-separated deterministic fault entries for non-replay calls
 - `check`: boolean; when true, run `model-service.check` immediately and fail if incompatible
 
 ## example
@@ -43,6 +44,7 @@ Supported config fields:
   (map.set! cfg 'request_timeout_ms 5000)
   (map.set! cfg 'replay_mode "record")
   (map.set! cfg 'replay_cache_path "runs/model-service-cache")
+  (map.set! cfg 'fault_schedule "none")
   (map.set! cfg 'check true)
   (model-service.configure cfg))
 ```
@@ -56,6 +58,8 @@ Supported config fields:
 - `check=true` verifies descriptor compatibility, not task-specific model quality.
 - `record` mode calls the live service and writes raw response envelopes to the replay cache.
 - `replay` mode reads from the replay cache by request hash and does not need a reachable service when the cache entry exists.
+- `fault_schedule` is for deterministic tests and evidence runs. Supported entries are `none`, `delay:<ms>`, `timeout`, `unavailable`, `invalid_output`, `unsafe_output`, `stale_result`, and `policy_violation`.
+- Fault entries are consumed in order for non-replay calls. Replay mode reads the cache and does not consume the schedule.
 
 ## see also
 
