@@ -392,6 +392,12 @@ endif ()
 
 add_test(NAME muslisp_tests COMMAND muslisp_tests)
 
+if (TARGET muesli_bt_integration_model_service)
+  add_executable(muesli_bt_model_service_bridge_tests tests/test_model_service_bridge.cpp)
+  target_link_libraries(muesli_bt_model_service_bridge_tests PRIVATE muesli_bt_integration_model_service)
+  add_test(NAME muesli_bt_model_service_bridge_tests COMMAND muesli_bt_model_service_bridge_tests)
+endif ()
+
 add_executable(muesli_bt_conformance_tests tests/conformance/mock_backend.cpp
                                            tests/conformance/test_conformance_main.cpp)
 target_link_libraries(muesli_bt_conformance_tests PRIVATE muesli_bt_core)

@@ -82,6 +82,16 @@ cmake -S . -B build/model-service \
 
 The default is `OFF`, so core users do not inherit a model-service or networking dependency.
 
+When the optional integration target is built, it provides a small `ws://` `MMSP v0.2` client factory:
+
+```cpp
+bt::model_service_config cfg;
+cfg.endpoint = "ws://127.0.0.1:8765/v1/ws";
+auto client = bt::make_websocket_model_service_client(cfg);
+```
+
+This is the transport slice only. Runtime wiring into `cap.call`, VLA submit/poll/cancel, canonical capability lifecycle events, replay caches, and validation gates remains `v0.8.0` roadmap work.
+
 The `muslisp` command can also start the external service in the foreground:
 
 ```bash
@@ -140,6 +150,35 @@ and `frame://camera1/latest`. The model call should use refs:
 }
 ```
 
+After `start` returns a `session_id`, a VLA `step` response uses `status: "action_chunk"` and places proposed host actions under `output.actions`:
+
+```json
+{
+  "version": "0.2",
+  "id": "vla-step-1",
+  "status": "action_chunk",
+  "output": {
+    "actions": [
+      {
+        "type": "joint_targets",
+        "values": [0.10, -0.17, -0.20, -0.04, -0.03, 0.38],
+        "dt_ms": 33
+      }
+    ]
+  },
+  "session_id": "sess-000001",
+  "error": null,
+  "metadata": {
+    "capability": "cap.vla.action_chunk.v1",
+    "backend": "smolvla",
+    "action_dim": 6,
+    "chunk_length": 50
+  }
+}
+```
+
+The bridge must validate those proposals before any downstream host capability or robot action can observe them as executable commands.
+
 ## example
 
 A bounded world-model request should use a stable capability id:
@@ -162,6 +201,7 @@ The host bridge maps the request to `MMSP v0.2`, validates the response, emits c
 - `--model-service-start` is a convenience wrapper. It does not make the Python service part of the C++ runtime.
 - Configured but unreachable service must produce fallback-capable unavailable results.
 - `frame://.../latest` is a handle in the service frame cache. It does not itself transport bytes.
+- Current frame refs are resolved inside the service. Recording immutable resolved refs in replay metadata is a hardening item, not a BT semantics dependency.
 - Backend metadata is not BT semantics.
 - Late, stale, invalid, unsafe, or policy-violating outputs must have `host_reached=false`.
 - A `step` timeout does not automatically cancel a service session.

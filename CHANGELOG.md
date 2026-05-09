@@ -4,6 +4,14 @@ muesli-bt
 
 ## [Unreleased]
 
+### Added
+- Added documentation for starting the optional `muesli-model-service` from `muslisp` with `--model-service-start`, while keeping the service outside the core runtime and disabled unless a host configures model capabilities.
+- Added documentation for HTTP frame ingest as the preferred live-image path for remote VLA calls, using `frame://...` references in model-call envelopes instead of copying image bytes through JSON.
+- Added the first optional `ws://` `MMSP v0.2` client implementation for `muesli-model-service`, including request-envelope serialisation, response parsing, WebSocket handshake/framing, and deterministic unavailable results on connection failure.
+
+### Changed
+- Clarified the `muesli-model-service` bridge response shape for VLA sessions: `step` returns `status: "action_chunk"` with proposed host actions under `output.actions`, and those actions remain untrusted until host-side validation accepts them.
+
 ## [0.7.0] - 2026-05-05
 
 ### Added

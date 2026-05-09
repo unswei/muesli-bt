@@ -2188,6 +2188,25 @@ void test_model_service_protocol_skeleton() {
 
     check(std::string(bt::model_service_operation_name(request.op)) == "invoke",
           "model service operation name mismatch");
+    const std::string envelope = bt::model_service_request_to_json(request);
+    check(envelope.find("\"version\":\"0.2\"") != std::string::npos, "model service envelope version missing");
+    check(envelope.find("\"op\":\"invoke\"") != std::string::npos, "model service envelope operation missing");
+    check(envelope.find("\"capability\":\"cap.model.world.rollout.v1\"") != std::string::npos,
+          "model service envelope capability missing");
+
+    const bt::model_service_response parsed = bt::model_service_response_from_json(
+        "{\"version\":\"0.2\",\"id\":\"req-1\",\"status\":\"action_chunk\","
+        "\"output\":{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.1],\"dt_ms\":33}]},"
+        "\"session_id\":\"sess-1\",\"error\":null,"
+        "\"metadata\":{\"capability\":\"cap.vla.action_chunk.v1\",\"backend\":\"smolvla\"}}");
+    check(parsed.id == "req-1", "model service parsed response id mismatch");
+    check(parsed.status == bt::model_service_status::action_chunk, "model service parsed status mismatch");
+    check(parsed.output_json.find("\"actions\"") != std::string::npos,
+          "model service parsed output should preserve raw actions JSON");
+    check(parsed.session_id == "sess-1", "model service parsed session id mismatch");
+    check(parsed.metadata_json.find("\"smolvla\"") != std::string::npos,
+          "model service parsed metadata should preserve raw JSON");
+
     check(std::string(bt::model_service_status_name(response.status)) == "unavailable",
           "model service unavailable status mismatch");
     check(bt::model_service_status_terminal(response.status), "unavailable should be terminal");

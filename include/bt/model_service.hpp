@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -87,6 +88,12 @@ class unavailable_model_service_client final : public model_service_client {
 public:
     [[nodiscard]] model_service_response call(const model_service_request& request) override;
 };
+
+[[nodiscard]] std::string model_service_request_to_json(const model_service_request& request);
+[[nodiscard]] model_service_response model_service_response_from_json(const std::string& text);
+
+[[nodiscard]] std::unique_ptr<model_service_client>
+make_websocket_model_service_client(model_service_config config);
 
 [[nodiscard]] const char* model_service_operation_name(model_service_operation op) noexcept;
 [[nodiscard]] const char* model_service_status_name(model_service_status status) noexcept;

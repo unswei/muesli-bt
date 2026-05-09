@@ -460,15 +460,21 @@ Focus:
 - prove that deadlines, cancellation, stale-result rejection, and fallback matter under model latency
 - keep the model integration behind host capability contracts rather than turning VLA into a special runtime case
 - make asynchronous model/VLA integration look like ordinary host-capability use, so the BT source is independent of whether a service runs in-process, as a subprocess, on an edge server, through ROS2, or over HTTP
+- use `MMSP v0.2` as the first accepted `muesli-bt` to `muesli-model-service` protocol profile, with public capability ids and backend placement kept out of BT source
 - land the runtime and evidence pieces needed before a physical or Nav2-backed flagship run can be defended publicly
 
 Scope:
 
+- complete the optional `muesli-model-service` bridge against `MMSP v0.2`: the first low-level `ws://` request/response client exists, but runtime wiring still needs `describe`, `invoke`, `start`, `step`, `cancel`, `status`, and `close`, with no-service behaviour preserved for BTs that do not request model capabilities
+- use the initial public model capability ids `cap.model.world.rollout.v1`, `cap.model.world.score_trajectory.v1`, `cap.vla.action_chunk.v1`, and `cap.vla.propose_nav_goal.v1`
+- support the current VLA session response shape: `step` returns `status: "action_chunk"` and places proposed host actions under `output.actions`; those actions remain untrusted until host-side validation accepts them
+- keep live camera bytes outside model-call JSON by using HTTP frame ingest on the service side and `frame://` refs in model requests; `frame://.../latest` is a service-local handle, not reproducible evidence by itself
+- record model request refs, response hashes, and immutable resolved frame refs when available in replay artefacts; do not turn high-rate raw frame upload into the main canonical BT event stream by default
 - implement at least one real model backend behind the existing VLA service interface, preferably as a local process or HTTP backend that can be replayed deterministically from stored request and response records
 - integrate VLA as a transport-transparent asynchronous host capability, using SmolVLA through the LeRobot async inference path as the primary practical backend and OpenVLA-OFT as the heavyweight VLA backend; the BT source must remain independent of whether inference runs locally, on an edge server, over HTTP/ROS2, or from a replay cache
 - keep the current stub backend as a deterministic unit-test backend, not as the release evidence path
 - support submit, poll, timeout, cancellation, partial response, final response, response hashing, request hashing, replay from stored records, and backend failure reporting
-- define first capability names for model-backed perception or action proposal, for example `cap.perception.scene.v1`, `cap.vla.select_target.v1`, or `cap.vla.propose_nav_goal.v1`
+- define any additional flagship-specific capability names only after checking that the initial `MMSP v0.2` set cannot express the task cleanly
 - implement an injected latency and failure layer for VLA and planner backends, including delayed success, timeout, invalid action schema, unsafe action value, stale scene timestamp, dropped response, backend crash, and cancellation ignored until completion
 - implement first-class action validation before any VLA or planner output can reach `env.act` or a host capability execution call
 - include validators for continuous bounds, max command delta, timestamp freshness, target frame validity, forbidden zones, Nav2 goal validity where available, and host-declared capability schema compliance
@@ -521,7 +527,7 @@ capabilities:
 - provide validation result objects with valid/invalid status, reason code, field path, source capability or node, selected fallback, and whether the result was allowed to reach the host
 - add a standard replay record format for asynchronous capability calls, including request hash, request summary, response hash, response summary, backend identity, latency, deadline, validation outcome, cancellation outcome, stale-result status, and redaction markers where needed
 
-See also: [VLA backend integration plan](integration/vla-backend-integration-plan.md).
+See also: [muesli-model-service bridge](integration/model-service-bridge.md) and [VLA backend integration plan](integration/vla-backend-integration-plan.md).
 
 The VLA backend integration plan is a temporary planning document. Once the SmolVLA/OpenVLA-OFT path is implemented, documented through normal user-facing pages, covered by fixtures, and represented in release evidence, delete the planning page and replace roadmap links with the implementation docs and evidence pages.
 
@@ -560,6 +566,10 @@ Benchmark and evidence requirements:
 Exit criteria:
 
 - at least one real model backend is used in a reproducible demo or benchmark
+- BTs that do not request model capabilities run without contacting or requiring `muesli-model-service`
+- configured but unavailable model service calls return deterministic fallback-capable unavailable results
+- the bridge rejects incompatible `describe` descriptors before runtime execution
+- VLA requests can carry `frame://` refs for live camera observations without copying image bytes through model-call JSON
 - all VLA and planner outputs pass through a documented validator before execution
 - seeded latency and failure injection is reproducible across runs
 - the same VLA or planner fault schedule can be replayed from trace artefacts
