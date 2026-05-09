@@ -2185,6 +2185,8 @@ void test_capability_registry_call_echo() {
           "model-service cap.call should expose response_hash");
     check(!boolean_value(eval_text("(map.get model_response 'replay_cache_hit true)", env)),
           "unconfigured model-service cap.call should not be a replay cache hit");
+    check(symbol_name(eval_text("(map.get model_response 'validation_status ':missing)", env)) == ":not_checked",
+          "unconfigured model-service cap.call should not run output validation");
     check(!boolean_value(eval_text("(map.get model_response 'host_reached true)", env)),
           "unconfigured model-service cap.call must not reach host");
     const std::vector<std::string> cap_events = bt::default_runtime_host().events().snapshot();
@@ -2313,7 +2315,7 @@ void test_model_service_protocol_skeleton() {
             bt::model_service_response out;
             out.id = req.id;
             out.status = bt::model_service_status::success;
-            out.output_json = "{\"score\":1.0}";
+            out.output_json = "{\"predicted_states\":[{\"vector\":[0.0]}]}";
             out.metadata_json = "{\"backend\":\"fake\"}";
             out.raw_json = bt::model_service_response_to_json(out);
             return out;
@@ -2337,6 +2339,8 @@ void test_model_service_protocol_skeleton() {
     cache_request.input_json = "{\"state\":{\"vector\":[0.0]},\"actions\":[]}";
     const bt::model_service_response recorded = host.call_model_service(cache_request);
     check(recorded.status == bt::model_service_status::success, "recorded model-service call should succeed");
+    check(recorded.validation_checked, "recorded model-service call should run validation");
+    check(recorded.validation_ok, "recorded model-service call should pass validation");
     check(!recorded.request_hash.empty(), "recorded model-service call should have request hash");
     check(!recorded.response_hash.empty(), "recorded model-service call should have response hash");
     check(record_client_ptr->calls == 1, "recording should call live model-service client once");
@@ -2349,10 +2353,50 @@ void test_model_service_protocol_skeleton() {
     host.set_model_service_client(replay_cfg, nullptr);
     const bt::model_service_response replayed = host.call_model_service(cache_request);
     check(replayed.status == bt::model_service_status::success, "replayed model-service call should succeed");
+    check(replayed.validation_checked, "replayed model-service call should run validation");
+    check(replayed.validation_ok, "replayed model-service call should pass validation");
     check(replayed.replay_cache_hit, "replayed model-service call should report cache hit");
     check(replayed.request_hash == recorded.request_hash, "replayed model-service request hash mismatch");
     check(replayed.response_hash == recorded.response_hash, "replayed model-service response hash mismatch");
     std::filesystem::remove_all(cache_dir);
+
+    struct invalid_output_client final : bt::model_service_client {
+        bt::model_service_response call(const bt::model_service_request& req) override {
+            bt::model_service_response out;
+            out.id = req.id;
+            out.status = bt::model_service_status::success;
+            out.output_json = "{\"score\":1.0}";
+            out.raw_json = bt::model_service_response_to_json(out);
+            return out;
+        }
+    };
+    host.set_model_service_client(bt::model_service_config{}, std::make_unique<invalid_output_client>());
+    const bt::model_service_response invalid = host.call_model_service(cache_request);
+    check(invalid.status == bt::model_service_status::invalid_output,
+          "world rollout missing predicted_states should be invalid_output");
+    check(invalid.validation_checked, "invalid model-service output should run validation");
+    check(!invalid.validation_ok, "invalid model-service output should fail validation");
+    check(invalid.validation_reason_code == "model_service_missing_predicted_states",
+          "invalid model-service output reason mismatch");
+    check(!invalid.host_reached, "invalid model-service output must not reach host");
+
+    struct unsafe_output_client final : bt::model_service_client {
+        bt::model_service_response call(const bt::model_service_request& req) override {
+            bt::model_service_response out;
+            out.id = req.id;
+            out.status = bt::model_service_status::success;
+            out.output_json = "{\"predicted_states\":[],\"unsafe\":true}";
+            out.raw_json = bt::model_service_response_to_json(out);
+            return out;
+        }
+    };
+    host.set_model_service_client(bt::model_service_config{}, std::make_unique<unsafe_output_client>());
+    const bt::model_service_response unsafe = host.call_model_service(cache_request);
+    check(unsafe.status == bt::model_service_status::unsafe_output,
+          "unsafe model-service output should be unsafe_output");
+    check(unsafe.validation_reason_code == "model_service_unsafe_output",
+          "unsafe model-service output reason mismatch");
+    check(!unsafe.host_reached, "unsafe model-service output must not reach host");
 }
 
 void test_vla_builtins_submit_poll_cancel_and_caps() {

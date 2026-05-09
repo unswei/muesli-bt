@@ -404,6 +404,7 @@ model_service_response runtime_host::call_model_service(const model_service_requ
     if (replay_mode == "replay") {
         if (std::optional<model_service_response> cached = read_model_service_cache(model_service_config_, request_hash);
             cached.has_value()) {
+            validate_model_service_response(request, *cached);
             return *cached;
         }
         return model_service_replay_miss(request, request_hash);
@@ -423,6 +424,7 @@ model_service_response runtime_host::call_model_service(const model_service_requ
     }
     response.response_hash = event_log::hash64_hex(response.raw_json);
     response.replay_cache_hit = false;
+    validate_model_service_response(request, response);
     if (replay_mode == "record") {
         write_model_service_cache(model_service_config_, request_hash, response);
     }

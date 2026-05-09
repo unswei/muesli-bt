@@ -90,7 +90,7 @@ cfg.endpoint = "ws://127.0.0.1:8765/v1/ws";
 auto client = bt::make_websocket_model_service_client(cfg);
 ```
 
-The client is intentionally small: it supports the first `ws://` request/response path. Broader runtime hardening, VLA submit/poll/cancel, replay caches, and validation gates remain `v0.8.0` roadmap work.
+The client is intentionally small: it supports the first `ws://` request/response path. Broader runtime hardening, VLA submit/poll/cancel, redaction, and richer replay reports remain `v0.8.0` roadmap work.
 
 The first runtime wiring is now the stateless `cap.call` path for:
 
@@ -129,11 +129,13 @@ Then call a bounded model capability:
 
 `cap.call` emits `cap_call_start` and `cap_call_end` for model-service calls. Returned model outputs have `host_reached=false`; validation and host execution remain separate.
 
-`cap_call_end` includes deterministic request/response hashes. In `record` mode, the raw response envelope is written under `replay_cache_path` using the request hash as the file name. In `replay` mode, `muesli-bt` reads that cached response and reports `replay_cache_hit=true`.
+The first stateless validation gate runs on successful model-service proposals. World-model rollout outputs must contain `predicted_states`; trajectory scoring outputs must contain `score`. Outputs marked `unsafe`, `stale`, or `policy_violation` are rejected. Rejected outputs return `:invalid_output` or `:unsafe_output`, include `validation_status=:rejected`, and keep `host_reached=false`.
+
+`cap_call_end` includes deterministic request/response hashes and validation status. In `record` mode, the raw response envelope is written under `replay_cache_path` using the request hash as the file name. In `replay` mode, `muesli-bt` reads that cached response, re-runs the validation gate, and reports `replay_cache_hit=true`.
 
 The `check` field sends a `describe` request and verifies the first required `MMSP v0.2` capability ids are present before runtime use. The same gate is available explicitly as `(model-service.check)`.
 
-Still planned: deeper descriptor schema/mode checks, redaction, richer replay reports, and VLA session wiring.
+Still planned: deeper descriptor schema/mode checks, redaction, richer replay reports, VLA session wiring, and validation at host action dispatch.
 
 The `muslisp` command can also start the external service in the foreground:
 

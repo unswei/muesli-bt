@@ -12,6 +12,7 @@ muesli-bt
 - Routed stateless model-service capabilities through `cap.call` for `cap.model.world.rollout.v1` and `cap.model.world.score_trajectory.v1`, including `cap_call_start` and `cap_call_end` canonical events.
 - Added `model-service.check` and `model-service.configure` `check=true` support for the first `MMSP v0.2` `describe` compatibility gate.
 - Added deterministic request/response hashes and a request-hash keyed replay cache for stateless model-service `cap.call` in `record` and `replay` modes.
+- Added the first host-side validation gate for stateless model-service outputs, rejecting missing, stale, unsafe, or policy-violating proposals before any host reach.
 
 ### Changed
 - Clarified the `muesli-model-service` bridge response shape for VLA sessions: `step` returns `status: "action_chunk"` with proposed host actions under `output.actions`, and those actions remain untrusted until host-side validation accepts them.

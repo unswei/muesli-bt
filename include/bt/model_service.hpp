@@ -80,6 +80,10 @@ struct model_service_response {
     std::string request_hash;
     std::string response_hash;
     bool replay_cache_hit = false;
+    bool validation_checked = false;
+    bool validation_ok = false;
+    std::string validation_reason_code;
+    std::string validation_message;
 };
 
 struct model_service_compatibility_result {
@@ -106,6 +110,7 @@ public:
 [[nodiscard]] std::string model_service_request_to_json(const model_service_request& request);
 [[nodiscard]] std::string model_service_response_to_json(const model_service_response& response);
 [[nodiscard]] model_service_response model_service_response_from_json(const std::string& text);
+void validate_model_service_response(const model_service_request& request, model_service_response& response);
 [[nodiscard]] std::vector<std::string> model_service_required_capabilities();
 [[nodiscard]] model_service_compatibility_result
 check_model_service_compatibility(model_service_client& client,

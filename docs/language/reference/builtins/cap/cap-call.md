@@ -60,12 +60,16 @@ The model-service result uses:
 - `request_hash`: deterministic hash of the `MMSP v0.2` request envelope
 - `response_hash`: deterministic hash of the raw response envelope
 - `replay_cache_hit`: whether the result came from the local replay cache
+- `validation_status`: `:accepted`, `:rejected`, or `:not_checked`
+- `validation_reason_code`: reason code when validation rejects the output
+- `validation_message`: human-readable validation message when available
 
 ## Errors And Edge Cases
 
 - missing `capability` raises a runtime error
 - unknown capability raises a runtime error
 - configured but unreachable model service returns `:unavailable`, not a direct host action
+- invalid, stale, unsafe, or policy-violating model-service outputs are rejected before host reach
 - missing or unsupported `schema_version` raises a runtime error
 - missing `operation` raises a runtime error
 - unsupported `cap.echo.v1` operations return a result map with `status` set to `:rejected`
@@ -135,6 +139,7 @@ The model-service result uses:
 - Future motion and perception adapters should stay behind their capability contracts.
 - Model-service calls emit canonical `mbt.evt.v1` lifecycle events named `cap_call_start` and `cap_call_end`.
 - `cap_call_end` includes request and response hashes when available.
+- `cap_call_end` includes validation status and rejection reason codes when validation runs.
 - The deterministic `cap.echo.v1` smoke path does not need those events until it stops being a pure registry/API fixture.
 
 ## See Also

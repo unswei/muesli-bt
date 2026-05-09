@@ -2633,6 +2633,17 @@ value model_service_response_to_lisp(const bt::model_service_response& response,
         map_set_symbol(out, "response_hash", make_string(response.response_hash));
     }
     map_set_symbol(out, "replay_cache_hit", make_boolean(response.replay_cache_hit));
+    if (response.validation_checked) {
+        map_set_symbol(out, "validation_status", keyword_symbol(response.validation_ok ? "accepted" : "rejected"));
+        if (!response.validation_reason_code.empty()) {
+            map_set_symbol(out, "validation_reason_code", make_string(response.validation_reason_code));
+        }
+        if (!response.validation_message.empty()) {
+            map_set_symbol(out, "validation_message", make_string(response.validation_message));
+        }
+    } else {
+        map_set_symbol(out, "validation_status", keyword_symbol("not_checked"));
+    }
     return out;
 }
 
@@ -2686,6 +2697,13 @@ void emit_cap_call_event(std::string_view event_type,
             data << ",\"response_hash\":\"" << bt::event_log::json_escape(response->response_hash) << "\"";
         }
         data << ",\"replay_cache_hit\":" << (response->replay_cache_hit ? "true" : "false");
+        data << ",\"validation_status\":\""
+             << (response->validation_checked ? (response->validation_ok ? "accepted" : "rejected") : "not_checked")
+             << "\"";
+        if (!response->validation_reason_code.empty()) {
+            data << ",\"validation_reason_code\":\""
+                 << bt::event_log::json_escape(response->validation_reason_code) << "\"";
+        }
         if (!response->error_code.empty()) {
             data << ",\"error_code\":\"" << bt::event_log::json_escape(response->error_code) << "\"";
         }

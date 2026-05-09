@@ -246,6 +246,37 @@ bool contains_json_string_field(std::string_view text, std::string_view field, s
     return text.find(needle.str()) != std::string_view::npos;
 }
 
+bool contains_json_bool_field(std::string_view text, std::string_view field, bool value) {
+    std::ostringstream compact;
+    compact << '"' << field << "\":" << (value ? "true" : "false");
+    if (text.find(compact.str()) != std::string_view::npos) {
+        return true;
+    }
+
+    std::ostringstream spaced;
+    spaced << '"' << field << "\" : " << (value ? "true" : "false");
+    return text.find(spaced.str()) != std::string_view::npos;
+}
+
+void reject_model_service_output(model_service_response& response,
+                                 model_service_status status,
+                                 std::string reason_code,
+                                 std::string message) {
+    response.status = status;
+    response.host_reached = false;
+    response.validation_checked = true;
+    response.validation_ok = false;
+    response.validation_reason_code = std::move(reason_code);
+    response.validation_message = std::move(message);
+    if (response.error_code.empty()) {
+        response.error_code = response.validation_reason_code;
+    }
+    if (response.error_message.empty()) {
+        response.error_message = response.validation_message;
+    }
+    response.error_retryable = false;
+}
+
 }  // namespace
 
 model_service_response unavailable_model_service_client::call(const model_service_request& request) {
@@ -347,6 +378,94 @@ model_service_response model_service_response_from_json(const std::string& text)
     }
     out.host_reached = false;
     return out;
+}
+
+void validate_model_service_response(const model_service_request& request, model_service_response& response) {
+    response.host_reached = false;
+    if (request.op != model_service_operation::invoke && request.op != model_service_operation::step) {
+        return;
+    }
+    if (response.status != model_service_status::success && response.status != model_service_status::action_chunk) {
+        return;
+    }
+
+    response.validation_checked = true;
+    response.validation_ok = false;
+    response.validation_reason_code.clear();
+    response.validation_message.clear();
+
+    std::string_view output = response.output_json;
+    std::size_t pos = 0;
+    skip_ws(output, pos);
+    if (pos >= output.size() || output[pos] != '{') {
+        reject_model_service_output(response,
+                                    model_service_status::invalid_output,
+                                    "model_service_output_not_object",
+                                    "model-service output must be a JSON object");
+        return;
+    }
+
+    const auto object = parse_top_level_object(output);
+    if (contains_json_bool_field(output, "unsafe", true) ||
+        contains_json_bool_field(output, "unsafe_output", true)) {
+        reject_model_service_output(response,
+                                    model_service_status::unsafe_output,
+                                    "model_service_unsafe_output",
+                                    "model-service output was marked unsafe");
+        return;
+    }
+    if (contains_json_bool_field(output, "policy_violation", true)) {
+        reject_model_service_output(response,
+                                    model_service_status::unsafe_output,
+                                    "model_service_policy_violation",
+                                    "model-service output violated host policy");
+        return;
+    }
+    if (contains_json_bool_field(output, "stale", true) ||
+        contains_json_bool_field(output, "stale_result", true)) {
+        reject_model_service_output(response,
+                                    model_service_status::invalid_output,
+                                    "model_service_stale_result",
+                                    "model-service output was marked stale");
+        return;
+    }
+
+    auto require_field = [&](std::string_view field, std::string reason_code, std::string message) -> bool {
+        if (object.find(std::string(field)) != object.end()) {
+            return true;
+        }
+        reject_model_service_output(response,
+                                    model_service_status::invalid_output,
+                                    std::move(reason_code),
+                                    std::move(message));
+        return false;
+    };
+
+    if (request.capability == "cap.model.world.rollout.v1") {
+        if (!require_field("predicted_states",
+                           "model_service_missing_predicted_states",
+                           "world rollout output is missing predicted_states")) {
+            return;
+        }
+    } else if (request.capability == "cap.model.world.score_trajectory.v1") {
+        if (!require_field("score", "model_service_missing_score", "trajectory score output is missing score")) {
+            return;
+        }
+    } else if (request.capability == "cap.vla.action_chunk.v1") {
+        if (!require_field("actions", "model_service_missing_actions", "VLA action chunk output is missing actions")) {
+            return;
+        }
+    } else if (request.capability == "cap.vla.propose_nav_goal.v1") {
+        if (object.find("goal") == object.end() && object.find("nav_goal") == object.end()) {
+            reject_model_service_output(response,
+                                        model_service_status::invalid_output,
+                                        "model_service_missing_nav_goal",
+                                        "VLA nav-goal output is missing goal or nav_goal");
+            return;
+        }
+    }
+
+    response.validation_ok = true;
 }
 
 std::vector<std::string> model_service_required_capabilities() {

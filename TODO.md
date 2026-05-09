@@ -12,7 +12,7 @@ Use the public `v1.0` direction page under `docs/project/v1-direction.md` for th
 - `v0.8.0`: deepen `describe` compatibility checks beyond the first capability-presence gate, including mode/schema/freshness/replay fields and incompatible descriptor diagnostics
 - `v0.8.0`: continue model-service capability paths after the first stateless `cap.call` world-model path: VLA session submit/poll/cancel adapter, redaction, richer replay reports, and evidence outputs
 - `v0.8.0`: add a host-side frame-ingest helper or documented adapter path for live VLA observations, so camera bytes are published through `PUT /v1/frames/{name}` and BT-visible model requests carry `frame://` refs rather than image payloads
-- `v0.8.0`: add action and capability validation gates so stale, invalid, or policy-violating outputs reach the host zero times in supported injected tests
+- `v0.8.0`: extend validation gates beyond the first stateless model-service output checks, covering VLA action chunks, host action dispatch, stale timing windows, and supported injected tests where invalid outputs reach the host zero times
 - `v0.8.0`: publish one real model-backed async capability path for the flagship lane, with deterministic fault injection schedules, replay parity checks, and outcome metrics for stale-result rejection, invalid-output rejection, fallback count, cancellation outcome, and host reach
 - `v0.9.0`: add a Nav2-backed capability lane for the flagship wheeled robot while keeping ROS2 as a thin transport plus capability host surface
 - `v0.9.0`: add one physical wheeled runbook with required artefacts, plus a clear Nav2/rosbag-backed fallback posture if hardware readiness slips
@@ -53,6 +53,7 @@ Use the public `v1.0` direction page under `docs/project/v1-direction.md` for th
 - `v0.8.0`: wire the optional model-service client into runtime configuration and route stateless world-model `cap.call` requests through it, with deterministic unavailable results and `cap_call_start` / `cap_call_end` events
 - `v0.8.0`: add the first `describe` compatibility gate for configured model-service endpoints, covering protocol version, successful describe, descriptor envelope shape, and required public capability ids
 - `v0.8.0`: add deterministic request/response hashes and the first request-hash keyed replay cache for stateless model-service `cap.call`
+- `v0.8.0`: add the first stateless model-service output validation gate, including accepted/rejected validation status, reason codes, and rejection of missing, stale, unsafe, or policy-violating proposals before host reach
 - `v0.5.0`: publish the final release notes from the green release baseline
 - `v0.6.0`: define host capability bundle naming and registration rules without changing BT or Lisp semantics
 - `v0.6.0`: make the boundary between `env.*`, `planner.plan`, and external host capabilities explicit in docs and examples
