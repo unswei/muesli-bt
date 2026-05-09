@@ -6,7 +6,7 @@
 
 ## purpose
 
-This document defines the first two model integrations for the `muesli-bt` VLA/model-backed asynchronous path.
+This document defines the first practical model integrations for the `muesli-bt` VLA/model-backed asynchronous path.
 
 The goal is not to make `muesli-bt` a model-serving framework. The goal is to prove that `muesli-bt` can supervise heavy, delayed, fallible AI model calls as transport-transparent asynchronous host capabilities.
 
@@ -23,7 +23,8 @@ The selected integrations should convince potential users that:
 The first two integrations should be:
 
 1. SmolVLA through LeRobot async inference
-2. OpenVLA-OFT through a model-serving adapter
+2. MiniVLA through the OpenVLA-Mini adapter path
+3. OpenVLA-OFT through a model-serving adapter
 
 Both are VLAs. This is deliberate. For user adoption, VLAs are a stronger first integration target than a world model because they naturally stress the system features `muesli-bt` is designed to provide:
 
@@ -118,7 +119,7 @@ The implementation should not hard-code `smolvla` or `openvla` into the BT sourc
 
 ## backend 1: SmolVLA / LeRobot async
 
-SmolVLA should be the primary practical integration.
+SmolVLA should be one practical integration behind `cap.vla.action_chunk.v1`.
 
 It should show that an accessible robotics-model stack can be connected to `muesli-bt` without changing BT semantics.
 
@@ -189,7 +190,30 @@ The schema should allow image handles rather than forcing large image blobs into
 
 For the first implementation, it is acceptable to use a simplified action representation if the demo does not execute raw low-level actions. The preferred safe path is to have the VLA propose short-horizon action candidates that are then validated or converted by a host-side controller.
 
-### validation requirements
+## backend 2: MiniVLA / OpenVLA-Mini
+
+MiniVLA should be a peer practical integration to SmolVLA, not a new BT feature and not a new public capability id.
+
+MiniVLA through `muesli-model-service` is useful because:
+
+- it exercises the same `cap.vla.action_chunk.v1` contract with a different VLA family
+- it keeps model selection in service configuration rather than BT source
+- it can use the same HTTP frame ingest and `frame://` reference flow as SmolVLA
+- it provides a smaller OpenVLA-family alternative before heavier OpenVLA-OFT work
+
+The service should select it with `MMS_ACTION_CHUNK_BACKEND=minivla` and report `backend: "minivla"` plus `adapter: "openvla-mini"` in metadata. `muesli-bt` must not branch on those fields for BT semantics.
+
+MiniVLA uses the same request and result shapes as SmolVLA:
+
+- `instruction`
+- `observation.state`
+- `observation.images`
+- `frame://...` image references resolved by the service frame store
+- `status: "action_chunk"` with `output.actions[]`
+
+The release evidence may use either SmolVLA or MiniVLA as the first practical backend if the selected path has real inference, replayable requests, validation outcomes, and documented limitations.
+
+## shared validation requirements
 
 Before any result can affect execution:
 
@@ -201,7 +225,7 @@ Before any result can affect execution:
 - robot mode must permit action use
 - fallback must be available if validation fails
 
-## backend 2: OpenVLA-OFT
+## backend 3: OpenVLA-OFT
 
 OpenVLA-OFT should be the heavyweight credibility integration.
 

@@ -471,7 +471,7 @@ Scope:
 - keep live camera bytes outside model-call JSON by using HTTP frame ingest on the service side and `frame://` refs in model requests; `frame://.../latest` is a service-local handle, not reproducible evidence by itself
 - record model request refs, response hashes, and immutable resolved frame refs when available in replay artefacts; do not turn high-rate raw frame upload into the main canonical BT event stream by default
 - implement at least one real model backend behind the existing VLA service interface, preferably as a local process or HTTP backend that can be replayed deterministically from stored request and response records
-- integrate VLA as a transport-transparent asynchronous host capability, using SmolVLA through the LeRobot async inference path as the primary practical backend and OpenVLA-OFT as the heavyweight VLA backend; the BT source must remain independent of whether inference runs locally, on an edge server, over HTTP/ROS2, or from a replay cache
+- integrate VLA as a transport-transparent asynchronous host capability, using selectable `muesli-model-service` backends such as SmolVLA or MiniVLA for the first practical path and OpenVLA-OFT as a heavier optional path; the BT source must remain independent of whether inference runs locally, on an edge server, over HTTP/ROS2, or from a replay cache
 - keep the current stub backend as a deterministic unit-test backend, not as the release evidence path
 - support submit, poll, timeout, cancellation, partial response, final response, response hashing, request hashing, replay from stored records, and backend failure reporting
 - define any additional flagship-specific capability names only after checking that the initial `MMSP v0.2` set cannot express the task cleanly
@@ -529,7 +529,7 @@ capabilities:
 
 See also: [muesli-model-service bridge](integration/model-service-bridge.md) and [VLA backend integration plan](integration/vla-backend-integration-plan.md).
 
-The VLA backend integration plan is a temporary planning document. Once the SmolVLA/OpenVLA-OFT path is implemented, documented through normal user-facing pages, covered by fixtures, and represented in release evidence, delete the planning page and replace roadmap links with the implementation docs and evidence pages.
+The VLA backend integration plan is a temporary planning document. Once the capability-native VLA backend path is implemented, documented through normal user-facing pages, covered by fixtures, and represented in release evidence, delete the planning page and replace roadmap links with the implementation docs and evidence pages.
 
 Additional scope: constrained model or template-produced BT fragments:
 
@@ -866,7 +866,7 @@ Exit criteria:
 - hot-path allocation, GC pause, and long-run memory evidence are generated from the tagged codebase
 - async cancellation, timeout, late-completion-drop, fallback, and action-validation behaviour are covered by deterministic fixtures and trace validation
 - at least one real model-backed VLA or model-mediated async experiment is included, not only stub output
-- the release includes replayable trace bundles for at least one SmolVLA-backed or OpenVLA-OFT-backed run, with model-call lifecycle events, validation outcomes, stale-result handling, and fallback behaviour visible in `mbt.evt.v1`
+- the release includes replayable trace bundles for at least one real VLA-backed run, with model-call lifecycle events, validation outcomes, stale-result handling, and fallback behaviour visible in `mbt.evt.v1`
 - at least one fair BehaviorTree.CPP baseline comparison is included with public baseline code and matched scenario manifests
 - at least one figure, table row, or evaluation slice includes ROS-backed evidence
 - preferred outcome: at least one Nav2-backed or physical wheeled run is included with `events.jsonl`, rosbag, replay report, and failure classification
