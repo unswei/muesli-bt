@@ -198,6 +198,7 @@ nav:
       - Docs Coverage: docs-coverage.md
       - Diagram Workflow: diagrams/diagrams.md
   - Project:
+      - v1.0 Direction: project/v1-direction.md
       - Roadmap To 1.0: roadmap-to-1.0.md
       - Roadmap: limitations-roadmap.md
       - Known Limitations: known-limitations.md

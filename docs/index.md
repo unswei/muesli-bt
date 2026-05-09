@@ -6,6 +6,8 @@
 
 It is for task-level decision logic. It is not a hard real-time servo controller, robot driver stack, or replacement for ROS2, Nav2, or MoveIt.
 
+The public `v1.0.0` direction is to use that runtime contract for dependable model-mediated wheeled robot behaviour with host-side validation, replayable evidence, and a physical-first release path.
+
 ## the core idea
 
 ![muesli-bt architecture](assets/architecture-at-a-glance.svg)
@@ -59,6 +61,7 @@ If you want the longer setup page, use [getting started](getting-started.md).
 
 ## roadmap
 
+- [v1.0 direction](project/v1-direction.md)
 - [known limitations](known-limitations.md)
 - [roadmap to 1.0](roadmap-to-1.0.md)
 - [release notes](releases/index.md)

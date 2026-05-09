@@ -2,11 +2,20 @@
 
 This backlog is maintained forward from March 2, 2026.
 It is aligned with `docs/roadmap-to-1.0.md`.
+Use the public `v1.0` direction page under `docs/project/v1-direction.md` for the release ordering behind this backlog.
 
 ## next
 
+- `v0.8.0`: document the `v1.0.0` flagship direction in `docs/` and update the roadmap/backlog so one physical wheeled inspection or semantic-navigation task family is the main public release anchor
+- `v0.8.0`: freeze the flagship task contract, failure taxonomy, and evidence bundle contract for the wheeled flagship path; required artefacts should include canonical `events.jsonl`, run log, manifest, replay report, rosbag where applicable, model request/response cache where applicable, and time-aligned media notes where applicable
 - `v0.8.0`: implement canonical host capability lifecycle events for real runtime-affecting capability calls; use `cap_call_start` and `cap_call_end` in `mbt.evt.v1`, including request id, capability name, operation, status, latency, rejection/error reason where applicable, and enough tick/job context for replay and first-divergence reports
 - `v0.8.0`: implement the VLA backend integration plan for transport-transparent async host capabilities, with SmolVLA/LeRobot as the primary practical backend, OpenVLA-OFT as the heavyweight backend, replay-cache mode, validation, redaction, canonical lifecycle events, and evidence outputs
+- `v0.8.0`: add action and capability validation gates so stale, invalid, or policy-violating outputs reach the host zero times in supported injected tests
+- `v0.8.0`: publish one real model-backed async capability path for the flagship lane, with deterministic fault injection schedules, replay parity checks, and outcome metrics for stale-result rejection, invalid-output rejection, fallback count, cancellation outcome, and host reach
+- `v0.9.0`: add a Nav2-backed capability lane for the flagship wheeled robot while keeping ROS2 as a thin transport plus capability host surface
+- `v0.9.0`: add one physical wheeled runbook with required artefacts, plus a clear Nav2/rosbag-backed fallback posture if hardware readiness slips
+- `v0.9.0`: add reproducible flagship experiment manifests, figure scripts, trace bundle generation, and one fair BehaviorTree.CPP matched baseline for the same scenario
+- `v0.9.0`: land the generated guarded recovery subtree evidence path if it remains the chosen Lisp demonstration
 - `post-release`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
 
 ## status notes
@@ -23,10 +32,10 @@ It is aligned with `docs/roadmap-to-1.0.md`.
 - `v0.8.0`: finish the checked-in H1 Isaac demo with one Ubuntu 22.04 + Humble + NVIDIA smoke run, then freeze scope unless a concrete demo bug appears
 - `v0.8.0`: keep the H1 Isaac demo as a bounded deployability lane and do not let it displace `v0.4.0` replay parity or `v0.5.0` cross-transport evidence
 - `v0.8.0`: after the VLA backend path is implemented and covered by normal docs/evidence, delete `docs/integration/vla-backend-integration-plan.md` and replace temporary roadmap links with the final implementation pages
-- `v0.9.0`: prefer a second serious scenario built around a simulated robot arm, with Towers of Hanoi as the preferred target if the simulator, MoveIt path, and perception stack stay reproducible
-- `v0.9.0`: add a usable perception path for the manipulator scenario rather than relying on hidden oracle state in the evaluation demo
-- `v0.9.0`: likely first concrete perception adapter, if it stays reproducible enough, is a YOLO-compatible detector feeding a scene-state normaliser rather than raw detections
-- `v0.9.0`: choose the simulator on reproducibility, MoveIt compatibility, and perception quality first; prefer Isaac Sim if it gives the cleanest ROS-backed manipulator path without blowing up scope
+- `v0.9.0`: if the wheeled flagship is already secure, consider one second serious scenario built around a simulated robot arm, with Towers of Hanoi as the preferred target only if the simulator, MoveIt path, and perception stack stay reproducible
+- `v0.9.0`: if the manipulator stretch lane proceeds, add a usable perception path rather than relying on hidden oracle state in the evaluation demo
+- `v0.9.0`: if the manipulator stretch lane proceeds, the likely first concrete perception adapter remains a YOLO-compatible detector feeding a scene-state normaliser rather than raw detections
+- `v0.9.0`: choose any manipulator simulator on reproducibility, MoveIt compatibility, and perception quality first; prefer Isaac Sim only if it gives the cleanest ROS-backed path without blowing up scope
 - `v1.0.0`: finish evidence artefacts, baseline comparisons, release hygiene, and exact `L0` / `L1` / `L2` runbooks
 - `post-1.0`: extend ROS2 transport binding beyond the first `Odometry` / `Twist` path (`topics` / `actions` / `services`)
 - `post-1.0`: add a second supported Linux distro lane (Ubuntu 24.04 + Jazzy) after Humble is stable

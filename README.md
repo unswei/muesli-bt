@@ -6,7 +6,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/unswei/muesli-bt?display_name=tag)](https://github.com/unswei/muesli-bt/releases)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 
-`muesli-bt` is a compact Lisp-authored Behaviour Tree runtime for robotics, with bounded-time planning, cancellable asynchronous jobs, and canonical event logs.
+`muesli-bt` is a compact Lisp-authored Behaviour Tree runtime for robotics, with bounded-time planning, cancellable asynchronous jobs, canonical event logs, and a release path centred on dependable model-mediated wheeled robot behaviour.
 
 ## what it is
 
@@ -25,7 +25,7 @@ Robotics task logic often needs more than a plain BT tick:
 - execution traces must be good enough for debugging, conformance, and external evaluation;
 - simulator and ROS2 backends should not redefine the BT semantics.
 
-`muesli-bt` keeps these concerns explicit through the Lisp BT DSL, the runtime contract, and the canonical `mbt.evt.v1` event stream.
+`muesli-bt` keeps these concerns explicit through the Lisp BT DSL, the runtime contract, and the canonical `mbt.evt.v1` event stream. The public `v1.0.0` direction is to prove that this runtime can supervise real model-mediated wheeled robot behaviour with validation, replay, and reproducible evidence, without changing BT semantics.
 
 ## what makes it different
 
@@ -120,8 +120,8 @@ For the shortest walkthrough, use [first 10 minutes](docs/getting-started-10min.
 - New users: [choose your path](docs/getting-oriented/choose-your-path.md), [what is muesli-bt](docs/getting-oriented/what-is-muesli-bt.md), [feature inventory](docs/getting-oriented/feature-inventory.md), [first 10 minutes](docs/getting-started-10min.md).
 - BT users: [BT introduction](docs/bt/intro.md), [BT syntax](docs/bt/syntax.md), [why not just BehaviorTree.CPP?](docs/getting-oriented/why-not-btcpp.md).
 - Robot and simulator integration: [integration overview](docs/integration/overview.md), [env API](docs/integration/env-api.md), [ROS2 tutorial](docs/integration/ros2-tutorial.md).
-- Tool builders and reviewers: [runtime contract v1](docs/contracts/runtime-contract-v1.md), [conformance levels](docs/contracts/conformance.md), [evidence index](docs/evidence/index.md).
-- Limits and roadmap: [known limitations](docs/known-limitations.md), [roadmap to 1.0](docs/roadmap-to-1.0.md), [release notes](docs/releases/index.md).
+- Tool builders and evaluators: [runtime contract v1](docs/contracts/runtime-contract-v1.md), [conformance levels](docs/contracts/conformance.md), [evidence index](docs/evidence/index.md).
+- Limits and roadmap: [v1.0 direction](docs/project/v1-direction.md), [known limitations](docs/known-limitations.md), [roadmap to 1.0](docs/roadmap-to-1.0.md), [release notes](docs/releases/index.md).
 
 ## benchmarks and evidence
 
@@ -134,13 +134,13 @@ Benchmark numbers are reported for curated evidence bundles. The README links to
 
 ## ROS2 and integrations
 
-ROS2 support is a thin host integration layer. The released baseline is Humble-focused and keeps the core transport surface intentionally narrow: `nav_msgs/msg/Odometry` in, `geometry_msgs/msg/Twist` out, canonical logs through `mbt.evt.v1`.
+ROS2 support is a thin host integration layer. The released baseline is Humble-focused and keeps the core transport surface intentionally narrow: `nav_msgs/msg/Odometry` in, `geometry_msgs/msg/Twist` out, canonical logs through `mbt.evt.v1`. The public `v1.0.0` direction is to keep that thin transport surface while adding a Nav2-backed capability lane and a physical wheeled evidence path above it.
 
 Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md), then read [ROS2 backend scope](docs/integration/ros2-backend-scope.md) and [host capability bundles](docs/integration/host-capability-bundles.md). Nav2 and MoveIt adapters are roadmap work unless a release note says otherwise.
 
 ## VLA status
 
-VLA/model support is currently experimental lifecycle infrastructure: submit, poll, cancel, timeout handling, BT node semantics, and canonical logging. Production provider transport, credentials, and safety validation are planned work behind host-side capability layers unless a concrete backend is documented and tested in release notes.
+VLA/model support is currently experimental lifecycle infrastructure: submit, poll, cancel, timeout handling, BT node semantics, and canonical logging. The next release milestones are aimed at one real model-backed async capability path, host-side validation and rejection, deterministic replay cache support, and reproducible wheeled flagship evidence rather than broad provider coverage.
 
 See [VLA integration](docs/bt/vla-integration.md), [VLA nodes](docs/bt/vla-nodes.md), and [known limitations](docs/known-limitations.md).
 

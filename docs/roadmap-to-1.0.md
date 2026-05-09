@@ -47,6 +47,21 @@ In practical terms, ROS2 is important for `v1.0.0` because it should prove:
 2. rosbag-driven runs can reproduce deterministic logs and stable decision traces for fixed inputs
 3. the optional ROS2 integration does not contaminate core runtime semantics or non-ROS builds
 
+### flagship direction
+
+The main public `v1.0.0` anchor is one physical wheeled inspection or semantic-navigation task family.
+
+That means:
+
+- model-backed, replay, validation, safety, and ROS capability work should serve one wheeled flagship rather than several equal demos
+- “same BT, different IO transport” remains the first evidence point, but no longer the whole `v1.0.0` story
+- the preferred release evidence is physical wheeled robot behaviour
+- the acceptable fallback is a reproducible Nav2-backed or rosbag-backed ROS2 path for the same task family if hardware readiness slips
+
+The product direction behind this ordering is documented in [v1.0 direction](project/v1-direction.md).
+
+Before `v1.0.0`, new work should normally be justified by how it strengthens the flagship task, the runtime contract, or reproducible release evidence.
+
 ### current baseline
 
 The project is not starting this roadmap from zero.
@@ -93,6 +108,7 @@ The thin adaptor and observability baseline are already real enough that the nex
 The remaining path is:
 
 - preserve “same BT, different IO transport” as the first release evidence point
+- freeze the wheeled flagship task family, failure taxonomy, and required artefact bundle before broader scope expansion
 - harden the Lisp/C++ runtime so the evidence can defend allocation behaviour, GC pauses, deadline handling, cancellation, and deterministic replay
 - replace VLA stubs with at least one real model-backed asynchronous service and failure-injection path
 - build a fair comparison engine against BehaviorTree.CPP rather than relying only on internal microbenchmarks
@@ -193,6 +209,46 @@ The release must include one concrete demonstration that makes this argument vis
 - ROS2 `L2` remains focused on the released thin `Odometry` -> `Twist` lane because no concrete new ROS-backed path was added
 
 Further work should now move to correctness hardening, runtime measurement, async evidence, model-backed services, host capability adapters, or concrete consumer fixes rather than casually broadening the baseline transport.
+
+#### milestone A: flagship direction and artefact contract
+
+Status:
+
+- next planning milestone before broader `v0.8.0+` implementation expands further
+
+Focus:
+
+- freeze one physical wheeled inspection or semantic-navigation task family as the main `v1.0.0` anchor
+- freeze the evidence posture: physical wheeled preferred, Nav2-backed or rosbag-backed ROS2 fallback acceptable if hardware readiness slips
+- freeze the runtime failure taxonomy and the artefacts expected from every flagship condition
+
+Scope:
+
+- document the flagship direction in project docs and link it from the roadmap, TODO, and front-door pages
+- define the required failure taxonomy for flagship evidence:
+  - delay
+  - timeout
+  - stale result
+  - invalid payload
+  - unsafe action
+  - backend unavailable
+  - cancellation ignored until completion
+- define the minimum artefact bundle for every flagship condition:
+  - canonical `events.jsonl`
+  - run log
+  - manifest
+  - replay report
+  - rosbag where applicable
+  - model request/response cache where applicable
+  - video or time-aligned media note where applicable
+- land early documentation and runbook expectations before broader scope expansion
+
+Exit criteria:
+
+- the flagship task family is stated consistently in the roadmap, TODO, and front-door docs
+- the physical-first, Nav2/rosbag fallback posture is stated consistently
+- the failure taxonomy is fixed in writing
+- the expected flagship artefact bundle is fixed in writing
 
 #### `v0.5.0`: same BT, different IO transport
 
@@ -392,14 +448,15 @@ Outcome taxonomy evidence:
 - the BT runtime emits the implemented tick, planner timeout, VLA timeout, late-result-drop, and cancellation outcome events alongside the detailed lifecycle events
 - the ROS2 `L2` rosbag corpus includes a safe-action pre-emption case that reuses `host_action_invalid` and `fallback_used`; it does not add a ROS-specific cancellation model
 
-#### `v0.8.0`: model-backed async and VLA stress path
+#### `v0.8.0`: real model-backed runtime and fault-injection path
 
 Focus:
 
-- move VLA support from stubbed orchestration to a real model-backed asynchronous service
+- move VLA support from stubbed orchestration to a real model-backed asynchronous service for the wheeled flagship lane
 - prove that deadlines, cancellation, stale-result rejection, and fallback matter under model latency
 - keep the model integration behind host capability contracts rather than turning VLA into a special runtime case
 - make asynchronous model/VLA integration look like ordinary host-capability use, so the BT source is independent of whether a service runs in-process, as a subprocess, on an edge server, through ROS2, or over HTTP
+- land the runtime and evidence pieces needed before a physical or Nav2-backed flagship run can be defended publicly
 
 Scope:
 
@@ -414,6 +471,7 @@ Scope:
 - extend canonical logs with `vla_submit`, `vla_partial`, `vla_result`, `vla_cancel`, `vla_timeout`, `action_validation`, and `model_result_dropped` events, or their existing canonical equivalents if already named differently
 - keep the flagship wheeled demo polished, but make the evaluation focus in this milestone the model-latency and cancellation behaviour, not visual demo quality
 - keep the existing Isaac Sim / ROS2 showcase as supporting evidence, not as a required semantic surface or CI dependency
+- ensure the milestone outputs are framed around one wheeled flagship task contract rather than around general provider breadth
 
 Additional scope: capability authoring and backend usability:
 
@@ -477,6 +535,13 @@ Benchmark and evidence requirements:
 - report stale completion rate, cancellation acknowledgement latency, late-result-drop count, invalid-action count, fallback count, and unsafe-action-to-host count
 - report task success under at least three VLA/planner latency conditions: nominal, heavy-tail latency, and failure-injected latency
 - report the effect of runtime validation by comparing invalid model outputs produced, invalid model outputs rejected, and invalid model outputs reaching the host, which should be zero for the supported path
+- make the flagship-facing outcome metrics explicit in the evidence bundle:
+  - stale results rejected
+  - invalid outputs rejected
+  - invalid outputs reaching the host, which should be zero for the supported path
+  - fallback count
+  - cancellation outcome
+  - replay parity
 - include one trace bundle where a model result arrives late and is correctly dropped rather than committed
 - include accepted and rejected generated-fragment examples in the trace corpus
 - include at least one rejection caused by an unsafe or unsupported host capability request
@@ -508,14 +573,15 @@ Exit criteria:
 - capability request and result validation failures produce useful diagnostics
 - async capability calls are replayable from recorded request/result metadata
 - no visual tool is required to understand capability registration, validation, or failure
+- the milestone clearly supports the wheeled flagship path rather than a generic model-integration showcase
 
-#### `v0.9.0`: baselines, ROS capability bridges, and evaluation hardening
+#### `v0.9.0`: physical wheeled host bridge and evaluation hardening
 
 Focus:
 
 - prevent the evaluation from looking like an implementation report with only internal benchmarks
 - build a fair comparison path against BehaviorTree.CPP
-- add the ROS2 glue needed for a physical or physical-like validation run without contaminating core runtime semantics
+- add the ROS2 glue needed for a physical wheeled or clearly equivalent Nav2-backed validation run without contaminating core runtime semantics
 - reduce the risk that the evidence rests on one example only
 - make `muesli-bt` usable as an engine inside a normal robot software stack, not only as a standalone executable or benchmark harness
 
@@ -530,8 +596,8 @@ Scope:
 - map Nav2 action feedback, result codes, cancellation acknowledgement, transform age, and planner/controller timing into canonical host capability events
 - keep the existing thin `Odometry` -> `Twist` lane as the baseline transport path; Nav2 is a host capability bundle, not a replacement for `env.*`
 - add a physical-demo runbook for a TurtleBot3-style or equivalent differential-drive platform, including required ROS distro, launch files, map, BT source hash, model backend, fault seed, rosbag, `events.jsonl`, replay report, and video/time-alignment artefacts
-- add a second serious scenario only if it can be kept reproducible; preferred candidate remains Towers of Hanoi with a simulated robot arm, but a simpler manipulator benchmark is acceptable if Hanoi becomes too heavy
-- treat MoveIt as the first concrete manipulation host capability bundle if the non-wheeled scenario proceeds
+- add a second serious scenario only if the wheeled flagship is already secure and the added path stays reproducible; preferred candidate remains Towers of Hanoi with a simulated robot arm, but a simpler manipulator benchmark is acceptable if Hanoi becomes too heavy
+- treat MoveIt as the first concrete manipulation host capability bundle only if the non-wheeled stretch scenario proceeds
 - add a perception scene normaliser before BT logic consumes perception outputs, preferably using a YOLO-compatible detector or another reproducible detector path feeding stable scene state rather than raw detections
 - choose Isaac Sim, Webots + ROS, or another simulator for the non-wheeled path based on reproducibility, MoveIt compatibility, and perception support, not appearance
 
@@ -711,7 +777,7 @@ Exit criteria:
 - at least one generated or live-patched subtree experiment demonstrates why a Lisp runtime is useful beyond implementation taste
 - the Nav2 adapter can run the wheeled scenario through a host capability boundary and emit canonical logs
 - one ROS-backed row or slice exists in the evaluation outputs, preferably Nav2-backed; if not physical, it must at least be rosbag-backed and replay-validated
-- two distinct scenarios exist with clear rationale, or the roadmap records why the second scenario was deferred to preserve the core evaluation claim
+- the wheeled flagship remains the primary evaluation lane, and any second scenario is clearly documented as supporting evidence or explicitly deferred
 - all baseline and ROS evidence uses the same canonical event-log discipline as the core runtime experiments
 - at least one generated guarded recovery subtree demonstration is runnable from documented commands
 - the demonstration proves the full Lisp-as-DSL path: generate as Lisp data, normalise, validate, compile, serialise, install at tick boundary, execute, log, and replay
@@ -726,13 +792,14 @@ Exit criteria:
 - task-level safety hooks are documented and covered by at least one fixture
 - none of these engine features require `muesli-studio`
 
-#### `v1.0.0`: evidence artefacts and release baseline
+#### `v1.0.0`: release artefacts, reproducible flagship evidence, and public support boundary
 
 Focus:
 
 - cut the first release-ready, tool-builder-friendly, release-quality baseline
 - make the `v1.0.0` release internally consistent across traces, scripts, manifests, and benchmark outputs
 - make the `v1.0.0` release usable as a BT engine by early adopters, not only as an evidence artefact
+- freeze the public support boundary around one reproducible wheeled flagship story
 
 Scope:
 
@@ -742,6 +809,7 @@ Scope:
 - publish trace bundles for the core runtime, VLA/model-latency path, BehaviorTree.CPP comparison path, and ROS-backed evaluation path
 - publish scripts that regenerate all release evaluation tables and figures from checked-in or archived artefacts
 - include memory, GC, allocation, tail-latency, cancellation, fallback, replay, baseline, and ROS evidence in the release artefact set
+- publish one reproducible flagship evidence bundle for the chosen wheeled task family, with the physical run preferred and the Nav2/rosbag fallback stated explicitly if the physical path is not ready
 - document the exact claim boundaries: task-level deadlines rather than hard real time, host capabilities rather than ROS semantics, and model orchestration rather than a new VLA model
 - publish the Lisp-as-DSL technical argument in the README or documentation entry path, with careful wording that presents Lisp as structured BT data rather than arbitrary scripting
 - publish the generated guarded recovery subtree demonstration as a supported evidence artefact or clearly labelled evaluation example
@@ -789,6 +857,7 @@ Exit criteria:
 - at least one figure, table row, or evaluation slice includes ROS-backed evidence
 - preferred outcome: at least one Nav2-backed or physical wheeled run is included with `events.jsonl`, rosbag, replay report, and failure classification
 - acceptable fallback: if physical hardware is not stable enough by the tag, the release includes a rosbag-backed Nav2 or equivalent ROS action-capability run and states the physical limitation plainly
+- one reproducible flagship evidence bundle exists for the chosen wheeled task family
 - the core claim is demonstrably true: BT semantics stay stable while transport changes, asynchronous planner/model work is deadline-aware and cancellable, and canonical event logs support replay and inspection across supported transports
 - the `v1.0.0` release contains one implemented demonstration where Lisp clearly enables useful runtime BT handling beyond hand-authored static trees
 - the demonstration is reproducible from a clean checkout or archived release artefact using documented commands
@@ -866,7 +935,7 @@ If `muesli-bt` emits traces that a tool can display only by reverse-engineering 
 - Real-time suitability depends on tail latency, allocation, GC, and long-run memory behaviour, not average tick speed alone.
 - BehaviorTree.CPP comparisons need proper non-blocking actions and halt/pre-emption handling.
 - Real model, Nav2, MoveIt, and Isaac integrations remain host capabilities. They must not add new Lisp or BT core semantics.
-- The second flagship should follow the strongest reproducible evidence rather than being locked too early.
+- Any second scenario should follow the strongest reproducible evidence rather than being treated as co-primary with the wheeled flagship too early.
 - Lisp is useful here as structured tree data for generated, validated, serialised, replayed, and safely installed BT fragments.
 - Generated Lisp fragments are untrusted input until parsed, normalised, validated, and checked against capability and fallback rules.
 - Generated-subtree demonstrations use the same runtime contract, canonical logging, and replay validation as hand-authored BTs.
@@ -894,6 +963,7 @@ If the remaining roadmap becomes too large, prioritise practical engine usabilit
 
 ## see also
 
+- [v1.0 direction](project/v1-direction.md)
 - [Roadmap](limitations-roadmap.md)
 - [todo](todo.md)
 - [conformance levels](contracts/conformance.md)
