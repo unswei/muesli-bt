@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <cctype>
 #include <cmath>
 #include <filesystem>
@@ -215,6 +216,261 @@ std::string json_escape_string_fragment(std::string_view text) {
     }
     return out.str();
 }
+
+std::string json_number_array(const std::vector<double>& values) {
+    std::ostringstream out;
+    out << '[';
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        if (i != 0) {
+            out << ',';
+        }
+        out << values[i];
+    }
+    out << ']';
+    return out.str();
+}
+
+std::string bounds_to_json_array(const std::vector<std::pair<double, double>>& bounds) {
+    std::ostringstream out;
+    out << '[';
+    for (std::size_t i = 0; i < bounds.size(); ++i) {
+        if (i != 0) {
+            out << ',';
+        }
+        out << '[' << bounds[i].first << ',' << bounds[i].second << ']';
+    }
+    out << ']';
+    return out.str();
+}
+
+std::string vla_request_to_model_service_input_json(const vla_request& request) {
+    std::ostringstream out;
+    out << "{\"task_id\":\"" << json_escape_string_fragment(request.task_id) << "\","
+        << "\"instruction\":\"" << json_escape_string_fragment(request.instruction) << "\","
+        << "\"observation\":{\"state\":" << json_number_array(request.observation.state)
+        << ",\"timestamp_ms\":" << request.observation.timestamp_ms
+        << ",\"frame_id\":\"" << json_escape_string_fragment(request.observation.frame_id) << "\"";
+    if (request.observation.frame_id.rfind("frame://", 0) == 0) {
+        out << ",\"images\":{\"camera\":{\"ref\":\"" << json_escape_string_fragment(request.observation.frame_id)
+            << "\"}}";
+    }
+    out << "},\"action_space\":{\"type\":\"" << json_escape_string_fragment(request.action_space.type)
+        << "\",\"dims\":" << request.action_space.dims << ",\"bounds\":" << bounds_to_json_array(request.action_space.bounds)
+        << "},\"constraints\":{\"max_abs_value\":" << request.constraints.max_abs_value
+        << ",\"max_delta\":" << request.constraints.max_delta
+        << ",\"forbidden_ranges\":" << bounds_to_json_array(request.constraints.forbidden_ranges) << "}}";
+    return out.str();
+}
+
+std::optional<std::vector<double>> extract_first_action_values(std::string_view output_json) {
+    const std::size_t actions_pos = output_json.find("\"actions\"");
+    if (actions_pos == std::string_view::npos) {
+        return std::nullopt;
+    }
+    const std::size_t values_pos = output_json.find("\"values\"", actions_pos);
+    if (values_pos == std::string_view::npos) {
+        return std::nullopt;
+    }
+    const std::size_t begin = output_json.find('[', values_pos);
+    if (begin == std::string_view::npos) {
+        return std::nullopt;
+    }
+    const std::size_t end = output_json.find(']', begin + 1);
+    if (end == std::string_view::npos || end <= begin + 1) {
+        return std::nullopt;
+    }
+
+    std::vector<double> values;
+    std::string raw(output_json.substr(begin + 1, end - begin - 1));
+    const char* cursor = raw.c_str();
+    while (*cursor != '\0') {
+        while (*cursor == ' ' || *cursor == '\t' || *cursor == '\n' || *cursor == '\r' || *cursor == ',') {
+            ++cursor;
+        }
+        if (*cursor == '\0') {
+            break;
+        }
+        char* next = nullptr;
+        const double value = std::strtod(cursor, &next);
+        if (next == cursor || !std::isfinite(value)) {
+            return std::nullopt;
+        }
+        values.push_back(value);
+        cursor = next;
+    }
+    if (values.empty()) {
+        return std::nullopt;
+    }
+    return values;
+}
+
+vla_response model_service_error_to_vla_response(const vla_request& request, const model_service_response& response) {
+    vla_response out;
+    out.model = request.model;
+    switch (response.status) {
+    case model_service_status::cancelled:
+        out.status = vla_status::cancelled;
+        break;
+    case model_service_status::timeout:
+        out.status = vla_status::timeout;
+        break;
+    case model_service_status::invalid_request:
+    case model_service_status::invalid_output:
+    case model_service_status::unsafe_output:
+        out.status = vla_status::invalid;
+        break;
+    case model_service_status::unavailable:
+    case model_service_status::resource_exhausted:
+    case model_service_status::failure:
+    case model_service_status::internal_error:
+    case model_service_status::success:
+    case model_service_status::running:
+    case model_service_status::action_chunk:
+    case model_service_status::partial:
+        out.status = vla_status::error;
+        break;
+    }
+    out.explanation = response.error_message.empty() ? model_service_status_name(response.status)
+                                                     : response.error_message;
+    if (!response.validation_reason_code.empty()) {
+        out.explanation = response.validation_reason_code + ": " + response.validation_message;
+    }
+    return out;
+}
+
+vla_response action_chunk_to_vla_response(const vla_request& request, const model_service_response& response) {
+    if (response.status != model_service_status::action_chunk && response.status != model_service_status::success) {
+        return model_service_error_to_vla_response(request, response);
+    }
+    if (response.validation_checked && !response.validation_ok) {
+        return model_service_error_to_vla_response(request, response);
+    }
+    const std::optional<std::vector<double>> values = extract_first_action_values(response.output_json);
+    if (!values.has_value()) {
+        vla_response invalid;
+        invalid.status = vla_status::invalid;
+        invalid.model = request.model;
+        invalid.explanation = "model-service VLA action chunk is missing finite action values";
+        return invalid;
+    }
+
+    vla_response out;
+    out.status = vla_status::ok;
+    out.model = request.model;
+    out.action.type = vla_action_type::continuous;
+    out.action.u = *values;
+    out.confidence = 1.0;
+    out.explanation = "model-service action chunk";
+    return out;
+}
+
+model_service_request make_vla_model_service_request(const vla_request& request,
+                                                     model_service_operation op,
+                                                     std::string id,
+                                                     std::string session_id = {}) {
+    model_service_request out;
+    out.id = std::move(id);
+    out.op = op;
+    out.capability = request.capability;
+    out.deadline_ms = request.deadline_ms;
+    out.input_json = vla_request_to_model_service_input_json(request);
+    out.session_id = std::move(session_id);
+    out.trace = model_service_trace{
+        .run_id = request.run_id,
+        .tree_id = "vla",
+        .tick_id = request.tick_index,
+        .node_id = request.node_name,
+    };
+    return out;
+}
+
+class model_service_vla_backend final : public vla_backend {
+public:
+    explicit model_service_vla_backend(runtime_host* host) : host_(host) {}
+
+    vla_response infer(const vla_request& request,
+                       std::function<bool(const vla_partial&)> on_partial,
+                       std::atomic<bool>& cancel_flag) override {
+        if (!host_) {
+            vla_response out;
+            out.status = vla_status::error;
+            out.model = request.model;
+            out.explanation = "model-service VLA backend has no runtime host";
+            return out;
+        }
+
+        const std::string request_key = std::to_string(vla_service::hash_request(request));
+        model_service_response start = host_->call_model_service(make_vla_model_service_request(
+            request, model_service_operation::start, "vla-start-" + request_key));
+        if (start.status == model_service_status::action_chunk || start.status == model_service_status::success) {
+            return action_chunk_to_vla_response(request, start);
+        }
+        if (start.status != model_service_status::running && start.status != model_service_status::partial) {
+            return model_service_error_to_vla_response(request, start);
+        }
+        if (start.session_id.empty()) {
+            vla_response out;
+            out.status = vla_status::error;
+            out.model = request.model;
+            out.explanation = "model-service VLA start did not return a session_id";
+            return out;
+        }
+
+        const auto started = std::chrono::steady_clock::now();
+        std::uint64_t step_index = 0;
+        while (true) {
+            if (cancel_flag.load()) {
+                (void)host_->call_model_service(make_vla_model_service_request(
+                    request, model_service_operation::cancel, "vla-cancel-" + request_key, start.session_id));
+                (void)host_->call_model_service(make_vla_model_service_request(
+                    request, model_service_operation::close, "vla-close-" + request_key, start.session_id));
+                vla_response out;
+                out.status = vla_status::cancelled;
+                out.model = request.model;
+                out.explanation = "cancelled";
+                return out;
+            }
+
+            const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - started).count();
+            if (request.deadline_ms > 0 && elapsed > request.deadline_ms) {
+                (void)host_->call_model_service(make_vla_model_service_request(
+                    request, model_service_operation::cancel, "vla-timeout-cancel-" + request_key, start.session_id));
+                (void)host_->call_model_service(make_vla_model_service_request(
+                    request, model_service_operation::close, "vla-timeout-close-" + request_key, start.session_id));
+                vla_response out;
+                out.status = vla_status::timeout;
+                out.model = request.model;
+                out.explanation = "deadline exceeded";
+                return out;
+            }
+
+            model_service_response step = host_->call_model_service(make_vla_model_service_request(
+                request,
+                model_service_operation::step,
+                "vla-step-" + request_key + "-" + std::to_string(++step_index),
+                start.session_id));
+            if (step.status == model_service_status::running || step.status == model_service_status::partial) {
+                vla_partial partial;
+                partial.sequence = step_index;
+                partial.text_chunk = model_service_status_name(step.status);
+                partial.confidence = 0.0;
+                if (!on_partial(partial)) {
+                    cancel_flag.store(true);
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                continue;
+            }
+
+            (void)host_->call_model_service(make_vla_model_service_request(
+                request, model_service_operation::close, "vla-close-" + request_key, start.session_id));
+            return action_chunk_to_vla_response(request, step);
+        }
+    }
+
+private:
+    runtime_host* host_ = nullptr;
+};
 
 std::optional<model_service_response> read_model_service_cache(const model_service_config& config,
                                                                const std::string& request_hash) {
@@ -528,6 +784,7 @@ void runtime_host::set_model_service_client(model_service_config config, std::un
     model_service_config_ = std::move(config);
     model_service_client_ = std::move(client);
     model_service_fault_index_ = 0;
+    vla_.register_backend("model-service", std::make_shared<model_service_vla_backend>(this));
 }
 
 void runtime_host::clear_model_service_client() noexcept {

@@ -1,8 +1,8 @@
 # VLA Integration In BTs
 
 !!! note "status"
-    Status: released lifecycle hooks and stubs.
-    The runtime exposes submit, poll, cancel, timeout, BT node semantics, and canonical logging. Production provider transport and credentials are host-side integration work unless a concrete backend is documented and tested.
+    Status: released lifecycle hooks, deterministic stubs, and an optional model-service session adapter.
+    The runtime exposes submit, poll, cancel, timeout, BT node semantics, and canonical logging. Production provider transport and credentials remain outside the core runtime.
 
 This runtime exposes VLA access through [host](../terminology.md#host) capabilities and async jobs.
 
@@ -17,8 +17,8 @@ Implemented now:
 Host-defined / optional in this repo:
 
 - production model/provider transport and credentials
-- remote inference integration details beyond stub/replay adapters
-- `muesli-model-service` bridge transport, when the optional bridge is built and configured
+- remote inference hardening beyond stub/replay adapters
+- `muesli-model-service` bridge transport and VLA session adapter, when the optional bridge is built and configured
 
 Key principles:
 
@@ -34,9 +34,9 @@ Capability metadata is host-registered and inspectable from Lisp:
 - `(cap.list)`
 - `(cap.describe "vla.rt2")`
 
-A request is submitted with `(vla.submit request-map)`. The runtime executes it behind a registered backend (stub, replay, or custom host backend).
+A request is submitted with `(vla.submit request-map)`. The runtime executes it behind a registered backend (stub, replay, model-service, or custom host backend).
 
-The first external model-service bridge keeps the same lifecycle surface but uses stable capability ids such as `cap.vla.action_chunk.v1`. See [muesli-model-service bridge](../integration/model-service-bridge.md).
+The first external model-service bridge keeps the same lifecycle surface but uses stable capability ids such as `cap.vla.action_chunk.v1`. Select it by configuring the optional model-service bridge and setting the VLA request model name to `model-service`. See [muesli-model-service bridge](../integration/model-service-bridge.md).
 
 ## Async Lifecycle
 

@@ -1,8 +1,13 @@
 #include "bt/model_service.hpp"
+#include "bt/runtime_host.hpp"
 
 #include <cstdlib>
+#include <chrono>
 #include <iostream>
+#include <memory>
 #include <string>
+#include <thread>
+#include <vector>
 
 namespace {
 
@@ -12,6 +17,36 @@ void check(bool condition, const std::string& message) {
         std::exit(1);
     }
 }
+
+class fake_vla_model_service_client final : public bt::model_service_client {
+public:
+    bt::model_service_response call(const bt::model_service_request& request) override {
+        ops.push_back(bt::model_service_operation_name(request.op));
+        bt::model_service_response response;
+        response.id = request.id;
+        response.metadata_json = "{\"service\":\"fake\"}";
+        if (request.op == bt::model_service_operation::start) {
+            response.status = bt::model_service_status::running;
+            response.session_id = "sess-test";
+            return response;
+        }
+        if (request.op == bt::model_service_operation::step) {
+            response.status = bt::model_service_status::action_chunk;
+            response.session_id = request.session_id;
+            response.output_json = "{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,-0.1],\"dt_ms\":200}]}";
+            return response;
+        }
+        if (request.op == bt::model_service_operation::cancel || request.op == bt::model_service_operation::close) {
+            response.status = bt::model_service_status::success;
+            response.session_id = request.session_id;
+            return response;
+        }
+        response.status = bt::model_service_status::success;
+        return response;
+    }
+
+    std::vector<std::string> ops;
+};
 
 }  // namespace
 
@@ -52,5 +87,47 @@ int main() {
         check(compatibility.compatible, "live describe compatibility check should pass");
         check(compatibility.missing_capabilities.empty(), "live compatibility check should not report missing caps");
     }
+
+    bt::runtime_host host;
+    auto fake = std::make_unique<fake_vla_model_service_client>();
+    fake_vla_model_service_client* fake_ptr = fake.get();
+    bt::model_service_config fake_cfg;
+    host.set_model_service_client(fake_cfg, std::move(fake));
+
+    bt::vla_request vla;
+    vla.capability = "cap.vla.action_chunk.v1";
+    vla.task_id = "test-task";
+    vla.instruction = "move a little";
+    vla.deadline_ms = 1000;
+    vla.model.name = "model-service";
+    vla.model.version = "test";
+    vla.observation.state = {0.0, 0.0};
+    vla.action_space.type = "continuous";
+    vla.action_space.dims = 2;
+    vla.action_space.bounds = {{-1.0, 1.0}, {-1.0, 1.0}};
+    vla.constraints.max_abs_value = 1.0;
+    vla.constraints.max_delta = 1.0;
+
+    const bt::vla_service::vla_job_id job = host.vla_ref().submit(vla);
+    bt::vla_poll poll;
+    for (int i = 0; i < 100; ++i) {
+        poll = host.vla_ref().poll(job);
+        if (poll.status == bt::vla_job_status::done || poll.status == bt::vla_job_status::error ||
+            poll.status == bt::vla_job_status::timeout || poll.status == bt::vla_job_status::cancelled) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    check(poll.status == bt::vla_job_status::done, "model-service VLA job should complete");
+    check(poll.final.has_value(), "model-service VLA job should return final response");
+    check(poll.final->status == bt::vla_status::ok, "model-service VLA final response should be ok");
+    check(poll.final->action.u.size() == 2, "model-service VLA action should preserve action dimensions");
+    check(poll.final->action.u[0] == 0.2, "model-service VLA action should parse first value");
+    check(poll.final->action.u[1] == -0.1, "model-service VLA action should parse second value");
+    check(fake_ptr->ops.size() >= 3, "model-service VLA backend should call start, step, and close");
+    check(fake_ptr->ops[0] == "start", "model-service VLA backend should start a session first");
+    check(fake_ptr->ops[1] == "step", "model-service VLA backend should step the session");
+    check(fake_ptr->ops.back() == "close", "model-service VLA backend should close the session");
+
     return 0;
 }

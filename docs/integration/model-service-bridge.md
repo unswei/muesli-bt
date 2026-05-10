@@ -90,7 +90,7 @@ cfg.endpoint = "ws://127.0.0.1:8765/v1/ws";
 auto client = bt::make_websocket_model_service_client(cfg);
 ```
 
-The client is intentionally small: it supports the first `ws://` request/response path. Broader runtime hardening, VLA submit/poll/cancel, redaction, and richer replay reports remain `v0.8.0` roadmap work.
+The client is intentionally small: it supports the first `ws://` request/response path. Stateless world-model calls use `cap.call`. VLA sessions can opt into the bridge through the existing `vla.submit`, `vla.poll`, and `vla.cancel` lifecycle by selecting the `model-service` VLA backend.
 
 The first runtime wiring is now the stateless `cap.call` path for:
 
@@ -138,7 +138,7 @@ Deterministic fault injection is available through `fault_schedule`. Entries are
 
 The `check` field sends a `describe` request and verifies the first required `MMSP v0.2` capability ids are present before runtime use. The same gate is available explicitly as `(model-service.check)`.
 
-Still planned: deeper descriptor schema/mode checks, redaction, richer replay reports, VLA session wiring, fault schedules for session lifecycle calls, and validation at host action dispatch.
+Still planned: deeper descriptor schema/mode checks, redaction, richer replay reports, fault schedules for session lifecycle calls, replay parity for sessions, and validation at host action dispatch.
 
 The `muslisp` command can also start the external service in the foreground:
 
@@ -226,6 +226,27 @@ After `start` returns a `session_id`, a VLA `step` response uses `status: "actio
 ```
 
 The bridge must validate those proposals before any downstream host capability or robot action can observe them as executable commands.
+
+To route the existing VLA API through the model service, configure the bridge and use the public model-service capability with the `model-service` backend name:
+
+```lisp
+(begin
+  (define req (map.make))
+  (map.set! req 'capability "cap.vla.action_chunk.v1")
+  (map.set! req 'task_id "smoke")
+  (map.set! req 'instruction "move forward slowly")
+  (map.set! req 'deadline_ms 500)
+
+  (define model (map.make))
+  (map.set! model 'name "model-service")
+  (map.set! model 'version "0.2")
+  (map.set! req 'model model)
+
+  ;; Fill observation, action_space, and constraints as for any VLA request.
+  (vla.submit req))
+```
+
+The BT source still sees an ordinary VLA job id. The backend adapter performs `start`, one or more `step` calls, best-effort `cancel` when the runtime cancels the job, and `close` when the session reaches a terminal result.
 
 ## example
 
