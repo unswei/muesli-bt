@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -20,6 +21,11 @@ void check(bool condition, const std::string& message) {
 
 class fake_vla_model_service_client final : public bt::model_service_client {
 public:
+    explicit fake_vla_model_service_client(
+        std::string step_output =
+            "{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,-0.1],\"dt_ms\":200}]}")
+        : step_output_(std::move(step_output)) {}
+
     bt::model_service_response call(const bt::model_service_request& request) override {
         ops.push_back(bt::model_service_operation_name(request.op));
         bt::model_service_response response;
@@ -33,7 +39,7 @@ public:
         if (request.op == bt::model_service_operation::step) {
             response.status = bt::model_service_status::action_chunk;
             response.session_id = request.session_id;
-            response.output_json = "{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,-0.1],\"dt_ms\":200}]}";
+            response.output_json = step_output_;
             return response;
         }
         if (request.op == bt::model_service_operation::cancel || request.op == bt::model_service_operation::close) {
@@ -46,7 +52,63 @@ public:
     }
 
     std::vector<std::string> ops;
+
+private:
+    std::string step_output_;
 };
+
+bt::model_service_response validate_action_chunk_output(const std::string& output_json) {
+    bt::model_service_request request;
+    request.id = "validate-action-chunk";
+    request.op = bt::model_service_operation::step;
+    request.capability = "cap.vla.action_chunk.v1";
+    request.deadline_ms = 100;
+
+    bt::model_service_response response;
+    response.id = request.id;
+    response.status = bt::model_service_status::action_chunk;
+    response.output_json = output_json;
+    response.host_reached = true;
+
+    bt::validate_model_service_response(request, response);
+    return response;
+}
+
+bt::vla_request make_model_service_vla_request() {
+    bt::vla_request vla;
+    vla.capability = "cap.vla.action_chunk.v1";
+    vla.task_id = "test-task";
+    vla.instruction = "move a little";
+    vla.deadline_ms = 1000;
+    vla.model.name = "model-service";
+    vla.model.version = "test";
+    vla.observation.state = {0.0, 0.0};
+    vla.action_space.type = "continuous";
+    vla.action_space.dims = 2;
+    vla.action_space.bounds = {{-1.0, 1.0}, {-1.0, 1.0}};
+    vla.constraints.max_abs_value = 1.0;
+    vla.constraints.max_delta = 1.0;
+    return vla;
+}
+
+bt::vla_poll run_model_service_vla(std::string output_json) {
+    bt::runtime_host host;
+    auto fake = std::make_unique<fake_vla_model_service_client>(std::move(output_json));
+    bt::model_service_config fake_cfg;
+    host.set_model_service_client(fake_cfg, std::move(fake));
+
+    const bt::vla_service::vla_job_id job = host.vla_ref().submit(make_model_service_vla_request());
+    bt::vla_poll poll;
+    for (int i = 0; i < 100; ++i) {
+        poll = host.vla_ref().poll(job);
+        if (poll.status == bt::vla_job_status::done || poll.status == bt::vla_job_status::error ||
+            poll.status == bt::vla_job_status::timeout || poll.status == bt::vla_job_status::cancelled) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return poll;
+}
 
 }  // namespace
 
@@ -94,21 +156,7 @@ int main() {
     bt::model_service_config fake_cfg;
     host.set_model_service_client(fake_cfg, std::move(fake));
 
-    bt::vla_request vla;
-    vla.capability = "cap.vla.action_chunk.v1";
-    vla.task_id = "test-task";
-    vla.instruction = "move a little";
-    vla.deadline_ms = 1000;
-    vla.model.name = "model-service";
-    vla.model.version = "test";
-    vla.observation.state = {0.0, 0.0};
-    vla.action_space.type = "continuous";
-    vla.action_space.dims = 2;
-    vla.action_space.bounds = {{-1.0, 1.0}, {-1.0, 1.0}};
-    vla.constraints.max_abs_value = 1.0;
-    vla.constraints.max_delta = 1.0;
-
-    const bt::vla_service::vla_job_id job = host.vla_ref().submit(vla);
+    const bt::vla_service::vla_job_id job = host.vla_ref().submit(make_model_service_vla_request());
     bt::vla_poll poll;
     for (int i = 0; i < 100; ++i) {
         poll = host.vla_ref().poll(job);
@@ -128,6 +176,50 @@ int main() {
     check(fake_ptr->ops[0] == "start", "model-service VLA backend should start a session first");
     check(fake_ptr->ops[1] == "step", "model-service VLA backend should step the session");
     check(fake_ptr->ops.back() == "close", "model-service VLA backend should close the session");
+
+    const bt::model_service_response malformed =
+        validate_action_chunk_output("{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,\"bad\"],\"dt_ms\":200}]}");
+    check(malformed.status == bt::model_service_status::invalid_output, "malformed action values should be rejected");
+    check(!malformed.host_reached, "malformed action values must not reach host execution");
+    check(malformed.validation_reason_code == "model_service_action_values_invalid",
+          "malformed action values should report a specific validation reason");
+
+    const bt::model_service_response stale = validate_action_chunk_output(
+        "{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,-0.1],\"dt_ms\":200}],\"stale\":true}");
+    check(stale.status == bt::model_service_status::invalid_output, "stale action chunks should be rejected");
+    check(!stale.host_reached, "stale action chunks must not reach host execution");
+    check(stale.validation_reason_code == "model_service_stale_result",
+          "stale action chunks should report a stale-result reason");
+
+    const bt::model_service_response unsafe = validate_action_chunk_output(
+        "{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,-0.1],\"dt_ms\":200}],\"unsafe\":true}");
+    check(unsafe.status == bt::model_service_status::unsafe_output, "unsafe action chunks should be rejected");
+    check(!unsafe.host_reached, "unsafe action chunks must not reach host execution");
+    check(unsafe.validation_reason_code == "model_service_unsafe_output",
+          "unsafe action chunks should report an unsafe-output reason");
+
+    const bt::model_service_response late = validate_action_chunk_output(
+        "{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,-0.1],\"dt_ms\":200}],\"late\": true}");
+    check(late.status == bt::model_service_status::invalid_output, "late action chunks should be rejected");
+    check(!late.host_reached, "late action chunks must not reach host execution");
+    check(late.validation_reason_code == "model_service_late_result",
+          "late action chunks should report a late-result reason");
+
+    const bt::model_service_response policy = validate_action_chunk_output(
+        "{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,-0.1],\"dt_ms\":200}],\"policy_violation\":true}");
+    check(policy.status == bt::model_service_status::unsafe_output,
+          "policy-violating action chunks should be rejected");
+    check(!policy.host_reached, "policy-violating action chunks must not reach host execution");
+    check(policy.validation_reason_code == "model_service_policy_violation",
+          "policy-violating action chunks should report a policy reason");
+
+    const bt::vla_poll invalid_poll =
+        run_model_service_vla("{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,\"bad\"],\"dt_ms\":200}]}");
+    check(invalid_poll.status == bt::vla_job_status::error,
+          "malformed model-service VLA output should become an error job");
+    check(invalid_poll.final.has_value(), "malformed model-service VLA output should produce a final response");
+    check(invalid_poll.final->status == bt::vla_status::invalid,
+          "malformed model-service VLA output should produce invalid final status");
 
     return 0;
 }

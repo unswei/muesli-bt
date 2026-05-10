@@ -1,7 +1,10 @@
 #include "bt/model_service.hpp"
 
-#include <cctype>
 #include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstdlib>
+#include <optional>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>
@@ -247,15 +250,123 @@ bool contains_json_string_field(std::string_view text, std::string_view field, s
 }
 
 bool contains_json_bool_field(std::string_view text, std::string_view field, bool value) {
-    std::ostringstream compact;
-    compact << '"' << field << "\":" << (value ? "true" : "false");
-    if (text.find(compact.str()) != std::string_view::npos) {
-        return true;
+    const std::string quoted_field = json_quote(field);
+    std::size_t pos = 0;
+    while ((pos = text.find(quoted_field, pos)) != std::string_view::npos) {
+        pos += quoted_field.size();
+        skip_ws(text, pos);
+        if (pos >= text.size() || text[pos] != ':') {
+            continue;
+        }
+        ++pos;
+        skip_ws(text, pos);
+        const std::string_view literal = value ? std::string_view("true") : std::string_view("false");
+        if (text.substr(pos, literal.size()) == literal) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<double> parse_json_number(std::string_view raw) {
+    std::string text(raw);
+    const char* begin = text.c_str();
+    char* end = nullptr;
+    const double value = std::strtod(begin, &end);
+    if (end == begin || !std::isfinite(value)) {
+        return std::nullopt;
+    }
+    while (*end != '\0') {
+        if (!std::isspace(static_cast<unsigned char>(*end))) {
+            return std::nullopt;
+        }
+        ++end;
+    }
+    return value;
+}
+
+bool parse_finite_number_array(std::string_view raw) {
+    std::size_t pos = 0;
+    skip_ws(raw, pos);
+    if (pos >= raw.size() || raw[pos] != '[') {
+        return false;
+    }
+    ++pos;
+    skip_ws(raw, pos);
+    if (pos < raw.size() && raw[pos] == ']') {
+        return false;
     }
 
-    std::ostringstream spaced;
-    spaced << '"' << field << "\" : " << (value ? "true" : "false");
-    return text.find(spaced.str()) != std::string_view::npos;
+    bool saw_value = false;
+    while (pos < raw.size()) {
+        skip_ws(raw, pos);
+        const std::size_t begin = pos;
+        while (pos < raw.size() && raw[pos] != ',' && raw[pos] != ']') {
+            ++pos;
+        }
+        const std::optional<double> value = parse_json_number(raw.substr(begin, pos - begin));
+        if (!value.has_value()) {
+            return false;
+        }
+        saw_value = true;
+        skip_ws(raw, pos);
+        if (pos < raw.size() && raw[pos] == ',') {
+            ++pos;
+            continue;
+        }
+        if (pos < raw.size() && raw[pos] == ']') {
+            ++pos;
+            skip_ws(raw, pos);
+            return saw_value && pos == raw.size();
+        }
+        return false;
+    }
+    return false;
+}
+
+std::optional<std::pair<std::string, std::string>> validate_action_chunk_shape(std::string_view actions_raw) {
+    std::size_t pos = 0;
+    skip_ws(actions_raw, pos);
+    if (pos >= actions_raw.size() || actions_raw[pos] != '[') {
+        return std::make_pair("model_service_actions_not_array", "VLA action chunk actions must be an array");
+    }
+    ++pos;
+    skip_ws(actions_raw, pos);
+    if (pos < actions_raw.size() && actions_raw[pos] == ']') {
+        return std::make_pair("model_service_actions_empty", "VLA action chunk actions must not be empty");
+    }
+    if (pos >= actions_raw.size() || actions_raw[pos] != '{') {
+        return std::make_pair("model_service_action_not_object", "VLA action chunk action entries must be objects");
+    }
+
+    const std::size_t first_begin = pos;
+    const std::size_t first_end = scan_json_value(actions_raw, pos);
+    const auto action = parse_top_level_object(actions_raw.substr(first_begin, first_end - first_begin));
+
+    const auto type_it = action.find("type");
+    if (type_it == action.end() || unquote_json_string(type_it->second).empty()) {
+        return std::make_pair("model_service_action_type_missing", "VLA action chunk action is missing type");
+    }
+
+    const auto values_it = action.find("values");
+    if (values_it == action.end()) {
+        return std::make_pair("model_service_action_values_missing", "VLA action chunk action is missing values");
+    }
+    if (!parse_finite_number_array(values_it->second)) {
+        return std::make_pair("model_service_action_values_invalid",
+                              "VLA action chunk action values must be a non-empty finite numeric array");
+    }
+
+    const auto dt_it = action.find("dt_ms");
+    if (dt_it == action.end()) {
+        return std::make_pair("model_service_action_dt_missing", "VLA action chunk action is missing dt_ms");
+    }
+    const std::optional<double> dt_ms = parse_json_number(dt_it->second);
+    if (!dt_ms.has_value() || *dt_ms <= 0.0) {
+        return std::make_pair("model_service_action_dt_invalid", "VLA action chunk dt_ms must be positive and finite");
+    }
+
+    return std::nullopt;
 }
 
 void reject_model_service_output(model_service_response& response,
@@ -421,12 +532,28 @@ void validate_model_service_response(const model_service_request& request, model
                                     "model-service output violated host policy");
         return;
     }
+    if (contains_json_bool_field(output, "policy_violating", true)) {
+        reject_model_service_output(response,
+                                    model_service_status::unsafe_output,
+                                    "model_service_policy_violation",
+                                    "model-service output violated host policy");
+        return;
+    }
     if (contains_json_bool_field(output, "stale", true) ||
         contains_json_bool_field(output, "stale_result", true)) {
         reject_model_service_output(response,
                                     model_service_status::invalid_output,
                                     "model_service_stale_result",
                                     "model-service output was marked stale");
+        return;
+    }
+    if (contains_json_bool_field(output, "late", true) ||
+        contains_json_bool_field(output, "late_result", true) ||
+        contains_json_bool_field(output, "deadline_missed", true)) {
+        reject_model_service_output(response,
+                                    model_service_status::invalid_output,
+                                    "model_service_late_result",
+                                    "model-service output was marked late");
         return;
     }
 
@@ -453,6 +580,13 @@ void validate_model_service_response(const model_service_request& request, model
         }
     } else if (request.capability == "cap.vla.action_chunk.v1") {
         if (!require_field("actions", "model_service_missing_actions", "VLA action chunk output is missing actions")) {
+            return;
+        }
+        if (const auto invalid = validate_action_chunk_shape(object.at("actions")); invalid.has_value()) {
+            reject_model_service_output(response,
+                                        model_service_status::invalid_output,
+                                        invalid->first,
+                                        invalid->second);
             return;
         }
     } else if (request.capability == "cap.vla.propose_nav_goal.v1") {

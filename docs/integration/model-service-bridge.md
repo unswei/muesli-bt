@@ -130,7 +130,7 @@ Then call a bounded model capability:
 
 `cap.call` emits `cap_call_start` and `cap_call_end` for model-service calls. Returned model outputs have `host_reached=false`; validation and host execution remain separate.
 
-The first stateless validation gate runs on successful model-service proposals. World-model rollout outputs must contain `predicted_states`; trajectory scoring outputs must contain `score`. Outputs marked `unsafe`, `stale`, or `policy_violation` are rejected. Rejected outputs return `:invalid_output` or `:unsafe_output`, include `validation_status=:rejected`, and keep `host_reached=false`.
+The first validation gates run on successful model-service proposals. World-model rollout outputs must contain `predicted_states`; trajectory scoring outputs must contain `score`. VLA `action_chunk` outputs must contain a non-empty `actions` array whose first action has a string `type`, finite numeric `values`, and positive finite `dt_ms`. Outputs marked `unsafe`, `stale`, `late`, `deadline_missed`, or `policy_violation` are rejected. Rejected outputs return `:invalid_output` or `:unsafe_output`, include `validation_status=:rejected`, and keep `host_reached=false`.
 
 `cap_call_end` includes deterministic request/response hashes and validation status. In `record` mode, the raw response envelope is written under `replay_cache_path` using the request hash as the file name. In `replay` mode, `muesli-bt` reads that cached response, re-runs the validation gate, and reports `replay_cache_hit=true`.
 
@@ -225,7 +225,7 @@ After `start` returns a `session_id`, a VLA `step` response uses `status: "actio
 }
 ```
 
-The bridge must validate those proposals before any downstream host capability or robot action can observe them as executable commands.
+The bridge validates those proposals before any downstream host capability or robot action can observe them as executable commands. Malformed, stale, unsafe, late, or policy-violating chunks are rejected with `host_reached=false`.
 
 To route the existing VLA API through the model service, configure the bridge and use the public model-service capability with the `model-service` backend name:
 
