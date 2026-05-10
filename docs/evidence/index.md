@@ -35,7 +35,7 @@ Reproduction commands live in the linked contract and conformance pages.
 
 ## model-backed VLA evidence
 
-- [v0.8 draft support boundary](../releases/v0.8.0.md)
+- [v0.8 release notes](../releases/v0.8.0.md)
 - [model-backed async evidence report](model-backed-async-evidence-report.md)
 - [release-safe redaction policy](redaction-policy.md)
 - [MiniVLA smoke evidence](minivla-smoke-evidence.md)

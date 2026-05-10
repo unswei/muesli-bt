@@ -8,7 +8,7 @@ This page states the current project boundaries directly. Use it alongside the [
 
 ## VLA production backends
 
-The runtime has async/model-call lifecycle support and an optional `muesli-model-service` bridge candidate for `v0.8.0`.
+The runtime has async/model-call lifecycle support and an optional `muesli-model-service` bridge in `v0.8.0`.
 
 The current model-backed evidence path is gated and experimental. It covers descriptor checks, frame refs, request/response hashes, replay-cache hits, validation status, deterministic fault injection, MiniVLA smoke evidence, release-safe summaries, and a mock-host handoff. It does not make any VLA provider a production support surface.
 

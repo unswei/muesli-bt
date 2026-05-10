@@ -7,7 +7,7 @@ authors:
 repository-code: "https://github.com/unswei/muesli-bt"
 url: "https://unswei.github.io/muesli-bt/"
 license: MIT
-date-released: 2026-04-26
+date-released: 2026-05-10
 abstract: "A compact Lisp-authored Behaviour Tree runtime for robotics, with bounded-time planning, cancellable asynchronous jobs, and canonical event logs."
 keywords:
   - robotics

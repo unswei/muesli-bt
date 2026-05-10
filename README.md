@@ -73,8 +73,11 @@ Status vocabulary used in this repository:
 | Generated-fragment rejection fixtures | experimental | [why Lisp as DSL?](docs/getting-oriented/why-lisp-dsl.md) |
 | Host capability bundles | contract-only | [host capability bundles](docs/integration/host-capability-bundles.md) |
 | `cap.echo.v1` registry smoke path | released | [cap.call](docs/language/reference/builtins/cap/cap-call.md) |
-| `muesli-model-service` bridge | experimental v0.8 candidate, optional and disabled by default | [model-service bridge](docs/integration/model-service-bridge.md) |
-| VLA lifecycle and model-service sessions | experimental v0.8 candidate | [VLA integration](docs/bt/vla-integration.md) |
+| `muesli-model-service` bridge | experimental in v0.8, optional and disabled by default | [model-service bridge](docs/integration/model-service-bridge.md) |
+| Model-service stateless `cap.call` paths | experimental in v0.8 | [model-service bridge](docs/integration/model-service-bridge.md) |
+| VLA lifecycle hooks and deterministic stubs | released | [VLA integration](docs/bt/vla-integration.md) |
+| Model-service VLA sessions | experimental in v0.8 | [model-service bridge](docs/integration/model-service-bridge.md) |
+| MiniVLA smoke/evidence path | gated experimental evidence | [MiniVLA smoke evidence](docs/evidence/minivla-smoke-evidence.md) |
 | Production VLA providers | planned | [roadmap to 1.0](docs/roadmap-to-1.0.md) |
 | Nav2/MoveIt adapters | planned | [roadmap to 1.0](docs/roadmap-to-1.0.md) |
 
@@ -122,7 +125,7 @@ For the shortest walkthrough, use [first 10 minutes](docs/getting-started-10min.
 - BT users: [BT introduction](docs/bt/intro.md), [BT syntax](docs/bt/syntax.md), [why not just BehaviorTree.CPP?](docs/getting-oriented/why-not-btcpp.md).
 - Robot and simulator integration: [integration overview](docs/integration/overview.md), [env API](docs/integration/env-api.md), [ROS2 tutorial](docs/integration/ros2-tutorial.md).
 - Tool builders and evaluators: [runtime contract v1](docs/contracts/runtime-contract-v1.md), [conformance levels](docs/contracts/conformance.md), [evidence index](docs/evidence/index.md).
-- Limits and roadmap: [v1.0 direction](docs/project/v1-direction.md), [known limitations](docs/known-limitations.md), [roadmap to 1.0](docs/roadmap-to-1.0.md), [v0.8 draft support boundary](docs/releases/v0.8.0.md), [release notes](docs/releases/index.md).
+- Limits and roadmap: [v1.0 direction](docs/project/v1-direction.md), [known limitations](docs/known-limitations.md), [roadmap to 1.0](docs/roadmap-to-1.0.md), [v0.8 release notes](docs/releases/v0.8.0.md), [release notes](docs/releases/index.md).
 
 ## benchmarks and evidence
 
@@ -141,7 +144,7 @@ Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md), then read [RO
 
 ## VLA and model-service status
 
-VLA/model support is an experimental `v0.8` candidate surface. It includes submit, poll, cancel, timeout handling, BT node semantics, canonical logging, an optional `muesli-model-service` bridge, `MMSP v0.2` descriptor checks, stateless world-model `cap.call`, model-service VLA sessions, request/response hashes, replay-cache support, validation gates, deterministic fault injection, and a curated MiniVLA smoke/evidence path.
+VLA/model support is an experimental `v0.8` surface. It includes submit, poll, cancel, timeout handling, BT node semantics, canonical logging, an optional `muesli-model-service` bridge, `MMSP v0.2` descriptor checks, stateless world-model `cap.call`, model-service VLA sessions, request/response hashes, replay-cache support, validation gates, deterministic fault injection, and a curated MiniVLA smoke/evidence path.
 
 The support boundary is deliberately narrow. `muesli-bt` must run without `muesli-model-service` unless a host configures model capabilities. Model outputs remain untrusted proposals until host-side validation accepts them. The current mock-host handoff proves the dispatch boundary and report shape, not physical robot dispatch. Production VLA providers, Nav2, MoveIt, and physical host dispatch are not part of the released support surface unless a release note says so.
 

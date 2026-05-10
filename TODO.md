@@ -6,20 +6,17 @@ Use the public `v1.0` direction page under `docs/project/v1-direction.md` for th
 
 ## next
 
-- `v0.8.0`: finish release-candidate cleanup: docs status, changelog, support boundary, final docs build, and bridge/evidence verification
-- `v0.8.0`: decide whether explicit `MMSP v0.2` `status` operation coverage is required by any supported backend before the tag; if not, record it as a deferred compatibility hook
-- `v0.8.0`: replace or retire `docs/integration/vla-backend-integration-plan.md` once the final implementation pages fully cover the released bridge/evidence path
-- `v0.8.0`: prepare the final generated evidence snapshot for release review without committing raw private model-service caches or generated build artefacts
 - `v0.9.0`: add a Nav2-backed capability lane for the flagship wheeled robot while keeping ROS2 as a thin transport plus capability host surface
 - `v0.9.0`: add one physical wheeled runbook with required artefacts, plus a clear Nav2/rosbag-backed fallback posture if hardware readiness slips
 - `v0.9.0`: add reproducible flagship experiment manifests, figure scripts, trace bundle generation, and one fair BehaviorTree.CPP matched baseline for the same scenario
 - `v0.9.0`: land the generated guarded recovery subtree evidence path if it remains the chosen Lisp demonstration
+- `v0.9.0`: replace or retire `docs/integration/vla-backend-integration-plan.md` once the final implementation pages fully cover the released bridge/evidence path
+- `post-release`: add explicit `MMSP v0.2` `status` operation coverage if a supported backend starts requiring it
 - `post-release`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
 
 ## status notes
 
 - released: supported runtime/API/example surfaces through the latest tagged release
-- v0.8 candidate: implemented on `main` for the next release, but not a stable external dependency surface until the tag is cut
 - experimental: implemented evidence paths that are not yet a stable external dependency surface, including Lisp DSL round-trip/hash evidence, generated-fragment rejection fixtures, and the model-service/MiniVLA evidence lane
 - contract-only: documented host capability boundaries such as `cap.motion.v1` and `cap.perception.scene.v1`
 - planned: roadmap work that is not implemented as a release surface, including production VLA providers, physical or simulator host dispatch beyond the mock-host handoff, Nav2 adapters, MoveIt adapters, and generated subtree execution
@@ -64,6 +61,8 @@ Use the public `v1.0` direction page under `docs/project/v1-direction.md` for th
 - `v0.8.0`: standardise the curated MiniVLA replay report as the model-backed async evidence format, including summary gates, per-condition record/replay parity, request/response hashes, validation status, replay-cache status, and host-reach outcomes
 - `v0.8.0`: add a validated mock-host action handoff to the curated MiniVLA evidence path, proving that accepted proposals can cross the host dispatch boundary separately from model-service proposal validation
 - `v0.8.0`: publish a curated real model-backed async capability path for the flagship lane, using MiniVLA, checked-in Webots frames, frame refs, request/response hashes, replay cache hits, validation status, release-safe sidecars, and host-safe action proposals
+- `v0.8.0`: record `muesli-model-service v0.2.0` and commit `be3ff75` in the MiniVLA evidence manifest and release notes
+- `v0.8.0`: finish release hygiene for docs status, changelog, support boundary, final docs build, and bridge/evidence verification
 - `v0.5.0`: publish the final release notes from the green release baseline
 - `v0.6.0`: define host capability bundle naming and registration rules without changing BT or Lisp semantics
 - `v0.6.0`: make the boundary between `env.*`, `planner.plan`, and external host capabilities explicit in docs and examples

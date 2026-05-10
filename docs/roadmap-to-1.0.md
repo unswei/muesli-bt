@@ -456,9 +456,9 @@ Outcome taxonomy evidence:
 
 Status:
 
-- release candidate cleanup on `main`
-- core candidate pieces are implemented: optional `MMSP v0.2` bridge, descriptor hardening, stateless model `cap.call`, VLA session wiring, request/response hashes, replay cache, validation gates, deterministic fault injection, release-safe evidence redaction, standard MiniVLA evidence report, curated MiniVLA smoke path, and mock-host handoff evidence
-- remaining `v0.8.0` work is release hygiene: final docs/build verification, final support-boundary review, final evidence snapshot review, and explicit `status` operation coverage only if a supported backend requires it
+- released in `v0.8.0`
+- core pieces are implemented: optional `MMSP v0.2` bridge, descriptor hardening, stateless model `cap.call`, VLA session wiring, request/response hashes, replay cache, validation gates, deterministic fault injection, release-safe evidence redaction, standard MiniVLA evidence report, curated MiniVLA smoke path, and mock-host handoff evidence
+- explicit `status` operation coverage remains deferred until a supported backend requires it
 
 Focus:
 

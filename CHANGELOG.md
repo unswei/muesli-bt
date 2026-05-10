@@ -4,6 +4,8 @@ muesli-bt
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-05-10
+
 ### Added
 - Added documentation for starting the optional `muesli-model-service` from `muslisp` with `--model-service-start`, while keeping the service outside the core runtime and disabled unless a host configures model capabilities.
 - Added documentation for HTTP frame ingest as the preferred live-image path for remote VLA calls, using `frame://...` references in model-call envelopes instead of copying image bytes through JSON.
@@ -23,11 +25,11 @@ muesli-bt
 - Standardised the curated MiniVLA replay report as the model-backed async evidence format, with summary gates, per-condition record/replay parity, request/response hashes, validation status, replay-cache status, and host-reach outcomes.
 - Added a curated MiniVLA smoke/evidence path using checked-in Webots frames, HTTP frame ingest, immutable `frame://` refs, request/response hashes, replay-cache hits, validation status, release-safe sidecars, and host-safe action proposals.
 - Added a validated mock-host action handoff to the MiniVLA evidence path so accepted model proposals can cross an explicit host boundary separately from model-service proposal validation.
-- Added draft `v0.8.0` support-boundary documentation for the optional model-service bridge, model-backed async evidence path, and surfaces that remain planned.
+- Added `v0.8.0` support-boundary documentation for the optional model-service bridge, model-backed async evidence path, and surfaces that remain planned.
 
 ### Changed
 - Clarified the `muesli-model-service` bridge response shape for VLA sessions: `step` returns `status: "action_chunk"` with proposed host actions under `output.actions`, and those actions remain untrusted until host-side validation accepts them.
-- Updated README, docs index, roadmap, TODO, and limitation pages so the model-service bridge is described as an optional experimental `v0.8` candidate rather than a skeleton-only plan.
+- Updated README, docs index, roadmap, TODO, and limitation pages so the model-service bridge is described as an optional experimental `v0.8` surface rather than a skeleton-only plan.
 - Clarified that mock-host dispatch evidence proves the dispatch boundary and report shape, not physical robot dispatch, and that production VLA providers, Nav2, MoveIt, and physical host dispatch remain outside the support boundary unless a release note says otherwise.
 
 ## [0.7.0] - 2026-05-05

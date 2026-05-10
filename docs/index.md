@@ -47,8 +47,11 @@ If you want the longer setup page, use [getting started](getting-started.md).
 | PyBullet/Webots examples | released examples | [examples overview](examples/index.md) |
 | ROS2 thin transport | released baseline, Humble-focused | [ROS2 tutorial](integration/ros2-tutorial.md) |
 | Host capability bundles | contract-only / emerging | [host capability bundles](integration/host-capability-bundles.md) |
-| VLA/model service bridge | experimental v0.8 candidate, optional and disabled by default | [muesli-model-service bridge](integration/model-service-bridge.md) |
-| VLA lifecycle and model-service sessions | experimental v0.8 candidate | [VLA integration](bt/vla-integration.md) |
+| VLA/model service bridge | experimental in v0.8, optional and disabled by default | [muesli-model-service bridge](integration/model-service-bridge.md) |
+| Model-service stateless `cap.call` paths | experimental in v0.8 | [muesli-model-service bridge](integration/model-service-bridge.md) |
+| VLA lifecycle hooks and deterministic stubs | released | [VLA integration](bt/vla-integration.md) |
+| Model-service VLA sessions | experimental in v0.8 | [muesli-model-service bridge](integration/model-service-bridge.md) |
+| MiniVLA smoke/evidence path | gated experimental evidence | [MiniVLA smoke evidence](evidence/minivla-smoke-evidence.md) |
 | Production VLA providers | planned unless listed in release notes | [roadmap to 1.0](roadmap-to-1.0.md) |
 | Nav2/MoveIt adapters | planned unless listed in release notes | [roadmap to 1.0](roadmap-to-1.0.md) |
 
@@ -66,5 +69,5 @@ If you want the longer setup page, use [getting started](getting-started.md).
 - [v1.0 direction](project/v1-direction.md)
 - [known limitations](known-limitations.md)
 - [roadmap to 1.0](roadmap-to-1.0.md)
-- [v0.8 draft support boundary](releases/v0.8.0.md)
+- [v0.8 release notes](releases/v0.8.0.md)
 - [release notes](releases/index.md)
