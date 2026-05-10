@@ -25,10 +25,11 @@ The `v1.0.0` effort is centred on dependable model-mediated wheeled robot behavi
 - one physical wheeled flagship path with matching Nav2-backed or rosbag-backed evidence
 - host capability bundles for richer external services such as manipulation, navigation, and perception
 - optional `muesli-model-service` bridge for capability-native world-model and VLA calls, with live images staged through frame ingest and model requests carrying `frame://` refs
+- curated model-backed async evidence showing MiniVLA action-chunk proposals, validation, replay-cache hits, release-safe summaries, and a mock-host handoff
 - cross-transport evidence for the existing ROS2 thin adaptor as a foundation, not the whole `v1.0.0` headline
 - keep the existing Isaac Sim / ROS2 H1 showcase documented and reproducible
 - add one documented Isaac Sim wheeled showcase that reuses the released `Odometry -> Twist` path and yields website-ready capture artefacts
-- additional VLA backends beyond stub/replay capability adapters
+- production VLA backends beyond the experimental model-service evidence path
 - consumer-driven expansion of the thin ROS2 adaptor only after parity and evidence needs are clear
 - external telemetry/export integrations
 

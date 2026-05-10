@@ -73,8 +73,8 @@ Status vocabulary used in this repository:
 | Generated-fragment rejection fixtures | experimental | [why Lisp as DSL?](docs/getting-oriented/why-lisp-dsl.md) |
 | Host capability bundles | contract-only | [host capability bundles](docs/integration/host-capability-bundles.md) |
 | `cap.echo.v1` registry smoke path | released | [cap.call](docs/language/reference/builtins/cap/cap-call.md) |
-| `muesli-model-service` bridge | optional skeleton and contract | [model-service bridge](docs/integration/model-service-bridge.md) |
-| VLA lifecycle hooks and stubs | experimental | [VLA integration](docs/bt/vla-integration.md) |
+| `muesli-model-service` bridge | experimental v0.8 candidate, optional and disabled by default | [model-service bridge](docs/integration/model-service-bridge.md) |
+| VLA lifecycle and model-service sessions | experimental v0.8 candidate | [VLA integration](docs/bt/vla-integration.md) |
 | Production VLA providers | planned | [roadmap to 1.0](docs/roadmap-to-1.0.md) |
 | Nav2/MoveIt adapters | planned | [roadmap to 1.0](docs/roadmap-to-1.0.md) |
 
@@ -122,7 +122,7 @@ For the shortest walkthrough, use [first 10 minutes](docs/getting-started-10min.
 - BT users: [BT introduction](docs/bt/intro.md), [BT syntax](docs/bt/syntax.md), [why not just BehaviorTree.CPP?](docs/getting-oriented/why-not-btcpp.md).
 - Robot and simulator integration: [integration overview](docs/integration/overview.md), [env API](docs/integration/env-api.md), [ROS2 tutorial](docs/integration/ros2-tutorial.md).
 - Tool builders and evaluators: [runtime contract v1](docs/contracts/runtime-contract-v1.md), [conformance levels](docs/contracts/conformance.md), [evidence index](docs/evidence/index.md).
-- Limits and roadmap: [v1.0 direction](docs/project/v1-direction.md), [known limitations](docs/known-limitations.md), [roadmap to 1.0](docs/roadmap-to-1.0.md), [release notes](docs/releases/index.md).
+- Limits and roadmap: [v1.0 direction](docs/project/v1-direction.md), [known limitations](docs/known-limitations.md), [roadmap to 1.0](docs/roadmap-to-1.0.md), [v0.8 draft support boundary](docs/releases/v0.8.0.md), [release notes](docs/releases/index.md).
 
 ## benchmarks and evidence
 
@@ -139,12 +139,14 @@ ROS2 support is a thin host integration layer. The released baseline is Humble-f
 
 Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md), then read [ROS2 backend scope](docs/integration/ros2-backend-scope.md) and [host capability bundles](docs/integration/host-capability-bundles.md). Nav2 and MoveIt adapters are roadmap work unless a release note says otherwise.
 
-## VLA status
+## VLA and model-service status
 
-VLA/model support is currently experimental lifecycle infrastructure: submit, poll, cancel, timeout handling, BT node semantics, canonical logging, and an optional `muesli-model-service` bridge contract. The next release milestones are aimed at one real model-backed async capability path, selectable VLA backends configured outside BT source, host-side validation and rejection, deterministic replay cache support, and reproducible wheeled flagship evidence rather than broad provider coverage.
+VLA/model support is an experimental `v0.8` candidate surface. It includes submit, poll, cancel, timeout handling, BT node semantics, canonical logging, an optional `muesli-model-service` bridge, `MMSP v0.2` descriptor checks, stateless world-model `cap.call`, model-service VLA sessions, request/response hashes, replay-cache support, validation gates, deterministic fault injection, and a curated MiniVLA smoke/evidence path.
+
+The support boundary is deliberately narrow. `muesli-bt` must run without `muesli-model-service` unless a host configures model capabilities. Model outputs remain untrusted proposals until host-side validation accepts them. The current mock-host handoff proves the dispatch boundary and report shape, not physical robot dispatch. Production VLA providers, Nav2, MoveIt, and physical host dispatch are not part of the released support surface unless a release note says so.
 
 To start the optional external service from the `muslisp` command, use `muslisp --model-service-start --model-service-dir /path/to/muesli-model-service`.
-Camera images for remote VLA calls should be staged with the service frame-ingest endpoint and referenced as `frame://camera/latest`, not copied into the model-call JSON.
+Camera images for remote VLA calls should be staged with the service frame-ingest endpoint and referenced as `frame://camera1/latest` for live calls or immutable `frame://camera1/<timestamp>` refs for evidence, not copied into the model-call JSON.
 
 See [VLA integration](docs/bt/vla-integration.md), [model-service bridge](docs/integration/model-service-bridge.md), [VLA nodes](docs/bt/vla-nodes.md), and [known limitations](docs/known-limitations.md).
 

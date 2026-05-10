@@ -214,6 +214,7 @@ nav:
       - Contributing To Docs: contributing/docs-style-guide.md
   - Release Notes:
       - Overview: releases/index.md
+      - v0.8.0 Draft Support Boundary: releases/v0.8.0.md
       - v0.7.0: releases/v0.7.0.md
       - v0.6.0: releases/v0.6.0.md
       - v0.5.0: releases/v0.5.0.md

@@ -33,12 +33,14 @@ This page keeps the compact feature inventory that used to live in the root READ
 
 - capability registry: `cap.list`, `cap.describe`, `cap.call`;
 - deterministic capability fixture: `cap.echo.v1`;
+- optional model-service bridge candidate for world-model `cap.call` and VLA sessions;
+- model-service request/response hashes, replay cache, validation gates, fault injection, and release-safe evidence summaries;
 - async job API: `vla.submit`, `vla.poll`, `vla.cancel`;
 - stream-aware polling statuses: `:queued`, `:running`, `:streaming`, `:done`, `:error`, `:timeout`, `:cancelled`;
 - opaque media handles plus metadata accessors;
 - structured per-job logs.
 
-Production VLA provider transport, credentials, and robot safety validation are host-side work unless a concrete backend is documented and tested.
+Production VLA provider transport, credentials, and robot safety validation are host-side work unless a concrete backend is documented, tested, and listed in release notes.
 
 ## environment capability layer
 

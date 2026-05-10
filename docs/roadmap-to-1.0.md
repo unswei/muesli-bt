@@ -216,7 +216,7 @@ Further work should now move to correctness hardening, runtime measurement, asyn
 
 Status:
 
-- next planning milestone before broader `v0.8.0+` implementation expands further
+- complete on `main`; retained here as the planning record that keeps later implementation anchored to one flagship lane
 
 Focus:
 
@@ -454,6 +454,12 @@ Outcome taxonomy evidence:
 
 #### `v0.8.0`: real model-backed runtime and fault-injection path
 
+Status:
+
+- release candidate cleanup on `main`
+- core candidate pieces are implemented: optional `MMSP v0.2` bridge, descriptor hardening, stateless model `cap.call`, VLA session wiring, request/response hashes, replay cache, validation gates, deterministic fault injection, release-safe evidence redaction, standard MiniVLA evidence report, curated MiniVLA smoke path, and mock-host handoff evidence
+- remaining `v0.8.0` work is release hygiene: final docs/build verification, final support-boundary review, final evidence snapshot review, and explicit `status` operation coverage only if a supported backend requires it
+
 Focus:
 
 - move VLA support from stubbed orchestration to a real model-backed asynchronous service for the wheeled flagship lane
@@ -465,18 +471,18 @@ Focus:
 
 Scope:
 
-- complete the optional `muesli-model-service` bridge against `MMSP v0.2`: the first low-level `ws://` request/response client exists, stateless `cap.call` world-model requests can use it, the `describe` compatibility gate checks required public capability ids plus descriptor mode, schema, cancellation, deadline, freshness, and replay declarations, stateless calls have request/response hashes plus a request-hash keyed replay cache, the first stateless output validation gate rejects missing, stale, unsafe, or policy-violating proposals before host reach, stateless calls have deterministic fault schedules for invalid output, unsafe output, stale result, timeout, unavailable, and delay injection, the first VLA session adapter maps the existing `vla.submit` / `vla.poll` / `vla.cancel` lifecycle onto `MMSP v0.2` `start` / `step` / `cancel` / `close`, the first VLA `action_chunk` validation gate rejects malformed, stale, unsafe, late, or policy-violating proposals before host reach, session calls now carry `frame://` refs plus request/response hashes through replay-cache-backed VLA records, VLA session fault schedules cover timeout, delay, invalid output, unsafe output, stale frame, unavailable backend, and cancellation-late cases, model-backed evidence has release-safe redaction sidecars for prompts, raw frame refs, backend placement metadata, raw envelopes, request ids, session ids, and cache summaries, the MiniVLA replay report is standardised as the model-backed async evidence format with summary gates and per-condition record/replay parity, and the curated evidence path includes a validated mock-host action handoff; runtime hardening still needs explicit `status` operation coverage if required by a backend, physical or simulator host dispatch evidence, and evidence outputs
+- complete the optional `muesli-model-service` bridge against `MMSP v0.2`: the first low-level `ws://` request/response client exists, stateless `cap.call` world-model requests can use it, the `describe` compatibility gate checks required public capability ids plus descriptor mode, schema, cancellation, deadline, freshness, and replay declarations, stateless calls have request/response hashes plus a request-hash keyed replay cache, the first stateless output validation gate rejects missing, stale, unsafe, or policy-violating proposals before host reach, stateless calls have deterministic fault schedules for invalid output, unsafe output, stale result, timeout, unavailable, and delay injection, the first VLA session adapter maps the existing `vla.submit` / `vla.poll` / `vla.cancel` lifecycle onto `MMSP v0.2` `start` / `step` / `cancel` / `close`, the first VLA `action_chunk` validation gate rejects malformed, stale, unsafe, late, or policy-violating proposals before host reach, session calls now carry `frame://` refs plus request/response hashes through replay-cache-backed VLA records, VLA session fault schedules cover timeout, delay, invalid output, unsafe output, stale frame, unavailable backend, and cancellation-late cases, model-backed evidence has release-safe redaction sidecars for prompts, raw frame refs, backend placement metadata, raw envelopes, request ids, session ids, and cache summaries, the MiniVLA replay report is standardised as the model-backed async evidence format with summary gates and per-condition record/replay parity, and the curated evidence path includes a validated mock-host action handoff; physical or simulator host dispatch beyond the mock boundary remains `v0.9.0+`
 - use the initial public model capability ids `cap.model.world.rollout.v1`, `cap.model.world.score_trajectory.v1`, `cap.vla.action_chunk.v1`, and `cap.vla.propose_nav_goal.v1`
 - support the current VLA session response shape: `step` returns `status: "action_chunk"` and places proposed host actions under `output.actions`; those actions remain untrusted until host-side validation accepts them
 - keep live camera bytes outside model-call JSON by using HTTP frame ingest on the service side and `frame://` refs in model requests; `frame://.../latest` is a service-local handle, not reproducible evidence by itself
 - record model request refs, response hashes, and immutable resolved frame refs when available in replay artefacts; do not turn high-rate raw frame upload into the main canonical BT event stream by default
-- implement at least one real model backend behind the existing VLA service interface, preferably as a local process or HTTP backend that can be replayed deterministically from stored request and response records
+- retain at least one real model backend evidence path behind the existing VLA service interface; the current curated path uses MiniVLA through `muesli-model-service` and can replay deterministically from stored request and response records
 - integrate VLA as a transport-transparent asynchronous host capability, using selectable `muesli-model-service` backends such as SmolVLA or MiniVLA for the first practical path and OpenVLA-OFT as a heavier optional path; the BT source must remain independent of whether inference runs locally, on an edge server, over HTTP/ROS2, or from a replay cache
 - keep the current stub backend as a deterministic unit-test backend, not as the release evidence path
 - support submit, poll, timeout, cancellation, partial response, final response, response hashing, request hashing, replay from stored records, and backend failure reporting
 - define any additional flagship-specific capability names only after checking that the initial `MMSP v0.2` set cannot express the task cleanly
-- implement an injected latency and failure layer for VLA and planner backends, including delayed success, timeout, invalid action schema, unsafe action value, stale scene timestamp, dropped response, backend crash, and cancellation ignored until completion
-- implement first-class action validation before any VLA or planner output can reach `env.act` or a host capability execution call
+- maintain an injected latency and failure layer for model-service calls, including delayed success, timeout, invalid action schema, unsafe action value, stale frame, unavailable backend, and cancellation ignored until completion
+- keep first-class validation before any model-service proposal can reach host execution; `v0.8.0` proves this for stateless model outputs, VLA action chunks, and a mock-host handoff, while physical or simulator host dispatch remains later work
 - include validators for continuous bounds, max command delta, timestamp freshness, target frame validity, forbidden zones, Nav2 goal validity where available, and host-declared capability schema compliance
 - extend canonical logs with `vla_submit`, `vla_partial`, `vla_result`, `vla_cancel`, `vla_timeout`, `action_validation`, and `model_result_dropped` events, or their existing canonical equivalents if already named differently
 - keep the flagship wheeled demo polished, but make the evaluation focus in this milestone the model-latency and cancellation behaviour, not visual demo quality
@@ -527,7 +533,7 @@ capabilities:
 - provide validation result objects with valid/invalid status, reason code, field path, source capability or node, selected fallback, and whether the result was allowed to reach the host
 - add a standard replay record format for asynchronous capability calls, including request hash, request summary, response hash, response summary, backend identity, latency, deadline, validation outcome, cancellation outcome, stale-result status, and redaction markers where needed
 
-See also: [muesli-model-service bridge](integration/model-service-bridge.md) and [VLA backend integration plan](integration/vla-backend-integration-plan.md).
+See also: [muesli-model-service bridge](integration/model-service-bridge.md), [MiniVLA smoke evidence](evidence/minivla-smoke-evidence.md), [model-backed async evidence report](evidence/model-backed-async-evidence-report.md), and [VLA backend integration plan](integration/vla-backend-integration-plan.md).
 
 The VLA backend integration plan is a temporary planning document. Once the capability-native VLA backend path is implemented, documented through normal user-facing pages, covered by fixtures, and represented in release evidence, delete the planning page and replace roadmap links with the implementation docs and evidence pages.
 

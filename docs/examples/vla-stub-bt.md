@@ -1,7 +1,7 @@
 # Example: Async VLA Stub BT
 
 This script shows non-blocking VLA integration in a behaviour tree.
-It demonstrates the current repository scope: **stub integration + contract hooks** (not production model transport).
+It demonstrates the deterministic stub path. The optional model-service path is covered separately in the VLA and evidence docs.
 
 Script path:
 
@@ -22,8 +22,8 @@ What to look for:
 
 What is real vs placeholder:
 
-- real now: async API shape, cancellation path, BT orchestration, event logging
-- placeholder: provider auth/network integration (implemented by host backends)
+- real now: async API shape, cancellation path, BT orchestration, event logging, and optional model-service sessions when configured
+- placeholder here: provider auth/network integration, because this example intentionally uses the deterministic stub backend
 
 ## Source
 

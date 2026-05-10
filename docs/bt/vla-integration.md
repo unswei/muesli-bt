@@ -1,23 +1,26 @@
 # VLA Integration In BTs
 
 !!! note "status"
-    Status: released lifecycle hooks, deterministic stubs, and an optional model-service session adapter.
-    The runtime exposes submit, poll, cancel, timeout, BT node semantics, and canonical logging. Production provider transport and credentials remain outside the core runtime.
+    Status: released lifecycle hooks, deterministic stubs, and an experimental `v0.8` model-service session adapter.
+    The runtime exposes submit, poll, cancel, timeout, BT node semantics, canonical logging, validation gates, replay-cache metadata, and deterministic fault injection for the optional model-service path. Production provider transport and credentials remain outside the core runtime.
 
 This runtime exposes VLA access through [host](../terminology.md#host) capabilities and async jobs.
 
-Current repository scope: **stub integration + contract hooks**.
+Current repository scope: **released lifecycle hooks plus an experimental optional model-service path**.
 
 Implemented now:
 
 - async submit/poll/cancel interface and BT node semantics
 - cancellation and timeout behaviour in runtime lifecycle
 - canonical `mbt.evt.v1` logging for VLA events
+- optional `muesli-model-service` VLA session adapter for `cap.vla.action_chunk.v1`
+- validation gates for malformed, stale, unsafe, late, or policy-violating action chunks
+- request/response hashes, replay-cache hits, frame-ref tracking, and deterministic VLA fault injection for the optional model-service path
 
 Host-defined / optional in this repo:
 
 - production model/provider transport and credentials
-- remote inference hardening beyond stub/replay adapters
+- physical or simulator robot dispatch beyond the mock-host evidence path
 - `muesli-model-service` bridge transport and VLA session adapter, when the optional bridge is built and configured
 
 Key principles:

@@ -142,7 +142,7 @@ The `check` field sends a `describe` request before runtime use. The same gate i
 
 Release evidence should use the documented model-backed async evidence report and redaction boundary. Raw prompts, raw `frame://` refs, backend placement metadata, raw model-service envelopes, request ids, and session ids stay in private reproduction bundles. Release-safe summaries keep hashes, validation outcomes, replay status, and allowlisted public metadata. The curated MiniVLA path also includes a mock-host dispatch report: model outputs remain `host_reached=false` proposals until validation accepts them, then the mock handoff records `host_reached=true` at the host boundary.
 
-Still planned: richer replay reports and validation at host action dispatch.
+Still planned: explicit `status` operation coverage if a supported backend requires it, physical or simulator host dispatch evidence, broader production-provider support, and Nav2-backed flagship integration.
 
 The `muslisp` command can also start the external service in the foreground:
 

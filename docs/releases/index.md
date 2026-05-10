@@ -27,6 +27,7 @@ The changelog stays cumulative. Release notes stay tag-specific.
 
 Available release notes:
 
+- [v0.8.0 draft support boundary](v0.8.0.md)
 - [v0.7.0](v0.7.0.md)
 - [v0.6.0](v0.6.0.md)
 - [v0.5.0](v0.5.0.md)
@@ -43,7 +44,7 @@ If you are deciding which runtime tag to pin in `muesli-studio`, use the release
 ## gotchas
 
 - Release notes do not replace the changelog.
-- Unreleased changes belong in `CHANGELOG.md`, not in a future release note page.
+- Unreleased changes belong in `CHANGELOG.md`. Draft support-boundary pages may exist before a tag, but they must be clearly labelled as drafts.
 - Contract-affecting release notes should stay aligned with the compatibility policy.
 
 ## see also

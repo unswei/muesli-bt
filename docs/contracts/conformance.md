@@ -77,7 +77,7 @@ cmake --build --preset core-only -j
 ctest --preset core-only --output-on-failure
 ```
 
-This preset keeps `MUESLI_BT_BUILD_INTEGRATION_ROS2=OFF` explicitly, so reviewers can treat it as the supported cross-platform baseline.
+This preset keeps `MUESLI_BT_BUILD_INTEGRATION_ROS2=OFF` explicitly, so downstream users can treat it as the supported cross-platform baseline.
 
 Run the current Linux ROS2 validation locally on Ubuntu 22.04 + Humble:
 

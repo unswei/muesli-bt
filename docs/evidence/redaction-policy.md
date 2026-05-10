@@ -89,7 +89,7 @@ A release-safe cache summary keeps deterministic request and response hashes but
 
 ## gotchas
 
-- Release-safe does not mean secret-free in all deployments. Review the generated summaries before publication when a robot, lab, or backend setup is sensitive.
+- Release-safe does not mean secret-free in all deployments. Review the generated summaries before public release when a robot, lab, or backend setup is sensitive.
 - Raw caches are still required for deterministic replay. Do not delete them from private evidence bundles just because release-safe summaries exist.
 - Backend metadata is allowlisted. Public fields such as `backend`, `adapter`, `capability`, `service`, and `service_version` may appear. Placement details such as device names, model paths, and worker URLs are redacted.
 - The release-safe replay report keeps the standard model-backed async evidence structure, but replaces raw `frame://` refs with hashes.
