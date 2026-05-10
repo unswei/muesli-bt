@@ -54,7 +54,9 @@ Run the curated evidence path:
 ```bash
 python3 tools/evidence/run_minivla_smoke.py \
   --http-endpoint http://127.0.0.1:8765 \
-  --ws-endpoint ws://127.0.0.1:8765/v1/ws
+  --ws-endpoint ws://127.0.0.1:8765/v1/ws \
+  --service-release-tag v0.2.0 \
+  --service-git-commit be3ff75
 ```
 
 If port `8765` is already in use locally, use another tunnel port and pass matching endpoints:
@@ -63,7 +65,9 @@ If port `8765` is already in use locally, use another tunnel port and pass match
 ssh -L 18765:127.0.0.1:8765 magrathea
 python3 tools/evidence/run_minivla_smoke.py \
   --http-endpoint http://127.0.0.1:18765 \
-  --ws-endpoint ws://127.0.0.1:18765/v1/ws
+  --ws-endpoint ws://127.0.0.1:18765/v1/ws \
+  --service-release-tag v0.2.0 \
+  --service-git-commit be3ff75
 ```
 
 ## example
@@ -93,6 +97,8 @@ Expected artefacts:
 - `release_safe_cache_summary.json`
 - `release_safe_replay_report.json`
 - copied input frames under `frames/`
+
+The manifest records the exact `muesli-model-service` release tag and commit used for the run.
 
 The fixture images are in:
 

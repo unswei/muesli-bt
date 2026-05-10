@@ -647,6 +647,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--muslisp", type=Path, default=DEFAULT_MUSLISP)
     parser.add_argument("--poll-sleep-ms", type=int, default=50)
     parser.add_argument("--poll-count", type=int, default=1400)
+    parser.add_argument("--service-release-tag", default="")
+    parser.add_argument("--service-git-commit", default="")
     parser.add_argument("--no-replay", action="store_true")
     return parser.parse_args()
 
@@ -786,6 +788,8 @@ def main() -> int:
             "http_endpoint": args.http_endpoint,
             "ws_endpoint": args.ws_endpoint,
             "health": health,
+            "release_tag": args.service_release_tag or None,
+            "git_commit": args.service_git_commit or None,
             "capability": "cap.vla.action_chunk.v1",
             "backend": "minivla",
         },
