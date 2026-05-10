@@ -18,6 +18,10 @@ The runtime sends a `describe` request and verifies:
 - the response status is `success`
 - the response contains `output.capabilities`
 - required public capability ids are present
+- each required descriptor has the expected `mode`
+- each required descriptor declares request and response schemas
+- each required descriptor declares cancellation and deadline support
+- each required descriptor declares freshness and replay fields
 
 The first required capability set is:
 
@@ -38,6 +42,8 @@ Result fields:
 - `request_id`
 - `required_capabilities`
 - `missing_capabilities`
+- `invalid_capabilities`
+- `descriptor_errors`
 - `error_code`, when incompatible
 - `error`, when incompatible
 
@@ -54,7 +60,7 @@ Result fields:
 ## gotchas
 
 - This is a compatibility gate, not a health monitor.
-- It currently checks capability presence and descriptor envelope sanity. Deeper schema/mode checks are later bridge-hardening work.
+- It checks descriptor compatibility. It does not prove model quality, task fitness, or host-side action safety.
 - An unconfigured service returns `compatible=false`.
 
 ## see also

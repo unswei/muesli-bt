@@ -2288,10 +2288,27 @@ void test_model_service_protocol_skeleton() {
             out.status = bt::model_service_status::success;
             out.output_json =
                 "{\"capabilities\":["
-                "{\"id\":\"cap.model.world.rollout.v1\"},"
-                "{\"id\":\"cap.model.world.score_trajectory.v1\"},"
-                "{\"id\":\"cap.vla.action_chunk.v1\"},"
-                "{\"id\":\"cap.vla.propose_nav_goal.v1\"}"
+                "{\"id\":\"cap.model.world.rollout.v1\",\"mode\":\"invoke\","
+                "\"input_schema\":\"mms://schemas/cap.model.world.rollout.request.v1\","
+                "\"output_schema\":\"mms://schemas/cap.model.world.rollout.result.v1\","
+                "\"supports_cancel\":false,\"supports_deadline\":true,\"freshness\":{},"
+                "\"replay\":{\"supported\":true}},"
+                "{\"id\":\"cap.model.world.score_trajectory.v1\",\"mode\":\"invoke\","
+                "\"input_schema\":\"mms://schemas/cap.model.world.score_trajectory.request.v1\","
+                "\"output_schema\":\"mms://schemas/cap.model.world.score_trajectory.result.v1\","
+                "\"supports_cancel\":false,\"supports_deadline\":true,\"freshness\":{},"
+                "\"replay\":{\"supported\":true}},"
+                "{\"id\":\"cap.vla.action_chunk.v1\",\"mode\":\"session\","
+                "\"input_schema\":\"mms://schemas/cap.vla.action_chunk.request.v1\","
+                "\"output_schema\":\"mms://schemas/cap.vla.action_chunk.result.v1\","
+                "\"supports_cancel\":true,\"supports_deadline\":true,"
+                "\"freshness\":{\"expects_fresh_observation\":true},"
+                "\"replay\":{\"supported\":false}},"
+                "{\"id\":\"cap.vla.propose_nav_goal.v1\",\"mode\":\"invoke\","
+                "\"input_schema\":\"mms://schemas/cap.vla.propose_nav_goal.request.v1\","
+                "\"output_schema\":\"mms://schemas/cap.vla.propose_nav_goal.result.v1\","
+                "\"supports_cancel\":false,\"supports_deadline\":true,\"freshness\":{},"
+                "\"replay\":{\"supported\":true}}"
                 "]}";
             return out;
         }
@@ -2301,6 +2318,8 @@ void test_model_service_protocol_skeleton() {
         bt::check_model_service_compatibility(compatible_client);
     check(compatible.compatible, "complete describe response should be compatible");
     check(compatible.missing_capabilities.empty(), "compatible describe should not report missing capabilities");
+    check(compatible.invalid_capabilities.empty(), "compatible describe should not report invalid capabilities");
+    check(compatible.descriptor_errors.empty(), "compatible describe should not report descriptor errors");
 
     struct missing_describe_client final : bt::model_service_client {
         bt::model_service_response call(const bt::model_service_request& req) override {
@@ -2318,6 +2337,50 @@ void test_model_service_protocol_skeleton() {
     check(missing.error_code == "model_service_capability_missing",
           "missing describe response should report capability_missing");
     check(!missing.missing_capabilities.empty(), "missing describe response should list missing capabilities");
+
+    struct invalid_descriptor_client final : bt::model_service_client {
+        bt::model_service_response call(const bt::model_service_request& req) override {
+            bt::model_service_response out;
+            out.id = req.id;
+            out.status = bt::model_service_status::success;
+            out.output_json =
+                "{\"capabilities\":["
+                "{\"id\":\"cap.model.world.rollout.v1\",\"mode\":\"invoke\","
+                "\"input_schema\":\"mms://schemas/cap.model.world.rollout.request.v1\","
+                "\"output_schema\":\"mms://schemas/cap.model.world.rollout.result.v1\","
+                "\"supports_cancel\":false,\"supports_deadline\":true,\"freshness\":{},"
+                "\"replay\":{\"supported\":true}},"
+                "{\"id\":\"cap.model.world.score_trajectory.v1\",\"mode\":\"invoke\","
+                "\"input_schema\":\"mms://schemas/cap.model.world.score_trajectory.request.v1\","
+                "\"output_schema\":\"mms://schemas/cap.model.world.score_trajectory.result.v1\","
+                "\"supports_cancel\":false,\"supports_deadline\":true,\"freshness\":{},"
+                "\"replay\":{\"supported\":true}},"
+                "{\"id\":\"cap.vla.action_chunk.v1\",\"mode\":\"invoke\","
+                "\"input_schema\":\"mms://schemas/cap.vla.action_chunk.request.v1\","
+                "\"output_schema\":\"mms://schemas/cap.vla.action_chunk.result.v1\","
+                "\"supports_cancel\":false,\"supports_deadline\":true,"
+                "\"freshness\":{\"expects_fresh_observation\":false},"
+                "\"replay\":{\"supported\":false}},"
+                "{\"id\":\"cap.vla.propose_nav_goal.v1\",\"mode\":\"invoke\","
+                "\"input_schema\":\"mms://schemas/cap.vla.propose_nav_goal.request.v1\","
+                "\"output_schema\":\"mms://schemas/cap.vla.propose_nav_goal.result.v1\","
+                "\"supports_cancel\":false,\"supports_deadline\":true,\"freshness\":{},"
+                "\"replay\":{\"supported\":true}}"
+                "]}";
+            return out;
+        }
+    };
+    invalid_descriptor_client invalid_descriptor;
+    const bt::model_service_compatibility_result invalid_compatibility =
+        bt::check_model_service_compatibility(invalid_descriptor);
+    check(!invalid_compatibility.compatible, "invalid descriptor response should be incompatible");
+    check(invalid_compatibility.error_code == "model_service_descriptor_invalid",
+          "invalid descriptor response should report descriptor_invalid");
+    check(invalid_compatibility.invalid_capabilities.size() == 1 &&
+              invalid_compatibility.invalid_capabilities.front() == "cap.vla.action_chunk.v1",
+          "invalid descriptor response should report the invalid capability");
+    check(!invalid_compatibility.descriptor_errors.empty(),
+          "invalid descriptor response should include descriptor diagnostics");
 
     struct replay_fake_client final : bt::model_service_client {
         int calls = 0;

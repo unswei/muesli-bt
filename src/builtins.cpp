@@ -2746,6 +2746,12 @@ value model_service_compatibility_to_lisp(const bt::model_service_compatibility_
     value missing = string_vector_to_lisp_list(result.missing_capabilities);
     roots.add(&missing);
     map_set_symbol(out, "missing_capabilities", missing);
+    value invalid = string_vector_to_lisp_list(result.invalid_capabilities);
+    roots.add(&invalid);
+    map_set_symbol(out, "invalid_capabilities", invalid);
+    value descriptor_errors = string_vector_to_lisp_list(result.descriptor_errors);
+    roots.add(&descriptor_errors);
+    map_set_symbol(out, "descriptor_errors", descriptor_errors);
     return out;
 }
 

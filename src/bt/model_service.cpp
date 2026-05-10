@@ -203,6 +203,194 @@ std::unordered_map<std::string, std::string> parse_top_level_object(std::string_
     return out;
 }
 
+std::string_view trim_json_view(std::string_view text) {
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front()))) {
+        text.remove_prefix(1);
+    }
+    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back()))) {
+        text.remove_suffix(1);
+    }
+    return text;
+}
+
+std::optional<std::string> json_string_value(const std::unordered_map<std::string, std::string>& object,
+                                             std::string_view field) {
+    const auto it = object.find(std::string(field));
+    if (it == object.end()) {
+        return std::nullopt;
+    }
+    const std::string_view raw = trim_json_view(it->second);
+    if (raw.size() < 2 || raw.front() != '"' || raw.back() != '"') {
+        return std::nullopt;
+    }
+    return unquote_json_string(raw);
+}
+
+std::optional<bool> json_bool_value(const std::unordered_map<std::string, std::string>& object,
+                                    std::string_view field) {
+    const auto it = object.find(std::string(field));
+    if (it == object.end()) {
+        return std::nullopt;
+    }
+    const std::string_view raw = trim_json_view(it->second);
+    if (raw == "true") {
+        return true;
+    }
+    if (raw == "false") {
+        return false;
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> json_object_value(const std::unordered_map<std::string, std::string>& object,
+                                             std::string_view field) {
+    const auto it = object.find(std::string(field));
+    if (it == object.end()) {
+        return std::nullopt;
+    }
+    const std::string_view raw = trim_json_view(it->second);
+    if (raw.size() < 2 || raw.front() != '{' || raw.back() != '}') {
+        return std::nullopt;
+    }
+    return std::string(raw);
+}
+
+bool has_non_empty_json_string(const std::unordered_map<std::string, std::string>& object, std::string_view field) {
+    const std::optional<std::string> value = json_string_value(object, field);
+    return value.has_value() && !value->empty();
+}
+
+std::vector<std::string> parse_top_level_object_array(std::string_view text) {
+    std::vector<std::string> out;
+    std::size_t pos = 0;
+    skip_ws(text, pos);
+    if (pos >= text.size() || text[pos] != '[') {
+        return out;
+    }
+    ++pos;
+    while (pos < text.size()) {
+        skip_ws(text, pos);
+        if (pos >= text.size() || text[pos] == ']') {
+            break;
+        }
+        const std::size_t value_begin = pos;
+        const std::size_t value_end = scan_json_value(text, pos);
+        const std::string_view raw = trim_json_view(text.substr(value_begin, value_end - value_begin));
+        if (raw.size() >= 2 && raw.front() == '{' && raw.back() == '}') {
+            out.emplace_back(raw);
+        }
+        pos = value_end;
+        skip_ws(text, pos);
+        if (pos < text.size() && text[pos] == ',') {
+            ++pos;
+        }
+    }
+    return out;
+}
+
+std::optional<std::string> find_capability_descriptor(std::string_view output_json, std::string_view capability) {
+    const auto root = parse_top_level_object(output_json);
+    const auto capabilities_it = root.find("capabilities");
+    if (capabilities_it == root.end()) {
+        return std::nullopt;
+    }
+    for (const std::string& descriptor : parse_top_level_object_array(capabilities_it->second)) {
+        const auto fields = parse_top_level_object(descriptor);
+        const std::optional<std::string> id = json_string_value(fields, "id");
+        if (id.has_value() && *id == capability) {
+            return descriptor;
+        }
+    }
+    return std::nullopt;
+}
+
+struct model_service_descriptor_expectation {
+    std::string_view capability;
+    std::string_view mode;
+    bool requires_cancel;
+    bool requires_fresh_observation;
+};
+
+std::optional<model_service_descriptor_expectation>
+descriptor_expectation_for(std::string_view capability) {
+    static constexpr model_service_descriptor_expectation expectations[] = {
+        {"cap.model.world.rollout.v1", "invoke", false, false},
+        {"cap.model.world.score_trajectory.v1", "invoke", false, false},
+        {"cap.vla.action_chunk.v1", "session", true, true},
+        {"cap.vla.propose_nav_goal.v1", "invoke", false, false},
+    };
+    for (const model_service_descriptor_expectation& expectation : expectations) {
+        if (expectation.capability == capability) {
+            return expectation;
+        }
+    }
+    return std::nullopt;
+}
+
+void validate_capability_descriptor(std::string_view capability,
+                                    std::string_view descriptor_json,
+                                    std::vector<std::string>& descriptor_errors) {
+    const auto fields = parse_top_level_object(descriptor_json);
+    const auto expectation = descriptor_expectation_for(capability);
+    const auto add_error = [&](std::string_view message) {
+        std::ostringstream out;
+        out << capability << ": " << message;
+        descriptor_errors.push_back(out.str());
+    };
+
+    const std::optional<std::string> mode = json_string_value(fields, "mode");
+    if (!mode.has_value() || mode->empty()) {
+        add_error("descriptor is missing string mode");
+    } else if (expectation.has_value() && *mode != expectation->mode) {
+        std::ostringstream out;
+        out << "descriptor mode is '" << *mode << "', expected '" << expectation->mode << "'";
+        add_error(out.str());
+    }
+
+    if (!has_non_empty_json_string(fields, "input_schema")) {
+        add_error("descriptor is missing string input_schema");
+    }
+    if (!has_non_empty_json_string(fields, "output_schema")) {
+        add_error("descriptor is missing string output_schema");
+    }
+
+    const std::optional<bool> supports_cancel = json_bool_value(fields, "supports_cancel");
+    if (!supports_cancel.has_value()) {
+        add_error("descriptor is missing boolean supports_cancel");
+    } else if (expectation.has_value() && expectation->requires_cancel && !*supports_cancel) {
+        add_error("descriptor must support cancellation for this capability");
+    }
+
+    const std::optional<bool> supports_deadline = json_bool_value(fields, "supports_deadline");
+    if (!supports_deadline.has_value()) {
+        add_error("descriptor is missing boolean supports_deadline");
+    } else if (!*supports_deadline) {
+        add_error("descriptor must support deadlines");
+    }
+
+    const std::optional<std::string> freshness = json_object_value(fields, "freshness");
+    if (!freshness.has_value()) {
+        add_error("descriptor is missing freshness object");
+    } else if (expectation.has_value() && expectation->requires_fresh_observation) {
+        const auto freshness_fields = parse_top_level_object(*freshness);
+        const std::optional<bool> expects_fresh_observation =
+            json_bool_value(freshness_fields, "expects_fresh_observation");
+        if (!expects_fresh_observation.has_value() || !*expects_fresh_observation) {
+            add_error("descriptor freshness must require fresh observations");
+        }
+    }
+
+    const std::optional<std::string> replay = json_object_value(fields, "replay");
+    if (!replay.has_value()) {
+        add_error("descriptor is missing replay object");
+    } else {
+        const auto replay_fields = parse_top_level_object(*replay);
+        if (!json_bool_value(replay_fields, "supported").has_value()) {
+            add_error("descriptor replay object is missing boolean supported");
+        }
+    }
+}
+
 model_service_status status_from_name(const std::string& status) {
     if (status == "success") {
         return model_service_status::success;
@@ -241,12 +429,6 @@ model_service_status status_from_name(const std::string& status) {
         return model_service_status::internal_error;
     }
     return model_service_status::unavailable;
-}
-
-bool contains_json_string_field(std::string_view text, std::string_view field, std::string_view value) {
-    std::ostringstream needle;
-    needle << '"' << field << "\":\"" << value << '"';
-    return text.find(needle.str()) != std::string_view::npos;
 }
 
 bool contains_json_bool_field(std::string_view text, std::string_view field, bool value) {
@@ -644,13 +826,25 @@ check_model_service_compatibility(model_service_client& client,
     }
 
     for (const std::string& capability : result.required_capabilities) {
-        if (!contains_json_string_field(response.output_json, "id", capability)) {
+        const std::optional<std::string> descriptor = find_capability_descriptor(response.output_json, capability);
+        if (!descriptor.has_value()) {
             result.missing_capabilities.push_back(capability);
+            continue;
+        }
+        const std::size_t errors_before = result.descriptor_errors.size();
+        validate_capability_descriptor(capability, *descriptor, result.descriptor_errors);
+        if (result.descriptor_errors.size() != errors_before) {
+            result.invalid_capabilities.push_back(capability);
         }
     }
     if (!result.missing_capabilities.empty()) {
         result.error_code = "model_service_capability_missing";
         result.error_message = "describe response is missing required model-service capabilities";
+        return result;
+    }
+    if (!result.invalid_capabilities.empty()) {
+        result.error_code = "model_service_descriptor_invalid";
+        result.error_message = "describe response contains incompatible model-service capability descriptors";
         return result;
     }
 

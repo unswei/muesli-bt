@@ -94,6 +94,8 @@ struct model_service_compatibility_result {
     std::string error_message;
     std::vector<std::string> required_capabilities{};
     std::vector<std::string> missing_capabilities{};
+    std::vector<std::string> invalid_capabilities{};
+    std::vector<std::string> descriptor_errors{};
 };
 
 class model_service_client {

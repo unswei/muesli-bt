@@ -138,9 +138,9 @@ The same request-hash replay cache is used for VLA sessions. The `model-service`
 
 Deterministic fault injection is available through `fault_schedule`. Entries are consumed in order for non-replay calls. Supported entries are `none`, `delay:<ms>`, `timeout`, `unavailable`, `backend_unavailable`, `unavailable_backend`, `invalid_output`, `unsafe_output`, `stale_result`, `stale_frame`, `policy_violation`, and `cancellation_late`. This is intended for reproducible validation and evidence runs, not as a production retry policy.
 
-The `check` field sends a `describe` request and verifies the first required `MMSP v0.2` capability ids are present before runtime use. The same gate is available explicitly as `(model-service.check)`.
+The `check` field sends a `describe` request before runtime use. The same gate is available explicitly as `(model-service.check)`. The gate verifies protocol version, successful status, required public capability ids, expected descriptor modes, schema fields, cancellation and deadline declarations, freshness declarations, and replay declarations. Incompatible descriptors return `compatible=false` with `invalid_capabilities` and `descriptor_errors`.
 
-Still planned: deeper descriptor schema/mode checks, redaction, richer replay reports, and validation at host action dispatch.
+Still planned: redaction, richer replay reports, and validation at host action dispatch.
 
 The `muslisp` command can also start the external service in the foreground:
 
