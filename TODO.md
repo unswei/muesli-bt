@@ -60,6 +60,7 @@ Use the public `v1.0` direction page under `docs/project/v1-direction.md` for th
 - `v0.8.0`: extend request/response hashing and replay-cache support from stateless `cap.call` to VLA sessions, including `frame://` refs, response hashes, replay-cache hit reporting, and VLA records
 - `v0.8.0`: add deterministic VLA session fault injection for timeout, delay, invalid output, unsafe output, stale frame, unavailable backend, and cancellation-late cases
 - `v0.8.0`: add a release-safe redaction boundary for model-backed evidence, covering prompts, raw frame refs, backend placement metadata, raw model-service envelopes, request ids, session ids, and cache summaries
+- `v0.8.0`: standardise the curated MiniVLA replay report as the model-backed async evidence format, including summary gates, per-condition record/replay parity, request/response hashes, validation status, replay-cache status, and host-reach outcomes
 - `v0.5.0`: publish the final release notes from the green release baseline
 - `v0.6.0`: define host capability bundle naming and registration rules without changing BT or Lisp semantics
 - `v0.6.0`: make the boundary between `env.*`, `planner.plan`, and external host capabilities explicit in docs and examples

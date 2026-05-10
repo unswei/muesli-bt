@@ -173,6 +173,7 @@ nav:
           - Isaac H1 Demo Source: examples/isaac-h1-ros2-demo-source.md
   - Evidence:
       - Evidence Index: evidence/index.md
+      - Model-backed Async Evidence Report: evidence/model-backed-async-evidence-report.md
       - Release-safe Redaction Policy: evidence/redaction-policy.md
       - MiniVLA Smoke Evidence: evidence/minivla-smoke-evidence.md
       - Index: contracts/README.md

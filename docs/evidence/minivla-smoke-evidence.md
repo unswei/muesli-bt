@@ -25,7 +25,8 @@ For each frame, the runner:
 - writes canonical `events.jsonl`
 - writes request-hash keyed response cache files under `model-service-cache/`
 - runs a replay pass using the recorded cache
-- writes `replay_report.json` with request hash, response hash, frame ref, replay hit, validation, and action-parity checks
+- writes `replay_report.json` using the standard model-backed async evidence report format
+- records request hashes, response hashes, frame refs, replay hits, validation results, host-reach outcomes, and action-parity checks
 - writes release-safe sidecars that redact prompts, raw frame refs, backend placement metadata, request ids, session ids, and raw cache envelopes
 
 The model output remains a proposal. The evidence report marks accepted outputs as host-safe proposals and keeps `host_reached=false`.
@@ -107,6 +108,7 @@ fixtures/model-service/minivla-smoke/
 
 ## see also
 
+- [model-backed async evidence report](model-backed-async-evidence-report.md)
 - [muesli-model-service bridge](../integration/model-service-bridge.md)
 - [release-safe redaction policy](redaction-policy.md)
 - [VLA backend integration plan](../integration/vla-backend-integration-plan.md)

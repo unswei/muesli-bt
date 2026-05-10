@@ -19,6 +19,9 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_FIXTURE = REPO_ROOT / "fixtures/model-service/minivla-smoke"
 DEFAULT_MUSLISP = REPO_ROOT / "build/model-service-bridge-test/muslisp"
+MODEL_ASYNC_REPORT_SCHEMA = "muesli-bt.model_async_evidence_report.v1"
+RELEASE_SAFE_MODEL_ASYNC_REPORT_SCHEMA = "muesli-bt.release_safe_model_async_evidence_report.v1"
+MODEL_ASYNC_REPORT_PROFILE = "model_service.vla_action_chunk_smoke.v1"
 MINIVLA_SMOKE_INSTRUCTION = "Given the camera image, propose one safe low-speed robot action chunk."
 RELEASE_METADATA_ALLOWLIST = {
     "adapter",
@@ -241,43 +244,49 @@ def redact_cache_index(entries: list[dict[str, object]]) -> dict[str, object]:
 
 
 def redact_replay_report(report: dict[str, object]) -> dict[str, object]:
-    comparisons = report.get("comparisons", [])
-    redacted_comparisons: list[dict[str, object]] = []
-    if isinstance(comparisons, list):
-        for comparison in comparisons:
-            if not isinstance(comparison, dict):
+    conditions = report.get("conditions", [])
+    redacted_conditions: list[dict[str, object]] = []
+    if isinstance(conditions, list):
+        for condition in conditions:
+            if not isinstance(condition, dict):
                 continue
-            frame_refs = comparison.get("frame_refs", [])
-            redacted_comparisons.append(
+            artefacts = condition.get("artefacts", {})
+            frame_refs = artefacts.get("frame_refs", []) if isinstance(artefacts, dict) else []
+            redacted_artefacts = {
+                "request_hashes": artefacts.get("request_hashes", []) if isinstance(artefacts, dict) else [],
+                "response_hashes": artefacts.get("response_hashes", []) if isinstance(artefacts, dict) else [],
+                "frame_ref_hashes": [redact_ref(ref) for ref in frame_refs] if isinstance(frame_refs, list) else [],
+            }
+            redacted_conditions.append(
                 {
-                    "record_status": comparison.get("record_status"),
-                    "record_final_status": comparison.get("record_final_status"),
-                    "replay_status": comparison.get("replay_status"),
-                    "replay_final_status": comparison.get("replay_final_status"),
-                    "record_validation": comparison.get("record_validation"),
-                    "replay_validation": comparison.get("replay_validation"),
-                    "actions_match": comparison.get("actions_match"),
-                    "frame_refs_match": comparison.get("frame_refs_match"),
-                    "request_hashes_match": comparison.get("request_hashes_match"),
-                    "response_hashes_match": comparison.get("response_hashes_match"),
-                    "record_replay_cache_hit": comparison.get("record_replay_cache_hit"),
-                    "replay_cache_hit": comparison.get("replay_cache_hit"),
-                    "request_hashes": comparison.get("request_hashes", []),
-                    "response_hashes": comparison.get("response_hashes", []),
-                    "frame_ref_hashes": [redact_ref(ref) for ref in frame_refs] if isinstance(frame_refs, list) else [],
+                    "condition_id": condition.get("condition_id"),
+                    "capability": condition.get("capability"),
+                    "operation_path": condition.get("operation_path", []),
+                    "record": condition.get("record", {}),
+                    "replay": condition.get("replay", {}),
+                    "parity": condition.get("parity", {}),
+                    "artefacts": redacted_artefacts,
                 }
             )
+    summary = report.get("summary", {}) if isinstance(report.get("summary"), dict) else {}
     return {
-        "schema": "muesli-bt.release_safe_replay_report.v1",
-        "record_result_count": report.get("record_result_count"),
-        "replay_result_count": report.get("replay_result_count"),
-        "all_actions_match": report.get("all_actions_match"),
-        "all_replay_hits": report.get("all_replay_hits"),
-        "all_request_hashes_match": report.get("all_request_hashes_match"),
-        "all_response_hashes_match": report.get("all_response_hashes_match"),
-        "all_record_actions_host_safe": report.get("all_record_actions_host_safe"),
-        "all_replay_actions_host_safe": report.get("all_replay_actions_host_safe"),
-        "comparisons": redacted_comparisons,
+        "schema": RELEASE_SAFE_MODEL_ASYNC_REPORT_SCHEMA,
+        "profile": report.get("profile"),
+        "capability": report.get("capability"),
+        "service_protocol": report.get("service_protocol"),
+        "transport": report.get("transport"),
+        "redaction": "raw frame refs and raw model-service envelopes are private to the raw evidence bundle",
+        "summary": summary,
+        "gates": report.get("gates", []),
+        "conditions": redacted_conditions,
+        "record_result_count": summary.get("record_result_count"),
+        "replay_result_count": summary.get("replay_result_count"),
+        "all_actions_match": summary.get("all_actions_match"),
+        "all_replay_hits": summary.get("all_replay_hits"),
+        "all_request_hashes_match": summary.get("all_request_hashes_match"),
+        "all_response_hashes_match": summary.get("all_response_hashes_match"),
+        "all_record_actions_host_safe": summary.get("all_record_actions_host_safe"),
+        "all_replay_actions_host_safe": summary.get("all_replay_actions_host_safe"),
     }
 
 
@@ -425,52 +434,116 @@ def index_cache(run_dir: Path) -> list[dict[str, object]]:
     return entries
 
 
-def build_report(record_rows: list[dict[str, object]], replay_rows: list[dict[str, object]]) -> dict[str, object]:
-    comparisons = []
-    for record, replay in zip(record_rows, replay_rows, strict=False):
+def build_report(record_rows: list[dict[str, object]],
+                 replay_rows: list[dict[str, object]],
+                 condition_ids: list[str] | None = None) -> dict[str, object]:
+    conditions = []
+    for index, (record, replay) in enumerate(zip(record_rows, replay_rows, strict=False), start=1):
         record_final = record.get("final", {}) if isinstance(record.get("final"), dict) else {}
         replay_final = replay.get("final", {}) if isinstance(replay.get("final"), dict) else {}
         record_ms = record_final.get("model_service", {}) if isinstance(record_final.get("model_service"), dict) else {}
         replay_ms = replay_final.get("model_service", {}) if isinstance(replay_final.get("model_service"), dict) else {}
         record_validation = validate_action(record)
         replay_validation = validate_action(replay)
-        comparisons.append(
+        condition_id = (
+            condition_ids[index - 1]
+            if condition_ids is not None and index - 1 < len(condition_ids)
+            else str(record.get("task_id") or record.get("id") or f"condition-{index:03d}")
+        )
+        request_hashes_match = record_ms.get("request_hashes") == replay_ms.get("request_hashes")
+        response_hashes_match = record_ms.get("response_hashes") == replay_ms.get("response_hashes")
+        frame_refs_match = record_ms.get("frame_refs") == replay_ms.get("frame_refs")
+        actions_match = record_final.get("action") == replay_final.get("action")
+        conditions.append(
             {
-                "record_status": record.get("status"),
-                "record_final_status": record_final.get("status"),
-                "replay_status": replay.get("status"),
-                "replay_final_status": replay_final.get("status"),
-                "record_validation": record_validation,
-                "replay_validation": replay_validation,
-                "actions_match": record_final.get("action") == replay_final.get("action"),
-                "frame_refs_match": record_ms.get("frame_refs") == replay_ms.get("frame_refs"),
-                "request_hashes_match": record_ms.get("request_hashes") == replay_ms.get("request_hashes"),
-                "response_hashes_match": record_ms.get("response_hashes") == replay_ms.get("response_hashes"),
-                "record_replay_cache_hit": record_ms.get("replay_cache_hit"),
-                "replay_cache_hit": replay_ms.get("replay_cache_hit"),
-                "request_hashes": record_ms.get("request_hashes", []),
-                "response_hashes": record_ms.get("response_hashes", []),
-                "frame_refs": record_ms.get("frame_refs", []),
+                "condition_id": condition_id,
+                "capability": "cap.vla.action_chunk.v1",
+                "operation_path": ["start", "step", "close"],
+                "record": {
+                    "status": record.get("status"),
+                    "final_status": record_final.get("status"),
+                    "validation": record_validation,
+                    "replay_cache_hit": record_ms.get("replay_cache_hit"),
+                    "host_reached": record_validation.get("host_reached"),
+                },
+                "replay": {
+                    "status": replay.get("status"),
+                    "final_status": replay_final.get("status"),
+                    "validation": replay_validation,
+                    "replay_cache_hit": replay_ms.get("replay_cache_hit"),
+                    "host_reached": replay_validation.get("host_reached"),
+                },
+                "parity": {
+                    "actions_match": actions_match,
+                    "frame_refs_match": frame_refs_match,
+                    "request_hashes_match": request_hashes_match,
+                    "response_hashes_match": response_hashes_match,
+                },
+                "artefacts": {
+                    "request_hashes": record_ms.get("request_hashes", []),
+                    "response_hashes": record_ms.get("response_hashes", []),
+                    "frame_refs": record_ms.get("frame_refs", []),
+                },
             }
         )
-    return {
-        "schema": "muesli-bt.minivla.replay_report.v1",
+    summary = {
         "record_result_count": len(record_rows),
         "replay_result_count": len(replay_rows),
-        "all_actions_match": all(c["actions_match"] for c in comparisons),
-        "all_replay_hits": all(c["replay_cache_hit"] is True for c in comparisons),
-        "all_request_hashes_match": all(c["request_hashes_match"] for c in comparisons),
-        "all_response_hashes_match": all(c["response_hashes_match"] for c in comparisons),
+        "condition_count": len(conditions),
+        "all_actions_match": all(c["parity"]["actions_match"] for c in conditions),
+        "all_replay_hits": all(c["replay"]["replay_cache_hit"] is True for c in conditions),
+        "all_request_hashes_match": all(c["parity"]["request_hashes_match"] for c in conditions),
+        "all_response_hashes_match": all(c["parity"]["response_hashes_match"] for c in conditions),
+        "all_frame_refs_match": all(c["parity"]["frame_refs_match"] for c in conditions),
         "all_record_actions_host_safe": all(
-            c["record_validation"]["validation_status"] == "accepted" and c["record_validation"]["host_reached"] is False
-            for c in comparisons
+            c["record"]["validation"]["validation_status"] == "accepted" and c["record"]["host_reached"] is False
+            for c in conditions
         ),
         "all_replay_actions_host_safe": all(
-            c["replay_validation"]["validation_status"] == "accepted" and c["replay_validation"]["host_reached"] is False
-            for c in comparisons
+            c["replay"]["validation"]["validation_status"] == "accepted" and c["replay"]["host_reached"] is False
+            for c in conditions
         ),
-        "comparisons": comparisons,
     }
+    gates = [
+        {
+            "name": "record_completed",
+            "required": True,
+            "passed": summary["record_result_count"] == summary["condition_count"],
+        },
+        {
+            "name": "replay_completed",
+            "required": True,
+            "passed": summary["replay_result_count"] == summary["condition_count"],
+        },
+        {"name": "replay_cache_hit", "required": True, "passed": summary["all_replay_hits"]},
+        {"name": "action_parity", "required": True, "passed": summary["all_actions_match"]},
+        {"name": "request_hash_parity", "required": True, "passed": summary["all_request_hashes_match"]},
+        {"name": "response_hash_parity", "required": True, "passed": summary["all_response_hashes_match"]},
+        {"name": "frame_ref_parity", "required": True, "passed": summary["all_frame_refs_match"]},
+        {"name": "record_host_reached_zero", "required": True, "passed": summary["all_record_actions_host_safe"]},
+        {"name": "replay_host_reached_zero", "required": True, "passed": summary["all_replay_actions_host_safe"]},
+    ]
+    report = {
+        "schema": MODEL_ASYNC_REPORT_SCHEMA,
+        "profile": MODEL_ASYNC_REPORT_PROFILE,
+        "capability": "cap.vla.action_chunk.v1",
+        "service_protocol": "MMSP v0.2",
+        "transport": "model-service websocket plus HTTP frame ingest",
+        "evidence_kind": "model_backed_async_replay",
+        "summary": summary,
+        "gates": gates,
+        "conditions": conditions,
+        "legacy_schema": "muesli-bt.minivla.replay_report.v1",
+        "record_result_count": summary["record_result_count"],
+        "replay_result_count": summary["replay_result_count"],
+        "all_actions_match": summary["all_actions_match"],
+        "all_replay_hits": summary["all_replay_hits"],
+        "all_request_hashes_match": summary["all_request_hashes_match"],
+        "all_response_hashes_match": summary["all_response_hashes_match"],
+        "all_record_actions_host_safe": summary["all_record_actions_host_safe"],
+        "all_replay_actions_host_safe": summary["all_replay_actions_host_safe"],
+    }
+    return report
 
 
 def parse_args() -> argparse.Namespace:
@@ -584,7 +657,8 @@ def main() -> int:
 
     cache_index = index_cache(run_dir)
     write_json(run_dir / "request_response_cache_index.json", {"files": cache_index})
-    replay_report = build_report(record_results, replay_results) if replay_results else {}
+    condition_ids = [str(frame["name"]) for frame in uploaded_frames]
+    replay_report = build_report(record_results, replay_results, condition_ids) if replay_results else {}
     write_json(run_dir / "replay_report.json", replay_report)
     redaction_policy = release_redaction_policy()
     release_safe_prompt_summary = {

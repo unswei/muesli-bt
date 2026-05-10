@@ -91,10 +91,12 @@ A release-safe cache summary keeps deterministic request and response hashes but
 - Release-safe does not mean secret-free in all deployments. Review the generated summaries before publication when a robot, lab, or backend setup is sensitive.
 - Raw caches are still required for deterministic replay. Do not delete them from private evidence bundles just because release-safe summaries exist.
 - Backend metadata is allowlisted. Public fields such as `backend`, `adapter`, `capability`, `service`, and `service_version` may appear. Placement details such as device names, model paths, and worker URLs are redacted.
+- The release-safe replay report keeps the standard model-backed async evidence structure, but replaces raw `frame://` refs with hashes.
 - Frame images are not redacted by this policy. Only use checked-in, curated, non-sensitive fixture frames for release evidence.
 
 ## see also
 
 - [MiniVLA smoke evidence](minivla-smoke-evidence.md)
+- [model-backed async evidence report](model-backed-async-evidence-report.md)
 - [muesli-model-service bridge](../integration/model-service-bridge.md)
 - [event log](../observability/event-log.md)

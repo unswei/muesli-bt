@@ -140,7 +140,7 @@ Deterministic fault injection is available through `fault_schedule`. Entries are
 
 The `check` field sends a `describe` request before runtime use. The same gate is available explicitly as `(model-service.check)`. The gate verifies protocol version, successful status, required public capability ids, expected descriptor modes, schema fields, cancellation and deadline declarations, freshness declarations, and replay declarations. Incompatible descriptors return `compatible=false` with `invalid_capabilities` and `descriptor_errors`.
 
-Release evidence should use the documented redaction boundary. Raw prompts, raw `frame://` refs, backend placement metadata, raw model-service envelopes, request ids, and session ids stay in private reproduction bundles. Release-safe summaries keep hashes, validation outcomes, replay status, and allowlisted public metadata.
+Release evidence should use the documented model-backed async evidence report and redaction boundary. Raw prompts, raw `frame://` refs, backend placement metadata, raw model-service envelopes, request ids, and session ids stay in private reproduction bundles. Release-safe summaries keep hashes, validation outcomes, replay status, and allowlisted public metadata.
 
 Still planned: richer replay reports and validation at host action dispatch.
 
@@ -295,6 +295,7 @@ The host bridge maps the request to `MMSP v0.2`, validates the response, emits c
 
 - [VLA integration](../bt/vla-integration.md)
 - [VLA backend integration plan](vla-backend-integration-plan.md)
+- [Model-backed async evidence report](../evidence/model-backed-async-evidence-report.md)
 - [Release-safe redaction policy](../evidence/redaction-policy.md)
 - [Host capability bundles](host-capability-bundles.md)
 - [cap.call](../language/reference/builtins/cap/cap-call.md)
