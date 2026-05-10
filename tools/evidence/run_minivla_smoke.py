@@ -115,6 +115,7 @@ def release_redaction_policy() -> dict[str, object]:
             "release_safe_model_service_describe.json",
             "release_safe_cache_summary.json",
             "release_safe_replay_report.json",
+            "mock_host_dispatch_report.json",
         ],
         "rules": {
             "prompts": "replace prompt text with SHA-256 and character count",
@@ -266,6 +267,7 @@ def redact_replay_report(report: dict[str, object]) -> dict[str, object]:
                     "replay": condition.get("replay", {}),
                     "parity": condition.get("parity", {}),
                     "artefacts": redacted_artefacts,
+                    "host_dispatch": condition.get("host_dispatch"),
                 }
             )
     summary = report.get("summary", {}) if isinstance(report.get("summary"), dict) else {}
@@ -414,6 +416,59 @@ def validate_action(row: dict[str, object]) -> dict[str, object]:
     return {"validation_status": "rejected", "reason": "invalid_or_unsafe_action_proposal", "host_reached": False}
 
 
+def mock_host_dispatch(row: dict[str, object], condition_id: str) -> dict[str, object]:
+    validation = validate_action(row)
+    final = row.get("final") if isinstance(row.get("final"), dict) else {}
+    action = final.get("action") if isinstance(final, dict) and isinstance(final.get("action"), dict) else {}
+    values = action.get("u") if isinstance(action, dict) else None
+    if validation["validation_status"] != "accepted" or not isinstance(values, list):
+        return {
+            "condition_id": condition_id,
+            "host": "mock-host.v1",
+            "dispatch_status": "rejected",
+            "validation": validation,
+            "host_reached": False,
+            "reason": validation.get("reason"),
+        }
+
+    host_action = {
+        "schema": "mock_host.action_handoff.v1",
+        "source": "validated_vla_proposal",
+        "condition_id": condition_id,
+        "u": values,
+    }
+    action_hash = sha256_text(json.dumps(host_action, sort_keys=True, separators=(",", ":")))
+    return {
+        "condition_id": condition_id,
+        "host": "mock-host.v1",
+        "dispatch_status": "accepted",
+        "validation": validation,
+        "host_reached": True,
+        "action_schema": host_action["schema"],
+        "action_hash": action_hash,
+        "action_dims": len(values),
+    }
+
+
+def build_mock_host_dispatch_report(record_rows: list[dict[str, object]], condition_ids: list[str]) -> dict[str, object]:
+    dispatches = [
+        mock_host_dispatch(row, condition_ids[index] if index < len(condition_ids) else f"condition-{index + 1:03d}")
+        for index, row in enumerate(record_rows)
+    ]
+    return {
+        "schema": "muesli-bt.mock_host_dispatch_report.v1",
+        "host": "mock-host.v1",
+        "source_boundary": "validated_vla_proposal",
+        "dispatch_count": len(dispatches),
+        "accepted_count": sum(1 for row in dispatches if row["dispatch_status"] == "accepted"),
+        "all_dispatches_host_reached": all(row["host_reached"] is True for row in dispatches),
+        "all_dispatches_validated": all(
+            row["validation"]["validation_status"] == "accepted" for row in dispatches
+        ),
+        "dispatches": dispatches,
+    }
+
+
 def index_cache(run_dir: Path) -> list[dict[str, object]]:
     entries: list[dict[str, object]] = []
     for path in sorted((run_dir / "model-service-cache").glob("*.json")):
@@ -436,8 +491,16 @@ def index_cache(run_dir: Path) -> list[dict[str, object]]:
 
 def build_report(record_rows: list[dict[str, object]],
                  replay_rows: list[dict[str, object]],
-                 condition_ids: list[str] | None = None) -> dict[str, object]:
+                 condition_ids: list[str] | None = None,
+                 host_dispatch_report: dict[str, object] | None = None) -> dict[str, object]:
     conditions = []
+    dispatches_by_id = {}
+    if host_dispatch_report is not None and isinstance(host_dispatch_report.get("dispatches"), list):
+        dispatches_by_id = {
+            str(row.get("condition_id")): row
+            for row in host_dispatch_report["dispatches"]
+            if isinstance(row, dict) and row.get("condition_id") is not None
+        }
     for index, (record, replay) in enumerate(zip(record_rows, replay_rows, strict=False), start=1):
         record_final = record.get("final", {}) if isinstance(record.get("final"), dict) else {}
         replay_final = replay.get("final", {}) if isinstance(replay.get("final"), dict) else {}
@@ -484,12 +547,25 @@ def build_report(record_rows: list[dict[str, object]],
                     "response_hashes": record_ms.get("response_hashes", []),
                     "frame_refs": record_ms.get("frame_refs", []),
                 },
+                "host_dispatch": dispatches_by_id.get(condition_id),
             }
         )
+    dispatch_count = int(host_dispatch_report.get("dispatch_count", 0)) if host_dispatch_report else 0
+    accepted_dispatch_count = int(host_dispatch_report.get("accepted_count", 0)) if host_dispatch_report else 0
+    all_dispatches_host_reached = (
+        bool(host_dispatch_report.get("all_dispatches_host_reached")) if host_dispatch_report else False
+    )
+    all_dispatches_validated = (
+        bool(host_dispatch_report.get("all_dispatches_validated")) if host_dispatch_report else False
+    )
     summary = {
         "record_result_count": len(record_rows),
         "replay_result_count": len(replay_rows),
         "condition_count": len(conditions),
+        "mock_host_dispatch_count": dispatch_count,
+        "mock_host_dispatch_accepted_count": accepted_dispatch_count,
+        "all_mock_host_dispatches_host_reached": all_dispatches_host_reached,
+        "all_mock_host_dispatches_validated": all_dispatches_validated,
         "all_actions_match": all(c["parity"]["actions_match"] for c in conditions),
         "all_replay_hits": all(c["replay"]["replay_cache_hit"] is True for c in conditions),
         "all_request_hashes_match": all(c["parity"]["request_hashes_match"] for c in conditions),
@@ -522,6 +598,21 @@ def build_report(record_rows: list[dict[str, object]],
         {"name": "frame_ref_parity", "required": True, "passed": summary["all_frame_refs_match"]},
         {"name": "record_host_reached_zero", "required": True, "passed": summary["all_record_actions_host_safe"]},
         {"name": "replay_host_reached_zero", "required": True, "passed": summary["all_replay_actions_host_safe"]},
+        {
+            "name": "mock_host_dispatch_completed",
+            "required": True,
+            "passed": summary["mock_host_dispatch_count"] == summary["condition_count"],
+        },
+        {
+            "name": "mock_host_dispatch_validated",
+            "required": True,
+            "passed": summary["all_mock_host_dispatches_validated"],
+        },
+        {
+            "name": "mock_host_dispatch_reached",
+            "required": True,
+            "passed": summary["all_mock_host_dispatches_host_reached"],
+        },
     ]
     report = {
         "schema": MODEL_ASYNC_REPORT_SCHEMA,
@@ -530,6 +621,7 @@ def build_report(record_rows: list[dict[str, object]],
         "service_protocol": "MMSP v0.2",
         "transport": "model-service websocket plus HTTP frame ingest",
         "evidence_kind": "model_backed_async_replay",
+        "host_dispatch_boundary": "validated mock host action handoff",
         "summary": summary,
         "gates": gates,
         "conditions": conditions,
@@ -658,7 +750,9 @@ def main() -> int:
     cache_index = index_cache(run_dir)
     write_json(run_dir / "request_response_cache_index.json", {"files": cache_index})
     condition_ids = [str(frame["name"]) for frame in uploaded_frames]
-    replay_report = build_report(record_results, replay_results, condition_ids) if replay_results else {}
+    mock_host_dispatch_report = build_mock_host_dispatch_report(record_results, condition_ids)
+    write_json(run_dir / "mock_host_dispatch_report.json", mock_host_dispatch_report)
+    replay_report = build_report(record_results, replay_results, condition_ids, mock_host_dispatch_report) if replay_results else {}
     write_json(run_dir / "replay_report.json", replay_report)
     redaction_policy = release_redaction_policy()
     release_safe_prompt_summary = {
@@ -711,6 +805,7 @@ def main() -> int:
             "release_safe_model_service_describe": "release_safe_model_service_describe.json",
             "release_safe_cache_summary": "release_safe_cache_summary.json",
             "release_safe_replay_report": "release_safe_replay_report.json",
+            "mock_host_dispatch_report": "mock_host_dispatch_report.json",
         },
         "release_safety": {
             "profile": "release_safe",
@@ -729,6 +824,7 @@ def main() -> int:
             "replay_report_json_sha256": sha256_file(run_dir / "replay_report.json"),
             "release_safe_replay_report_json_sha256": sha256_file(run_dir / "release_safe_replay_report.json"),
             "release_safe_cache_summary_json_sha256": sha256_file(run_dir / "release_safe_cache_summary.json"),
+            "mock_host_dispatch_report_json_sha256": sha256_file(run_dir / "mock_host_dispatch_report.json"),
         },
         "summary": {
             "record_runs": len(record_results),
@@ -743,6 +839,8 @@ def main() -> int:
             "all_replay_hits": replay_report.get("all_replay_hits") if replay_report else None,
             "all_actions_match": replay_report.get("all_actions_match") if replay_report else None,
             "all_record_actions_host_safe": replay_report.get("all_record_actions_host_safe") if replay_report else None,
+            "mock_host_dispatches": mock_host_dispatch_report["dispatch_count"],
+            "all_mock_host_dispatches_host_reached": mock_host_dispatch_report["all_dispatches_host_reached"],
         },
     }
     write_json(run_dir / "manifest.json", manifest)
@@ -758,6 +856,8 @@ def main() -> int:
         failures.append("replayed actions do not match recorded actions")
     if replay_results and not replay_report.get("all_record_actions_host_safe"):
         failures.append("recorded actions were not all accepted host-safe proposals")
+    if not mock_host_dispatch_report.get("all_dispatches_host_reached"):
+        failures.append("validated actions did not all reach the mock host")
 
     print(json.dumps({"run_dir": str(run_dir), "summary": manifest["summary"], "failures": failures}, indent=2))
     return 1 if failures else 0

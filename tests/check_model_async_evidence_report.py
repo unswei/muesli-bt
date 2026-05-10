@@ -44,34 +44,55 @@ def test_model_async_report_shape() -> None:
     runner = load_runner()
     record = sample_result(replay_cache_hit=False)
     replay = copy.deepcopy(sample_result(replay_cache_hit=True))
-    report = runner.build_report([record], [replay])
+    dispatch_report = runner.build_mock_host_dispatch_report([record], ["condition-a"])
+    report = runner.build_report([record], [replay], ["condition-a"], dispatch_report)
     assert report["schema"] == "muesli-bt.model_async_evidence_report.v1"
     assert report["profile"] == "model_service.vla_action_chunk_smoke.v1"
     assert report["summary"]["condition_count"] == 1
     assert report["summary"]["all_replay_hits"] is True
     assert report["summary"]["all_record_actions_host_safe"] is True
+    assert report["summary"]["mock_host_dispatch_count"] == 1
+    assert report["summary"]["all_mock_host_dispatches_host_reached"] is True
     assert all(gate["passed"] for gate in report["gates"] if gate["required"])
     condition = report["conditions"][0]
+    assert condition["condition_id"] == "condition-a"
     assert condition["capability"] == "cap.vla.action_chunk.v1"
     assert condition["operation_path"] == ["start", "step", "close"]
     assert condition["record"]["host_reached"] is False
     assert condition["replay"]["replay_cache_hit"] is True
     assert condition["parity"]["request_hashes_match"] is True
+    assert condition["host_dispatch"]["host_reached"] is True
+    assert condition["host_dispatch"]["dispatch_status"] == "accepted"
+    assert "action_hash" in condition["host_dispatch"]
 
 
 def test_release_safe_report_redacts_frame_refs() -> None:
     runner = load_runner()
     record = sample_result(replay_cache_hit=False)
     replay = copy.deepcopy(sample_result(replay_cache_hit=True))
-    report = runner.build_report([record], [replay])
+    dispatch_report = runner.build_mock_host_dispatch_report([record], ["condition-a"])
+    report = runner.build_report([record], [replay], ["condition-a"], dispatch_report)
     safe = runner.redact_replay_report(report)
     text = str(safe)
     assert safe["schema"] == "muesli-bt.release_safe_model_async_evidence_report.v1"
     assert "frame://camera1/1730000000000000000" not in text
     assert safe["conditions"][0]["artefacts"]["frame_ref_hashes"][0]["scheme"] == "frame"
     assert safe["summary"]["all_actions_match"] is True
+    assert safe["conditions"][0]["host_dispatch"]["host_reached"] is True
+
+
+def test_mock_host_rejects_invalid_proposal() -> None:
+    runner = load_runner()
+    invalid = sample_result(replay_cache_hit=False)
+    invalid["final"]["action"]["u"][0] = "bad"
+    dispatch_report = runner.build_mock_host_dispatch_report([invalid], ["condition-b"])
+    dispatch = dispatch_report["dispatches"][0]
+    assert dispatch["dispatch_status"] == "rejected"
+    assert dispatch["host_reached"] is False
+    assert dispatch_report["all_dispatches_host_reached"] is False
 
 
 if __name__ == "__main__":
     test_model_async_report_shape()
     test_release_safe_report_redacts_frame_refs()
+    test_mock_host_rejects_invalid_proposal()

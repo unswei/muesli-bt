@@ -20,6 +20,7 @@ The report has four stable sections:
 - `gates`: release-relevant checks that should pass before the evidence is considered usable
 - `conditions`: one record/replay comparison per task condition
 - `artefacts`: request hashes, response hashes, and frame refs used by that condition
+- `host_dispatch`: optional validated handoff to a mock host action sink
 
 Each condition records:
 
@@ -28,6 +29,7 @@ Each condition records:
 - record status, validation result, replay-cache status, and `host_reached`
 - replay status, validation result, replay-cache status, and `host_reached`
 - parity checks for actions, request hashes, response hashes, and frame refs
+- validated mock-host dispatch status, action hash, action dimension, and `host_reached=true` when the handoff succeeds
 
 The release-safe companion report uses schema `muesli-bt.release_safe_model_async_evidence_report.v1`. It keeps the same summary, gates, and condition structure, but replaces raw `frame://` refs with hashes.
 
@@ -46,7 +48,8 @@ Minimal shape:
     "condition_count": 4,
     "all_replay_hits": true,
     "all_actions_match": true,
-    "all_record_actions_host_safe": true
+    "all_record_actions_host_safe": true,
+    "all_mock_host_dispatches_host_reached": true
   },
   "gates": [],
   "conditions": []
@@ -64,6 +67,9 @@ Required gates for the current MiniVLA smoke path:
 - `frame_ref_parity`
 - `record_host_reached_zero`
 - `replay_host_reached_zero`
+- `mock_host_dispatch_completed`
+- `mock_host_dispatch_validated`
+- `mock_host_dispatch_reached`
 
 ## example
 
@@ -101,6 +107,14 @@ One condition looks like this:
     "frame_refs_match": true,
     "request_hashes_match": true,
     "response_hashes_match": true
+  },
+  "host_dispatch": {
+    "host": "mock-host.v1",
+    "dispatch_status": "accepted",
+    "host_reached": true,
+    "action_schema": "mock_host.action_handoff.v1",
+    "action_hash": "...",
+    "action_dims": 7
   }
 }
 ```
@@ -108,7 +122,9 @@ One condition looks like this:
 ## gotchas
 
 - A replay report proves runtime/replay behaviour for the recorded conditions. It does not prove model quality outside those conditions.
-- `host_reached=false` means the model output remained a proposal in this evidence path. Host-dispatch evidence is a separate gate.
+- `record.host_reached=false` and `replay.host_reached=false` mean the model output remained a proposal at the model boundary.
+- `host_dispatch.host_reached=true` is only set after the proposal passes validation and is handed to the mock host action sink.
+- The mock host proves the dispatch boundary and report shape. It does not claim that a physical robot accepted the action.
 - Raw `frame://` refs belong in the private report. Public evidence should use `release_safe_replay_report.json`.
 - Request and response hashes are deterministic evidence identifiers, not cryptographic access controls.
 

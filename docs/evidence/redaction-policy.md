@@ -34,6 +34,7 @@ release_safe_frame_refs.json
 release_safe_model_service_describe.json
 release_safe_cache_summary.json
 release_safe_replay_report.json
+mock_host_dispatch_report.json
 ```
 
 The raw-only artefacts include:
@@ -92,6 +93,7 @@ A release-safe cache summary keeps deterministic request and response hashes but
 - Raw caches are still required for deterministic replay. Do not delete them from private evidence bundles just because release-safe summaries exist.
 - Backend metadata is allowlisted. Public fields such as `backend`, `adapter`, `capability`, `service`, and `service_version` may appear. Placement details such as device names, model paths, and worker URLs are redacted.
 - The release-safe replay report keeps the standard model-backed async evidence structure, but replaces raw `frame://` refs with hashes.
+- The mock-host dispatch report contains action hashes and dimensions, not raw actuator values.
 - Frame images are not redacted by this policy. Only use checked-in, curated, non-sensitive fixture frames for release evidence.
 
 ## see also

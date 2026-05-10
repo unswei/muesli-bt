@@ -27,9 +27,10 @@ For each frame, the runner:
 - runs a replay pass using the recorded cache
 - writes `replay_report.json` using the standard model-backed async evidence report format
 - records request hashes, response hashes, frame refs, replay hits, validation results, host-reach outcomes, and action-parity checks
+- writes `mock_host_dispatch_report.json` proving that accepted proposals can be handed to a mock host action sink
 - writes release-safe sidecars that redact prompts, raw frame refs, backend placement metadata, request ids, session ids, and raw cache envelopes
 
-The model output remains a proposal. The evidence report marks accepted outputs as host-safe proposals and keeps `host_reached=false`.
+The model output remains a proposal at the model boundary. The evidence report marks accepted outputs as host-safe proposals and keeps record/replay `host_reached=false`. The separate mock-host dispatch section sets `host_reached=true` only after validation accepts the proposal and the handoff reaches the mock host.
 
 ## api / syntax
 
@@ -84,6 +85,7 @@ Expected artefacts:
 - `replay-results.jsonl`
 - `request_response_cache_index.json`
 - `model-service-cache/*.json`
+- `mock_host_dispatch_report.json`
 - `redaction_policy.json`
 - `release_safe_prompt_summary.json`
 - `release_safe_frame_refs.json`
@@ -104,6 +106,7 @@ fixtures/model-service/minivla-smoke/
 - Do not use `frame://camera1/latest` in release evidence. The bundle must use immutable frame refs returned by HTTP ingest.
 - Use the `release_safe_*` artefacts for public evidence. Keep raw model-service caches, raw `frame://` refs, generated scripts, and stdout/stderr private unless they have been reviewed.
 - `events.jsonl` from this smoke path is canonical event JSONL, but it is a VLA API smoke run rather than a full BT tick trace.
+- `mock_host_dispatch_report.json` proves a validated handoff into a mock host. It is not physical robot dispatch evidence.
 - The evidence directory under `build/` is an artefact. Commit the fixture and runner, not the generated cache bundle.
 
 ## see also
