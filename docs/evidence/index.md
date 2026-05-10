@@ -35,6 +35,7 @@ Reproduction commands live in the linked contract and conformance pages.
 
 ## model-backed VLA evidence
 
+- [release-safe redaction policy](redaction-policy.md)
 - [MiniVLA smoke evidence](minivla-smoke-evidence.md)
 - [muesli-model-service bridge](../integration/model-service-bridge.md)
 - [VLA backend integration plan](../integration/vla-backend-integration-plan.md)

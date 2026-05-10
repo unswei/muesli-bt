@@ -140,7 +140,9 @@ Deterministic fault injection is available through `fault_schedule`. Entries are
 
 The `check` field sends a `describe` request before runtime use. The same gate is available explicitly as `(model-service.check)`. The gate verifies protocol version, successful status, required public capability ids, expected descriptor modes, schema fields, cancellation and deadline declarations, freshness declarations, and replay declarations. Incompatible descriptors return `compatible=false` with `invalid_capabilities` and `descriptor_errors`.
 
-Still planned: redaction, richer replay reports, and validation at host action dispatch.
+Release evidence should use the documented redaction boundary. Raw prompts, raw `frame://` refs, backend placement metadata, raw model-service envelopes, request ids, and session ids stay in private reproduction bundles. Release-safe summaries keep hashes, validation outcomes, replay status, and allowlisted public metadata.
+
+Still planned: richer replay reports and validation at host action dispatch.
 
 The `muslisp` command can also start the external service in the foreground:
 
@@ -285,6 +287,7 @@ The host bridge maps the request to `MMSP v0.2`, validates the response, emits c
 - `frame://.../latest` is a handle in the service frame cache. It does not itself transport bytes.
 - Current frame refs are resolved inside the service. Recording immutable resolved refs in replay metadata is a hardening item, not a BT semantics dependency.
 - Backend metadata is not BT semantics.
+- Backend placement metadata is not release evidence by default. Use the release-safe redaction sidecars when publishing model-backed runs.
 - Late, stale, invalid, unsafe, or policy-violating outputs must have `host_reached=false`.
 - A `step` timeout does not automatically cancel a service session.
 
@@ -292,6 +295,7 @@ The host bridge maps the request to `MMSP v0.2`, validates the response, emits c
 
 - [VLA integration](../bt/vla-integration.md)
 - [VLA backend integration plan](vla-backend-integration-plan.md)
+- [Release-safe redaction policy](../evidence/redaction-policy.md)
 - [Host capability bundles](host-capability-bundles.md)
 - [cap.call](../language/reference/builtins/cap/cap-call.md)
 - [v1.0 direction](../project/v1-direction.md)

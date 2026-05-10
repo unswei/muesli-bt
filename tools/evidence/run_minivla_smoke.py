@@ -19,6 +19,15 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_FIXTURE = REPO_ROOT / "fixtures/model-service/minivla-smoke"
 DEFAULT_MUSLISP = REPO_ROOT / "build/model-service-bridge-test/muslisp"
+MINIVLA_SMOKE_INSTRUCTION = "Given the camera image, propose one safe low-speed robot action chunk."
+RELEASE_METADATA_ALLOWLIST = {
+    "adapter",
+    "backend",
+    "capability",
+    "requires_gpu",
+    "service",
+    "service_version",
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -27,6 +36,10 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: f.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def read_json(path: Path) -> object:
@@ -75,6 +88,199 @@ def shell_string(text: str) -> str:
     return json.dumps(text)
 
 
+def release_redaction_policy() -> dict[str, object]:
+    return {
+        "schema": "muesli-bt.release_redaction_policy.v1",
+        "profile": "release_safe",
+        "purpose": "publishable evidence summaries without raw prompts, raw frame refs, backend placement details, or raw model-service envelopes",
+        "raw_only": [
+            "run-record.lisp",
+            "run-replay.lisp",
+            "record.stdout",
+            "record.stderr",
+            "replay.stdout",
+            "replay.stderr",
+            "model-service-cache/*.json",
+            "model-service-describe.json",
+            "frame_refs.json",
+            "request_response_cache_index.json",
+        ],
+        "release_safe": [
+            "redaction_policy.json",
+            "release_safe_prompt_summary.json",
+            "release_safe_frame_refs.json",
+            "release_safe_model_service_describe.json",
+            "release_safe_cache_summary.json",
+            "release_safe_replay_report.json",
+        ],
+        "rules": {
+            "prompts": "replace prompt text with SHA-256 and character count",
+            "frame_refs": "replace raw frame:// refs with SHA-256; keep fixture file names and fixture hashes",
+            "backend_metadata": "allow only stable public fields; redact model paths, device names, worker URLs, and placement details",
+            "cache_summaries": "keep request/response hashes and response file hashes; redact request ids, session ids, raw outputs, and raw metadata",
+        },
+    }
+
+
+def redact_identifier(value: object) -> object:
+    if isinstance(value, str) and value:
+        return {"sha256": sha256_text(value), "redacted": True}
+    return None
+
+
+def redact_prompt_summary(name: str, prompt: str) -> dict[str, object]:
+    return {
+        "name": name,
+        "sha256": sha256_text(prompt),
+        "char_count": len(prompt),
+        "redacted": True,
+    }
+
+
+def redact_ref(value: object) -> object:
+    if not isinstance(value, str) or not value:
+        return None
+    scheme = value.split(":", 1)[0] if ":" in value else None
+    return {
+        "scheme": scheme,
+        "sha256": sha256_text(value),
+        "redacted": True,
+    }
+
+
+def redact_metadata(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
+        return {}
+    out: dict[str, object] = {}
+    redacted_key_count = 0
+    for key, raw in sorted(value.items()):
+        if key in RELEASE_METADATA_ALLOWLIST and (isinstance(raw, (str, int, float, bool)) or raw is None):
+            out[key] = raw
+        else:
+            redacted_key_count += 1
+    if redacted_key_count:
+        out["_redacted_key_count"] = redacted_key_count
+    return out
+
+
+def redact_frame_refs(frames: list[dict[str, object]]) -> dict[str, object]:
+    redacted_frames: list[dict[str, object]] = []
+    for frame in frames:
+        redacted_frames.append(
+            {
+                "name": frame.get("name"),
+                "source_file": frame.get("source_file"),
+                "bundle_file": frame.get("bundle_file"),
+                "fixture_sha256": frame.get("fixture_sha256"),
+                "content_sha256": frame.get("sha256") or frame.get("fixture_sha256"),
+                "ref": redact_ref(frame.get("ref")),
+                "latest_ref": redact_ref(frame.get("latest_ref")),
+                "timestamp_ns": frame.get("timestamp_ns"),
+            }
+        )
+    return {
+        "schema": "muesli-bt.release_safe_frame_refs.v1",
+        "redaction": "raw frame:// refs are private to the raw bundle; release artefacts keep hashes",
+        "frames": redacted_frames,
+    }
+
+
+def redact_describe(describe: object) -> dict[str, object]:
+    output = describe.get("output") if isinstance(describe, dict) else None
+    capabilities = output.get("capabilities") if isinstance(output, dict) else None
+    redacted_capabilities: list[dict[str, object]] = []
+    if isinstance(capabilities, list):
+        for capability in capabilities:
+            if not isinstance(capability, dict):
+                continue
+            redacted_capabilities.append(
+                {
+                    "id": capability.get("id"),
+                    "kind": capability.get("kind"),
+                    "mode": capability.get("mode"),
+                    "input_schema": capability.get("input_schema"),
+                    "output_schema": capability.get("output_schema"),
+                    "supports_cancel": capability.get("supports_cancel"),
+                    "supports_deadline": capability.get("supports_deadline"),
+                    "freshness": capability.get("freshness") if isinstance(capability.get("freshness"), dict) else {},
+                    "replay": capability.get("replay") if isinstance(capability.get("replay"), dict) else {},
+                    "metadata": redact_metadata(capability.get("metadata")),
+                }
+            )
+    metadata = describe.get("metadata") if isinstance(describe, dict) else None
+    return {
+        "schema": "muesli-bt.release_safe_model_service_describe.v1",
+        "version": describe.get("version") if isinstance(describe, dict) else None,
+        "status": describe.get("status") if isinstance(describe, dict) else None,
+        "metadata": redact_metadata(metadata),
+        "capabilities": redacted_capabilities,
+    }
+
+
+def redact_cache_index(entries: list[dict[str, object]]) -> dict[str, object]:
+    redacted_files: list[dict[str, object]] = []
+    for entry in entries:
+        redacted_files.append(
+            {
+                "file": entry.get("file"),
+                "request_hash": entry.get("request_hash"),
+                "sha256": entry.get("sha256"),
+                "id": redact_identifier(entry.get("id")),
+                "session_id": redact_identifier(entry.get("session_id")),
+                "status": entry.get("status"),
+                "has_output": entry.get("has_output"),
+                "metadata": redact_metadata(entry.get("metadata")),
+            }
+        )
+    return {
+        "schema": "muesli-bt.release_safe_cache_summary.v1",
+        "redaction": "raw model-service envelopes stay under model-service-cache; this file contains only hashes, statuses, and allowlisted metadata",
+        "file_count": len(redacted_files),
+        "files": redacted_files,
+    }
+
+
+def redact_replay_report(report: dict[str, object]) -> dict[str, object]:
+    comparisons = report.get("comparisons", [])
+    redacted_comparisons: list[dict[str, object]] = []
+    if isinstance(comparisons, list):
+        for comparison in comparisons:
+            if not isinstance(comparison, dict):
+                continue
+            frame_refs = comparison.get("frame_refs", [])
+            redacted_comparisons.append(
+                {
+                    "record_status": comparison.get("record_status"),
+                    "record_final_status": comparison.get("record_final_status"),
+                    "replay_status": comparison.get("replay_status"),
+                    "replay_final_status": comparison.get("replay_final_status"),
+                    "record_validation": comparison.get("record_validation"),
+                    "replay_validation": comparison.get("replay_validation"),
+                    "actions_match": comparison.get("actions_match"),
+                    "frame_refs_match": comparison.get("frame_refs_match"),
+                    "request_hashes_match": comparison.get("request_hashes_match"),
+                    "response_hashes_match": comparison.get("response_hashes_match"),
+                    "record_replay_cache_hit": comparison.get("record_replay_cache_hit"),
+                    "replay_cache_hit": comparison.get("replay_cache_hit"),
+                    "request_hashes": comparison.get("request_hashes", []),
+                    "response_hashes": comparison.get("response_hashes", []),
+                    "frame_ref_hashes": [redact_ref(ref) for ref in frame_refs] if isinstance(frame_refs, list) else [],
+                }
+            )
+    return {
+        "schema": "muesli-bt.release_safe_replay_report.v1",
+        "record_result_count": report.get("record_result_count"),
+        "replay_result_count": report.get("replay_result_count"),
+        "all_actions_match": report.get("all_actions_match"),
+        "all_replay_hits": report.get("all_replay_hits"),
+        "all_request_hashes_match": report.get("all_request_hashes_match"),
+        "all_response_hashes_match": report.get("all_response_hashes_match"),
+        "all_record_actions_host_safe": report.get("all_record_actions_host_safe"),
+        "all_replay_actions_host_safe": report.get("all_replay_actions_host_safe"),
+        "comparisons": redacted_comparisons,
+    }
+
+
 def make_lisp_script(
     *,
     run_dir: Path,
@@ -114,7 +320,7 @@ def make_lisp_script(
         f"      (map.set! req 'run_id {shell_string(run_id)})",
         "      (map.set! req 'tick_index tick)",
         "      (map.set! req 'node_name \"mini-vla-action-chunk\")",
-        "      (map.set! req 'instruction \"Given the camera image, propose one safe low-speed robot action chunk.\")",
+        f"      (map.set! req 'instruction {shell_string(MINIVLA_SMOKE_INSTRUCTION)})",
         "      (map.set! req 'deadline_ms 60000)",
         "      (map.set! req 'seed task-id)",
         "      (map.set! req 'model model)",
@@ -380,6 +586,22 @@ def main() -> int:
     write_json(run_dir / "request_response_cache_index.json", {"files": cache_index})
     replay_report = build_report(record_results, replay_results) if replay_results else {}
     write_json(run_dir / "replay_report.json", replay_report)
+    redaction_policy = release_redaction_policy()
+    release_safe_prompt_summary = {
+        "schema": "muesli-bt.release_safe_prompt_summary.v1",
+        "redaction": "prompt text is private to the raw bundle; release artefacts keep hashes and sizes",
+        "prompts": [redact_prompt_summary("minivla_smoke_instruction", MINIVLA_SMOKE_INSTRUCTION)],
+    }
+    release_safe_frame_refs = redact_frame_refs(uploaded_frames)
+    release_safe_describe = redact_describe(describe)
+    release_safe_cache_summary = redact_cache_index(cache_index)
+    release_safe_replay_report = redact_replay_report(replay_report) if replay_report else {}
+    write_json(run_dir / "redaction_policy.json", redaction_policy)
+    write_json(run_dir / "release_safe_prompt_summary.json", release_safe_prompt_summary)
+    write_json(run_dir / "release_safe_frame_refs.json", release_safe_frame_refs)
+    write_json(run_dir / "release_safe_model_service_describe.json", release_safe_describe)
+    write_json(run_dir / "release_safe_cache_summary.json", release_safe_cache_summary)
+    write_json(run_dir / "release_safe_replay_report.json", release_safe_replay_report)
 
     git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True).strip()
     git_describe = subprocess.check_output(["git", "describe", "--tags", "--always", "--dirty"], cwd=REPO_ROOT, text=True).strip()
@@ -409,6 +631,17 @@ def main() -> int:
             "frame_refs": "frame_refs.json",
             "record_results": "record-results.jsonl",
             "replay_results": "replay-results.jsonl",
+            "redaction_policy": "redaction_policy.json",
+            "release_safe_prompt_summary": "release_safe_prompt_summary.json",
+            "release_safe_frame_refs": "release_safe_frame_refs.json",
+            "release_safe_model_service_describe": "release_safe_model_service_describe.json",
+            "release_safe_cache_summary": "release_safe_cache_summary.json",
+            "release_safe_replay_report": "release_safe_replay_report.json",
+        },
+        "release_safety": {
+            "profile": "release_safe",
+            "publishable_artefacts": redaction_policy["release_safe"],
+            "raw_only_artefacts": redaction_policy["raw_only"],
         },
         "hashes": {
             "events_jsonl_sha256": sha256_file(run_dir / "events.jsonl"),
@@ -420,6 +653,8 @@ def main() -> int:
             if (run_dir / "replay-results.jsonl").exists()
             else None,
             "replay_report_json_sha256": sha256_file(run_dir / "replay_report.json"),
+            "release_safe_replay_report_json_sha256": sha256_file(run_dir / "release_safe_replay_report.json"),
+            "release_safe_cache_summary_json_sha256": sha256_file(run_dir / "release_safe_cache_summary.json"),
         },
         "summary": {
             "record_runs": len(record_results),
