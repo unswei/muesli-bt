@@ -468,11 +468,16 @@ public:
 
         const auto started = std::chrono::steady_clock::now();
         std::uint64_t step_index = 0;
+        bool cancellation_late_injected = false;
         while (true) {
-            if (cancel_flag.load()) {
+            if (cancel_flag.load() && !cancellation_late_injected) {
                 model_service_response cancel = host_->call_model_service(make_vla_model_service_request(
                     request, model_service_operation::cancel, "vla-cancel-" + request_key, start.session_id));
                 append_model_service_vla_trace(trace, cancel);
+                if (cancel.error_code == "model_service_fault_cancellation_late") {
+                    cancellation_late_injected = true;
+                    continue;
+                }
                 model_service_response close = host_->call_model_service(make_vla_model_service_request(
                     request, model_service_operation::close, "vla-close-" + request_key, start.session_id));
                 append_model_service_vla_trace(trace, close);
@@ -596,7 +601,7 @@ std::string model_service_fault_output_json(const model_service_request& request
         if (fault == "unsafe_output") {
             return "{\"predicted_states\":[],\"unsafe\":true}";
         }
-        if (fault == "stale_result") {
+        if (fault == "stale_result" || fault == "stale_frame") {
             return "{\"predicted_states\":[],\"stale\":true}";
         }
         if (fault == "policy_violation") {
@@ -608,7 +613,7 @@ std::string model_service_fault_output_json(const model_service_request& request
         if (fault == "unsafe_output") {
             return "{\"score\":0.0,\"unsafe\":true}";
         }
-        if (fault == "stale_result") {
+        if (fault == "stale_result" || fault == "stale_frame") {
             return "{\"score\":0.0,\"stale\":true}";
         }
         if (fault == "policy_violation") {
@@ -620,8 +625,8 @@ std::string model_service_fault_output_json(const model_service_request& request
         if (fault == "unsafe_output") {
             return "{\"actions\":[],\"unsafe\":true}";
         }
-        if (fault == "stale_result") {
-            return "{\"actions\":[],\"stale\":true}";
+        if (fault == "stale_result" || fault == "stale_frame") {
+            return "{\"actions\":[],\"stale\":true,\"stale_frame\":true}";
         }
         if (fault == "policy_violation") {
             return "{\"actions\":[],\"policy_violation\":true}";
@@ -632,7 +637,7 @@ std::string model_service_fault_output_json(const model_service_request& request
         if (fault == "unsafe_output") {
             return "{\"goal\":{},\"unsafe\":true}";
         }
-        if (fault == "stale_result") {
+        if (fault == "stale_result" || fault == "stale_frame") {
             return "{\"goal\":{},\"stale\":true}";
         }
         if (fault == "policy_violation") {
@@ -673,15 +678,20 @@ std::optional<model_service_response> injected_model_service_fault(const model_s
         out.error_code = "model_service_fault_timeout";
         out.error_message = "deterministic model-service timeout fault";
         out.error_retryable = true;
-    } else if (fault == "unavailable" || fault == "backend_unavailable") {
+    } else if (fault == "unavailable" || fault == "backend_unavailable" || fault == "unavailable_backend") {
         out.status = model_service_status::unavailable;
         out.error_code = "model_service_fault_unavailable";
         out.error_message = "deterministic model-service unavailable fault";
         out.error_retryable = true;
     } else if (fault == "invalid_output" || fault == "unsafe_output" ||
-               fault == "stale_result" || fault == "policy_violation") {
+               fault == "stale_result" || fault == "stale_frame" || fault == "policy_violation") {
         out.status = model_service_status::success;
         out.output_json = model_service_fault_output_json(request, fault);
+    } else if (fault == "cancellation_late" || fault == "cancel_late") {
+        out.status = model_service_status::failure;
+        out.error_code = "model_service_fault_cancellation_late";
+        out.error_message = "deterministic model-service cancellation-late fault";
+        out.error_retryable = false;
     } else {
         out.status = model_service_status::internal_error;
         out.error_code = "model_service_fault_unknown";

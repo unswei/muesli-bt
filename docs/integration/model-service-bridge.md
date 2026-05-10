@@ -136,11 +136,11 @@ The first validation gates run on successful model-service proposals. World-mode
 
 The same request-hash replay cache is used for VLA sessions. The `model-service` VLA backend records `start`, `step`, `cancel`, and `close` envelopes independently. VLA final results and VLA record JSON include model-service request hashes, response hashes, replay-cache hit status, and any `frame://` refs carried by the session.
 
-Deterministic fault injection is available through `fault_schedule`. Entries are consumed in order for non-replay calls. Supported entries are `none`, `delay:<ms>`, `timeout`, `unavailable`, `invalid_output`, `unsafe_output`, `stale_result`, and `policy_violation`. This is intended for reproducible validation and evidence runs, not as a production retry policy.
+Deterministic fault injection is available through `fault_schedule`. Entries are consumed in order for non-replay calls. Supported entries are `none`, `delay:<ms>`, `timeout`, `unavailable`, `backend_unavailable`, `unavailable_backend`, `invalid_output`, `unsafe_output`, `stale_result`, `stale_frame`, `policy_violation`, and `cancellation_late`. This is intended for reproducible validation and evidence runs, not as a production retry policy.
 
 The `check` field sends a `describe` request and verifies the first required `MMSP v0.2` capability ids are present before runtime use. The same gate is available explicitly as `(model-service.check)`.
 
-Still planned: deeper descriptor schema/mode checks, redaction, richer replay reports, fault schedules for session lifecycle calls, replay parity for sessions, and validation at host action dispatch.
+Still planned: deeper descriptor schema/mode checks, redaction, richer replay reports, and validation at host action dispatch.
 
 The `muslisp` command can also start the external service in the foreground:
 

@@ -1,6 +1,7 @@
 #include "bt/model_service.hpp"
 #include "bt/runtime_host.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
@@ -25,8 +26,11 @@ public:
     explicit fake_vla_model_service_client(
         std::string step_output =
             "{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,-0.1],\"dt_ms\":200}]}",
-        bool fail_on_call = false)
-        : step_output_(std::move(step_output)), fail_on_call_(fail_on_call) {}
+        bool fail_on_call = false,
+        bool first_step_partial = false)
+        : step_output_(std::move(step_output)),
+          fail_on_call_(fail_on_call),
+          first_step_partial_(first_step_partial) {}
 
     bt::model_service_response call(const bt::model_service_request& request) override {
         if (fail_on_call_) {
@@ -45,6 +49,14 @@ public:
             return response;
         }
         if (request.op == bt::model_service_operation::step) {
+            const int previous_step_calls = step_calls.fetch_add(1);
+            if (first_step_partial_ && previous_step_calls == 0) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                response.status = bt::model_service_status::partial;
+                response.session_id = request.session_id;
+                response.output_json = "{}";
+                return response;
+            }
             response.status = bt::model_service_status::action_chunk;
             response.session_id = request.session_id;
             response.output_json = step_output_;
@@ -61,10 +73,12 @@ public:
 
     std::vector<std::string> ops;
     std::size_t refs_seen = 0;
+    std::atomic<int> step_calls{0};
 
 private:
     std::string step_output_;
     bool fail_on_call_ = false;
+    bool first_step_partial_ = false;
 };
 
 bt::model_service_response validate_action_chunk_output(const std::string& output_json) {
@@ -119,6 +133,17 @@ bt::vla_poll run_model_service_vla(std::string output_json) {
     bt::runtime_host host;
     auto fake = std::make_unique<fake_vla_model_service_client>(std::move(output_json));
     bt::model_service_config fake_cfg;
+    host.set_model_service_client(fake_cfg, std::move(fake));
+
+    const bt::vla_service::vla_job_id job = host.vla_ref().submit(make_model_service_vla_request());
+    return wait_for_terminal_vla(host, job);
+}
+
+bt::vla_poll run_model_service_vla_with_faults(std::vector<std::string> faults) {
+    bt::runtime_host host;
+    auto fake = std::make_unique<fake_vla_model_service_client>();
+    bt::model_service_config fake_cfg;
+    fake_cfg.fault_schedule = std::move(faults);
     host.set_model_service_client(fake_cfg, std::move(fake));
 
     const bt::vla_service::vla_job_id job = host.vla_ref().submit(make_model_service_vla_request());
@@ -276,6 +301,66 @@ int main() {
     check(invalid_poll.final.has_value(), "malformed model-service VLA output should produce a final response");
     check(invalid_poll.final->status == bt::vla_status::invalid,
           "malformed model-service VLA output should produce invalid final status");
+
+    const bt::vla_poll timeout_fault = run_model_service_vla_with_faults({"none", "timeout"});
+    check(timeout_fault.status == bt::vla_job_status::timeout, "VLA timeout fault should produce timeout job status");
+    check(timeout_fault.final.has_value() && timeout_fault.final->status == bt::vla_status::timeout,
+          "VLA timeout fault should produce timeout final status");
+
+    const auto delay_started = std::chrono::steady_clock::now();
+    const bt::vla_poll delay_fault = run_model_service_vla_with_faults({"none", "delay:10"});
+    const auto delay_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - delay_started);
+    check(delay_fault.status == bt::vla_job_status::done, "VLA delay fault should still allow successful output");
+    check(delay_elapsed.count() >= 5, "VLA delay fault should apply deterministic delay");
+
+    const bt::vla_poll invalid_fault = run_model_service_vla_with_faults({"none", "invalid_output"});
+    check(invalid_fault.status == bt::vla_job_status::error, "VLA invalid-output fault should produce error job status");
+    check(invalid_fault.final.has_value() && invalid_fault.final->status == bt::vla_status::invalid,
+          "VLA invalid-output fault should produce invalid final status");
+
+    const bt::vla_poll unsafe_fault = run_model_service_vla_with_faults({"none", "unsafe_output"});
+    check(unsafe_fault.status == bt::vla_job_status::error, "VLA unsafe-output fault should produce error job status");
+    check(unsafe_fault.final.has_value() && unsafe_fault.final->status == bt::vla_status::invalid,
+          "VLA unsafe-output fault should produce invalid final status");
+
+    const bt::vla_poll stale_fault = run_model_service_vla_with_faults({"none", "stale_frame"});
+    check(stale_fault.status == bt::vla_job_status::error, "VLA stale-frame fault should produce error job status");
+    check(stale_fault.final.has_value() && stale_fault.final->status == bt::vla_status::invalid,
+          "VLA stale-frame fault should produce invalid final status");
+
+    const bt::vla_poll unavailable_fault = run_model_service_vla_with_faults({"unavailable_backend"});
+    check(unavailable_fault.status == bt::vla_job_status::error,
+          "VLA unavailable-backend fault should produce error job status");
+    check(unavailable_fault.final.has_value() && unavailable_fault.final->status == bt::vla_status::error,
+          "VLA unavailable-backend fault should produce error final status");
+
+    {
+        bt::runtime_host cancel_late_host;
+        auto cancel_late_fake = std::make_unique<fake_vla_model_service_client>(
+            "{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,-0.1],\"dt_ms\":200}]}",
+            false,
+            true);
+        fake_vla_model_service_client* cancel_late_fake_ptr = cancel_late_fake.get();
+        bt::model_service_config cancel_late_cfg;
+        cancel_late_cfg.fault_schedule = {"none", "none", "cancellation_late"};
+        cancel_late_host.set_model_service_client(cancel_late_cfg, std::move(cancel_late_fake));
+        const bt::vla_service::vla_job_id cancel_late_job =
+            cancel_late_host.vla_ref().submit(make_model_service_vla_request());
+
+        for (int i = 0; i < 100 && cancel_late_fake_ptr->step_calls.load() == 0; ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        check(cancel_late_host.vla_ref().cancel(cancel_late_job), "VLA cancellation-late setup should accept cancel");
+        const bt::vla_poll cancel_late_poll = wait_for_terminal_vla(cancel_late_host, cancel_late_job);
+        check(cancel_late_poll.status == bt::vla_job_status::cancelled,
+              "VLA cancellation-late fault should end as cancelled after late output");
+        const std::string records = cancel_late_host.dump_vla_records();
+        check(records.find("\"completion_dropped\":true") != std::string::npos,
+              "VLA cancellation-late fault should record dropped late completion");
+        check(records.find("response_hashes") != std::string::npos,
+              "VLA cancellation-late fault should preserve model-service response hashes");
+    }
 
     return 0;
 }
