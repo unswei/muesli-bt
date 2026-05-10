@@ -1304,6 +1304,12 @@ void test_math_time_and_domain_errors() {
     value t2 = eval_text("(time.now-ms)", env);
     check(is_integer(t1) && is_integer(t2), "time.now-ms should return integer");
     check(integer_value(t2) >= integer_value(t1), "time.now-ms should be monotonic");
+    const auto sleep_start = std::chrono::steady_clock::now();
+    value sleep_result = eval_text("(time.sleep-ms 2)", env);
+    const auto sleep_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - sleep_start);
+    check(is_nil(sleep_result), "time.sleep-ms should return nil");
+    check(sleep_elapsed.count() >= 1, "time.sleep-ms should block for a measurable interval");
 
     try {
         (void)eval_text("(sqrt -1)", env);
@@ -1313,6 +1319,11 @@ void test_math_time_and_domain_errors() {
     try {
         (void)eval_text("(log 0)", env);
         throw std::runtime_error("expected log domain error");
+    } catch (const lisp_error&) {
+    }
+    try {
+        (void)eval_text("(time.sleep-ms -1)", env);
+        throw std::runtime_error("expected time.sleep-ms domain error");
     } catch (const lisp_error&) {
     }
 }

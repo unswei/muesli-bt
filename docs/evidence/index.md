@@ -33,6 +33,12 @@ Benchmark pages should include hardware, commit, compiler, build flags, commands
 
 Reproduction commands live in the linked contract and conformance pages.
 
+## model-backed VLA evidence
+
+- [MiniVLA smoke evidence](minivla-smoke-evidence.md)
+- [muesli-model-service bridge](../integration/model-service-bridge.md)
+- [VLA backend integration plan](../integration/vla-backend-integration-plan.md)
+
 ## ROS2 evidence
 
 - [ROS2 tutorial](../integration/ros2-tutorial.md)

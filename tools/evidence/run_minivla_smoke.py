@@ -1,0 +1,458 @@
+#!/usr/bin/env python3
+"""Run a curated MiniVLA model-service smoke evidence bundle."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import shutil
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_FIXTURE = REPO_ROOT / "fixtures/model-service/minivla-smoke"
+DEFAULT_MUSLISP = REPO_ROOT / "build/model-service-bridge-test/muslisp"
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def read_json(path: Path) -> object:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def write_json(path: Path, value: object) -> None:
+    path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def write_jsonl(path: Path, rows: list[object]) -> None:
+    with path.open("w", encoding="utf-8") as f:
+        for row in rows:
+            f.write(json.dumps(row, sort_keys=True) + "\n")
+
+
+def parse_lisp_json_stdout(path: Path) -> list[object]:
+    rows: list[object] = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line == "nil":
+            continue
+        decoded = json.loads(line)
+        rows.append(json.loads(decoded))
+    return rows
+
+
+def http_get_json(url: str, timeout_s: float) -> object:
+    with urllib.request.urlopen(url, timeout=timeout_s) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def upload_frame(http_base: str, frame_path: Path, timeout_s: float) -> dict[str, object]:
+    url = http_base.rstrip("/") + "/v1/frames/camera1"
+    request = urllib.request.Request(
+        url,
+        data=frame_path.read_bytes(),
+        headers={"Content-Type": "image/jpeg"},
+        method="PUT",
+    )
+    with urllib.request.urlopen(request, timeout=timeout_s) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def shell_string(text: str) -> str:
+    return json.dumps(text)
+
+
+def make_lisp_script(
+    *,
+    run_dir: Path,
+    run_id: str,
+    ws_endpoint: str,
+    replay_mode: str,
+    event_log_name: str,
+    frames: list[dict[str, object]],
+    poll_sleep_ms: int,
+    poll_count: int,
+) -> str:
+    lines = [
+        "(begin",
+        f"  (events.set-path {shell_string(str(run_dir / event_log_name))})",
+        "  (events.set-flush-each-message #t)",
+        "  (events.set-ring-size 256)",
+        "",
+        "  (define cfg (map.make))",
+        f"  (map.set! cfg 'endpoint {shell_string(ws_endpoint)})",
+        "  (map.set! cfg 'connect_timeout_ms 5000)",
+        "  (map.set! cfg 'request_timeout_ms 70000)",
+        f"  (map.set! cfg 'replay_mode {shell_string(replay_mode)})",
+        f"  (map.set! cfg 'replay_cache_path {shell_string(str(run_dir / 'model-service-cache'))})",
+        "  (map.set! cfg 'check #t)",
+        "  (model-service.configure cfg)",
+        "  (print (json.encode (model-service.check)))",
+        "  (print (json.encode (model-service.info)))",
+        "",
+        "  (define model (map.make))",
+        "  (map.set! model 'name \"model-service\")",
+        "  (map.set! model 'version \"0.2\")",
+        "",
+        "  (define (make-request task-id frame-ref tick ts-ms)",
+        "    (let ((req (map.make)))",
+        "      (map.set! req 'capability \"cap.vla.action_chunk.v1\")",
+        "      (map.set! req 'task_id task-id)",
+        f"      (map.set! req 'run_id {shell_string(run_id)})",
+        "      (map.set! req 'tick_index tick)",
+        "      (map.set! req 'node_name \"mini-vla-action-chunk\")",
+        "      (map.set! req 'instruction \"Given the camera image, propose one safe low-speed robot action chunk.\")",
+        "      (map.set! req 'deadline_ms 60000)",
+        "      (map.set! req 'seed task-id)",
+        "      (map.set! req 'model model)",
+        "      (let ((obs (map.make)))",
+        "        (map.set! obs 'state (list 0.0 0.0 0.0 0.0 0.0 0.0 0.0))",
+        "        (map.set! obs 'timestamp_ms ts-ms)",
+        "        (map.set! obs 'frame_id frame-ref)",
+        "        (map.set! req 'observation obs))",
+        "      (let ((space (map.make)))",
+        "        (map.set! space 'type \"continuous\")",
+        "        (map.set! space 'dims 7)",
+        "        (map.set! space 'bounds (list (list -2.0 2.0) (list -2.0 2.0) (list -2.0 2.0) (list -2.0 2.0) (list -2.0 2.0) (list -2.0 2.0) (list 0.0 1.0)))",
+        "        (map.set! req 'action_space space))",
+        "      (let ((constraints (map.make)))",
+        "        (map.set! constraints 'max_abs_value 2.0)",
+        "        (map.set! constraints 'max_delta 2.0)",
+        "        (map.set! req 'constraints constraints))",
+        "      req))",
+        "",
+        "  (define (terminal? p)",
+        "    (or (eq? (map.get p 'status ':none) ':done)",
+        "        (eq? (map.get p 'status ':none) ':error)",
+        "        (eq? (map.get p 'status ':none) ':timeout)",
+        "        (eq? (map.get p 'status ':none) ':cancelled)))",
+        "",
+        "  (define (wait-final id remaining)",
+        "    (if (= remaining 0)",
+        "        (vla.poll id)",
+        "        (let ((p (vla.poll id)))",
+        "          (if (terminal? p)",
+        "              p",
+        "              (begin",
+        f"                (time.sleep-ms {poll_sleep_ms})",
+        "                (wait-final id (- remaining 1)))))))",
+        "",
+        "  (define (run-one label frame-ref tick ts-ms)",
+        "    (let ((job (vla.submit (make-request label frame-ref tick ts-ms))))",
+        "      (let ((result (wait-final job " + str(poll_count) + ")))",
+        "        (print (json.encode result))",
+        "        result)))",
+        "",
+    ]
+
+    for index, frame in enumerate(frames, start=1):
+        label = str(frame["name"])
+        ref = str(frame["ref"])
+        timestamp_ms = int(int(frame["timestamp_ns"]) / 1_000_000)
+        lines.append(
+            f"  (run-one {shell_string(label)} {shell_string(ref)} {index} {timestamp_ms})"
+        )
+
+    lines.extend(
+        [
+            f"  (save {shell_string(str(run_dir / (replay_mode + '-events.snapshot.lisp')))} (events.dump 256))",
+            "  (model-service.clear))",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def run_muslisp(muslisp: Path, script: Path, stdout: Path, stderr: Path) -> None:
+    with stdout.open("w", encoding="utf-8") as out, stderr.open("w", encoding="utf-8") as err:
+        subprocess.run([str(muslisp), str(script)], cwd=REPO_ROOT, stdout=out, stderr=err, check=True)
+
+
+def validate_action(row: dict[str, object]) -> dict[str, object]:
+    final = row.get("final")
+    if not isinstance(final, dict):
+        return {"validation_status": "rejected", "reason": "missing_final", "host_reached": False}
+    action = final.get("action")
+    if not isinstance(action, dict):
+        return {"validation_status": "rejected", "reason": "missing_action", "host_reached": False}
+    values = action.get("u")
+    if not isinstance(values, list) or len(values) != 7:
+        return {"validation_status": "rejected", "reason": "wrong_action_dimension", "host_reached": False}
+    finite = all(isinstance(v, (int, float)) and math.isfinite(float(v)) for v in values)
+    bounds_ok = finite and all(-2.0 <= float(v) <= 2.0 for v in values[:6]) and 0.0 <= float(values[6]) <= 1.0
+    status_ok = row.get("status") == ":done" and final.get("status") == ":ok"
+    if status_ok and bounds_ok:
+        return {"validation_status": "accepted", "reason": "host_safe_action_proposal", "host_reached": False}
+    return {"validation_status": "rejected", "reason": "invalid_or_unsafe_action_proposal", "host_reached": False}
+
+
+def index_cache(run_dir: Path) -> list[dict[str, object]]:
+    entries: list[dict[str, object]] = []
+    for path in sorted((run_dir / "model-service-cache").glob("*.json")):
+        response = read_json(path)
+        assert isinstance(response, dict)
+        entries.append(
+            {
+                "file": str(path.relative_to(run_dir)),
+                "request_hash": path.stem,
+                "sha256": sha256_file(path),
+                "id": response.get("id"),
+                "session_id": response.get("session_id"),
+                "status": response.get("status"),
+                "has_output": response.get("output") is not None,
+                "metadata": response.get("metadata"),
+            }
+        )
+    return entries
+
+
+def build_report(record_rows: list[dict[str, object]], replay_rows: list[dict[str, object]]) -> dict[str, object]:
+    comparisons = []
+    for record, replay in zip(record_rows, replay_rows, strict=False):
+        record_final = record.get("final", {}) if isinstance(record.get("final"), dict) else {}
+        replay_final = replay.get("final", {}) if isinstance(replay.get("final"), dict) else {}
+        record_ms = record_final.get("model_service", {}) if isinstance(record_final.get("model_service"), dict) else {}
+        replay_ms = replay_final.get("model_service", {}) if isinstance(replay_final.get("model_service"), dict) else {}
+        record_validation = validate_action(record)
+        replay_validation = validate_action(replay)
+        comparisons.append(
+            {
+                "record_status": record.get("status"),
+                "record_final_status": record_final.get("status"),
+                "replay_status": replay.get("status"),
+                "replay_final_status": replay_final.get("status"),
+                "record_validation": record_validation,
+                "replay_validation": replay_validation,
+                "actions_match": record_final.get("action") == replay_final.get("action"),
+                "frame_refs_match": record_ms.get("frame_refs") == replay_ms.get("frame_refs"),
+                "request_hashes_match": record_ms.get("request_hashes") == replay_ms.get("request_hashes"),
+                "response_hashes_match": record_ms.get("response_hashes") == replay_ms.get("response_hashes"),
+                "record_replay_cache_hit": record_ms.get("replay_cache_hit"),
+                "replay_cache_hit": replay_ms.get("replay_cache_hit"),
+                "request_hashes": record_ms.get("request_hashes", []),
+                "response_hashes": record_ms.get("response_hashes", []),
+                "frame_refs": record_ms.get("frame_refs", []),
+            }
+        )
+    return {
+        "schema": "muesli-bt.minivla.replay_report.v1",
+        "record_result_count": len(record_rows),
+        "replay_result_count": len(replay_rows),
+        "all_actions_match": all(c["actions_match"] for c in comparisons),
+        "all_replay_hits": all(c["replay_cache_hit"] is True for c in comparisons),
+        "all_request_hashes_match": all(c["request_hashes_match"] for c in comparisons),
+        "all_response_hashes_match": all(c["response_hashes_match"] for c in comparisons),
+        "all_record_actions_host_safe": all(
+            c["record_validation"]["validation_status"] == "accepted" and c["record_validation"]["host_reached"] is False
+            for c in comparisons
+        ),
+        "all_replay_actions_host_safe": all(
+            c["replay_validation"]["validation_status"] == "accepted" and c["replay_validation"]["host_reached"] is False
+            for c in comparisons
+        ),
+        "comparisons": comparisons,
+    }
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--fixture-dir", type=Path, default=DEFAULT_FIXTURE)
+    parser.add_argument("--out-dir", type=Path)
+    parser.add_argument("--http-endpoint", default="http://127.0.0.1:8765")
+    parser.add_argument("--ws-endpoint", default="ws://127.0.0.1:8765/v1/ws")
+    parser.add_argument("--muslisp", type=Path, default=DEFAULT_MUSLISP)
+    parser.add_argument("--poll-sleep-ms", type=int, default=50)
+    parser.add_argument("--poll-count", type=int, default=1400)
+    parser.add_argument("--no-replay", action="store_true")
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    fixture_dir = args.fixture_dir.resolve()
+    muslisp = args.muslisp.resolve()
+    if not muslisp.is_file():
+        print(f"missing muslisp executable: {muslisp}", file=sys.stderr)
+        return 2
+    fixture_manifest = read_json(fixture_dir / "manifest.json")
+    if not isinstance(fixture_manifest, dict):
+        print("fixture manifest must be a JSON object", file=sys.stderr)
+        return 2
+
+    run_id = "minivla-smoke-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_dir = (args.out_dir or (REPO_ROOT / "build/evidence" / run_id)).resolve()
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "frames").mkdir(exist_ok=True)
+    (run_dir / "model-service-cache").mkdir(exist_ok=True)
+
+    health = http_get_json(args.http_endpoint.rstrip("/") + "/health", 5.0)
+    describe = http_get_json(args.http_endpoint.rstrip("/") + "/v1/describe", 5.0)
+
+    uploaded_frames: list[dict[str, object]] = []
+    fixture_frames = fixture_manifest.get("frames", [])
+    if not isinstance(fixture_frames, list) or not fixture_frames:
+        print("fixture manifest has no frames", file=sys.stderr)
+        return 2
+    for frame in fixture_frames:
+        if not isinstance(frame, dict):
+            print("fixture frame entry must be an object", file=sys.stderr)
+            return 2
+        source = fixture_dir / str(frame["file"])
+        expected_sha = str(frame["sha256"])
+        actual_sha = sha256_file(source)
+        if actual_sha != expected_sha:
+            print(f"fixture hash mismatch for {source}: {actual_sha} != {expected_sha}", file=sys.stderr)
+            return 2
+        target = run_dir / "frames" / source.name
+        shutil.copy2(source, target)
+        uploaded = upload_frame(args.http_endpoint, source, 30.0)
+        if not isinstance(uploaded, dict):
+            print(f"frame ingest did not return an object for {source}", file=sys.stderr)
+            return 3
+        frame_record = {
+            "name": source.stem,
+            "source_file": str(source.relative_to(REPO_ROOT)),
+            "bundle_file": str(target.relative_to(run_dir)),
+            "fixture_sha256": actual_sha,
+            **uploaded,
+        }
+        uploaded_frames.append(frame_record)
+        write_json(run_dir / "frames" / f"{source.stem}.frame.json", frame_record)
+
+    write_json(run_dir / "model-service-health.json", health)
+    write_json(run_dir / "model-service-describe.json", describe)
+    write_json(run_dir / "frame_refs.json", {"frames": uploaded_frames})
+
+    record_script = run_dir / "run-record.lisp"
+    record_script.write_text(
+        make_lisp_script(
+            run_dir=run_dir,
+            run_id=run_id,
+            ws_endpoint=args.ws_endpoint,
+            replay_mode="record",
+            event_log_name="events.jsonl",
+            frames=uploaded_frames,
+            poll_sleep_ms=args.poll_sleep_ms,
+            poll_count=args.poll_count,
+        ),
+        encoding="utf-8",
+    )
+    run_muslisp(muslisp, record_script, run_dir / "record.stdout", run_dir / "record.stderr")
+    record_stdout = parse_lisp_json_stdout(run_dir / "record.stdout")
+    record_results = [row for row in record_stdout[2:] if isinstance(row, dict)]
+    write_jsonl(run_dir / "record-results.jsonl", record_results)
+
+    replay_results: list[dict[str, object]] = []
+    if not args.no_replay:
+        replay_script = run_dir / "run-replay.lisp"
+        replay_script.write_text(
+            make_lisp_script(
+                run_dir=run_dir,
+                run_id=run_id,
+                ws_endpoint=args.ws_endpoint,
+                replay_mode="replay",
+                event_log_name="replay-events.jsonl",
+                frames=uploaded_frames,
+                poll_sleep_ms=args.poll_sleep_ms,
+                poll_count=args.poll_count,
+            ),
+            encoding="utf-8",
+        )
+        run_muslisp(muslisp, replay_script, run_dir / "replay.stdout", run_dir / "replay.stderr")
+        replay_stdout = parse_lisp_json_stdout(run_dir / "replay.stdout")
+        replay_results = [row for row in replay_stdout[2:] if isinstance(row, dict)]
+        write_jsonl(run_dir / "replay-results.jsonl", replay_results)
+
+    cache_index = index_cache(run_dir)
+    write_json(run_dir / "request_response_cache_index.json", {"files": cache_index})
+    replay_report = build_report(record_results, replay_results) if replay_results else {}
+    write_json(run_dir / "replay_report.json", replay_report)
+
+    git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True).strip()
+    git_describe = subprocess.check_output(["git", "describe", "--tags", "--always", "--dirty"], cwd=REPO_ROOT, text=True).strip()
+    dirty = subprocess.run(["git", "diff", "--quiet"], cwd=REPO_ROOT).returncode != 0
+    manifest = {
+        "schema": "muesli-bt.evidence.minivla_smoke.v1",
+        "bundle_name": run_dir.name,
+        "generated_at_utc": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "git_sha": git_sha,
+        "git_describe": git_describe,
+        "dirty_worktree": dirty,
+        "fixture_manifest": str((fixture_dir / "manifest.json").relative_to(REPO_ROOT)),
+        "model_service": {
+            "http_endpoint": args.http_endpoint,
+            "ws_endpoint": args.ws_endpoint,
+            "health": health,
+            "capability": "cap.vla.action_chunk.v1",
+            "backend": "minivla",
+        },
+        "artefacts": {
+            "events": "events.jsonl",
+            "replay_events": "replay-events.jsonl",
+            "manifest": "manifest.json",
+            "replay_report": "replay_report.json",
+            "request_response_cache": "model-service-cache/",
+            "request_response_cache_index": "request_response_cache_index.json",
+            "frame_refs": "frame_refs.json",
+            "record_results": "record-results.jsonl",
+            "replay_results": "replay-results.jsonl",
+        },
+        "hashes": {
+            "events_jsonl_sha256": sha256_file(run_dir / "events.jsonl"),
+            "record_results_jsonl_sha256": sha256_file(run_dir / "record-results.jsonl"),
+            "replay_events_jsonl_sha256": sha256_file(run_dir / "replay-events.jsonl")
+            if (run_dir / "replay-events.jsonl").exists()
+            else None,
+            "replay_results_jsonl_sha256": sha256_file(run_dir / "replay-results.jsonl")
+            if (run_dir / "replay-results.jsonl").exists()
+            else None,
+            "replay_report_json_sha256": sha256_file(run_dir / "replay_report.json"),
+        },
+        "summary": {
+            "record_runs": len(record_results),
+            "replay_runs": len(replay_results),
+            "record_successes": sum(
+                1 for row in record_results if row.get("status") == ":done" and row.get("final", {}).get("status") == ":ok"
+            ),
+            "replay_successes": sum(
+                1 for row in replay_results if row.get("status") == ":done" and row.get("final", {}).get("status") == ":ok"
+            ),
+            "cache_files": len(cache_index),
+            "all_replay_hits": replay_report.get("all_replay_hits") if replay_report else None,
+            "all_actions_match": replay_report.get("all_actions_match") if replay_report else None,
+            "all_record_actions_host_safe": replay_report.get("all_record_actions_host_safe") if replay_report else None,
+        },
+    }
+    write_json(run_dir / "manifest.json", manifest)
+
+    failures = []
+    if manifest["summary"]["record_successes"] != manifest["summary"]["record_runs"]:
+        failures.append("record successes do not match record run count")
+    if replay_results and manifest["summary"]["replay_successes"] != manifest["summary"]["replay_runs"]:
+        failures.append("replay successes do not match replay run count")
+    if replay_results and not replay_report.get("all_replay_hits"):
+        failures.append("not all replay calls hit the replay cache")
+    if replay_results and not replay_report.get("all_actions_match"):
+        failures.append("replayed actions do not match recorded actions")
+    if replay_results and not replay_report.get("all_record_actions_host_safe"):
+        failures.append("recorded actions were not all accepted host-safe proposals")
+
+    print(json.dumps({"run_dir": str(run_dir), "summary": manifest["summary"], "failures": failures}, indent=2))
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

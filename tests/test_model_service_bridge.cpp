@@ -40,6 +40,7 @@ public:
         }
         ops.push_back(bt::model_service_operation_name(request.op));
         refs_seen += request.refs_json.size();
+        refs_json.insert(refs_json.end(), request.refs_json.begin(), request.refs_json.end());
         bt::model_service_response response;
         response.id = request.id;
         response.metadata_json = "{\"service\":\"fake\"}";
@@ -72,6 +73,7 @@ public:
     }
 
     std::vector<std::string> ops;
+    std::vector<std::string> refs_json;
     std::size_t refs_seen = 0;
     std::atomic<int> step_calls{0};
 
@@ -209,6 +211,8 @@ int main() {
     check(fake_ptr->ops[1] == "step", "model-service VLA backend should step the session");
     check(fake_ptr->ops.back() == "close", "model-service VLA backend should close the session");
     check(fake_ptr->refs_seen >= 3, "model-service VLA calls should carry frame refs");
+    check(!fake_ptr->refs_json.empty() && fake_ptr->refs_json[0].find("\"name\":\"camera1\"") != std::string::npos,
+          "model-service VLA refs should use the camera1 frame stream");
     check(!poll.final->model_service_request_hashes.empty(), "model-service VLA final should include request hashes");
     check(!poll.final->model_service_response_hashes.empty(), "model-service VLA final should include response hashes");
     check(!poll.final->frame_refs.empty(), "model-service VLA final should include frame refs");

@@ -12,6 +12,7 @@
 #include <limits>
 #include <optional>
 #include <sstream>
+#include <thread>
 #include <utility>
 
 #include "bt/blackboard.hpp"
@@ -647,6 +648,19 @@ value builtin_time_now_ms(const std::vector<value>& args) {
     const auto now = std::chrono::steady_clock::now().time_since_epoch();
     const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
     return make_integer(ms);
+}
+
+value builtin_time_sleep_ms(const std::vector<value>& args) {
+    require_arity("time.sleep-ms", args, 1);
+    if (!is_integer(args[0])) {
+        throw lisp_error("time.sleep-ms: expected non-negative integer");
+    }
+    const std::int64_t ms = integer_value(args[0]);
+    if (ms < 0) {
+        throw lisp_error("time.sleep-ms: expected non-negative integer");
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
+    return make_nil();
 }
 
 value builtin_rng_make(const std::vector<value>& args) {
@@ -3372,6 +3386,7 @@ void install_core_builtins(env_ptr global_env) {
     bind_primitive(global_env, "float?", builtin_float_pred);
     bind_primitive(global_env, "zero?", builtin_zero_pred);
     bind_primitive(global_env, "time.now-ms", builtin_time_now_ms);
+    bind_primitive(global_env, "time.sleep-ms", builtin_time_sleep_ms);
     bind_primitive(global_env, "hash64", builtin_hash64);
     bind_primitive(global_env, "json.encode", builtin_json_encode);
     bind_primitive(global_env, "json.decode", builtin_json_decode);

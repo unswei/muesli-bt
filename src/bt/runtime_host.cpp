@@ -251,7 +251,7 @@ std::string vla_request_to_model_service_input_json(const vla_request& request) 
         << ",\"timestamp_ms\":" << request.observation.timestamp_ms
         << ",\"frame_id\":\"" << json_escape_string_fragment(request.observation.frame_id) << "\"";
     if (request.observation.frame_id.rfind("frame://", 0) == 0) {
-        out << ",\"images\":{\"camera\":{\"ref\":\"" << json_escape_string_fragment(request.observation.frame_id)
+        out << ",\"images\":{\"camera1\":{\"ref\":\"" << json_escape_string_fragment(request.observation.frame_id)
             << "\"}}";
     }
     out << "},\"action_space\":{\"type\":\"" << json_escape_string_fragment(request.action_space.type)
@@ -271,7 +271,7 @@ std::vector<std::string> vla_model_service_frame_refs(const vla_request& request
 }
 
 std::string frame_ref_to_model_service_ref_json(std::string_view ref) {
-    return "{\"type\":\"frame\",\"name\":\"camera\",\"ref\":\"" + json_escape_string_fragment(ref) + "\"}";
+    return "{\"type\":\"frame\",\"name\":\"camera1\",\"ref\":\"" + json_escape_string_fragment(ref) + "\"}";
 }
 
 std::optional<std::vector<double>> extract_first_action_values(std::string_view output_json) {

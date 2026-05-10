@@ -83,6 +83,7 @@ Use [Language Syntax](../syntax.md) and [Language Semantics](../semantics.md) fo
 ### Time
 
 - [`time.now-ms`](builtins/time/time-now-ms.md)
+- [`time.sleep-ms`](builtins/time/time-sleep-ms.md)
 
 ### JSON
 

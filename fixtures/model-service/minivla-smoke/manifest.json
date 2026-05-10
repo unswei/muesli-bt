@@ -1,0 +1,46 @@
+{
+  "frames": [
+    {
+      "camera": "camera1",
+      "file": "frames/webots-epuck-goal-clear-path.jpg",
+      "height": 224,
+      "media_type": "image/jpeg",
+      "sha256": "d4f61beb2a336440c92548279069af7e5aa8b54d6a66a2fe18de62d045e3bf54",
+      "width": 224
+    },
+    {
+      "camera": "camera1",
+      "file": "frames/webots-epuck-goal-obstacle-ahead.jpg",
+      "height": 224,
+      "media_type": "image/jpeg",
+      "sha256": "5bb9ad86678f8c5ec7a16f98fe2890edb131eb46f87207fd0f1a83ca89872059",
+      "width": 224
+    },
+    {
+      "camera": "camera1",
+      "file": "frames/webots-epuck-goal-start.jpg",
+      "height": 224,
+      "media_type": "image/jpeg",
+      "sha256": "c25bcc6a650ff8a874daf505be1534f0e63c70895419deed8762154decb31d2f",
+      "width": 224
+    },
+    {
+      "camera": "camera1",
+      "file": "frames/webots-epuck-goal-turn-left.jpg",
+      "height": 224,
+      "media_type": "image/jpeg",
+      "sha256": "9521ecb07706faa0a20697b170fb6e86f183f86505f6642cc68b24af13a9b8c2",
+      "width": 224
+    }
+  ],
+  "purpose": "Redistributable Webots robot-camera frames for MiniVLA model-service smoke and replay evidence.",
+  "schema": "muesli-bt.minivla_smoke_frames.v1",
+  "source": {
+    "base_world": "examples/webots_epuck_goal/worlds/epuck_goal_cluttered.wbt",
+    "capture_controller": "build/webots-minivla-frame-capture/controllers/capture_frames/capture_frames.py",
+    "capture_world": "build/webots-minivla-frame-capture/worlds/minivla_frame_capture_plain.wbt",
+    "notes": "The capture world uses a plain synthetic sky and the muesli-bt e-puck cluttered-goal arena. Frames are robot-camera images saved through Webots Camera.saveImage.",
+    "simulator": "Webots",
+    "webots_home": "/Users/oliver/Code/2026/webots"
+  }
+}
