@@ -134,6 +134,8 @@ The first validation gates run on successful model-service proposals. World-mode
 
 `cap_call_end` includes deterministic request/response hashes and validation status. In `record` mode, the raw response envelope is written under `replay_cache_path` using the request hash as the file name. In `replay` mode, `muesli-bt` reads that cached response, re-runs the validation gate, and reports `replay_cache_hit=true`.
 
+The same request-hash replay cache is used for VLA sessions. The `model-service` VLA backend records `start`, `step`, `cancel`, and `close` envelopes independently. VLA final results and VLA record JSON include model-service request hashes, response hashes, replay-cache hit status, and any `frame://` refs carried by the session.
+
 Deterministic fault injection is available through `fault_schedule`. Entries are consumed in order for non-replay calls. Supported entries are `none`, `delay:<ms>`, `timeout`, `unavailable`, `invalid_output`, `unsafe_output`, `stale_result`, and `policy_violation`. This is intended for reproducible validation and evidence runs, not as a production retry policy.
 
 The `check` field sends a `describe` request and verifies the first required `MMSP v0.2` capability ids are present before runtime use. The same gate is available explicitly as `(model-service.check)`.
@@ -247,6 +249,17 @@ To route the existing VLA API through the model service, configure the bridge an
 ```
 
 The BT source still sees an ordinary VLA job id. The backend adapter performs `start`, one or more `step` calls, best-effort `cancel` when the runtime cancels the job, and `close` when the session reaches a terminal result.
+
+`vla.poll` final responses include a `model_service` map when the session used the bridge:
+
+```lisp
+;; selected fields
+{:model_service
+  {:request_hashes ("...")
+   :response_hashes ("...")
+   :frame_refs ("frame://camera1/123456789")
+   :replay_cache_hit false}}
+```
 
 ## example
 

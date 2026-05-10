@@ -104,6 +104,17 @@ std::string action_to_json(const vla_action& action) {
     return out.str();
 }
 
+void append_json_string_array(std::ostringstream& out, const std::vector<std::string>& values) {
+    out << '[';
+    for (std::size_t i = 0; i < values.size(); ++i) {
+        if (i != 0) {
+            out << ',';
+        }
+        out << '"' << json_escape(values[i]) << '"';
+    }
+    out << ']';
+}
+
 std::string response_to_json_local(const vla_response& response) {
     std::ostringstream out;
     out << "{\"status\":\"" << vla_status_name(response.status) << "\",\"action\":" << action_to_json(response.action)
@@ -123,6 +134,16 @@ std::string response_to_json_local(const vla_response& response) {
             out << "\"" << json_escape(k) << "\":" << v;
         }
         out << '}';
+    }
+    if (!response.model_service_request_hashes.empty() || !response.model_service_response_hashes.empty() ||
+        !response.frame_refs.empty() || response.model_service_replay_cache_hit) {
+        out << ",\"model_service\":{\"request_hashes\":";
+        append_json_string_array(out, response.model_service_request_hashes);
+        out << ",\"response_hashes\":";
+        append_json_string_array(out, response.model_service_response_hashes);
+        out << ",\"frame_refs\":";
+        append_json_string_array(out, response.frame_refs);
+        out << ",\"replay_cache_hit\":" << (response.model_service_replay_cache_hit ? "true" : "false") << '}';
     }
     out << '}';
     return out.str();
@@ -579,6 +600,10 @@ vla_service::vla_job_id vla_service::submit(const vla_request& request) {
                 immediate_record.status = "done";
                 immediate_record.latency_ms = 0.0;
                 immediate_record.response_json = response_to_json_local(*state->final);
+                immediate_record.model_service_request_hashes = state->final->model_service_request_hashes;
+                immediate_record.model_service_response_hashes = state->final->model_service_response_hashes;
+                immediate_record.frame_refs = state->final->frame_refs;
+                immediate_record.model_service_replay_cache_hit = state->final->model_service_replay_cache_hit;
                 immediate_record.cache_hit = true;
                 emit_immediate_record = true;
             }
@@ -715,6 +740,10 @@ vla_service::vla_job_id vla_service::submit(const vla_request& request) {
             rec.status = vla_job_status_name(state->status);
             rec.latency_ms = latency;
             rec.response_json = response_to_json_local(response);
+            rec.model_service_request_hashes = response.model_service_request_hashes;
+            rec.model_service_response_hashes = response.model_service_response_hashes;
+            rec.frame_refs = response.frame_refs;
+            rec.model_service_replay_cache_hit = response.model_service_replay_cache_hit;
             rec.cache_hit = state->cache_hit;
             rec.replay_hit = state->replay_hit;
             rec.superseded = state->superseded;
@@ -1066,6 +1095,13 @@ std::string vla_service::record_to_json(const vla_record& record) const {
         << "\"replay_hit\":" << (record.replay_hit ? "true" : "false") << ','
         << "\"superseded\":" << (record.superseded ? "true" : "false") << ','
         << "\"completion_dropped\":" << (record.completion_dropped ? "true" : "false") << ','
+        << "\"model_service\":{\"request_hashes\":";
+    append_json_string_array(out, record.model_service_request_hashes);
+    out << ",\"response_hashes\":";
+    append_json_string_array(out, record.model_service_response_hashes);
+    out << ",\"frame_refs\":";
+    append_json_string_array(out, record.frame_refs);
+    out << ",\"replay_cache_hit\":" << (record.model_service_replay_cache_hit ? "true" : "false") << "},"
         << "\"response\":" << record.response_json << '}';
     return out.str();
 }

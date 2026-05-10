@@ -10,7 +10,7 @@ Use the public `v1.0` direction page under `docs/project/v1-direction.md` for th
 - `v0.8.0`: implement canonical host capability lifecycle events for real runtime-affecting capability calls; use `cap_call_start` and `cap_call_end` in `mbt.evt.v1`, including request id, capability name, operation, status, latency, rejection/error reason where applicable, and enough tick/job context for replay and first-divergence reports
 - `v0.8.0`: freeze the `MMSP v0.2` bridge profile that `muesli-bt` will accept: `describe` compatibility checks, public capability ids, `status: "action_chunk"` with `output.actions`, service-local `frame://` refs, timeout semantics, and no-service fallback behaviour
 - `v0.8.0`: deepen `describe` compatibility checks beyond the first capability-presence gate, including mode/schema/freshness/replay fields and incompatible descriptor diagnostics
-- `v0.8.0`: continue model-service capability paths after the first stateless `cap.call` world-model path and initial VLA session adapter: redaction, richer replay reports, session replay parity, session fault schedules, and evidence outputs
+- `v0.8.0`: continue model-service capability paths after the first stateless `cap.call` world-model path and initial VLA session adapter: redaction, richer replay reports, session fault schedules, and evidence outputs
 - `v0.8.0`: add a host-side frame-ingest helper or documented adapter path for live VLA observations, so camera bytes are published through `PUT /v1/frames/{name}` and BT-visible model requests carry `frame://` refs rather than image payloads
 - `v0.8.0`: extend validation gates beyond the first stateless model-service output checks and VLA action-chunk gate, covering host action dispatch, stale timing windows, and supported injected tests where invalid outputs reach the host zero times
 - `v0.8.0`: publish one real model-backed async capability path for the flagship lane, extending the first stateless deterministic fault schedules into replay parity checks, fallback metrics, cancellation outcome, and host-reach-zero evidence
@@ -57,6 +57,7 @@ Use the public `v1.0` direction page under `docs/project/v1-direction.md` for th
 - `v0.8.0`: add the first deterministic model-service fault schedule for stateless `cap.call`, covering invalid output, unsafe output, stale result, timeout, unavailable, and delay injection
 - `v0.8.0`: wire the optional model-service client into the existing VLA lifecycle by registering a `model-service` VLA backend that maps `vla.submit` / `vla.poll` / `vla.cancel` onto `MMSP v0.2` `start` / `step` / `cancel` / `close` sessions
 - `v0.8.0`: add the first VLA `action_chunk` validation gate for model-service outputs, rejecting malformed, stale, unsafe, late, and policy-violating proposals before host reach
+- `v0.8.0`: extend request/response hashing and replay-cache support from stateless `cap.call` to VLA sessions, including `frame://` refs, response hashes, replay-cache hit reporting, and VLA records
 - `v0.5.0`: publish the final release notes from the green release baseline
 - `v0.6.0`: define host capability bundle naming and registration rules without changing BT or Lisp semantics
 - `v0.6.0`: make the boundary between `env.*`, `planner.plan`, and external host capabilities explicit in docs and examples

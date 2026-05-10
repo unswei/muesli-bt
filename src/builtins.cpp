@@ -1308,6 +1308,17 @@ value vla_action_to_lisp(const bt::vla_action& action) {
     return out;
 }
 
+value string_list_to_lisp(const std::vector<std::string>& values) {
+    std::vector<value> items;
+    items.reserve(values.size());
+    gc_root_scope roots(default_gc());
+    for (const std::string& item : values) {
+        items.push_back(make_string(item));
+        roots.add(&items.back());
+    }
+    return list_from_vector(items);
+}
+
 value vla_response_to_lisp(const bt::vla_response& response) {
     value out = make_map();
     gc_root_scope roots(default_gc());
@@ -1332,6 +1343,22 @@ value vla_response_to_lisp(const bt::vla_response& response) {
     value stats = doubles_map_to_lisp_map(response.stats);
     roots.add(&stats);
     map_set_symbol(out, "stats", stats);
+    if (!response.model_service_request_hashes.empty() || !response.model_service_response_hashes.empty() ||
+        !response.frame_refs.empty() || response.model_service_replay_cache_hit) {
+        value model_service = make_map();
+        roots.add(&model_service);
+        value request_hashes = string_list_to_lisp(response.model_service_request_hashes);
+        roots.add(&request_hashes);
+        map_set_symbol(model_service, "request_hashes", request_hashes);
+        value response_hashes = string_list_to_lisp(response.model_service_response_hashes);
+        roots.add(&response_hashes);
+        map_set_symbol(model_service, "response_hashes", response_hashes);
+        value frame_refs = string_list_to_lisp(response.frame_refs);
+        roots.add(&frame_refs);
+        map_set_symbol(model_service, "frame_refs", frame_refs);
+        map_set_symbol(model_service, "replay_cache_hit", make_boolean(response.model_service_replay_cache_hit));
+        map_set_symbol(out, "model_service", model_service);
+    }
     return out;
 }
 

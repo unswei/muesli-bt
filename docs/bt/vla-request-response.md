@@ -68,6 +68,14 @@ Top-level fields:
 - `explanation` (optional string)
 - `model` (map)
 - `stats` (map)
+- `model_service` (optional map, present when a VLA session used the model-service bridge)
+
+`model_service` fields:
+
+- `request_hashes` (list of strings)
+- `response_hashes` (list of strings)
+- `frame_refs` (list of `frame://` refs)
+- `replay_cache_hit` (boolean)
 
 Action map forms:
 

@@ -1,8 +1,9 @@
 #include "bt/model_service.hpp"
 #include "bt/runtime_host.hpp"
 
-#include <cstdlib>
 #include <chrono>
+#include <cstdlib>
+#include <filesystem>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -23,11 +24,18 @@ class fake_vla_model_service_client final : public bt::model_service_client {
 public:
     explicit fake_vla_model_service_client(
         std::string step_output =
-            "{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,-0.1],\"dt_ms\":200}]}")
-        : step_output_(std::move(step_output)) {}
+            "{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,-0.1],\"dt_ms\":200}]}",
+        bool fail_on_call = false)
+        : step_output_(std::move(step_output)), fail_on_call_(fail_on_call) {}
 
     bt::model_service_response call(const bt::model_service_request& request) override {
+        if (fail_on_call_) {
+            std::cerr << "FAIL: replay mode unexpectedly contacted fake service for op "
+                      << bt::model_service_operation_name(request.op) << '\n';
+            std::exit(1);
+        }
         ops.push_back(bt::model_service_operation_name(request.op));
+        refs_seen += request.refs_json.size();
         bt::model_service_response response;
         response.id = request.id;
         response.metadata_json = "{\"service\":\"fake\"}";
@@ -52,9 +60,11 @@ public:
     }
 
     std::vector<std::string> ops;
+    std::size_t refs_seen = 0;
 
 private:
     std::string step_output_;
+    bool fail_on_call_ = false;
 };
 
 bt::model_service_response validate_action_chunk_output(const std::string& output_json) {
@@ -83,6 +93,7 @@ bt::vla_request make_model_service_vla_request() {
     vla.model.name = "model-service";
     vla.model.version = "test";
     vla.observation.state = {0.0, 0.0};
+    vla.observation.frame_id = "frame://camera1/123456789";
     vla.action_space.type = "continuous";
     vla.action_space.dims = 2;
     vla.action_space.bounds = {{-1.0, 1.0}, {-1.0, 1.0}};
@@ -91,13 +102,7 @@ bt::vla_request make_model_service_vla_request() {
     return vla;
 }
 
-bt::vla_poll run_model_service_vla(std::string output_json) {
-    bt::runtime_host host;
-    auto fake = std::make_unique<fake_vla_model_service_client>(std::move(output_json));
-    bt::model_service_config fake_cfg;
-    host.set_model_service_client(fake_cfg, std::move(fake));
-
-    const bt::vla_service::vla_job_id job = host.vla_ref().submit(make_model_service_vla_request());
+bt::vla_poll wait_for_terminal_vla(bt::runtime_host& host, bt::vla_service::vla_job_id job) {
     bt::vla_poll poll;
     for (int i = 0; i < 100; ++i) {
         poll = host.vla_ref().poll(job);
@@ -108,6 +113,16 @@ bt::vla_poll run_model_service_vla(std::string output_json) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     return poll;
+}
+
+bt::vla_poll run_model_service_vla(std::string output_json) {
+    bt::runtime_host host;
+    auto fake = std::make_unique<fake_vla_model_service_client>(std::move(output_json));
+    bt::model_service_config fake_cfg;
+    host.set_model_service_client(fake_cfg, std::move(fake));
+
+    const bt::vla_service::vla_job_id job = host.vla_ref().submit(make_model_service_vla_request());
+    return wait_for_terminal_vla(host, job);
 }
 
 }  // namespace
@@ -157,15 +172,7 @@ int main() {
     host.set_model_service_client(fake_cfg, std::move(fake));
 
     const bt::vla_service::vla_job_id job = host.vla_ref().submit(make_model_service_vla_request());
-    bt::vla_poll poll;
-    for (int i = 0; i < 100; ++i) {
-        poll = host.vla_ref().poll(job);
-        if (poll.status == bt::vla_job_status::done || poll.status == bt::vla_job_status::error ||
-            poll.status == bt::vla_job_status::timeout || poll.status == bt::vla_job_status::cancelled) {
-            break;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
+    bt::vla_poll poll = wait_for_terminal_vla(host, job);
     check(poll.status == bt::vla_job_status::done, "model-service VLA job should complete");
     check(poll.final.has_value(), "model-service VLA job should return final response");
     check(poll.final->status == bt::vla_status::ok, "model-service VLA final response should be ok");
@@ -176,6 +183,55 @@ int main() {
     check(fake_ptr->ops[0] == "start", "model-service VLA backend should start a session first");
     check(fake_ptr->ops[1] == "step", "model-service VLA backend should step the session");
     check(fake_ptr->ops.back() == "close", "model-service VLA backend should close the session");
+    check(fake_ptr->refs_seen >= 3, "model-service VLA calls should carry frame refs");
+    check(!poll.final->model_service_request_hashes.empty(), "model-service VLA final should include request hashes");
+    check(!poll.final->model_service_response_hashes.empty(), "model-service VLA final should include response hashes");
+    check(!poll.final->frame_refs.empty(), "model-service VLA final should include frame refs");
+    check(poll.final->frame_refs[0] == "frame://camera1/123456789",
+          "model-service VLA final should preserve frame ref");
+
+    const std::filesystem::path replay_dir =
+        std::filesystem::temp_directory_path() /
+        ("muesli-bt-vla-replay-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+    {
+        bt::runtime_host record_host;
+        auto record_fake = std::make_unique<fake_vla_model_service_client>();
+        bt::model_service_config record_cfg;
+        record_cfg.replay_mode = "record";
+        record_cfg.replay_cache_path = replay_dir.string();
+        record_host.set_model_service_client(record_cfg, std::move(record_fake));
+        const bt::vla_poll record_poll =
+            wait_for_terminal_vla(record_host, record_host.vla_ref().submit(make_model_service_vla_request()));
+        check(record_poll.status == bt::vla_job_status::done, "recorded VLA session should complete");
+        check(record_poll.final.has_value(), "recorded VLA session should produce final response");
+        check(!record_poll.final->model_service_request_hashes.empty(),
+              "recorded VLA session should expose request hashes");
+        check(!record_poll.final->model_service_response_hashes.empty(),
+              "recorded VLA session should expose response hashes");
+    }
+    {
+        bt::runtime_host replay_host;
+        auto replay_fake = std::make_unique<fake_vla_model_service_client>(
+            "{\"actions\":[{\"type\":\"joint_targets\",\"values\":[9.0,9.0],\"dt_ms\":200}]}", true);
+        bt::model_service_config replay_cfg;
+        replay_cfg.replay_mode = "replay";
+        replay_cfg.replay_cache_path = replay_dir.string();
+        replay_host.set_model_service_client(replay_cfg, std::move(replay_fake));
+        const bt::vla_poll replay_poll =
+            wait_for_terminal_vla(replay_host, replay_host.vla_ref().submit(make_model_service_vla_request()));
+        check(replay_poll.status == bt::vla_job_status::done, "replayed VLA session should complete");
+        check(replay_poll.final.has_value(), "replayed VLA session should produce final response");
+        check(replay_poll.final->model_service_replay_cache_hit,
+              "replayed VLA session should report model-service replay cache hit");
+        check(replay_poll.final->action.u[0] == 0.2 && replay_poll.final->action.u[1] == -0.1,
+              "replayed VLA session should use cached action output");
+        const std::string records = replay_host.dump_vla_records();
+        check(records.find("response_hashes") != std::string::npos,
+              "VLA records should include model-service response hashes");
+        check(records.find("frame://camera1/123456789") != std::string::npos,
+              "VLA records should include frame refs");
+    }
+    std::filesystem::remove_all(replay_dir);
 
     const bt::model_service_response malformed =
         validate_action_chunk_output("{\"actions\":[{\"type\":\"joint_targets\",\"values\":[0.2,\"bad\"],\"dt_ms\":200}]}");

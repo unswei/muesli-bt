@@ -16,6 +16,7 @@ muesli-bt
 - Added deterministic model-service fault schedules for stateless `cap.call` tests, covering invalid output, unsafe output, stale result, timeout, unavailable, and delay injection.
 - Added the first optional model-service VLA session adapter, mapping the existing `vla.submit` / `vla.poll` / `vla.cancel` lifecycle to `MMSP v0.2` `start` / `step` / `cancel` / `close` calls when a request selects the `model-service` backend.
 - Added VLA `action_chunk` validation gates for model-service outputs, rejecting malformed, stale, unsafe, late, and policy-violating proposals before host reach.
+- Extended model-service request/response hashing and replay-cache support to VLA sessions, including `frame://` refs, per-session request/response hashes, replay-cache hit reporting, and VLA record output.
 
 ### Changed
 - Clarified the `muesli-model-service` bridge response shape for VLA sessions: `step` returns `status: "action_chunk"` with proposed host actions under `output.actions`, and those actions remain untrusted until host-side validation accepts them.

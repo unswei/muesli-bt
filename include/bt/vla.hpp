@@ -149,6 +149,10 @@ struct vla_response {
     std::string explanation{};
     vla_model_info model{};
     std::unordered_map<std::string, double> stats{};
+    std::vector<std::string> model_service_request_hashes{};
+    std::vector<std::string> model_service_response_hashes{};
+    std::vector<std::string> frame_refs{};
+    bool model_service_replay_cache_hit = false;
 };
 
 struct vla_partial {
@@ -181,6 +185,10 @@ struct vla_record {
     std::string status;
     double latency_ms = 0.0;
     std::string response_json;
+    std::vector<std::string> model_service_request_hashes{};
+    std::vector<std::string> model_service_response_hashes{};
+    std::vector<std::string> frame_refs{};
+    bool model_service_replay_cache_hit = false;
     bool cache_hit = false;
     bool replay_hit = false;
     bool superseded = false;
