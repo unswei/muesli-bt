@@ -40,6 +40,8 @@ Public headers for this flow:
 - `bt/event_log.hpp`
 - integration headers (PyBullet: `pybullet/extension.hpp`, `pybullet/racecar_demo.hpp`; Webots: `webots/extension.hpp`; ROS2: `ros2/extension.hpp`, `ros2/backend.hpp`)
 
+For a direct robot loop, start with [embedding a minimal robot loop](../tutorials/embedding-minimal-robot-loop.md). That path uses `bt::registry`, `bt::tick`, and `bt::event_log` directly. `bt::runtime_host` remains useful for scripts, tests, examples, and service ownership, but it is not required for the smallest embedding.
+
 Event callback interface for inspectors:
 
 - `bt::event_log::set_line_listener(...)`: consume canonical pre-serialised `mbt.evt.v1` JSONL lines.

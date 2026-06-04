@@ -5,7 +5,7 @@
 
 ## what this is
 
-This tutorial shows the first generated guarded recovery subtree slice.
+This tutorial shows a deterministic generated guarded recovery subtree.
 
 A deterministic template reads a blocked-path context and emits a Lisp Behaviour Tree (BT) subtree. The fragment is treated as untrusted data. The validator checks node shape, host callbacks, capability names, planner budget, and fallback policy before the fixture records an install-at-tick-boundary event.
 
@@ -84,9 +84,9 @@ The fragment has three safety properties:
 
 ## gotchas
 
-This slice records install events as deterministic fixture evidence. It is not yet a released C++ runtime hot-swap API.
+The install events in this tutorial are deterministic fixture evidence. Live C++ runtime hot-swap is not part of the released API.
 
-The generator is deterministic on purpose. A planner or model can later fill in recovery parameters, but the subtree structure should still be produced by a constrained compiler and checked by the same validator.
+The generator is deterministic on purpose. A planner or model can fill in recovery parameters, but the subtree structure should still be produced by a constrained compiler and checked by the same validator.
 
 Hashes identify artefacts for replay and comparison. They are not a safety boundary.
 

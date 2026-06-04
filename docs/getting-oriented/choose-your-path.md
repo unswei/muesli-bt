@@ -2,44 +2,47 @@
 
 Use this page when you know what you want to do, but not which part of the documentation to read first.
 
-## I just want to run it
+## write and run a small BT
+
+Start here if you want to learn the runtime without a simulator.
 
 1. [first 10 minutes](../getting-started-10min.md)
 2. [Hello BT](../examples/hello-bt.md)
-3. [PyBullet e-puck-style goal seeking](../examples/pybullet-epuck-goal.md)
+3. [minimal real BT](../examples/minimal-real-bt.md)
+4. [Behaviour Tree semantics](../bt/semantics.md)
 
-## I know Behaviour Trees and want the semantics
+## connect a robot or simulator
 
-1. [Behaviour Trees: introduction](../bt/intro.md)
-2. [why Lisp as the BT DSL?](why-lisp-dsl.md)
-3. [BehaviorTree.CPP crosswalk](../bt/cpp-crosswalk.md)
+Start here if you have robot, simulator, or middleware code and need to attach it to the BT runtime.
+
+1. [embedding a minimal robot loop](../tutorials/embedding-minimal-robot-loop.md)
+2. [integration overview](../integration/overview.md)
+3. [env API](../integration/env-api.md)
+4. [writing a backend](../integration/writing-a-backend.md)
+5. [ROS2 tutorial](../integration/ros2-tutorial.md)
+
+## inspect logs and replay evidence
+
+Start here if you need traceability, validation, or reproducible run artefacts.
+
+1. [runtime contract in practice](../tutorials/runtime-contract-in-practice.md)
+2. [canonical event log](../observability/event-log.md)
+3. [conformance levels](../contracts/conformance.md)
 4. [runtime contract v1](../contracts/runtime-contract-v1.md)
-5. [conformance levels](../contracts/conformance.md)
 
-## I want to connect a robot or simulator
+## use advanced planner, VLA, or generated-fragment features
 
-1. [integration overview](../integration/overview.md)
-2. [env API](../integration/env-api.md)
-3. [writing a backend](../integration/writing-a-backend.md)
-4. [ROS2 tutorial](../integration/ros2-tutorial.md)
+Start here after you understand basic BT ticking and host integration.
 
-## I care about reproducible evidence
+1. [bounded-time planning](../planning/overview.md)
+2. [`plan-action` node](../planning/plan-action-node.md)
+3. [VLA integration](../bt/vla-integration.md)
+4. [VLA BT nodes](../bt/vla-nodes.md)
+5. [generated guarded recovery](../tutorials/generated-guarded-recovery.md)
 
-1. [runtime contract v1](../contracts/runtime-contract-v1.md)
-2. [conformance levels](../contracts/conformance.md)
-3. [runtime performance](../internals/runtime-performance.md)
-4. [benchmark harness](https://github.com/unswei/muesli-bt/blob/main/bench/README.md)
-5. [roadmap to 1.0](../roadmap-to-1.0.md)
+## understand project limits
 
-## I want model or VLA integration
-
-1. [VLA integration](../bt/vla-integration.md)
-2. [VLA nodes](../bt/vla-nodes.md)
-3. [VLA request/response](../bt/vla-request-response.md)
-4. [host capability bundles](../integration/host-capability-bundles.md)
-5. [roadmap to 1.0](../roadmap-to-1.0.md)
-
-## I want to understand the project limits
+Use these pages before depending on experimental or planned features.
 
 1. [known limitations](../known-limitations.md)
 2. [current maturity table](../index.md#current-maturity)

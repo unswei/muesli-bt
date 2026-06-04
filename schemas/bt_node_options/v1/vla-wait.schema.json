@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unswei.github.io/muesli-bt/schemas/bt_node_options/v1/vla-wait.schema.json",
+  "title": "vla-wait BT node options",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    ":name": { "type": "string" },
+    ":job_key": { "type": "string", "default": "<name>.job_id" },
+    ":action_key": { "type": "string", "default": "action" },
+    ":meta_key": { "type": "string" },
+    ":early_commit": { "type": "boolean", "default": false },
+    ":early_confidence": { "type": "number", "default": 1.1 },
+    ":cancel_on_early_commit": { "type": "boolean", "default": true },
+    ":clear_job": { "type": "boolean", "default": true }
+  }
+}

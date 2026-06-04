@@ -26,10 +26,12 @@ add_library(
   muesli_bt_core
   src/bt/blackboard.cpp
   src/bt/compiler.cpp
+  src/bt/event_payload.cpp
   src/bt/event_log.cpp
   src/bt/instance.cpp
   src/bt/logging.cpp
   src/bt/model_service.cpp
+  src/bt/node_options.cpp
   src/bt/planner.cpp
   src/bt/profile.cpp
   src/bt/registry.cpp
@@ -464,6 +466,22 @@ if (Python3_Interpreter_FOUND)
     NAME muesli_bt_generated_guarded_recovery
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_generated_guarded_recovery.py"
   )
+  add_test(
+    NAME muesli_bt_bt_node_option_docs
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-bt-node-option-docs.py"
+  )
+  add_test(
+    NAME muesli_bt_docs_user_prose
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-docs-user-prose.py"
+  )
+  add_test(
+    NAME muesli_bt_docs_snippet_freshness
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_docs_snippet_freshness.py"
+  )
+  add_test(
+    NAME muesli_bt_reference_coverage
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-reference-coverage.py"
+  )
 endif ()
 
 if (MUESLI_BT_BUILD_BENCHMARKS)
@@ -556,6 +574,11 @@ install(
 
 install(FILES schemas/event_log/v1/mbt.evt.v1.schema.json
         DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/schemas/event_log/v1
+)
+
+install(
+  DIRECTORY schemas/bt_node_options/
+  DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/schemas/bt_node_options
 )
 
 install(

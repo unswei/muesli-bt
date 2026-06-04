@@ -71,6 +71,7 @@ nav:
   - Tutorials:
       - Runtime Contract In Practice: tutorials/runtime-contract-in-practice.md
       - Generated Guarded Recovery: tutorials/generated-guarded-recovery.md
+      - Embed A Minimal Robot Loop: tutorials/embedding-minimal-robot-loop.md
       - Hello BT: examples/hello-bt.md
       - Minimal Real BT: examples/minimal-real-bt.md
       - Lisp Basics: examples/lisp-basics.md

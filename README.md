@@ -25,7 +25,7 @@ Robotics task logic often needs more than a plain BT tick:
 - execution traces must be good enough for debugging, conformance, and external evaluation;
 - simulator and ROS2 backends should not redefine the BT semantics.
 
-`muesli-bt` keeps these concerns explicit through the Lisp BT DSL, the runtime contract, and the canonical `mbt.evt.v1` event stream. The public `v1.0.0` direction is to prove that this runtime can supervise real model-mediated wheeled robot behaviour with validation, replay, and reproducible evidence, without changing BT semantics.
+`muesli-bt` keeps these concerns explicit through the Lisp BT DSL, the runtime contract, and the canonical `mbt.evt.v1` event stream. The supported core keeps BT semantics stable while host integrations validate, replay, and inspect task-level robot behaviour.
 
 ## what makes it different
 
@@ -121,9 +121,9 @@ For the shortest walkthrough, use [first 10 minutes](docs/getting-started-10min.
 
 ## documentation
 
-- New users: [choose your path](docs/getting-oriented/choose-your-path.md), [what is muesli-bt](docs/getting-oriented/what-is-muesli-bt.md), [feature inventory](docs/getting-oriented/feature-inventory.md), [first 10 minutes](docs/getting-started-10min.md).
+- New users: [choose your path](docs/getting-oriented/choose-your-path.md), [what is muesli-bt](docs/getting-oriented/what-is-muesli-bt.md), [first 10 minutes](docs/getting-started-10min.md), [minimal real BT](docs/examples/minimal-real-bt.md).
 - BT users: [BT introduction](docs/bt/intro.md), [BT syntax](docs/bt/syntax.md), [why not just BehaviorTree.CPP?](docs/getting-oriented/why-not-btcpp.md).
-- Robot and simulator integration: [integration overview](docs/integration/overview.md), [env API](docs/integration/env-api.md), [ROS2 tutorial](docs/integration/ros2-tutorial.md).
+- Robot and simulator integration: [embedding a minimal robot loop](docs/tutorials/embedding-minimal-robot-loop.md), [integration overview](docs/integration/overview.md), [env API](docs/integration/env-api.md), [ROS2 tutorial](docs/integration/ros2-tutorial.md).
 - Tool builders and evaluators: [runtime contract v1](docs/contracts/runtime-contract-v1.md), [conformance levels](docs/contracts/conformance.md), [evidence index](docs/evidence/index.md).
 - Limits and roadmap: [v1.0 direction](docs/project/v1-direction.md), [known limitations](docs/known-limitations.md), [roadmap to 1.0](docs/roadmap-to-1.0.md), [v0.8 release notes](docs/releases/v0.8.0.md), [release notes](docs/releases/index.md).
 
@@ -138,7 +138,7 @@ Benchmark numbers are reported for curated evidence bundles. The README links to
 
 ## ROS2 and integrations
 
-ROS2 support is a thin host integration layer. The released baseline is Humble-focused and keeps the core transport surface intentionally narrow: `nav_msgs/msg/Odometry` in, `geometry_msgs/msg/Twist` out, canonical logs through `mbt.evt.v1`. The public `v1.0.0` direction is to keep that thin transport surface while adding a Nav2-backed capability lane and a physical wheeled evidence path above it.
+ROS2 support is a thin host integration layer. The released baseline is Humble-focused and keeps the core transport surface intentionally narrow: `nav_msgs/msg/Odometry` in, `geometry_msgs/msg/Twist` out, canonical logs through `mbt.evt.v1`.
 
 Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md), then read [ROS2 backend scope](docs/integration/ros2-backend-scope.md) and [host capability bundles](docs/integration/host-capability-bundles.md). Nav2 and MoveIt adapters are roadmap work unless a release note says otherwise.
 

@@ -19,6 +19,13 @@ if(NOT EXISTS "${muesli_bt_SHARE_DIR}/schemas/event_log/v1/mbt.evt.v1.schema.jso
   message(FATAL_ERROR "missing installed schema: ${muesli_bt_SHARE_DIR}/schemas/event_log/v1/mbt.evt.v1.schema.json")
 endif()
 
+if(NOT EXISTS "${muesli_bt_SHARE_DIR}/schemas/bt_node_options/v1/plan-action.schema.json")
+  message(FATAL_ERROR "missing installed BT node option schema: ${muesli_bt_SHARE_DIR}/schemas/bt_node_options/v1/plan-action.schema.json")
+endif()
+
+add_executable(mbt_minimal_embedding_smoketest minimal_embedding_main.cpp)
+target_link_libraries(mbt_minimal_embedding_smoketest PRIVATE muesli_bt::runtime)
+
 if(TARGET muesli_bt::integration_pybullet)
   add_executable(mbt_inspector_smoketest main.cpp)
   target_link_libraries(mbt_inspector_smoketest PRIVATE muesli_bt::runtime muesli_bt::integration_pybullet)
@@ -32,8 +39,4 @@ endif()
 if(TARGET muesli_bt::integration_ros2)
   add_executable(mbt_inspector_ros2_smoketest ros2_main.cpp)
   target_link_libraries(mbt_inspector_ros2_smoketest PRIVATE muesli_bt::runtime muesli_bt::integration_ros2)
-endif()
-
-if(NOT TARGET muesli_bt::integration_pybullet AND NOT TARGET muesli_bt::integration_webots AND NOT TARGET muesli_bt::integration_ros2)
-  message(FATAL_ERROR "At least one integration target is required for this smoketest")
 endif()

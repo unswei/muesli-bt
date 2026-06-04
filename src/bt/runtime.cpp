@@ -7,6 +7,8 @@
 #include <vector>
 
 #include "bt/blackboard.hpp"
+#include "bt/event_payload.hpp"
+#include "bt/node_options.hpp"
 #include "bt/planner.hpp"
 #include "bt/vla.hpp"
 #include "muesli_bt/contract/events.hpp"
@@ -432,7 +434,7 @@ muslisp::value materialize_arg(const arg_value& arg) {
     return muslisp::make_nil();
 }
 
-std::string normalize_plan_option(std::string key) {
+std::string normalize_option_token(std::string key) {
     if (!key.empty() && key.front() == ':') {
         key.erase(key.begin());
     }
@@ -442,6 +444,24 @@ std::string normalize_plan_option(std::string key) {
         }
     }
     return key;
+}
+
+std::string canonical_runtime_option(std::string_view node_name, std::string key) {
+    std::string normalised = normalize_option_token(std::move(key));
+    std::string metadata_name = ":";
+    metadata_name += normalised;
+
+    if (const node_option_schema* schema = find_node_option_schema(node_name); schema) {
+        if (const std::string_view canonical = canonical_node_option_name(*schema, metadata_name); !canonical.empty()) {
+            std::string out{canonical};
+            if (!out.empty() && out.front() == ':') {
+                out.erase(out.begin());
+            }
+            return normalize_option_token(std::move(out));
+        }
+    }
+
+    return normalised;
 }
 
 std::string arg_as_text(const muslisp::value& v, const std::string& where) {
@@ -857,7 +877,7 @@ vla_request_options parse_vla_request_options(const node& n, const std::vector<m
 
     for (std::size_t i = 0; i < args.size(); i += 2) {
         const std::string raw_key = arg_as_text(args[i], "vla-request");
-        const std::string key = normalize_plan_option(raw_key);
+        const std::string key = canonical_runtime_option("vla-request", raw_key);
         const muslisp::value value = args[i + 1];
 
         if (key == "name") {
@@ -936,7 +956,7 @@ vla_wait_options parse_vla_wait_options(const node& n, const std::vector<muslisp
 
     for (std::size_t i = 0; i < args.size(); i += 2) {
         const std::string raw_key = arg_as_text(args[i], "vla-wait");
-        const std::string key = normalize_plan_option(raw_key);
+        const std::string key = canonical_runtime_option("vla-wait", raw_key);
         const muslisp::value value = args[i + 1];
 
         if (key == "name") {
@@ -970,7 +990,7 @@ vla_cancel_options parse_vla_cancel_options(const node& n, const std::vector<mus
 
     for (std::size_t i = 0; i < args.size(); i += 2) {
         const std::string raw_key = arg_as_text(args[i], "vla-cancel");
-        const std::string key = normalize_plan_option(raw_key);
+        const std::string key = canonical_runtime_option("vla-cancel", raw_key);
         const muslisp::value value = args[i + 1];
 
         if (key == "name") {
@@ -1201,7 +1221,7 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
 
     for (std::size_t i = 0; i < args.size(); i += 2) {
         const std::string raw_key = arg_as_text(args[i], "plan-action");
-        const std::string key = normalize_plan_option(raw_key);
+        const std::string key = canonical_runtime_option("plan-action", raw_key);
         const muslisp::value value = args[i + 1];
 
         if (key == "name") {
@@ -1461,10 +1481,9 @@ status execute_plan_action(const node& n, tick_context& ctx, const std::vector<m
     event_log* events = resolve_event_log(ctx);
     const auto planner_call_started = tick_now(ctx);
     if (events) {
-        std::ostringstream data;
-        data << "{\"node_id\":" << n.id << ",\"planner\":\"" << planner_backend_name(request.planner)
-             << "\",\"budget_ms\":" << request.budget_ms << "}";
-        (void)events->emit(muesli_bt::contract::kEventPlannerCallStart, ctx.tick_index, data.str());
+        (void)events->emit(muesli_bt::contract::kEventPlannerCallStart,
+                           ctx.tick_index,
+                           event_payload::planner_call_start(n.id, planner_backend_name(request.planner), request.budget_ms));
     }
 
     planner_result result;
@@ -1728,9 +1747,7 @@ status execute_vla_request(const node& n, tick_context& ctx, const std::vector<m
     ctx.bb_put(opts.job_key, bb_value{static_cast<std::int64_t>(id)}, opts.node_name);
 
     if (event_log* events = resolve_event_log(ctx); events) {
-        std::ostringstream data;
-        data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"status\":\"submitted\"}";
-        (void)events->emit("vla_submit", ctx.tick_index, data.str());
+        (void)events->emit("vla_submit", ctx.tick_index, event_payload::job_node_status(std::to_string(id), n.id, "submitted"));
     }
 
     std::ostringstream msg;
@@ -1770,10 +1787,9 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
     const vla_poll poll = ctx.svc.vla->poll(id);
 
     if (event_log* events = resolve_event_log(ctx); events) {
-        std::ostringstream data;
-        data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"status\":\""
-             << vla_job_status_name(poll.status) << "\"}";
-        (void)events->emit("vla_poll", ctx.tick_index, data.str());
+        (void)events->emit("vla_poll",
+                           ctx.tick_index,
+                           event_payload::job_node_status(std::to_string(id), n.id, vla_job_status_name(poll.status)));
     }
 
     if (!opts.meta_key.empty()) {
@@ -1787,14 +1803,13 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
         ctx.bb_put(opts.action_key, action_to_blackboard(*poll.partial->action_candidate), opts.node_name);
         if (opts.cancel_on_early_commit) {
             if (event_log* events = resolve_event_log(ctx); events) {
-                std::ostringstream data;
-                data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"reason\":\"early_commit\"}";
-                (void)events->emit(muesli_bt::contract::kEventAsyncCancelRequested, ctx.tick_index, data.str());
+                (void)events->emit(muesli_bt::contract::kEventAsyncCancelRequested,
+                                   ctx.tick_index,
+                                   event_payload::job_node_reason(std::to_string(id), n.id, "early_commit"));
                 const bool accepted = ctx.svc.vla->cancel(id);
-                std::ostringstream ack_data;
-                ack_data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"accepted\":"
-                         << (accepted ? "true" : "false") << "}";
-                (void)events->emit(muesli_bt::contract::kEventAsyncCancelAcknowledged, ctx.tick_index, ack_data.str());
+                (void)events->emit(muesli_bt::contract::kEventAsyncCancelAcknowledged,
+                                   ctx.tick_index,
+                                   event_payload::job_node_accepted(std::to_string(id), n.id, accepted));
                 emit_outcome_event(ctx,
                                    accepted ? muesli_bt::contract::kEventCancelAcknowledged
                                             : muesli_bt::contract::kEventCancelLate,
@@ -1830,10 +1845,10 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
         }
         emit_log(ctx, log_level::info, "vla", "vla-wait: committed final action");
         if (event_log* events = resolve_event_log(ctx); events) {
-            std::ostringstream data;
-            data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"status\":\"ok\",\"digest\":\""
-                 << event_log::hash64_hex(vla_action_to_json(poll.final->action)) << "\"}";
-            (void)events->emit("vla_result", ctx.tick_index, data.str());
+            (void)events->emit("vla_result",
+                               ctx.tick_index,
+                               event_payload::vla_result(
+                                   std::to_string(id), n.id, "ok", event_log::hash64_hex(vla_action_to_json(poll.final->action))));
         }
         return status::success;
     }
@@ -1841,9 +1856,9 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
     if ((poll.status == vla_job_status::cancelled || poll.status == vla_job_status::timeout) && poll.final.has_value() &&
         poll.final->status == vla_status::cancelled) {
         if (event_log* events = resolve_event_log(ctx); events) {
-            std::ostringstream data;
-            data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"reason\":\"completion_after_cancel\"}";
-            (void)events->emit(muesli_bt::contract::kEventAsyncCompletionDropped, ctx.tick_index, data.str());
+            (void)events->emit(muesli_bt::contract::kEventAsyncCompletionDropped,
+                               ctx.tick_index,
+                               event_payload::job_node_reason(std::to_string(id), n.id, "completion_after_cancel"));
         }
         emit_outcome_event(ctx,
                            muesli_bt::contract::kEventLateResultDropped,
@@ -1897,19 +1912,18 @@ status execute_vla_cancel(const node& n, tick_context& ctx, const std::vector<mu
 
     const auto id = static_cast<vla_service::vla_job_id>(*id_raw);
     if (event_log* events = resolve_event_log(ctx); events) {
-        std::ostringstream req_data;
-        req_data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"reason\":\"explicit_cancel\"}";
-        (void)events->emit(muesli_bt::contract::kEventAsyncCancelRequested, ctx.tick_index, req_data.str());
+        (void)events->emit(muesli_bt::contract::kEventAsyncCancelRequested,
+                           ctx.tick_index,
+                           event_payload::job_node_reason(std::to_string(id), n.id, "explicit_cancel"));
     }
     const bool accepted = ctx.svc.vla->cancel(id);
     clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
     ctx.inst.active_vla_jobs.erase(n.id);
     emit_log(ctx, log_level::info, "vla", "vla-cancel: cancelled job=" + std::to_string(id));
     if (event_log* events = resolve_event_log(ctx); events) {
-        std::ostringstream ack_data;
-        ack_data << "{\"job_id\":\"" << id << "\",\"node_id\":" << n.id << ",\"accepted\":"
-                 << (accepted ? "true" : "false") << "}";
-        (void)events->emit(muesli_bt::contract::kEventAsyncCancelAcknowledged, ctx.tick_index, ack_data.str());
+        (void)events->emit(muesli_bt::contract::kEventAsyncCancelAcknowledged,
+                           ctx.tick_index,
+                           event_payload::job_node_accepted(std::to_string(id), n.id, accepted));
         emit_outcome_event(ctx,
                            accepted ? muesli_bt::contract::kEventCancelAcknowledged
                                     : muesli_bt::contract::kEventCancelLate,

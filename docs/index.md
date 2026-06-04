@@ -6,7 +6,7 @@
 
 It is for task-level decision logic. It is not a hard real-time servo controller, robot driver stack, or replacement for ROS2, Nav2, or MoveIt.
 
-The public `v1.0.0` direction is to use that runtime contract for dependable model-mediated wheeled robot behaviour with host-side validation, replayable evidence, and a physical-first release path.
+The supported core is the task-level runtime contract: BT ticking, bounded planning, cancellable async work, host-side validation, and replayable event logs.
 
 ## the core idea
 
@@ -23,11 +23,10 @@ Lisp source defines inspectable BT task logic. Host backends provide robot or si
 
 ## choose your path
 
-- [I just want to run it](getting-oriented/choose-your-path.md#i-just-want-to-run-it)
-- [I know Behaviour Trees and want the semantics](getting-oriented/choose-your-path.md#i-know-behaviour-trees-and-want-the-semantics)
-- [I want to connect a robot or simulator](getting-oriented/choose-your-path.md#i-want-to-connect-a-robot-or-simulator)
-- [I care about reproducible evidence](getting-oriented/choose-your-path.md#i-care-about-reproducible-evidence)
-- [I want model or VLA integration](getting-oriented/choose-your-path.md#i-want-model-or-vla-integration)
+- [write and run a small BT](getting-oriented/choose-your-path.md#write-and-run-a-small-bt)
+- [connect a robot or simulator](getting-oriented/choose-your-path.md#connect-a-robot-or-simulator)
+- [inspect logs and replay evidence](getting-oriented/choose-your-path.md#inspect-logs-and-replay-evidence)
+- [use advanced planner, VLA, or generated-fragment features](getting-oriented/choose-your-path.md#use-advanced-planner-vla-or-generated-fragment-features)
 
 ## first runnable path
 

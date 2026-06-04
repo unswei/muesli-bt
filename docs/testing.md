@@ -78,6 +78,13 @@ Verify docs snippet freshness against `examples/**` source files:
 python3 scripts/check_docs_snippet_freshness.py
 ```
 
+Verify BT node option schema coverage and user-facing prose hygiene:
+
+```bash
+python3 scripts/check-bt-node-option-docs.py
+python3 scripts/check-docs-user-prose.py
+```
+
 Verify ROS-backed replay artefacts from the canonical event log:
 
 ```bash

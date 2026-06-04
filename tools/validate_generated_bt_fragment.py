@@ -16,6 +16,8 @@ from math import isfinite
 from pathlib import Path
 from typing import Any
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+NODE_SCHEMA_DIR = REPO_ROOT / "schemas" / "bt_node_options" / "v1"
 
 KNOWN_COMPOSITES = {"seq", "sel", "mem-seq", "mem-sel", "async-seq", "reactive-seq", "reactive-sel"}
 KNOWN_DECORATORS = {"invert"}
@@ -135,6 +137,10 @@ class Reader:
             raise ValidationError("malformed_subtree", "unexpected closing parenthesis")
         if token.startswith('"'):
             return json.loads(token)
+        if token == "#t":
+            return True
+        if token == "#f":
+            return False
         try:
             return int(token)
         except ValueError:
@@ -239,6 +245,82 @@ def key_values(items: list[Any], start: int, form_name: str) -> dict[str, Any]:
     return out
 
 
+def load_node_option_schemas() -> dict[str, dict[str, Any]]:
+    schemas: dict[str, dict[str, Any]] = {}
+    for path in NODE_SCHEMA_DIR.glob("*.schema.json"):
+        schemas[path.name.removesuffix(".schema.json")] = json.loads(path.read_text(encoding="utf-8"))
+    return schemas
+
+
+NODE_OPTION_SCHEMAS = load_node_option_schemas()
+
+
+def canonical_option_map(schema: dict[str, Any]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for name, spec in schema.get("properties", {}).items():
+        out[name] = name
+        for alias in spec.get("x-muesli-aliases", []):
+            out[alias] = name
+    return out
+
+
+def symbol_or_string(value: Any) -> str | None:
+    if isinstance(value, Symbol):
+        return value.name
+    if isinstance(value, str):
+        return value
+    return None
+
+
+def json_type_matches(value: Any, expected: str) -> bool:
+    if expected == "string":
+        return isinstance(value, (str, Symbol))
+    if expected == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected == "number":
+        return (isinstance(value, int) or isinstance(value, float)) and not isinstance(value, bool) and isfinite(float(value))
+    if expected == "boolean":
+        return isinstance(value, bool)
+    return True
+
+
+def validate_option_value(form_name: str, option_name: str, value: Any, spec: dict[str, Any]) -> None:
+    expected_type = spec.get("type")
+    expected_types = expected_type if isinstance(expected_type, list) else [expected_type]
+    if expected_type is not None and not any(json_type_matches(value, t) for t in expected_types):
+        raise ValidationError("malformed_subtree", f"{form_name}: {option_name} has invalid value type")
+
+    if "enum" in spec:
+        text = symbol_or_string(value)
+        if text is None or text not in spec["enum"]:
+            raise ValidationError("malformed_subtree", f"{form_name}: {option_name} has unsupported value: {text}")
+
+    if "minimum" in spec and isinstance(value, (int, float)) and not isinstance(value, bool):
+        if float(value) < float(spec["minimum"]):
+            if option_name in {":budget_ms", ":deadline_ms"}:
+                raise ValidationError("invalid_budget", f"{form_name}: {option_name} must be a positive number")
+            raise ValidationError("malformed_subtree", f"{form_name}: {option_name} is below minimum {spec['minimum']}")
+
+
+def validate_options_against_schema(form_name: str, options: dict[str, Any]) -> dict[str, Any]:
+    schema = NODE_OPTION_SCHEMAS.get(form_name)
+    if schema is None:
+        return options
+
+    canonical_names = canonical_option_map(schema)
+    properties = schema.get("properties", {})
+    canonical_options: dict[str, Any] = {}
+    for raw_name, value in options.items():
+        canonical_name = canonical_names.get(raw_name)
+        if canonical_name is None:
+            raise ValidationError("malformed_subtree", f"{form_name}: unknown option: {raw_name}")
+        if canonical_name in canonical_options:
+            raise ValidationError("malformed_subtree", f"{form_name}: duplicate option: {canonical_name}")
+        validate_option_value(form_name, canonical_name, value, properties[canonical_name])
+        canonical_options[canonical_name] = value
+    return canonical_options
+
+
 def validate_budget(options: dict[str, Any], form_name: str) -> None:
     for key in (":budget_ms", ":deadline_ms"):
         if key not in options:
@@ -293,7 +375,7 @@ def validate_shape(expr: Any) -> None:
             raise ValidationError("malformed_subtree", f"{form_name}: expects no arguments")
         return
 
-    options = key_values(expr, 1, form_name)
+    options = validate_options_against_schema(form_name, key_values(expr, 1, form_name))
     validate_budget(options, form_name)
     if form_name.startswith("vla-"):
         capability = options.get(":capability", "vla.rt2")

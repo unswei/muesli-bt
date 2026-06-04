@@ -27,7 +27,8 @@ This page keeps the compact feature inventory that used to live in the root READ
 - `plan-action` node for strict per-tick budgeted planning;
 - `planner.plan` service for direct scripted experiments;
 - backend selection across MCTS, MPPI, and iLQR;
-- structured planner stats and logs.
+- structured planner stats and logs;
+- public `plan-action` option schema under `schemas/bt_node_options/v1/`.
 
 ## capability and VLA layer
 
@@ -36,6 +37,7 @@ This page keeps the compact feature inventory that used to live in the root READ
 - optional model-service bridge for world-model `cap.call` and VLA sessions;
 - model-service request/response hashes, replay cache, validation gates, fault injection, and release-safe evidence summaries;
 - async job API: `vla.submit`, `vla.poll`, `vla.cancel`;
+- public VLA BT node option schemas under `schemas/bt_node_options/v1/`;
 - stream-aware polling statuses: `:queued`, `:running`, `:streaming`, `:done`, `:error`, `:timeout`, `:cancelled`;
 - opaque media handles plus metadata accessors;
 - structured per-job logs.

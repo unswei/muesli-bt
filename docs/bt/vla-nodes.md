@@ -1,75 +1,148 @@
-# VLA BT Nodes Reference
+# VLA BT nodes
 
-## `vla-request`
+## what this is
 
-**Signature:** `(vla-request key value key value ...)`
+The VLA BT nodes submit, poll, and cancel asynchronous Vision-Language-Action (VLA) jobs through the host VLA service.
 
-Submits a VLA job when no in-flight job id is present at `:job_key`.
+Status: released for lifecycle semantics and deterministic stubs. Model-service backed sessions remain experimental unless a release note lists a concrete backend as supported.
 
-Common keys:
+The public option schemas are:
 
-- `:name` (string)
-- `:job_key` (symbol/string)
-- `:instruction` or `:instruction_key`
-- `:task_id` or `:task_key`
-- `:state_key`
-- `:image_key` (optional)
-- `:blob_key` (optional)
-- `:deadline_ms`
-- `:dims`, `:bound_lo`, `:bound_hi`
-- `:max_abs`, `:max_delta`
-- `:seed` or `:seed_key`
-- `:model_name`, `:model_version`
-- `:capability`
+```text
+schemas/bt_node_options/v1/vla-request.schema.json
+schemas/bt_node_options/v1/vla-wait.schema.json
+schemas/bt_node_options/v1/vla-cancel.schema.json
+```
 
-Return semantics:
+## when to use it
 
-- `running` after submit
-- `running` while job id already exists
-- `failure` on invalid inputs/config
+Use these nodes when a BT should request an action proposal from an asynchronous model or VLA service, then fall back safely if the result is late, invalid, cancelled, or unavailable.
 
-## `vla-wait`
+Do not send model output directly to actuators. The host must validate proposals before physical dispatch.
 
-**Signature:** `(vla-wait key value key value ...)`
+## how it works
 
-Polls a submitted VLA job and optionally commits early streaming candidates.
+`vla-request` creates a job and stores its id in the blackboard. `vla-wait` polls that id and writes a valid action to the blackboard. `vla-cancel` cancels and clears the idempotent job key.
 
-Common keys:
+The usual pattern is:
 
-- `:name`
-- `:job_key`
-- `:action_key`
-- `:meta_key` (optional JSON summary)
-- `:early_commit` (bool)
-- `:early_confidence` (float)
-- `:cancel_on_early_commit` (bool)
-- `:clear_job` (bool)
+```lisp
+(reactive-sel
+  (seq
+    (vla-request :name "policy" :instruction "move to target" :state_key state)
+    (vla-wait :name "policy" :action_key action)
+    (act apply-action action))
+  (act safe-stop))
+```
 
-Return semantics:
+The fallback branch is part of the safety contract.
 
-- `success` when a valid final action is committed
-- `success` on valid early-commit candidate (if enabled)
-- `running` while job is queued/running/streaming
-- `failure` on timeout/error/cancel/invalid
+## api / syntax
 
-## `vla-cancel`
+### `vla-request`
 
-**Signature:** `(vla-cancel key value key value ...)`
+```lisp
+(vla-request key value key value ...)
+```
 
-Cancels an in-flight job id at `:job_key` and clears that key.
+| option | type | default | notes |
+| --- | --- | --- | --- |
+| `:name` | string or symbol | `vla-request-<node_id>` | Node and job-key base name. |
+| `:job_key` | string or symbol | `<name>.job_id` | Blackboard key for the async job id. |
+| `:instruction` | string or symbol | unset | Inline instruction. |
+| `:instruction_key` | string or symbol | `instruction` | Blackboard key used when `:instruction` is unset. |
+| `:task_id` | string or symbol | `task` | Task identifier. |
+| `:task_key` | string or symbol | unset | Optional blackboard task id. |
+| `:state_key` | string or symbol | `state` | Numeric state vector key. |
+| `:image_key`, `:blob_key` | string or symbol | unset | Optional media handle keys. |
+| `:capability` | string or symbol | `vla.rt2` | Host capability id. |
+| `:model_name` | string or symbol | `rt2-stub` | Model name for records. |
+| `:model_version` | string or symbol | `stub-1` | Model version for records. |
+| `:frame_id` | string or symbol | `base` | Observation frame id. |
+| `:deadline_ms` | integer > 0 | `20` | Async job deadline. Alias: `:budget_ms`. |
+| `:dims` | integer >= 0 | state dimension | Action dimensions. |
+| `:bound_lo`, `:bound_hi` | number | `-1.0`, `1.0` | Continuous action bounds. |
+| `:max_abs`, `:max_delta` | number | `1.0`, `1.0` | Validation clamps. |
+| `:forbidden_lo`, `:forbidden_hi` | number | unset | Optional forbidden scalar interval. |
+| `:seed`, `:seed_key` | number/string or key | derived | Deterministic seed control. |
 
-Common keys:
+Return status:
 
-- `:name`
-- `:job_key`
+- `running` after submit;
+- `running` when the job key already holds an in-flight id;
+- `failure` for missing state, missing instruction, invalid media handles, invalid bounds, invalid deadline, or missing service.
 
-Return semantics:
+### `vla-wait`
 
-- `success` when cancelled or nothing to cancel
-- `failure` only when service/config is invalid
+```lisp
+(vla-wait key value key value ...)
+```
 
-## See Also
+| option | type | default | notes |
+| --- | --- | --- | --- |
+| `:name` | string or symbol | `vla-request-<node_id>` | Used to derive the default job key. |
+| `:job_key` | string or symbol | `<name>.job_id` | Blackboard key containing the job id. |
+| `:action_key` | string or symbol | `action` | Output key for the accepted action. |
+| `:meta_key` | string or symbol | unset | Optional JSON poll summary. |
+| `:early_commit` | boolean | `false` | Allows a streaming partial action to succeed early. |
+| `:early_confidence` | number | `1.1` | Disabled by default because confidence cannot reach 1.1. |
+| `:cancel_on_early_commit` | boolean | `true` | Cancels the remaining job after early commit. |
+| `:clear_job` | boolean | `true` | Clears `:job_key` on terminal result. |
 
-- [VLA Integration In BTs](vla-integration.md)
-- [BT Semantics](semantics.md)
-- [VLA Logging Schema](../observability/vla-logging.md)
+Return status:
+
+- `success` when a valid final or early action is written;
+- `running` while the job is queued, running, or streaming;
+- `failure` on timeout, error, cancellation, invalid action, missing job key, or missing service.
+
+### `vla-cancel`
+
+```lisp
+(vla-cancel key value key value ...)
+```
+
+| option | type | default | notes |
+| --- | --- | --- | --- |
+| `:name` | string or symbol | `vla-request-<node_id>` | Used to derive the default job key. |
+| `:job_key` | string or symbol | `<name>.job_id` | Blackboard key containing the job id. |
+
+Return status:
+
+- `success` when a job was cancelled;
+- `success` when there was nothing to cancel;
+- `failure` only when the VLA service is not available.
+
+## example
+
+```lisp
+(defbt guarded-vla
+  (reactive-sel
+    (seq
+      (cond bb-has state)
+      (vla-request
+        :name "nav-policy"
+        :instruction "move towards the goal"
+        :state_key state
+        :deadline_ms 50
+        :capability "vla.rt2")
+      (vla-wait
+        :name "nav-policy"
+        :action_key action
+        :meta_key vla-meta)
+      (act apply-action action))
+    (act safe-stop)))
+```
+
+## gotchas
+
+- Use the same `:name` or `:job_key` across request, wait, and cancel nodes.
+- Keep a fallback branch after VLA work.
+- Treat model output as a proposal until the host validates it.
+- Prefer media handles such as `frame://camera1/latest` for remote calls instead of embedding image bytes in Lisp.
+
+## see also
+
+- [VLA integration](vla-integration.md)
+- [VLA request/response](vla-request-response.md)
+- [VLA logging](../observability/vla-logging.md)
+- [generated guarded recovery](../tutorials/generated-guarded-recovery.md)

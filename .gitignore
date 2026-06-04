@@ -34,6 +34,8 @@ compile_commands.json
 
 # python
 .venv
+__pycache__/
+*.pyc
 
 # logs and misc
 *.log
@@ -64,6 +66,3 @@ examples/**/logs/*
 !examples/**/logs/.gitkeep
 examples/**/out/*
 !examples/**/out/.gitkeep
-
-
-__pycache__/

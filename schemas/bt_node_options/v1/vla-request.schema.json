@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unswei.github.io/muesli-bt/schemas/bt_node_options/v1/vla-request.schema.json",
+  "title": "vla-request BT node options",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    ":name": { "type": "string" },
+    ":job_key": { "type": "string", "default": "<name>.job_id" },
+    ":instruction": { "type": "string" },
+    ":instruction_key": { "type": "string", "default": "instruction" },
+    ":task_id": { "type": "string", "default": "task" },
+    ":task_key": { "type": "string" },
+    ":state_key": { "type": "string", "default": "state" },
+    ":image_key": { "type": "string" },
+    ":blob_key": { "type": "string" },
+    ":capability": { "type": "string", "default": "vla.rt2" },
+    ":model_name": { "type": "string", "default": "rt2-stub" },
+    ":model_version": { "type": "string", "default": "stub-1" },
+    ":frame_id": { "type": "string", "default": "base" },
+    ":deadline_ms": { "type": "integer", "minimum": 1, "default": 20, "x-muesli-aliases": [":budget_ms"] },
+    ":dims": { "type": "integer", "minimum": 0, "default": 0 },
+    ":bound_lo": { "type": "number", "default": -1.0 },
+    ":bound_hi": { "type": "number", "default": 1.0 },
+    ":max_abs": { "type": "number", "default": 1.0 },
+    ":max_delta": { "type": "number", "default": 1.0 },
+    ":forbidden_lo": { "type": "number" },
+    ":forbidden_hi": { "type": "number" },
+    ":seed_key": { "type": "string" },
+    ":seed": { "type": ["integer", "number", "string"], "minimum": 0 }
+  }
+}

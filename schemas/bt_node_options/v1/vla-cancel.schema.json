@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unswei.github.io/muesli-bt/schemas/bt_node_options/v1/vla-cancel.schema.json",
+  "title": "vla-cancel BT node options",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    ":name": { "type": "string" },
+    ":job_key": { "type": "string", "default": "<name>.job_id" }
+  }
+}

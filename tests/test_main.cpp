@@ -14,8 +14,10 @@
 #include <vector>
 
 #include "bt/instance.hpp"
+#include "bt/event_payload.hpp"
 #include "bt/logging.hpp"
 #include "bt/model_service.hpp"
+#include "bt/node_options.hpp"
 #include "bt/runtime_host.hpp"
 #include "bt/trace.hpp"
 #include "../src/compiled_eval.hpp"
@@ -2787,6 +2789,40 @@ void test_bt_compile_checks() {
     (void)eval_text("(bt.compile '(reactive-sel (succeed)))", env);
 }
 
+void test_bt_node_option_metadata() {
+    const bt::node_option_schema* plan = bt::find_node_option_schema("plan-action");
+    check(plan != nullptr, "plan-action option schema should be registered");
+    check(bt::find_node_option_spec(*plan, ":planner") != nullptr, "plan-action should expose :planner option");
+    const bt::node_option_spec* budget = bt::find_node_option_spec(*plan, ":budget_ms");
+    check(budget != nullptr, "plan-action should expose :budget_ms option");
+    check(budget->kind == bt::option_value_kind::integer, "plan-action :budget_ms should be integer");
+    check(budget->default_value == "20", "plan-action :budget_ms default should be 20");
+    check(bt::canonical_node_option_name(*plan, ":iters_max") == ":work_max",
+          "plan-action should canonicalise :iters_max to :work_max");
+    check(bt::canonical_node_option_name(*plan, ":fallback_action") == ":safe_action",
+          "plan-action should canonicalise :fallback_action to :safe_action");
+
+    const bt::node_option_schema* request = bt::find_node_option_schema("vla-request");
+    check(request != nullptr, "vla-request option schema should be registered");
+    check(bt::canonical_node_option_name(*request, ":budget_ms") == ":deadline_ms",
+          "vla-request should canonicalise :budget_ms to :deadline_ms");
+    const bt::node_option_spec* capability = bt::find_node_option_spec(*request, ":capability");
+    check(capability != nullptr, "vla-request should expose :capability option");
+    check(capability->default_value == "vla.rt2", "vla-request :capability default should be vla.rt2");
+
+    const bt::node_option_schema* wait = bt::find_node_option_schema("vla-wait");
+    check(wait != nullptr, "vla-wait option schema should be registered");
+    const bt::node_option_spec* clear_job = bt::find_node_option_spec(*wait, ":clear_job");
+    check(clear_job != nullptr, "vla-wait should expose :clear_job option");
+    check(clear_job->kind == bt::option_value_kind::boolean, "vla-wait :clear_job should be boolean");
+    check(clear_job->default_value == "true", "vla-wait :clear_job default should be true");
+
+    const bt::node_option_schema* cancel = bt::find_node_option_schema("vla-cancel");
+    check(cancel != nullptr, "vla-cancel option schema should be registered");
+    check(bt::find_node_option_spec(*cancel, ":job_key") != nullptr, "vla-cancel should expose :job_key option");
+    check(bt::find_node_option_schema("seq") == nullptr, "plain composites should not expose option schemas");
+}
+
 void test_bt_new_composite_dsl_roundtrip() {
     using namespace muslisp;
 
@@ -3615,6 +3651,24 @@ void test_event_log_capture_stats_without_serialised_sink() {
         bt::event_log::serialise_event_line("node_enter", "stats-run", 1735689602000, 1, 4, payload).size();
     check(stats.byte_count == expected_size, "capture stats should match canonical serialised line size");
     check(events.snapshot().empty(), "zero-capacity ring should not retain canonical lines");
+}
+
+void test_event_payload_builders() {
+    check(bt::event_payload::job_node_status("job-1", 7, "running") ==
+              "{\"job_id\":\"job-1\",\"node_id\":7,\"status\":\"running\"}",
+          "job_node_status payload mismatch");
+    check(bt::event_payload::job_node_reason("job-2", 9, "explicit_cancel") ==
+              "{\"job_id\":\"job-2\",\"node_id\":9,\"reason\":\"explicit_cancel\"}",
+          "job_node_reason payload mismatch");
+    check(bt::event_payload::job_node_accepted("job-2", 9, true) ==
+              "{\"job_id\":\"job-2\",\"node_id\":9,\"accepted\":true}",
+          "job_node_accepted payload mismatch");
+    check(bt::event_payload::vla_result("job-3", 10, "ok", "fnv1a64:abc") ==
+              "{\"job_id\":\"job-3\",\"node_id\":10,\"status\":\"ok\",\"digest\":\"fnv1a64:abc\"}",
+          "vla_result payload mismatch");
+    check(bt::event_payload::planner_call_start(3, "mcts", 20) ==
+              "{\"node_id\":3,\"planner\":\"mcts\",\"budget_ms\":20}",
+          "planner_call_start payload mismatch");
 }
 
 void test_event_log_file_sink_reuses_stream_and_reopens_on_path_change() {
@@ -5239,6 +5293,7 @@ int main() {
         {"vla builtins submit/poll/cancel/caps", test_vla_builtins_submit_poll_cancel_and_caps},
         {"vla bt nodes flow and cancel", test_vla_bt_nodes_flow_and_cancel},
         {"bt compile checks", test_bt_compile_checks},
+        {"bt node option metadata", test_bt_node_option_metadata},
         {"bt new composite dsl roundtrip", test_bt_new_composite_dsl_roundtrip},
         {"bt mem-seq semantics", test_bt_mem_seq_semantics},
         {"bt mem-sel semantics", test_bt_mem_sel_semantics},
@@ -5263,6 +5318,7 @@ int main() {
          test_env_run_loop_multi_episode_canonical_summary_events},
         {"event log deterministic mode + canonical serialisation", test_event_log_deterministic_mode_and_canonical_serialisation},
         {"event log capture stats without serialised sink", test_event_log_capture_stats_without_serialised_sink},
+        {"event payload builders", test_event_payload_builders},
         {"event log file sink reuses stream and reopens on path change", test_event_log_file_sink_reuses_stream_and_reopens_on_path_change},
         {"runtime host deterministic test mode", test_runtime_host_deterministic_test_mode},
         {"pybullet backend absent in core env", test_pybullet_backend_absent_in_core_env},
