@@ -460,6 +460,10 @@ if (Python3_Interpreter_FOUND)
       "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/validate_generated_bt_fragment.py"
       "${CMAKE_CURRENT_SOURCE_DIR}/fixtures/dsl/generated-fragment-negative"
   )
+  add_test(
+    NAME muesli_bt_generated_guarded_recovery
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_generated_guarded_recovery.py"
+  )
 endif ()
 
 if (MUESLI_BT_BUILD_BENCHMARKS)

@@ -44,7 +44,7 @@ The same representation can serve several roles:
 
 This matters for robotics because task logic often needs to be inspected, compared, generated, or transformed without becoming opaque host code.
 
-For example, a future generated recovery subtree can be represented as Lisp data, normalised to a canonical form, validated against the BT grammar and host capability contract, compiled to a `bt_def`, logged by hash, installed at a tick boundary, and replayed from the same artefact.
+For example, the generated guarded recovery evidence slice represents a recovery subtree as Lisp data, normalises it to a canonical form, validates it against the BT grammar and host capability contract, records lifecycle events by hash, records tick-boundary installation evidence, and replay-loads the same artefact.
 
 ## safety boundary
 
@@ -107,7 +107,7 @@ The minimal example above is hand-authored, but it has the same tree shape a gen
 
 The important point is that this is not arbitrary host-side robot code. It is a small tree with known node types, known leaf references, and a shape that the runtime can validate before execution.
 
-The `v0.7.0` baseline is to make this representation argument explicit and testable through round-trip checks, canonical hashes where practical, and deterministic rejection fixtures for invalid generated fragments.
+The `v0.7.0` baseline made this representation argument explicit and testable through round-trip checks, canonical hashes where practical, and deterministic rejection fixtures for invalid generated fragments.
 
 ## current round-trip evidence
 
@@ -146,11 +146,12 @@ Run the check with:
 cmake --build --preset dev -j
 ctest --preset dev -R muslisp_tests --output-on-failure
 python3 tools/validate_generated_bt_fragment.py fixtures/dsl/generated-fragment-negative
+python3 tests/check_generated_guarded_recovery.py
 ```
 
 This is representative DSL evidence. It does not prove that every generated BT fragment is safe. Generated fragments still need grammar validation, capability checks, budget checks, fallback checks, canonical logging, and replay evidence before execution.
 
-A generated guarded recovery subtree is the intended demonstration for this path. It should show the full lifecycle: generate as Lisp data, normalise, validate, compile, serialise, install at a tick boundary, execute, log, and replay.
+The generated guarded recovery slice under `fixtures/dsl/generated_guarded_recovery` is the first concrete demonstration for this path. It shows deterministic generation as Lisp data, normalisation, validation, canonical hashing, schema-valid lifecycle events, tick-boundary install evidence, and replay loading. Live C++ runtime hot-swapping remains a later implementation step.
 
 ## gotchas
 

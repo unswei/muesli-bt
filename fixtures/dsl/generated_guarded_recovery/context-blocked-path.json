@@ -1,0 +1,10 @@
+{
+  "schema_version": "generated_guarded_recovery.context.v1",
+  "scenario": "blocked_path",
+  "generator": "deterministic-template-v1",
+  "blocked_path": true,
+  "observation_fresh": true,
+  "planner": "mcts",
+  "budget_ms": 20,
+  "work_max": 64
+}

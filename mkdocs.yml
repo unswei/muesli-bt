@@ -70,6 +70,7 @@ nav:
       - Known Limitations: known-limitations.md
   - Tutorials:
       - Runtime Contract In Practice: tutorials/runtime-contract-in-practice.md
+      - Generated Guarded Recovery: tutorials/generated-guarded-recovery.md
       - Hello BT: examples/hello-bt.md
       - Minimal Real BT: examples/minimal-real-bt.md
       - Lisp Basics: examples/lisp-basics.md
@@ -173,6 +174,7 @@ nav:
           - Isaac H1 Demo Source: examples/isaac-h1-ros2-demo-source.md
   - Evidence:
       - Evidence Index: evidence/index.md
+      - Lisp DSL Generated Subtree Evidence: evidence/lisp-dsl-generated-subtree.md
       - Model-backed Async Evidence Report: evidence/model-backed-async-evidence-report.md
       - Release-safe Redaction Policy: evidence/redaction-policy.md
       - MiniVLA Smoke Evidence: evidence/minivla-smoke-evidence.md

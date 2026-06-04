@@ -1,0 +1,11 @@
+{
+  "canonical_dsl": "(reactive-sel (seq (cond blocked-path?) (cond observation-fresh?) (plan-action :name \"recovery-turn\" :planner :mcts :budget_ms 20 :work_max 64 :state_key recovery-state :action_key recovery-action) (act execute-recovery-turn) (cond recovery-exit?)) (act safe-stop))",
+  "canonical_dsl_hash": "fnv1a64:7bb0dd1bf850f536",
+  "code": "accepted",
+  "fallback_policy": "required_and_present",
+  "long_running_nodes": [
+    "plan-action"
+  ],
+  "node_count": 8,
+  "ok": true
+}

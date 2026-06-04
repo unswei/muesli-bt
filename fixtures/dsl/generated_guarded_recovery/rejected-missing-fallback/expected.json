@@ -1,0 +1,5 @@
+{
+  "ok": false,
+  "code": "missing_fallback_long_running",
+  "message_contains": "explicit fallback branch"
+}

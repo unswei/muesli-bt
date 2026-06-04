@@ -31,10 +31,14 @@ The `ros2-*` bundles are pre-Linux surrogate fixtures. They define the canonical
 
 The `dsl/generated-fragment-negative` fixtures cover generated Lisp BT fragments that must be rejected before execution. They are validated with `tools/validate_generated_bt_fragment.py` and cover unknown node types, unknown callbacks, unsupported capabilities, invalid budgets, malformed subtrees, and missing fallbacks around long-running async/model calls.
 
+The `dsl/generated_guarded_recovery` fixtures cover the first accepted generated subtree evidence slice. They include a deterministic blocked-path generator context, one accepted guarded recovery fragment, rejected unsafe/incomplete variants, canonical hashes, a replay report, and a schema-valid `events.jsonl` lifecycle.
+
 Update and verify using:
 
 ```bash
 python3 tools/fixtures/update_fixture.py
 python3 tools/fixtures/verify_fixture.py
 python3 tools/validate_generated_bt_fragment.py fixtures/dsl/generated-fragment-negative
+python3 tools/generate_guarded_recovery_subtree.py
+python3 tests/check_generated_guarded_recovery.py
 ```

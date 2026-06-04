@@ -12,6 +12,7 @@ import argparse
 import json
 import sys
 from dataclasses import dataclass
+from math import isfinite
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +38,10 @@ KNOWN_CALLBACKS = {
     "bb-has",
     "bb-put-int",
     "async-sleep-ms",
+    "blocked-path?",
+    "observation-fresh?",
+    "execute-recovery-turn",
+    "recovery-exit?",
     "stop",
     "safe-stop",
     "move-towards-goal",
@@ -141,6 +146,85 @@ class Reader:
 
 def sym_name(value: Any) -> str | None:
     return value.name if isinstance(value, Symbol) else None
+
+
+def fnv1a64(text: str) -> str:
+    h = 1469598103934665603
+    for byte in text.encode("utf-8"):
+        h ^= byte
+        h = (h * 1099511628211) & 0xFFFFFFFFFFFFFFFF
+    return f"fnv1a64:{h:016x}"
+
+
+def canonical_atom(value: Any) -> str:
+    if isinstance(value, Symbol):
+        return value.name
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    if isinstance(value, bool):
+        return "#t" if value else "#f"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        if not isfinite(value):
+            raise ValidationError("malformed_subtree", "non-finite numeric literal")
+        return str(value)
+    raise ValidationError("malformed_subtree", f"unsupported atom in fragment: {value!r}")
+
+
+def canonical_dsl(expr: Any) -> str:
+    if isinstance(expr, list):
+        return "(" + " ".join(canonical_dsl(item) for item in expr) + ")"
+    return canonical_atom(expr)
+
+
+def count_nodes(expr: Any) -> int:
+    if not isinstance(expr, list) or not expr:
+        return 0
+    return 1 + sum(count_nodes(child) for child in expr[1:])
+
+
+def collect_symbols(expr: Any, form_names: set[str]) -> list[str]:
+    out: list[str] = []
+    if not isinstance(expr, list) or not expr:
+        return out
+    name = sym_name(expr[0])
+    if name in form_names and len(expr) >= 2:
+        callback = sym_name(expr[1]) if isinstance(expr[1], Symbol) else expr[1] if isinstance(expr[1], str) else None
+        if callback is not None:
+            out.append(callback)
+    for child in expr[1:]:
+        out.extend(collect_symbols(child, form_names))
+    return out
+
+
+def collect_long_running_nodes(expr: Any) -> list[str]:
+    out: list[str] = []
+    if not isinstance(expr, list) or not expr:
+        return out
+    name = sym_name(expr[0])
+    if name in KNOWN_LONG_RUNNING:
+        out.append(name)
+    for child in expr[1:]:
+        out.extend(collect_long_running_nodes(child))
+    return out
+
+
+def collect_capabilities(expr: Any) -> list[str]:
+    out: list[str] = []
+    if not isinstance(expr, list) or not expr:
+        return out
+    name = sym_name(expr[0])
+    if name is not None and name.startswith("vla-"):
+        options = key_values(expr, 1, name)
+        capability = options.get(":capability", "vla.rt2")
+        if isinstance(capability, Symbol):
+            capability = capability.name
+        if isinstance(capability, str):
+            out.append(capability)
+    for child in expr[1:]:
+        out.extend(collect_capabilities(child))
+    return out
 
 
 def key_values(items: list[Any], start: int, form_name: str) -> dict[str, Any]:
@@ -265,7 +349,23 @@ def validate_fragment(path: Path) -> dict[str, Any]:
             "missing_fallback_long_running",
             "long-running planner/model fragment must be guarded by an explicit fallback branch",
         )
-    return {"ok": True, "code": "accepted", "message": "fragment accepted"}
+    canonical = canonical_dsl(expr)
+    long_running_nodes = collect_long_running_nodes(expr)
+    callbacks = sorted(set(collect_symbols(expr, KNOWN_LEAVES)))
+    capabilities = sorted(set(collect_capabilities(expr)))
+    return {
+        "ok": True,
+        "code": "accepted",
+        "message": "fragment accepted",
+        "source_hash": fnv1a64(source),
+        "canonical_dsl": canonical,
+        "canonical_dsl_hash": fnv1a64(canonical),
+        "node_count": count_nodes(expr),
+        "callbacks": callbacks,
+        "capabilities": capabilities,
+        "long_running_nodes": long_running_nodes,
+        "fallback_policy": "required_and_present" if long_running_nodes else "not_required",
+    }
 
 
 def validate_fixture_dir(path: Path) -> dict[str, Any]:
@@ -282,6 +382,18 @@ def validate_fixture_dir(path: Path) -> dict[str, Any]:
         raise RuntimeError(f"{path}: expected {expected}, got {actual}")
     if expected.get("message_contains") and str(expected["message_contains"]) not in str(actual.get("message", "")):
         raise RuntimeError(f"{path}: rejection message mismatch: {actual}")
+    for key in (
+        "source_hash",
+        "canonical_dsl",
+        "canonical_dsl_hash",
+        "node_count",
+        "callbacks",
+        "capabilities",
+        "long_running_nodes",
+        "fallback_policy",
+    ):
+        if key in expected and actual.get(key) != expected.get(key):
+            raise RuntimeError(f"{path}: {key} mismatch: expected {expected.get(key)!r}, got {actual.get(key)!r}")
     return actual
 
 

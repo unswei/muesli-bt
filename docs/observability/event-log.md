@@ -55,6 +55,8 @@
 - `late_result_dropped`, `cancel_acknowledged`, `cancel_late`
 - `vla_submit`, `vla_poll`, `vla_cancel`, `vla_result`
 - `async_cancel_requested`, `async_cancel_acknowledged`, `async_completion_dropped`
+- `dsl_fragment_generated`, `dsl_fragment_normalised`, `dsl_fragment_validation_ok`, `dsl_fragment_validation_failed`
+- `dsl_fragment_compiled`, `subtree_install_requested`, `subtree_installed`, `subtree_install_rejected`, `subtree_replay_loaded`
 - `error`
 
 ## BT definition identity
@@ -78,6 +80,22 @@ Use these fields to connect runtime evidence back to the BT source:
 - compare evidence artefacts without relying on file names or prose labels.
 
 The hashes are not a security boundary. Generated fragments still need parser, normaliser, validator, capability, budget, fallback, and replay checks before execution.
+
+## generated fragment lifecycle events
+
+Generated subtree evidence uses these lifecycle events before any generated fragment is allowed to run:
+
+- `dsl_fragment_generated`: a deterministic generator, template, planner, or model proposed Lisp BT data.
+- `dsl_fragment_normalised`: the fragment was parsed and written as canonical DSL with a `canonical_dsl_hash`.
+- `dsl_fragment_validation_ok`: grammar, host callback/capability, budget, and fallback checks accepted the fragment.
+- `dsl_fragment_validation_failed`: validation rejected the fragment with a deterministic reason.
+- `dsl_fragment_compiled`: an accepted canonical fragment compiled to a tree artefact.
+- `subtree_install_requested`: the runtime or fixture requested installation at a documented safe point.
+- `subtree_installed`: the accepted subtree was installed at the recorded tick boundary.
+- `subtree_install_rejected`: installation was rejected and the previous tree remained active.
+- `subtree_replay_loaded`: replay loaded the canonical generated DSL artefact by hash.
+
+These events are identity and evidence records. They do not make generated fragments safe by themselves. The validator and host policy still decide whether a fragment can reach execution.
 
 ## Lisp controls
 

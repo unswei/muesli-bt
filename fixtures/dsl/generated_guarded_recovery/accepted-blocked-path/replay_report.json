@@ -1,0 +1,26 @@
+{
+  "canonical_dsl_hash": "fnv1a64:7bb0dd1bf850f536",
+  "checks": {
+    "fragment_generated": true,
+    "installed_at_tick_boundary": true,
+    "normalised": true,
+    "replay_loaded_same_canonical_hash": true,
+    "validation_accepted": true
+  },
+  "events": {
+    "count": 11,
+    "path": "events.jsonl",
+    "required_types": [
+      "dsl_fragment_generated",
+      "dsl_fragment_normalised",
+      "dsl_fragment_validation_ok",
+      "dsl_fragment_compiled",
+      "subtree_install_requested",
+      "subtree_installed",
+      "subtree_replay_loaded"
+    ]
+  },
+  "passed": true,
+  "schema_version": "generated_guarded_recovery.replay_report.v1",
+  "source_hash": "fnv1a64:795ddecd64bab31a"
+}

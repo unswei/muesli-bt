@@ -4,6 +4,12 @@ muesli-bt
 
 ## [Unreleased]
 
+### Added
+- Added the first deterministic generated guarded recovery subtree evidence slice, including a blocked-path generator, accepted and rejected generated-fragment fixtures, canonical DSL hashes, lifecycle events, replay report, tutorial, evidence page, and CTest coverage.
+
+### Changed
+- Extended the canonical event schema and event-log docs with generated-fragment and subtree-install lifecycle event names for the experimental generated-subtree evidence path.
+
 ## [0.8.0] - 2026-05-10
 
 ### Added
