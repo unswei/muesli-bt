@@ -1975,6 +1975,17 @@ value bt_node_to_dsl(const bt::definition& def, bt::node_id id) {
                 form.push_back(bt_node_to_dsl(def, child));
             }
             break;
+        case bt::node_kind::slot:
+            form.push_back(make_symbol("slot"));
+            form.push_back(make_symbol(n.leaf_name));
+            for (const bt::arg_value& arg : n.args) {
+                form.push_back(bt_arg_to_lisp_value(arg));
+            }
+            if (n.children.size() != 1) {
+                throw lisp_error("bt.to-dsl: slot node requires one child");
+            }
+            form.push_back(bt_node_to_dsl(def, n.children[0]));
+            break;
         case bt::node_kind::invert:
             form.push_back(make_symbol("invert"));
             if (n.children.size() != 1) {

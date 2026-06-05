@@ -9,7 +9,7 @@ Use the public `v1.0` direction page under `docs/project/v1-direction.md` for th
 - `v0.9.0`: add a Nav2-backed capability lane for the flagship wheeled robot while keeping ROS2 as a thin transport plus capability host surface
 - `v0.9.0`: add one physical wheeled runbook with required artefacts, plus a clear Nav2/rosbag-backed fallback posture if hardware readiness slips
 - `v0.9.0`: add reproducible flagship experiment manifests, figure scripts, trace bundle generation, and one fair BehaviorTree.CPP matched baseline for the same scenario
-- `v0.9.0`: extend the generated guarded recovery subtree path from the deterministic evidence slice to live runtime tick-boundary install if it remains the chosen Lisp demonstration
+- `v0.9.0`: harden the generated guarded recovery subtree path from transparent slot metadata and install/rollback evidence into live runtime tick-boundary subtree mutation if it remains the chosen Lisp demonstration
 - `v0.9.0`: replace or retire `docs/integration/vla-backend-integration-plan.md` once the final implementation pages fully cover the released bridge/evidence path
 - `post-release`: add explicit `MMSP v0.2` `status` operation coverage if a supported backend starts requiring it
 - `post-release`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream
@@ -64,6 +64,7 @@ Use the public `v1.0` direction page under `docs/project/v1-direction.md` for th
 - `v0.8.0`: record `muesli-model-service v0.2.0` and commit `be3ff75` in the MiniVLA evidence manifest and release notes
 - `v0.8.0`: finish release hygiene for docs status, changelog, support boundary, final docs build, and bridge/evidence verification
 - `v0.9.0`: add the first deterministic generated guarded recovery subtree evidence slice, including accepted and rejected fixtures, canonical DSL hashes, lifecycle events, replay report, tutorial, and CTest coverage
+- `v0.9.0`: add the first agent-proposed task-logic proposal path, including proposal envelopes, `guarded-recovery.v1`, manifests, validation result objects, semantic diffs, dry-run reports, rollback handles, transparent `slot` DSL metadata, rejection fixtures, and documentation
 - `v0.5.0`: publish the final release notes from the green release baseline
 - `v0.6.0`: define host capability bundle naming and registration rules without changing BT or Lisp semantics
 - `v0.6.0`: make the boundary between `env.*`, `planner.plan`, and external host capabilities explicit in docs and examples

@@ -667,7 +667,7 @@ docs/tutorials/embedding-muesli-bt.md
 Lisp-specific evidence path: generated guarded recovery subtree:
 
 - add one evaluation demonstration where Lisp clearly enables useful runtime task-logic handling beyond hand-written BT execution
-- current slice on `main`: deterministic fixture generation, accepted/rejected validation fixtures, canonical DSL hashes, generated-fragment lifecycle events, replay report, tutorial, and CTest coverage exist as an experimental evidence path; live C++ tick-boundary subtree installation remains in scope below
+- current slice on `main`: deterministic fixture generation, accepted/rejected validation fixtures, agent proposal envelopes, `guarded-recovery.v1`, manifests, validation result objects, semantic diffs, dry-run reports, rollback handles, transparent `slot` DSL metadata, canonical DSL hashes, generated-fragment lifecycle events, replay report, tutorial, and CTest coverage exist as an experimental evidence path; live C++ tick-boundary subtree mutation remains in scope below
 - recommended demo: `generated guarded recovery subtree`
 - start with a normal wheeled goal-seeking BT used in the existing cross-transport path
 - when a deterministic blocked-path or degraded-model condition is observed, generate a guarded recovery subtree as Lisp data using either quasiquote/templates or a deterministic generator

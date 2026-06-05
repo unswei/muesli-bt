@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unswei.github.io/muesli-bt/schemas/agent_task_logic/v1/capability_manifest.v1.schema.json",
+  "title": "capability_manifest.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "callbacks", "capabilities"],
+  "properties": {
+    "schema_version": { "const": "capability_manifest.v1" },
+    "callbacks": { "type": "array", "items": { "type": "string" } },
+    "capabilities": { "type": "array", "items": { "type": "string" } }
+  }
+}

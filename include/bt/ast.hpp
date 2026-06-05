@@ -27,7 +27,8 @@ enum class node_kind {
     mem_sel,
     async_seq,
     reactive_seq,
-    reactive_sel
+    reactive_sel,
+    slot
 };
 
 enum class arg_kind {

@@ -85,6 +85,7 @@ nav:
       - Bounded-Time Planning: bt/bounded-time-planning.md
       - Async And VLA Orchestration: bt/vla-integration.md
       - Host Capability Bundles: integration/host-capability-bundles.md
+      - Agent-proposed Task Logic: integration/agent-proposed-task-logic.md
       - Observability And Replay: getting-oriented/observability-first.md
       - Why Lisp As DSL: getting-oriented/why-lisp-dsl.md
       - Why Not Just BehaviorTree.CPP: getting-oriented/why-not-btcpp.md
@@ -126,6 +127,7 @@ nav:
       - Overview: integration/overview.md
       - Writing A Backend: integration/writing-a-backend.md
       - muesli-model-service Bridge: integration/model-service-bridge.md
+      - Agent-proposed Task Logic: integration/agent-proposed-task-logic.md
       - VLA Backend Integration Plan: integration/vla-backend-integration-plan.md
       - ROS2 Backend Scope: integration/ros2-backend-scope.md
       - ROS2 Tutorial: integration/ros2-tutorial.md

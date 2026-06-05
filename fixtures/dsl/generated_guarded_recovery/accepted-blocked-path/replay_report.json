@@ -5,10 +5,11 @@
     "installed_at_tick_boundary": true,
     "normalised": true,
     "replay_loaded_same_canonical_hash": true,
+    "rollback_restored_previous_hash": true,
     "validation_accepted": true
   },
   "events": {
-    "count": 11,
+    "count": 15,
     "path": "events.jsonl",
     "required_types": [
       "dsl_fragment_generated",
@@ -17,6 +18,8 @@
       "dsl_fragment_compiled",
       "subtree_install_requested",
       "subtree_installed",
+      "subtree_rollback_requested",
+      "subtree_rolled_back",
       "subtree_replay_loaded"
     ]
   },

@@ -7,7 +7,7 @@
 
 This page records the evidence for the generated guarded recovery subtree slice.
 
-The slice demonstrates that Lisp BT fragments can be generated as structured data, normalised, validated, hashed, represented in canonical events, and replay-loaded from a canonical artefact.
+The slice demonstrates that Lisp BT fragments can be generated as structured data, wrapped in an agent proposal envelope, normalised, validated, hashed, represented in canonical events, and replay-loaded from a canonical artefact.
 
 ## when to use it
 
@@ -39,12 +39,22 @@ The accepted fixture emits these generated-subtree lifecycle events:
 - `dsl_fragment_compiled`;
 - `subtree_install_requested`;
 - `subtree_installed`;
+- `subtree_rollback_requested`;
+- `subtree_rolled_back`;
 - `subtree_replay_loaded`.
 
 The rejected fixtures cover:
 
 - unsupported generated capability request;
 - missing fallback around `plan-action`.
+- malformed proposal envelope;
+- missing slot;
+- unknown fragment contract;
+- denied capability;
+- stale blackboard input;
+- invalid budget;
+- excessive depth;
+- unknown callback.
 
 ## api / syntax
 
@@ -68,6 +78,7 @@ fixtures/dsl/generated_guarded_recovery/accepted-blocked-path/canonical_fragment
 fixtures/dsl/generated_guarded_recovery/accepted-blocked-path/validation_report.json
 fixtures/dsl/generated_guarded_recovery/accepted-blocked-path/events.jsonl
 fixtures/dsl/generated_guarded_recovery/accepted-blocked-path/replay_report.json
+fixtures/dsl/generated_guarded_recovery/proposal-accepted/proposal.json
 ```
 
 ## example
@@ -85,6 +96,8 @@ The accepted validation report records:
 
 The replay report requires the same canonical DSL hash to appear in generation, validation, installation, and replay-loaded events.
 
+The accepted proposal validation result also includes a semantic diff, dry-run report, and rollback handle. All rejected proposal fixtures report `host_reached=false`.
+
 ## gotchas
 
 The current slice uses deterministic fixture events for the install lifecycle. It proves the artefact and event contract first. A later runtime implementation still needs to perform live tick-boundary subtree installation in C++.
@@ -93,6 +106,7 @@ The generated subtree is intentionally small. The value is the validated lifecyc
 
 ## see also
 
+- [agent-proposed task logic](../integration/agent-proposed-task-logic.md)
 - [generated guarded recovery tutorial](../tutorials/generated-guarded-recovery.md)
 - [why Lisp as DSL](../getting-oriented/why-lisp-dsl.md)
 - [canonical event log](../observability/event-log.md)

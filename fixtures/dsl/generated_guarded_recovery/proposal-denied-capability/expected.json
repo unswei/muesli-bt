@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "code": "denied_capability",
+  "status": "rejected",
+  "reason_code": "denied_capability",
+  "field_path": "fragment",
+  "slot": "recovery-policy",
+  "fragment_contract": "guarded-recovery.v1",
+  "host_reached": false
+}

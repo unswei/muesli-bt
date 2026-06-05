@@ -1,0 +1,10 @@
+{
+  "schema_version": "agent_proposal.v1",
+  "proposal_id": "proposal-recovery-unknown-contract",
+  "source": "deterministic-template-v1",
+  "intent": "recover from a blocked path",
+  "context_hash": "fnv1a64:1111111111111111",
+  "slot": "recovery-policy",
+  "fragment_contract": "freeform-agent-code.v1",
+  "fragment": "(reactive-sel (seq (cond blocked-path?) (plan-action :name \"recovery-turn\" :planner :mcts :budget_ms 20 :work_max 64 :state_key recovery-state :action_key recovery-action)) (act safe-stop))"
+}

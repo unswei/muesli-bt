@@ -136,7 +136,7 @@ std::string read_string(std::ifstream& in, const std::string& where) {
 }
 
 bool is_valid_node_kind(std::uint8_t raw) {
-    return raw <= static_cast<std::uint8_t>(node_kind::reactive_sel);
+    return raw <= static_cast<std::uint8_t>(node_kind::slot);
 }
 
 bool is_valid_arg_kind(std::uint8_t raw) {
@@ -183,6 +183,8 @@ const char* node_kind_name(node_kind kind) {
             return "reactive-seq";
         case node_kind::reactive_sel:
             return "reactive-sel";
+        case node_kind::slot:
+            return "slot";
     }
     return "unknown";
 }
@@ -263,8 +265,12 @@ void validate_definition(const definition& def) {
             case node_kind::invert:
             case node_kind::repeat:
             case node_kind::retry:
+            case node_kind::slot:
                 if (n.children.size() != 1) {
                     throw std::runtime_error("bt.load: decorator nodes require exactly one child");
+                }
+                if (n.kind == node_kind::slot && n.leaf_name.empty()) {
+                    throw std::runtime_error("bt.load: slot nodes require a name");
                 }
                 break;
             case node_kind::cond:

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unswei.github.io/muesli-bt/schemas/agent_task_logic/v1/install_policy.v1.schema.json",
+  "title": "install_policy.v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "allowed_slots", "denied_capabilities", "install_mode"],
+  "properties": {
+    "schema_version": { "const": "install_policy.v1" },
+    "allowed_slots": { "type": "array", "items": { "type": "string" } },
+    "denied_capabilities": { "type": "array", "items": { "type": "string" } },
+    "max_nodes": { "type": "integer", "minimum": 1 },
+    "max_depth": { "type": "integer", "minimum": 1 },
+    "requires_validation": { "type": "boolean" },
+    "requires_dry_run": { "type": "boolean" },
+    "install_mode": { "type": "string", "enum": ["at_tick_boundary"] },
+    "rollback": { "type": "string" }
+  }
+}

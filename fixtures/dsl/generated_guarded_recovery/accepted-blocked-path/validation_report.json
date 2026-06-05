@@ -17,5 +17,6 @@
   "message": "fragment accepted",
   "node_count": 8,
   "ok": true,
+  "schema_version": "fragment_validation_result.v1",
   "source_hash": "fnv1a64:795ddecd64bab31a"
 }

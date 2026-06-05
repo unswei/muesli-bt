@@ -85,6 +85,10 @@ def main() -> int:
         "subtree_install_requested",
         "subtree_installed",
         "tick_end",
+        "tick_begin",
+        "subtree_rollback_requested",
+        "subtree_rolled_back",
+        "tick_end",
         "subtree_replay_loaded",
         "run_end",
     ]
@@ -103,6 +107,19 @@ def main() -> int:
     if validation.get("long_running_nodes") != ["plan-action"]:
         raise AssertionError("accepted fragment should include exactly one plan-action")
 
+    completed = run_cli(str(VALIDATOR), str(FIXTURE_ROOT / "proposal-accepted"), "--json")
+    assert_ok(completed, "accepted agent proposal validation")
+    accepted_payload = json.loads(completed.stdout)
+    accepted = accepted_payload["results"][0]
+    if accepted.get("dry_run_report", {}).get("passed") is not True:
+        raise AssertionError("accepted proposal dry-run report should pass")
+    if accepted.get("schema_version") != "fragment_validation_result.v1":
+        raise AssertionError("accepted proposal should expose fragment_validation_result.v1")
+    if accepted.get("semantic_diff", {}).get("slot") != "recovery-policy":
+        raise AssertionError("accepted proposal semantic diff should name recovery-policy")
+    if accepted.get("rollback_handle", {}).get("previous_subtree_hash") != "fnv1a64:9999999999999999":
+        raise AssertionError("accepted proposal should include rollback handle for previous subtree")
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         generated = Path(tmp_dir) / "accepted-blocked-path"
         completed = run_cli(str(GENERATOR), "--context", str(CONTEXT), "--out-dir", str(generated))
@@ -110,6 +127,12 @@ def main() -> int:
         for name in ("canonical_fragment.lisp", "validation_report.json", "events.jsonl", "replay_report.json"):
             if (generated / name).read_text(encoding="utf-8") != (ACCEPTED / name).read_text(encoding="utf-8"):
                 raise AssertionError(f"regenerated {name} does not match checked-in fixture")
+        manifest_dir = Path(tmp_dir) / "manifests"
+        completed = run_cli(str(VALIDATOR), "--export-manifests", str(manifest_dir), "--json")
+        assert_ok(completed, "exporting agent manifests")
+        for name in ("capability_manifest.json", "blackboard_manifest.json", "install_policy.json", "fragment_contracts.json"):
+            if not (manifest_dir / name).is_file():
+                raise AssertionError(f"manifest export missing {name}")
 
     return 0
 

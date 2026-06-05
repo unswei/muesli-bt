@@ -78,6 +78,9 @@
         "subtree_installed",
         "subtree_install_rejected",
         "subtree_replay_loaded",
+        "subtree_rollback_requested",
+        "subtree_rolled_back",
+        "subtree_rollback_rejected",
         "error"
       ]
     },

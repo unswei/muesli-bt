@@ -20,7 +20,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 NODE_SCHEMA_DIR = REPO_ROOT / "schemas" / "bt_node_options" / "v1"
 
 KNOWN_COMPOSITES = {"seq", "sel", "mem-seq", "mem-sel", "async-seq", "reactive-seq", "reactive-sel"}
-KNOWN_DECORATORS = {"invert"}
+KNOWN_DECORATORS = {"invert", "slot"}
 KNOWN_COUNT_DECORATORS = {"repeat", "retry"}
 KNOWN_LEAVES = {"cond", "act"}
 KNOWN_CONSTANTS = {"succeed", "fail", "running"}
@@ -30,6 +30,7 @@ KNOWN_NODE_TYPES = KNOWN_COMPOSITES | KNOWN_DECORATORS | KNOWN_COUNT_DECORATORS 
     "vla-request",
     "vla-wait",
     "vla-cancel",
+    "slot",
 }
 
 KNOWN_CALLBACKS = {
@@ -50,6 +51,47 @@ KNOWN_CALLBACKS = {
 }
 KNOWN_CAPABILITIES = {"vla.rt2", "vision", "planner.mcts", "env.move"}
 FALLBACK_ACTIONS = {"stop", "safe-stop", "always-success"}
+DEFAULT_SLOT = "recovery-policy"
+DEFAULT_FRAGMENT_CONTRACT = "guarded-recovery.v1"
+DEFAULT_INSTALL_MODE = "at_tick_boundary"
+DEFAULT_INSTALL_POLICY = {
+    "schema_version": "install_policy.v1",
+    "allowed_slots": [DEFAULT_SLOT],
+    "denied_capabilities": ["unsupported.force", "raw-velocity", "unsafe-force"],
+    "max_nodes": 16,
+    "max_depth": 8,
+    "requires_validation": True,
+    "requires_dry_run": True,
+    "install_mode": DEFAULT_INSTALL_MODE,
+    "rollback": "previous-subtree-hash",
+}
+DEFAULT_FRAGMENT_CONTRACTS = {
+    DEFAULT_FRAGMENT_CONTRACT: {
+        "schema_version": "fragment_contract.v1",
+        "id": DEFAULT_FRAGMENT_CONTRACT,
+        "must_start_with_guard": True,
+        "min_guard_count": 1,
+        "requires_fallback_for_long_running": True,
+        "allowed_nodes": sorted(KNOWN_NODE_TYPES),
+        "allowed_actions": sorted(KNOWN_CALLBACKS),
+        "max_nodes": 16,
+        "max_depth": 8,
+    }
+}
+DEFAULT_BLACKBOARD_MANIFEST = {
+    "schema_version": "blackboard_manifest.v1",
+    "keys": {
+        "blocked_path": {"type": "bool", "max_age_ms": 200},
+        "observation_fresh": {"type": "bool", "max_age_ms": 200},
+        "recovery-state": {"type": "vector", "max_age_ms": 200},
+        "recovery-action": {"type": "map", "max_age_ms": 200},
+    },
+}
+DEFAULT_CAPABILITY_MANIFEST = {
+    "schema_version": "capability_manifest.v1",
+    "callbacks": sorted(KNOWN_CALLBACKS),
+    "capabilities": sorted(KNOWN_CAPABILITIES),
+}
 
 
 @dataclass(frozen=True)
@@ -190,6 +232,49 @@ def count_nodes(expr: Any) -> int:
     return 1 + sum(count_nodes(child) for child in expr[1:])
 
 
+def max_depth(expr: Any) -> int:
+    if not isinstance(expr, list) or not expr:
+        return 0
+    child_depths = [max_depth(child) for child in expr[1:]]
+    return 1 + (max(child_depths) if child_depths else 0)
+
+
+def effective_subtree(expr: Any) -> Any:
+    if not isinstance(expr, list) or not expr:
+        return expr
+    if sym_name(expr[0]) == "slot":
+        return expr[-1]
+    return expr
+
+
+def first_child_sequence(expr: Any) -> list[Any]:
+    tree = effective_subtree(expr)
+    if not isinstance(tree, list) or not tree:
+        return []
+    name = sym_name(tree[0])
+    if name in {"seq", "reactive-seq"}:
+        return tree[1:]
+    if name in {"sel", "reactive-sel"} and len(tree) >= 2 and isinstance(tree[1], list):
+        child = tree[1]
+        if child and sym_name(child[0]) in {"seq", "reactive-seq"}:
+            return child[1:]
+    return []
+
+
+def leading_guard_callbacks(expr: Any) -> list[str]:
+    out: list[str] = []
+    for child in first_child_sequence(expr):
+        if not isinstance(child, list) or not child:
+            break
+        if sym_name(child[0]) != "cond" or len(child) < 2:
+            break
+        callback = sym_name(child[1]) if isinstance(child[1], Symbol) else child[1] if isinstance(child[1], str) else None
+        if callback is None:
+            break
+        out.append(callback)
+    return out
+
+
 def collect_symbols(expr: Any, form_names: set[str]) -> list[str]:
     out: list[str] = []
     if not isinstance(expr, list) or not expr:
@@ -230,6 +315,23 @@ def collect_capabilities(expr: Any) -> list[str]:
             out.append(capability)
     for child in expr[1:]:
         out.extend(collect_capabilities(child))
+    return out
+
+
+def collect_plan_budgets(expr: Any) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if not isinstance(expr, list) or not expr:
+        return out
+    name = sym_name(expr[0])
+    if name in KNOWN_LONG_RUNNING:
+        options = key_values(expr, 1, name) if name not in KNOWN_LEAVES else {}
+        item: dict[str, Any] = {"node": name}
+        for key in (":budget_ms", ":deadline_ms", ":work_max"):
+            if key in options:
+                item[key.removeprefix(":")] = canonical_atom(options[key])
+        out.append(item)
+    for child in expr[1:]:
+        out.extend(collect_plan_budgets(child))
     return out
 
 
@@ -348,6 +450,24 @@ def validate_shape(expr: Any) -> None:
             validate_shape(child)
         return
 
+    if form_name == "slot":
+        if len(expr) < 4:
+            raise ValidationError("malformed_subtree", "slot: expects name, option key/value pairs, and one child")
+        slot_name = symbol_or_string(expr[1])
+        if not slot_name:
+            raise ValidationError("malformed_subtree", "slot: name must be a symbol or string")
+        if (len(expr) - 3) % 2 != 0:
+            raise ValidationError("malformed_subtree", "slot: expected option key/value pairs before child")
+        options = key_values(expr[:-1], 2, "slot") if len(expr) > 3 else {}
+        for required in (":contract", ":install", ":fallback"):
+            if required not in options:
+                raise ValidationError("malformed_subtree", f"slot: missing required option {required}")
+        install_mode = symbol_or_string(options[":install"])
+        if install_mode not in {DEFAULT_INSTALL_MODE, "at-tick-boundary"}:
+            raise ValidationError("unsupported_install_mode", f"slot: unsupported install mode: {install_mode}")
+        validate_shape(expr[-1])
+        return
+
     if form_name in KNOWN_DECORATORS:
         if len(expr) != 2:
             raise ValidationError("malformed_subtree", f"{form_name}: expects exactly one child")
@@ -424,6 +544,10 @@ def long_running_has_fallback(expr: Any, covered: bool = False) -> bool:
 
 def validate_fragment(path: Path) -> dict[str, Any]:
     source = path.read_text(encoding="utf-8")
+    return validate_fragment_source(source)
+
+
+def validate_fragment_source(source: str) -> dict[str, Any]:
     expr = Reader(source).read()
     validate_shape(expr)
     if contains_long_running(expr) and not long_running_has_fallback(expr):
@@ -436,6 +560,7 @@ def validate_fragment(path: Path) -> dict[str, Any]:
     callbacks = sorted(set(collect_symbols(expr, KNOWN_LEAVES)))
     capabilities = sorted(set(collect_capabilities(expr)))
     return {
+        "schema_version": "fragment_validation_result.v1",
         "ok": True,
         "code": "accepted",
         "message": "fragment accepted",
@@ -450,7 +575,206 @@ def validate_fragment(path: Path) -> dict[str, Any]:
     }
 
 
+def load_json_if_exists(path: Path, default: dict[str, Any]) -> dict[str, Any]:
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    return default
+
+
+def reject_result(code: str,
+                  message: str,
+                  field_path: str,
+                  proposal: dict[str, Any] | None = None,
+                  validation: dict[str, Any] | None = None) -> dict[str, Any]:
+    proposal = proposal or {}
+    return {
+        "schema_version": "fragment_validation_result.v1",
+        "ok": False,
+        "status": "rejected",
+        "code": code,
+        "message": message,
+        "reason_code": code,
+        "field_path": field_path,
+        "slot": proposal.get("slot"),
+        "fragment_contract": proposal.get("fragment_contract"),
+        "proposal_id": proposal.get("proposal_id"),
+        "source_hash": validation.get("source_hash") if validation else None,
+        "canonical_dsl_hash": validation.get("canonical_dsl_hash") if validation else None,
+        "host_reached": False,
+    }
+
+
+def validate_blackboard_snapshot(proposal: dict[str, Any], blackboard_manifest: dict[str, Any]) -> None:
+    snapshot = proposal.get("blackboard", {})
+    if not isinstance(snapshot, dict):
+        raise ValidationError("malformed_envelope", "proposal blackboard must be an object")
+    manifest_keys = blackboard_manifest.get("keys", {})
+    for key, spec in manifest_keys.items():
+        if key not in snapshot:
+            continue
+        item = snapshot[key]
+        if not isinstance(item, dict):
+            raise ValidationError("malformed_envelope", f"blackboard.{key}: expected object")
+        max_age = spec.get("max_age_ms")
+        age = item.get("age_ms")
+        if max_age is not None and age is not None and float(age) > float(max_age):
+            raise ValidationError("stale_blackboard_input", f"blackboard.{key}: age_ms exceeds max_age_ms")
+
+
+def validate_contract(expr: Any,
+                      validation: dict[str, Any],
+                      contract: dict[str, Any],
+                      install_policy: dict[str, Any]) -> None:
+    node_count = int(validation["node_count"])
+    depth = max_depth(expr)
+    max_nodes = min(int(contract.get("max_nodes", node_count)), int(install_policy.get("max_nodes", node_count)))
+    max_allowed_depth = min(int(contract.get("max_depth", depth)), int(install_policy.get("max_depth", depth)))
+    if node_count > max_nodes:
+        raise ValidationError("excessive_depth", f"fragment node count {node_count} exceeds max_nodes {max_nodes}")
+    if depth > max_allowed_depth:
+        raise ValidationError("excessive_depth", f"fragment depth {depth} exceeds max_depth {max_allowed_depth}")
+    if contract.get("must_start_with_guard", False):
+        guards = leading_guard_callbacks(expr)
+        min_guard_count = int(contract.get("min_guard_count", 1))
+        if len(guards) < min_guard_count:
+            raise ValidationError("missing_guard", "fragment must start with a guard condition")
+    if contract.get("requires_fallback_for_long_running", False) and validation["long_running_nodes"]:
+        if validation["fallback_policy"] != "required_and_present":
+            raise ValidationError("missing_fallback_long_running", "long-running fragment must have fallback")
+
+
+def semantic_diff(proposal: dict[str, Any], validation: dict[str, Any], expr: Any, install_policy: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": "bt_semantic_diff.v1",
+        "slot": proposal["slot"],
+        "old_subtree_hash": proposal.get("previous_subtree_hash", "fnv1a64:9999999999999999"),
+        "new_subtree_hash": validation["canonical_dsl_hash"],
+        "guards_added": leading_guard_callbacks(expr),
+        "long_running_nodes": validation["long_running_nodes"],
+        "budgets": collect_plan_budgets(expr),
+        "fallback_status": validation["fallback_policy"],
+        "capabilities_added": validation["capabilities"],
+        "canonical_hash_changed": proposal.get("previous_subtree_hash") != validation["canonical_dsl_hash"],
+        "install_mode": install_policy.get("install_mode", DEFAULT_INSTALL_MODE),
+    }
+
+
+def dry_run_report(proposal: dict[str, Any], validation: dict[str, Any], diff: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": "agent_proposal_dry_run.v1",
+        "passed": True,
+        "proposal_id": proposal["proposal_id"],
+        "slot": proposal["slot"],
+        "fixture": "blocked-path-case",
+        "checks": {
+            "proposal_envelope_valid": True,
+            "fragment_valid": True,
+            "policy_gates_passed": True,
+            "semantic_diff_available": True,
+            "fallback_preserved": validation["fallback_policy"] == "required_and_present",
+            "host_reached": False,
+        },
+        "fixed_recovery": {
+            "status": "baseline",
+            "fallback": "safe-stop",
+        },
+        "generated_recovery": {
+            "status": "accepted",
+            "canonical_dsl_hash": validation["canonical_dsl_hash"],
+            "guards": diff["guards_added"],
+        },
+    }
+
+
+def validate_proposal_dir(path: Path) -> dict[str, Any]:
+    proposal_path = path / "proposal.json"
+    expected_path = path / "expected.json"
+    if not proposal_path.is_file() or not expected_path.is_file():
+        raise RuntimeError(f"{path}: expected proposal.json and expected.json")
+    expected = json.loads(expected_path.read_text(encoding="utf-8"))
+    proposal = json.loads(proposal_path.read_text(encoding="utf-8"))
+    install_policy = load_json_if_exists(path / "install_policy.json", DEFAULT_INSTALL_POLICY)
+    contracts = load_json_if_exists(path / "fragment_contracts.json", DEFAULT_FRAGMENT_CONTRACTS)
+    blackboard_manifest = load_json_if_exists(path / "blackboard_manifest.json", DEFAULT_BLACKBOARD_MANIFEST)
+
+    try:
+        required = ("schema_version", "proposal_id", "source", "intent", "context_hash", "slot", "fragment_contract", "fragment")
+        for key in required:
+            if key not in proposal:
+                code = "missing_slot" if key == "slot" else "malformed_envelope"
+                raise ValidationError(code, f"proposal missing required field: {key}")
+        if proposal["schema_version"] != "agent_proposal.v1":
+            raise ValidationError("malformed_envelope", "proposal schema_version must be agent_proposal.v1")
+        if proposal["slot"] not in install_policy.get("allowed_slots", []):
+            raise ValidationError("missing_slot", f"slot is not allowed: {proposal['slot']}")
+        contract = contracts.get(proposal["fragment_contract"])
+        if contract is None:
+            raise ValidationError("unknown_fragment_contract", f"unknown fragment contract: {proposal['fragment_contract']}")
+        validate_blackboard_snapshot(proposal, blackboard_manifest)
+        validation = validate_fragment_source(str(proposal["fragment"]))
+        expr = Reader(str(proposal["fragment"])).read()
+        denied = set(install_policy.get("denied_capabilities", []))
+        denied_used = sorted(denied.intersection(validation["capabilities"]))
+        if denied_used:
+            raise ValidationError("denied_capability", f"fragment uses denied capability: {denied_used[0]}")
+        validate_contract(expr, validation, contract, install_policy)
+        diff = semantic_diff(proposal, validation, expr, install_policy)
+        dry_run = dry_run_report(proposal, validation, diff)
+        actual = {
+            **validation,
+            "status": "accepted",
+            "reason_code": "accepted",
+            "field_path": "",
+            "slot": proposal["slot"],
+            "fragment_contract": proposal["fragment_contract"],
+            "proposal_id": proposal["proposal_id"],
+            "host_reached": False,
+            "install_policy": install_policy,
+            "semantic_diff": diff,
+            "dry_run_report": dry_run,
+            "rollback_handle": {
+                "schema_version": "subtree_rollback_handle.v1",
+                "slot": proposal["slot"],
+                "previous_subtree_hash": proposal.get("previous_subtree_hash", "fnv1a64:9999999999999999"),
+                "new_subtree_hash": validation["canonical_dsl_hash"],
+                "install_mode": install_policy.get("install_mode", DEFAULT_INSTALL_MODE),
+            },
+        }
+    except ValidationError as exc:
+        field_paths = {
+            "missing_slot": "slot",
+            "unknown_fragment_contract": "fragment_contract",
+            "denied_capability": "fragment",
+            "stale_blackboard_input": "blackboard",
+            "missing_fallback_long_running": "fragment",
+            "invalid_budget": "fragment",
+            "excessive_depth": "fragment",
+            "unknown_callback": "fragment",
+            "malformed_envelope": "",
+        }
+        actual = reject_result(exc.code, exc.message, field_paths.get(exc.code, ""), proposal)
+
+    if actual.get("ok") != expected.get("ok") or actual.get("code") != expected.get("code"):
+        raise RuntimeError(f"{path}: expected {expected}, got {actual}")
+    for key in (
+        "status",
+        "reason_code",
+        "field_path",
+        "slot",
+        "fragment_contract",
+        "host_reached",
+        "canonical_dsl_hash",
+    ):
+        if key in expected and actual.get(key) != expected.get(key):
+            raise RuntimeError(f"{path}: {key} mismatch: expected {expected.get(key)!r}, got {actual.get(key)!r}")
+    if expected.get("message_contains") and str(expected["message_contains"]) not in str(actual.get("message", "")):
+        raise RuntimeError(f"{path}: rejection message mismatch: {actual}")
+    return actual
+
+
 def validate_fixture_dir(path: Path) -> dict[str, Any]:
+    if (path / "proposal.json").is_file():
+        return validate_proposal_dir(path)
     expected_path = path / "expected.json"
     fragment_path = path / "fragment.lisp"
     if not fragment_path.is_file() or not expected_path.is_file():
@@ -480,16 +804,41 @@ def validate_fixture_dir(path: Path) -> dict[str, Any]:
 
 
 def iter_fixture_dirs(root: Path) -> list[Path]:
-    if (root / "fragment.lisp").is_file():
+    if (root / "fragment.lisp").is_file() or (root / "proposal.json").is_file():
         return [root]
-    return sorted(path for path in root.iterdir() if path.is_dir() and (path / "fragment.lisp").is_file())
+    return sorted(
+        path
+        for path in root.iterdir()
+        if path.is_dir() and ((path / "fragment.lisp").is_file() or (path / "proposal.json").is_file())
+    )
 
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Validate generated BT fragment fixtures.")
     parser.add_argument("path", nargs="?", default="fixtures/dsl/generated-fragment-negative")
     parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON summary.")
+    parser.add_argument("--export-manifests", help="Write default agent-readable manifests to this directory.")
     args = parser.parse_args(argv)
+
+    if args.export_manifests:
+        out_dir = Path(args.export_manifests)
+        try:
+            out_dir.mkdir(parents=True, exist_ok=True)
+            for name, payload in {
+                "capability_manifest.json": DEFAULT_CAPABILITY_MANIFEST,
+                "blackboard_manifest.json": DEFAULT_BLACKBOARD_MANIFEST,
+                "install_policy.json": DEFAULT_INSTALL_POLICY,
+                "fragment_contracts.json": DEFAULT_FRAGMENT_CONTRACTS,
+            }.items():
+                (out_dir / name).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+        if args.json:
+            print(json.dumps({"manifest_dir": str(out_dir)}, indent=2, sort_keys=True))
+        else:
+            print(f"agent manifests written: {out_dir}")
+        return 0
 
     root = Path(args.path)
     results: list[dict[str, Any]] = []

@@ -1,0 +1,17 @@
+{
+  "allowed_slots": [
+    "recovery-policy"
+  ],
+  "denied_capabilities": [
+    "unsupported.force",
+    "raw-velocity",
+    "unsafe-force"
+  ],
+  "install_mode": "at_tick_boundary",
+  "max_depth": 8,
+  "max_nodes": 16,
+  "requires_dry_run": true,
+  "requires_validation": true,
+  "rollback": "previous-subtree-hash",
+  "schema_version": "install_policy.v1"
+}

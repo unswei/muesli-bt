@@ -1,0 +1,10 @@
+{
+  "schema_version": "agent_proposal.v1",
+  "proposal_id": "proposal-recovery-unknown-callback",
+  "source": "agent-fixture",
+  "intent": "recover from a blocked path with unknown host callback",
+  "context_hash": "fnv1a64:1111111111111111",
+  "slot": "recovery-policy",
+  "fragment_contract": "guarded-recovery.v1",
+  "fragment": "(reactive-sel (seq (cond blocked-path?) (act env.teleport)) (act safe-stop))"
+}

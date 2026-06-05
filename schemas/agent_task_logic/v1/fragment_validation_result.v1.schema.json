@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unswei.github.io/muesli-bt/schemas/agent_task_logic/v1/fragment_validation_result.v1.schema.json",
+  "title": "fragment_validation_result.v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "ok",
+    "code"
+  ],
+  "properties": {
+    "schema_version": { "const": "fragment_validation_result.v1" },
+    "ok": { "type": "boolean" },
+    "status": { "type": "string", "enum": ["accepted", "rejected"] },
+    "code": { "type": "string" },
+    "reason_code": { "type": "string" },
+    "field_path": { "type": "string" },
+    "slot": { "type": ["string", "null"] },
+    "fragment_contract": { "type": ["string", "null"] },
+    "source_hash": { "type": ["string", "null"] },
+    "canonical_dsl_hash": { "type": ["string", "null"] },
+    "host_reached": { "type": "boolean" }
+  }
+}

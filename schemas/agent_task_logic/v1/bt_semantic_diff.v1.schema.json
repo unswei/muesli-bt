@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unswei.github.io/muesli-bt/schemas/agent_task_logic/v1/bt_semantic_diff.v1.schema.json",
+  "title": "bt_semantic_diff.v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "slot", "old_subtree_hash", "new_subtree_hash"],
+  "properties": {
+    "schema_version": { "const": "bt_semantic_diff.v1" },
+    "slot": { "type": "string" },
+    "old_subtree_hash": { "type": "string" },
+    "new_subtree_hash": { "type": "string" },
+    "guards_added": { "type": "array", "items": { "type": "string" } },
+    "long_running_nodes": { "type": "array", "items": { "type": "string" } },
+    "budgets": { "type": "array", "items": { "type": "object" } },
+    "fallback_status": { "type": "string" },
+    "capabilities_added": { "type": "array", "items": { "type": "string" } },
+    "canonical_hash_changed": { "type": "boolean" },
+    "install_mode": { "type": "string" }
+  }
+}

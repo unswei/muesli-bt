@@ -1,0 +1,23 @@
+{
+  "schema_version": "agent_proposal.v1",
+  "proposal_id": "proposal-recovery-001",
+  "source": "deterministic-template-v1",
+  "intent": "recover from a blocked path with bounded planning and safe-stop fallback",
+  "context_hash": "fnv1a64:1111111111111111",
+  "slot": "recovery-policy",
+  "fragment_contract": "guarded-recovery.v1",
+  "previous_subtree_hash": "fnv1a64:9999999999999999",
+  "blackboard": {
+    "blocked_path": {
+      "type": "bool",
+      "value": true,
+      "age_ms": 50
+    },
+    "observation_fresh": {
+      "type": "bool",
+      "value": true,
+      "age_ms": 50
+    }
+  },
+  "fragment": "(reactive-sel\n  (seq\n    (cond blocked-path?)\n    (cond observation-fresh?)\n    (plan-action\n      :name \"recovery-turn\"\n      :planner :mcts\n      :budget_ms 20\n      :work_max 64\n      :state_key recovery-state\n      :action_key recovery-action)\n    (act execute-recovery-turn)\n    (cond recovery-exit?))\n  (act safe-stop))\n"
+}

@@ -40,6 +40,7 @@ Preferred authoring forms:
 | `invert` | decorator | inverts success/failure |
 | `repeat` | decorator | repeats child up to `n` successes |
 | `retry` | decorator | retries child up to `n` failures |
+| `slot` | metadata decorator | names an experimental patchable subtree boundary and ticks its child |
 | `cond` | leaf | condition callback |
 | `act` | leaf | action callback |
 | `plan-action` | leaf | bounded-time planner leaf |
@@ -187,6 +188,20 @@ Cancels an in-flight VLA job id.
 
 `n` must be a non-negative integer.
 
+### `slot`
+
+```lisp
+(slot recovery-policy
+  :contract guarded-recovery.v1
+  :install at-tick-boundary
+  :fallback safe-stop
+  child)
+```
+
+`slot` is experimental metadata for agent-proposed task-logic changes. It names a patchable subtree boundary, records the expected fragment contract, install mode, and fallback action, then ticks its child transparently.
+
+Current released semantics outside explicit generated-subtree tooling are simple: `slot` returns the status of its child. Live subtree replacement at the slot boundary remains an experimental pre-`v1.0.0` path.
+
 ## Utility Nodes
 
 ```lisp
@@ -224,3 +239,4 @@ Use DSL save/load when long-term portability is the priority.
 - [Planner Configuration Reference](planner-configuration.md)
 - [VLA BT Nodes](vla-nodes.md)
 - [VLA Integration In BTs](vla-integration.md)
+- [Agent-proposed Task Logic](../integration/agent-proposed-task-logic.md)

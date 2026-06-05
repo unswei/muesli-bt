@@ -5,10 +5,12 @@ muesli-bt
 ## [Unreleased]
 
 ### Added
+- Added the first experimental agent-proposed task-logic path, including `agent_proposal.v1` fixtures, `guarded-recovery.v1` contract checks, manifest export, validation result objects, semantic diffs, dry-run reports, rollback handles, proposal rejection fixtures, and an agent-facing integration page.
+- Added transparent `slot` BT DSL metadata for patchable subtree boundaries, with compile, tick, and `bt.to-dsl` round-trip coverage.
 - Added the first deterministic generated guarded recovery subtree evidence slice, including a blocked-path generator, accepted and rejected generated-fragment fixtures, canonical DSL hashes, lifecycle events, replay report, tutorial, evidence page, and CTest coverage.
 
 ### Changed
-- Extended the canonical event schema and event-log docs with generated-fragment and subtree-install lifecycle event names for the experimental generated-subtree evidence path.
+- Extended the canonical event schema and event-log docs with generated-fragment, subtree-install, and subtree-rollback lifecycle event names for the experimental generated-subtree evidence path.
 
 ## [0.8.0] - 2026-05-10
 

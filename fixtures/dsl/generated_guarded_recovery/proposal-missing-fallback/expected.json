@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "code": "missing_fallback_long_running",
+  "status": "rejected",
+  "reason_code": "missing_fallback_long_running",
+  "field_path": "fragment",
+  "slot": "recovery-policy",
+  "fragment_contract": "guarded-recovery.v1",
+  "host_reached": false
+}

@@ -2287,6 +2287,13 @@ status tick_node(node_id id, tick_context& ctx) {
         case node_kind::reactive_sel:
             return finalize(tick_reactive_sel(n, ctx));
 
+        case node_kind::slot: {
+            if (n.children.empty()) {
+                return finalize(status::failure);
+            }
+            return finalize(tick_node(n.children[0], ctx));
+        }
+
         case node_kind::invert: {
             const status st = tick_node(n.children[0], ctx);
             if (st == status::success) {

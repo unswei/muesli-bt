@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "code": "unknown_fragment_contract",
+  "status": "rejected",
+  "reason_code": "unknown_fragment_contract",
+  "field_path": "fragment_contract",
+  "slot": "recovery-policy",
+  "fragment_contract": "freeform-agent-code.v1",
+  "host_reached": false
+}

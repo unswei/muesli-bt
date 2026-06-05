@@ -1055,6 +1055,34 @@ void test_bt_dsl_hashes_are_logged_for_compiled_and_loaded_definitions() {
     std::filesystem::remove(dsl_path, ec);
 }
 
+void test_bt_slot_dsl_roundtrip_and_tick() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    (void)eval_text(
+        "(define tree "
+        "  (bt.compile "
+        "    '(slot recovery-policy "
+        "       :contract guarded-recovery.v1 "
+        "       :install at-tick-boundary "
+        "       :fallback safe-stop "
+        "       (seq (cond always-true) (act always-success)))))",
+        env);
+    const std::string canonical = string_value(eval_text("(write-to-string (bt.to-dsl tree))", env));
+    check(canonical.find("(slot recovery-policy") != std::string::npos, "bt.to-dsl should preserve slot form");
+    check(canonical.find(":contract guarded-recovery.v1") != std::string::npos, "bt.to-dsl should preserve slot contract");
+    check(canonical.find(":install at-tick-boundary") != std::string::npos, "bt.to-dsl should preserve slot install mode");
+    check(canonical.find(":fallback safe-stop") != std::string::npos, "bt.to-dsl should preserve slot fallback");
+
+    (void)eval_text("(define tree2 (bt.compile (bt.to-dsl tree)))", env);
+    const std::string canonical_again = string_value(eval_text("(write-to-string (bt.to-dsl tree2))", env));
+    check(canonical_again == canonical, "slot DSL round-trip should be stable");
+
+    (void)eval_text("(define inst (bt.new-instance tree2))", env);
+    check(symbol_name(eval_text("(bt.tick inst)", env)) == "success", "slot should tick transparently through its child");
+}
+
 void test_bt_export_dot_builtin() {
     using namespace muslisp;
 
@@ -5271,6 +5299,7 @@ int main() {
         {"bt representative dsl roundtrip shapes", test_bt_dsl_roundtrip_representative_shapes},
         {"bt dsl hashes logged for compiled and loaded definitions",
          test_bt_dsl_hashes_are_logged_for_compiled_and_loaded_definitions},
+        {"bt slot dsl roundtrip and tick", test_bt_slot_dsl_roundtrip_and_tick},
         {"bt export-dot builtin", test_bt_export_dot_builtin},
         {"bt binary save/load roundtrip and validation", test_bt_binary_save_load_roundtrip_and_validation},
         {"list and predicate builtins", test_list_and_predicate_builtins},

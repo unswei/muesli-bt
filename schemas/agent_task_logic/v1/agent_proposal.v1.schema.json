@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unswei.github.io/muesli-bt/schemas/agent_task_logic/v1/agent_proposal.v1.schema.json",
+  "title": "agent_proposal.v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schema_version",
+    "proposal_id",
+    "source",
+    "intent",
+    "context_hash",
+    "slot",
+    "fragment_contract",
+    "fragment"
+  ],
+  "properties": {
+    "schema_version": { "const": "agent_proposal.v1" },
+    "proposal_id": { "type": "string", "minLength": 1 },
+    "source": { "type": "string", "minLength": 1 },
+    "intent": { "type": "string", "minLength": 1 },
+    "context_hash": { "type": "string", "minLength": 1 },
+    "slot": { "type": "string", "minLength": 1 },
+    "fragment_contract": { "type": "string", "minLength": 1 },
+    "previous_subtree_hash": { "type": "string" },
+    "blackboard": { "type": "object" },
+    "fragment": { "type": "string", "minLength": 1 }
+  }
+}

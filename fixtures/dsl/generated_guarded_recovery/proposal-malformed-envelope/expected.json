@@ -1,0 +1,11 @@
+{
+  "ok": false,
+  "code": "malformed_envelope",
+  "status": "rejected",
+  "reason_code": "malformed_envelope",
+  "field_path": "",
+  "slot": "recovery-policy",
+  "fragment_contract": "guarded-recovery.v1",
+  "host_reached": false,
+  "message_contains": "fragment"
+}

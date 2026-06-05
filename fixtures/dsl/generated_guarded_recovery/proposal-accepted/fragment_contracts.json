@@ -1,0 +1,11 @@
+{
+  "guarded-recovery.v1": {
+    "schema_version": "fragment_contract.v1",
+    "id": "guarded-recovery.v1",
+    "must_start_with_guard": true,
+    "min_guard_count": 2,
+    "requires_fallback_for_long_running": true,
+    "max_nodes": 16,
+    "max_depth": 8
+  }
+}

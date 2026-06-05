@@ -1,0 +1,21 @@
+{
+  "keys": {
+    "blocked_path": {
+      "max_age_ms": 200,
+      "type": "bool"
+    },
+    "observation_fresh": {
+      "max_age_ms": 200,
+      "type": "bool"
+    },
+    "recovery-action": {
+      "max_age_ms": 200,
+      "type": "map"
+    },
+    "recovery-state": {
+      "max_age_ms": 200,
+      "type": "vector"
+    }
+  },
+  "schema_version": "blackboard_manifest.v1"
+}

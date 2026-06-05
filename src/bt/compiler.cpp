@@ -60,6 +60,27 @@ public:
             return emit_node(std::move(n));
         }
 
+        if (form_name == "slot") {
+            if (items.size() < 4) {
+                throw bt_compile_error("slot: expects name, option key/value pairs, and one child");
+            }
+            if (!muslisp::is_symbol(items[1]) && !muslisp::is_string(items[1])) {
+                throw bt_compile_error("slot: name must be symbol or string");
+            }
+            if (((items.size() - 3u) % 2u) != 0u) {
+                throw bt_compile_error("slot: expected option key/value pairs before child");
+            }
+
+            node n;
+            n.kind = node_kind::slot;
+            n.leaf_name = muslisp::is_symbol(items[1]) ? muslisp::symbol_name(items[1]) : muslisp::string_value(items[1]);
+            for (std::size_t i = 2; i + 1 < items.size(); ++i) {
+                n.args.push_back(compile_arg(items[i]));
+            }
+            n.children.push_back(compile_node(items.back()));
+            return emit_node(std::move(n));
+        }
+
         if (form_name == "repeat" || form_name == "retry") {
             require_arity(form_name, items, 3);
             if (!muslisp::is_integer(items[1])) {

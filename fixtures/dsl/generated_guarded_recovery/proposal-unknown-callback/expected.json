@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "code": "unknown_callback",
+  "status": "rejected",
+  "reason_code": "unknown_callback",
+  "field_path": "fragment",
+  "slot": "recovery-policy",
+  "fragment_contract": "guarded-recovery.v1",
+  "host_reached": false
+}

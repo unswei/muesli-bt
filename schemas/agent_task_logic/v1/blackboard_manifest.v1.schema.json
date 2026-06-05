@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unswei.github.io/muesli-bt/schemas/agent_task_logic/v1/blackboard_manifest.v1.schema.json",
+  "title": "blackboard_manifest.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "keys"],
+  "properties": {
+    "schema_version": { "const": "blackboard_manifest.v1" },
+    "keys": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["type"],
+        "properties": {
+          "type": { "type": "string" },
+          "max_age_ms": { "type": "number", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "install_policy.v1",
+  "allowed_slots": [
+    "recovery-policy"
+  ],
+  "denied_capabilities": [
+    "vla.rt2"
+  ],
+  "max_nodes": 16,
+  "max_depth": 8,
+  "requires_validation": true,
+  "requires_dry_run": true,
+  "install_mode": "at_tick_boundary",
+  "rollback": "previous-subtree-hash"
+}

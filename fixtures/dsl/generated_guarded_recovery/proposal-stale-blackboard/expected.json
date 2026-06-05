@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "code": "stale_blackboard_input",
+  "status": "rejected",
+  "reason_code": "stale_blackboard_input",
+  "field_path": "blackboard",
+  "slot": "recovery-policy",
+  "fragment_contract": "guarded-recovery.v1",
+  "host_reached": false
+}

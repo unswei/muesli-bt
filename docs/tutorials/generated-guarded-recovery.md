@@ -5,7 +5,7 @@
 
 ## what this is
 
-This tutorial shows a deterministic generated guarded recovery subtree.
+This tutorial shows a deterministic generated guarded recovery subtree and the first agent proposal envelope around it.
 
 A deterministic template reads a blocked-path context and emits a Lisp Behaviour Tree (BT) subtree. The fragment is treated as untrusted data. The validator checks node shape, host callbacks, capability names, planner budget, and fallback policy before the fixture records an install-at-tick-boundary event.
 
@@ -36,6 +36,9 @@ The accepted output lives under `fixtures/dsl/generated_guarded_recovery/accepte
 - `events.jsonl`: canonical lifecycle event stream;
 - `replay_report.json`: replay checks for the canonical hash and event set.
 
+The accepted proposal lives under `fixtures/dsl/generated_guarded_recovery/proposal-accepted/`.
+It adds the `agent_proposal.v1` envelope, target slot, fragment contract, blackboard context, semantic diff, dry-run report, and rollback handle.
+
 Rejected fragments live beside it and prove that unsafe or incomplete generated data still fails before install:
 
 - `rejected-unknown-capability`;
@@ -53,6 +56,21 @@ Validate all generated guarded recovery fixtures:
 
 ```bash
 python3 tools/validate_generated_bt_fragment.py fixtures/dsl/generated_guarded_recovery
+```
+
+Inspect proposal validation output:
+
+```bash
+python3 tools/validate_generated_bt_fragment.py \
+  fixtures/dsl/generated_guarded_recovery/proposal-accepted \
+  --json
+```
+
+Export default manifests:
+
+```bash
+python3 tools/validate_generated_bt_fragment.py \
+  --export-manifests build/agent-manifests
 ```
 
 Validate the generated event stream:
@@ -93,6 +111,7 @@ Hashes identify artefacts for replay and comparison. They are not a safety bound
 ## see also
 
 - [generated guarded recovery evidence](../evidence/lisp-dsl-generated-subtree.md)
+- [agent-proposed task logic](../integration/agent-proposed-task-logic.md)
 - [why Lisp as DSL](../getting-oriented/why-lisp-dsl.md)
 - [canonical event log](../observability/event-log.md)
 - [roadmap to 1.0](../roadmap-to-1.0.md)

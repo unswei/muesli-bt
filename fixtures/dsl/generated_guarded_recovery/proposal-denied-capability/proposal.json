@@ -1,0 +1,10 @@
+{
+  "schema_version": "agent_proposal.v1",
+  "proposal_id": "proposal-recovery-denied-capability",
+  "source": "agent-fixture",
+  "intent": "recover from a blocked path with a denied VLA capability",
+  "context_hash": "fnv1a64:1111111111111111",
+  "slot": "recovery-policy",
+  "fragment_contract": "guarded-recovery.v1",
+  "fragment": "(reactive-sel (seq (cond blocked-path?) (vla-request :name \"policy\" :job_key policy-job :capability \"vla.rt2\" :instruction \"recover\" :deadline_ms 50) (act execute-recovery-turn)) (act safe-stop))"
+}

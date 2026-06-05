@@ -1,0 +1,25 @@
+{
+  "callbacks": [
+    "always-fail",
+    "always-false",
+    "always-success",
+    "always-true",
+    "async-sleep-ms",
+    "bb-has",
+    "bb-put-int",
+    "blocked-path?",
+    "execute-recovery-turn",
+    "move-towards-goal",
+    "observation-fresh?",
+    "recovery-exit?",
+    "safe-stop",
+    "stop"
+  ],
+  "capabilities": [
+    "env.move",
+    "planner.mcts",
+    "vision",
+    "vla.rt2"
+  ],
+  "schema_version": "capability_manifest.v1"
+}

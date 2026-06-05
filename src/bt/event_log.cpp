@@ -739,6 +739,8 @@ std::string event_log::node_kind_name(node_kind kind) {
             return "reactive_seq";
         case node_kind::reactive_sel:
             return "reactive_sel";
+        case node_kind::slot:
+            return "slot";
     }
     return "unknown";
 }

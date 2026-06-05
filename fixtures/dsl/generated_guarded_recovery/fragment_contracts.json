@@ -1,0 +1,49 @@
+{
+  "guarded-recovery.v1": {
+    "allowed_actions": [
+      "always-fail",
+      "always-false",
+      "always-success",
+      "always-true",
+      "async-sleep-ms",
+      "bb-has",
+      "bb-put-int",
+      "blocked-path?",
+      "execute-recovery-turn",
+      "move-towards-goal",
+      "observation-fresh?",
+      "recovery-exit?",
+      "safe-stop",
+      "stop"
+    ],
+    "allowed_nodes": [
+      "act",
+      "async-seq",
+      "cond",
+      "fail",
+      "invert",
+      "mem-sel",
+      "mem-seq",
+      "plan-action",
+      "reactive-sel",
+      "reactive-seq",
+      "repeat",
+      "retry",
+      "running",
+      "sel",
+      "seq",
+      "slot",
+      "succeed",
+      "vla-cancel",
+      "vla-request",
+      "vla-wait"
+    ],
+    "id": "guarded-recovery.v1",
+    "max_depth": 8,
+    "max_nodes": 16,
+    "min_guard_count": 1,
+    "must_start_with_guard": true,
+    "requires_fallback_for_long_running": true,
+    "schema_version": "fragment_contract.v1"
+  }
+}

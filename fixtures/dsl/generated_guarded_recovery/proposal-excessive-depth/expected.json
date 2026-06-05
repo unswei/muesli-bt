@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "code": "excessive_depth",
+  "status": "rejected",
+  "reason_code": "excessive_depth",
+  "field_path": "fragment",
+  "slot": "recovery-policy",
+  "fragment_contract": "guarded-recovery.v1",
+  "host_reached": false
+}

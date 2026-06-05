@@ -1,0 +1,9 @@
+{
+  "ok": false,
+  "code": "missing_slot",
+  "status": "rejected",
+  "reason_code": "missing_slot",
+  "field_path": "slot",
+  "host_reached": false,
+  "message_contains": "slot"
+}

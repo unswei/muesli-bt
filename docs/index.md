@@ -52,6 +52,7 @@ If you want the longer setup page, use [getting started](getting-started.md).
 | Model-service VLA sessions | experimental in v0.8 | [muesli-model-service bridge](integration/model-service-bridge.md) |
 | MiniVLA smoke/evidence path | gated experimental evidence | [MiniVLA smoke evidence](evidence/minivla-smoke-evidence.md) |
 | Generated guarded recovery subtree | experimental evidence slice | [Lisp DSL generated subtree evidence](evidence/lisp-dsl-generated-subtree.md) |
+| Agent-proposed task logic | experimental pre-1.0 proposal path | [agent-proposed task logic](integration/agent-proposed-task-logic.md) |
 | Production VLA providers | planned unless listed in release notes | [roadmap to 1.0](roadmap-to-1.0.md) |
 | Nav2/MoveIt adapters | planned unless listed in release notes | [roadmap to 1.0](roadmap-to-1.0.md) |
 

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://unswei.github.io/muesli-bt/schemas/agent_task_logic/v1/fragment_contract.v1.schema.json",
+  "title": "fragment_contract.v1",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_version", "id"],
+  "properties": {
+    "schema_version": { "const": "fragment_contract.v1" },
+    "id": { "type": "string" },
+    "must_start_with_guard": { "type": "boolean" },
+    "min_guard_count": { "type": "integer", "minimum": 0 },
+    "requires_fallback_for_long_running": { "type": "boolean" },
+    "allowed_nodes": { "type": "array", "items": { "type": "string" } },
+    "allowed_actions": { "type": "array", "items": { "type": "string" } },
+    "max_nodes": { "type": "integer", "minimum": 1 },
+    "max_depth": { "type": "integer", "minimum": 1 }
+  }
+}
