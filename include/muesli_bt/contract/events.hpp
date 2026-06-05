@@ -38,5 +38,11 @@ inline constexpr std::string_view kEventCancelLate = "cancel_late";
 inline constexpr std::string_view kEventAsyncCancelRequested = "async_cancel_requested";
 inline constexpr std::string_view kEventAsyncCancelAcknowledged = "async_cancel_acknowledged";
 inline constexpr std::string_view kEventAsyncCompletionDropped = "async_completion_dropped";
+inline constexpr std::string_view kEventSubtreeInstallRequested = "subtree_install_requested";
+inline constexpr std::string_view kEventSubtreeInstalled = "subtree_installed";
+inline constexpr std::string_view kEventSubtreeInstallRejected = "subtree_install_rejected";
+inline constexpr std::string_view kEventSubtreeRollbackRequested = "subtree_rollback_requested";
+inline constexpr std::string_view kEventSubtreeRolledBack = "subtree_rolled_back";
+inline constexpr std::string_view kEventSubtreeRollbackRejected = "subtree_rollback_rejected";
 
 }  // namespace muesli_bt::contract

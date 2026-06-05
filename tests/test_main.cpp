@@ -14,11 +14,15 @@
 #include <vector>
 
 #include "bt/instance.hpp"
+#include "bt/event_log.hpp"
 #include "bt/event_payload.hpp"
 #include "bt/logging.hpp"
 #include "bt/model_service.hpp"
 #include "bt/node_options.hpp"
+#include "bt/registry.hpp"
+#include "bt/runtime.hpp"
 #include "bt/runtime_host.hpp"
+#include "bt/status.hpp"
 #include "bt/trace.hpp"
 #include "../src/compiled_eval.hpp"
 #include "../src/repl_support.hpp"
@@ -1081,6 +1085,257 @@ void test_bt_slot_dsl_roundtrip_and_tick() {
 
     (void)eval_text("(define inst (bt.new-instance tree2))", env);
     check(symbol_name(eval_text("(bt.tick inst)", env)) == "success", "slot should tick transparently through its child");
+}
+
+bt::arg_value bt_symbol_arg(std::string text) {
+    bt::arg_value arg;
+    arg.kind = bt::arg_kind::symbol;
+    arg.text = std::move(text);
+    return arg;
+}
+
+bt::node bt_action_node(bt::node_id id, std::string name) {
+    bt::node n;
+    n.kind = bt::node_kind::act;
+    n.id = id;
+    n.leaf_name = std::move(name);
+    return n;
+}
+
+bt::definition make_slot_action_definition(std::string slot,
+                                           std::string contract,
+                                           std::string fallback,
+                                           std::string action_name) {
+    bt::definition def;
+    bt::node slot_node;
+    slot_node.kind = bt::node_kind::slot;
+    slot_node.id = 0;
+    slot_node.leaf_name = std::move(slot);
+    slot_node.args = {bt_symbol_arg(":contract"),
+                      bt_symbol_arg(std::move(contract)),
+                      bt_symbol_arg(":install"),
+                      bt_symbol_arg("at-tick-boundary"),
+                      bt_symbol_arg(":fallback"),
+                      bt_symbol_arg(std::move(fallback))};
+    slot_node.children.push_back(1);
+    def.nodes.push_back(std::move(slot_node));
+    def.nodes.push_back(bt_action_node(1, std::move(action_name)));
+    def.root = 0;
+    return def;
+}
+
+bt::definition make_plain_action_definition(std::string action_name) {
+    bt::definition def;
+    def.nodes.push_back(bt_action_node(0, std::move(action_name)));
+    def.root = 0;
+    return def;
+}
+
+bt::subtree_install_request make_test_subtree_install_request(std::string proposal_id,
+                                                              std::string slot,
+                                                              std::string contract,
+                                                              std::string action_name) {
+    bt::subtree_install_request request;
+    request.proposal_id = std::move(proposal_id);
+    request.source = "unit-test";
+    request.slot = std::move(slot);
+    request.fragment_contract = std::move(contract);
+    request.install_mode = "at-tick-boundary";
+    request.validation_status = "accepted";
+    request.source_hash = "fnv1a64:test-source";
+    request.canonical_dsl_hash = "fnv1a64:test-canonical-" + action_name;
+    request.validation_result_hash = "fnv1a64:test-validation";
+    request.fragment =
+        make_slot_action_definition(request.slot, request.fragment_contract, "safe-stop", std::move(action_name));
+    return request;
+}
+
+bool event_lines_contain(const bt::event_log& events, std::string_view type) {
+    for (const std::string& line : events.snapshot()) {
+        if (line.find("\"type\":\"" + std::string(type) + "\"") != std::string::npos) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void test_bt_live_subtree_install_and_rollback() {
+    bt::definition base =
+        make_slot_action_definition("recovery-policy", "guarded-recovery.v1", "safe-stop", "old-recovery");
+    bt::instance inst(&base);
+    bt::registry reg;
+    int old_calls = 0;
+    int new_calls = 0;
+    reg.register_action("old-recovery",
+                        [&](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+                            ++old_calls;
+                            return bt::status::success;
+                        });
+    reg.register_action("new-recovery",
+                        [&](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+                            ++new_calls;
+                            return bt::status::success;
+                        });
+
+    bt::event_log events;
+    events.set_deterministic_time(1000);
+    bt::services svc;
+    svc.obs.events = &events;
+
+    check(bt::tick(inst, reg, svc) == bt::status::success, "baseline slot child should tick");
+    check(old_calls == 1 && new_calls == 0, "baseline should tick old recovery only");
+
+    bt::subtree_install_result install =
+        bt::request_subtree_install(inst, svc, make_test_subtree_install_request("proposal-1",
+                                                                                 "recovery-policy",
+                                                                                 "guarded-recovery.v1",
+                                                                                 "new-recovery"));
+    check(install.queued, "accepted subtree install should queue");
+    check(inst.pending_subtree_install.has_value(), "install should be pending until the next tick boundary");
+    check(old_calls == 1 && new_calls == 0, "queued install should not tick proposed subtree immediately");
+
+    check(bt::tick(inst, reg, svc) == bt::status::success, "installed subtree should tick after boundary");
+    check(old_calls == 1 && new_calls == 1, "installed subtree should replace old slot child");
+    check(!inst.pending_subtree_install.has_value(), "install should be consumed at tick boundary");
+    check(event_lines_contain(events, "subtree_install_requested"), "install request event should be emitted");
+    check(event_lines_contain(events, "subtree_installed"), "install commit event should be emitted");
+
+    const auto rollback_it = inst.subtree_rollbacks.find("recovery-policy");
+    check(rollback_it != inst.subtree_rollbacks.end(), "install should keep rollback state for the slot");
+    bt::subtree_rollback_request rollback;
+    rollback.rollback_id = rollback_it->second.rollback_id;
+    rollback.slot = "recovery-policy";
+    rollback.installed_subtree_hash = rollback_it->second.installed_subtree_hash;
+    rollback.previous_subtree_hash = rollback_it->second.previous_subtree_hash;
+    bt::subtree_install_result rollback_result = bt::request_subtree_rollback(inst, svc, rollback);
+    check(rollback_result.queued, "valid rollback should queue");
+
+    check(bt::tick(inst, reg, svc) == bt::status::success, "rolled back subtree should tick after boundary");
+    check(old_calls == 2 && new_calls == 1, "rollback should restore old slot child");
+    check(inst.subtree_rollbacks.find("recovery-policy") == inst.subtree_rollbacks.end(),
+          "completed rollback should consume rollback state");
+    check(event_lines_contain(events, "subtree_rollback_requested"), "rollback request event should be emitted");
+    check(event_lines_contain(events, "subtree_rolled_back"), "rollback commit event should be emitted");
+}
+
+void test_bt_live_subtree_install_rejections_are_non_destructive() {
+    bt::definition base =
+        make_slot_action_definition("recovery-policy", "guarded-recovery.v1", "safe-stop", "old-recovery");
+    bt::instance inst(&base);
+    bt::registry reg;
+    int old_calls = 0;
+    int rejected_calls = 0;
+    int accepted_calls = 0;
+    reg.register_action("old-recovery",
+                        [&](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+                            ++old_calls;
+                            return bt::status::success;
+                        });
+    reg.register_action("rejected-recovery",
+                        [&](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+                            ++rejected_calls;
+                            return bt::status::success;
+                        });
+    reg.register_action("accepted-recovery",
+                        [&](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+                            ++accepted_calls;
+                            return bt::status::success;
+                        });
+
+    bt::event_log events;
+    events.set_deterministic_time(2000);
+    bt::services svc;
+    svc.obs.events = &events;
+
+    bt::subtree_install_request unknown =
+        make_test_subtree_install_request("proposal-missing-slot", "unknown-slot", "guarded-recovery.v1", "rejected-recovery");
+    check(!bt::request_subtree_install(inst, svc, std::move(unknown)).queued, "unknown slot should be rejected");
+
+    bt::subtree_install_request mismatch =
+        make_test_subtree_install_request("proposal-contract", "recovery-policy", "other-contract.v1", "rejected-recovery");
+    check(!bt::request_subtree_install(inst, svc, std::move(mismatch)).queued, "contract mismatch should be rejected");
+
+    bt::subtree_install_request rejected =
+        make_test_subtree_install_request("proposal-rejected", "recovery-policy", "guarded-recovery.v1", "rejected-recovery");
+    rejected.validation_status = "rejected";
+    check(!bt::request_subtree_install(inst, svc, std::move(rejected)).queued,
+          "rejected validation status should be rejected");
+
+    bt::subtree_install_request non_slot =
+        make_test_subtree_install_request("proposal-non-slot", "recovery-policy", "guarded-recovery.v1", "rejected-recovery");
+    non_slot.fragment = make_plain_action_definition("rejected-recovery");
+    check(!bt::request_subtree_install(inst, svc, std::move(non_slot)).queued, "non-slot fragment root should be rejected");
+
+    check(bt::tick(inst, reg, svc) == bt::status::success, "old subtree should remain active after rejected installs");
+    check(old_calls == 1, "old subtree should tick after rejected installs");
+    check(rejected_calls == 0, "rejected proposal subtree must not reach host execution");
+
+    bt::subtree_install_result queued =
+        bt::request_subtree_install(inst, svc, make_test_subtree_install_request("proposal-accepted",
+                                                                                 "recovery-policy",
+                                                                                 "guarded-recovery.v1",
+                                                                                 "accepted-recovery"));
+    check(queued.queued, "first accepted proposal should queue");
+    bt::subtree_install_result duplicate =
+        bt::request_subtree_install(inst, svc, make_test_subtree_install_request("proposal-duplicate",
+                                                                                 "recovery-policy",
+                                                                                 "guarded-recovery.v1",
+                                                                                 "rejected-recovery"));
+    check(!duplicate.queued && duplicate.reason_code == "pending_request_exists",
+          "duplicate pending install should be rejected");
+    check(bt::tick(inst, reg, svc) == bt::status::success, "queued install should still commit after duplicate rejection");
+    check(accepted_calls == 1 && rejected_calls == 0, "duplicate rejected proposal must not tick");
+    check(event_lines_contain(events, "subtree_install_rejected"), "install rejection event should be emitted");
+}
+
+void test_bt_live_subtree_install_cleans_replaced_running_subtree() {
+    bt::definition base =
+        make_slot_action_definition("recovery-policy", "guarded-recovery.v1", "safe-stop", "running-recovery");
+    bt::instance inst(&base);
+    bt::registry reg;
+    int running_calls = 0;
+    int replacement_calls = 0;
+    int halt_calls = 0;
+    reg.register_action(
+        "running-recovery",
+        [&](bt::tick_context&, bt::node_id, bt::node_memory& mem, std::span<const muslisp::value>) {
+            ++running_calls;
+            mem.b0 = true;
+            return bt::status::running;
+        },
+        [&](bt::tick_context&, bt::node_id, bt::node_memory&) { ++halt_calls; });
+    reg.register_action("replacement-recovery",
+                        [&](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+                            ++replacement_calls;
+                            return bt::status::success;
+                        });
+
+    bt::event_log events;
+    events.set_deterministic_time(3000);
+    bt::services svc;
+    svc.obs.events = &events;
+
+    check(bt::tick(inst, reg, svc) == bt::status::running, "old running subtree should start");
+    check(running_calls == 1, "running subtree should tick once");
+    inst.active_vla_jobs[1] = 42;
+    inst.halt_warning_emitted.insert(1);
+    check(inst.memory.find(1) != inst.memory.end(), "running node should have memory before replacement");
+    check(inst.node_stats.find(1) != inst.node_stats.end(), "running node should have profile state before replacement");
+
+    bt::subtree_install_result install =
+        bt::request_subtree_install(inst, svc, make_test_subtree_install_request("proposal-cleanup",
+                                                                                 "recovery-policy",
+                                                                                 "guarded-recovery.v1",
+                                                                                 "replacement-recovery"));
+    check(install.queued, "replacement install should queue");
+    check(bt::tick(inst, reg, svc) == bt::status::success, "replacement subtree should tick after install");
+    check(halt_calls == 1, "replacing a running subtree should call halt");
+    check(running_calls == 1 && replacement_calls == 1, "replacement should tick without re-ticking old subtree");
+    check(inst.memory.find(1) == inst.memory.end(), "old subtree memory should be erased");
+    check(inst.active_vla_jobs.find(1) == inst.active_vla_jobs.end(), "old subtree active VLA job should be erased");
+    check(inst.halt_warning_emitted.find(1) == inst.halt_warning_emitted.end(),
+          "old subtree halt warning state should be erased");
+    check(inst.node_stats.find(1) == inst.node_stats.end(), "old subtree profile state should be erased");
 }
 
 void test_bt_export_dot_builtin() {
@@ -5300,6 +5555,11 @@ int main() {
         {"bt dsl hashes logged for compiled and loaded definitions",
          test_bt_dsl_hashes_are_logged_for_compiled_and_loaded_definitions},
         {"bt slot dsl roundtrip and tick", test_bt_slot_dsl_roundtrip_and_tick},
+        {"bt live subtree install and rollback", test_bt_live_subtree_install_and_rollback},
+        {"bt live subtree install rejections are non destructive",
+         test_bt_live_subtree_install_rejections_are_non_destructive},
+        {"bt live subtree install cleans replaced running subtree",
+         test_bt_live_subtree_install_cleans_replaced_running_subtree},
         {"bt export-dot builtin", test_bt_export_dot_builtin},
         {"bt binary save/load roundtrip and validation", test_bt_binary_save_load_roundtrip_and_validation},
         {"list and predicate builtins", test_list_and_predicate_builtins},

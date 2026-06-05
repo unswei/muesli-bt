@@ -198,9 +198,9 @@ Cancels an in-flight VLA job id.
   child)
 ```
 
-`slot` is experimental metadata for agent-proposed task-logic changes. It names a patchable subtree boundary, records the expected fragment contract, install mode, and fallback action, then ticks its child transparently.
+`slot` is experimental metadata for agent-proposed task-logic changes. It names a patchable subtree boundary, records the expected fragment contract, install mode, and fallback action, then ticks its current child.
 
-Current released semantics outside explicit generated-subtree tooling are simple: `slot` returns the status of its child. Live subtree replacement at the slot boundary remains an experimental pre-`v1.0.0` path.
+Without a queued runtime install, `slot` returns the status of its authored child. The experimental C++ runtime API can replace a matching slot child at a tick boundary and can roll back to the previous child snapshot.
 
 ## Utility Nodes
 

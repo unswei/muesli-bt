@@ -151,7 +151,7 @@ python3 tests/check_generated_guarded_recovery.py
 
 This is representative DSL evidence. It does not prove that every generated BT fragment is safe. Generated fragments still need grammar validation, capability checks, budget checks, fallback checks, canonical logging, and replay evidence before execution.
 
-The generated guarded recovery slice under `fixtures/dsl/generated_guarded_recovery` is the first concrete demonstration for this path. It shows deterministic generation as Lisp data, normalisation, validation, canonical hashing, schema-valid lifecycle events, tick-boundary install evidence, and replay loading. Live C++ runtime hot-swapping remains a later implementation step.
+The generated guarded recovery slice under `fixtures/dsl/generated_guarded_recovery` is the first concrete demonstration for this path. It shows deterministic generation as Lisp data, normalisation, validation, canonical hashing, schema-valid lifecycle events, tick-boundary install evidence, and replay loading. The C++ runtime now also has a narrow experimental tick-boundary install and rollback path for matching `slot` fragments.
 
 ## gotchas
 

@@ -9,7 +9,7 @@ Use the public `v1.0` direction page under `docs/project/v1-direction.md` for th
 - `v0.9.0`: add a Nav2-backed capability lane for the flagship wheeled robot while keeping ROS2 as a thin transport plus capability host surface
 - `v0.9.0`: add one physical wheeled runbook with required artefacts, plus a clear Nav2/rosbag-backed fallback posture if hardware readiness slips
 - `v0.9.0`: add reproducible flagship experiment manifests, figure scripts, trace bundle generation, and one fair BehaviorTree.CPP matched baseline for the same scenario
-- `v0.9.0`: harden the generated guarded recovery subtree path from transparent slot metadata and install/rollback evidence into live runtime tick-boundary subtree mutation if it remains the chosen Lisp demonstration
+- `v0.9.0`: apply the experimental live runtime tick-boundary subtree install path to the generated guarded recovery evidence lane and decide whether any Lisp-facing install helper is needed before `v1.0.0`
 - `v0.9.0`: replace or retire `docs/integration/vla-backend-integration-plan.md` once the final implementation pages fully cover the released bridge/evidence path
 - `post-release`: add explicit `MMSP v0.2` `status` operation coverage if a supported backend starts requiring it
 - `post-release`: revisit GitHub Pages deployment once `actions/configure-pages` or `actions/deploy-pages` ship a non-`node20` runtime upstream

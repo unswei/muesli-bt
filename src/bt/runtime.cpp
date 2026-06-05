@@ -4,6 +4,9 @@
 #include <cmath>
 #include <optional>
 #include <sstream>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "bt/blackboard.hpp"
@@ -414,6 +417,171 @@ const node& get_node(const definition& def, node_id id) {
         throw bt_runtime_error("BT runtime: invalid node id");
     }
     return def.nodes[id];
+}
+
+std::optional<std::string> node_arg_option(const node& n, std::string_view key) {
+    for (std::size_t i = 0; i + 1 < n.args.size(); i += 2) {
+        const arg_value& option_key = n.args[i];
+        if ((option_key.kind == arg_kind::symbol || option_key.kind == arg_kind::string) && option_key.text == key) {
+            const arg_value& value = n.args[i + 1];
+            if (value.kind == arg_kind::symbol || value.kind == arg_kind::string) {
+                return value.text;
+            }
+            if (value.kind == arg_kind::integer) {
+                return std::to_string(value.int_v);
+            }
+            if (value.kind == arg_kind::boolean) {
+                return value.bool_v ? "true" : "false";
+            }
+            if (value.kind == arg_kind::nil) {
+                return "nil";
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<node_id> find_slot_node(const definition& def, std::string_view slot) {
+    for (const node& n : def.nodes) {
+        if (n.kind == node_kind::slot && n.leaf_name == slot) {
+            return n.id;
+        }
+    }
+    return std::nullopt;
+}
+
+void append_subtree_signature(std::ostringstream& out, const definition& def, node_id id, std::unordered_set<node_id>& seen) {
+    if (!seen.insert(id).second) {
+        out << "|ref=" << id;
+        return;
+    }
+    const node& n = get_node(def, id);
+    out << "(kind=" << static_cast<int>(n.kind) << ",name=" << n.leaf_name << ",int=" << n.int_param;
+    for (const arg_value& arg : n.args) {
+        out << ",arg-kind=" << static_cast<int>(arg.kind);
+        switch (arg.kind) {
+            case arg_kind::nil:
+                break;
+            case arg_kind::boolean:
+                out << ':' << (arg.bool_v ? "true" : "false");
+                break;
+            case arg_kind::integer:
+                out << ':' << arg.int_v;
+                break;
+            case arg_kind::floating:
+                out << ':' << arg.float_v;
+                break;
+            case arg_kind::symbol:
+            case arg_kind::string:
+                out << ':' << arg.text;
+                break;
+        }
+    }
+    out << ",children=[";
+    for (node_id child : n.children) {
+        append_subtree_signature(out, def, child, seen);
+    }
+    out << "])";
+}
+
+std::string subtree_hash(const definition& def, node_id root) {
+    std::ostringstream signature;
+    std::unordered_set<node_id> seen;
+    append_subtree_signature(signature, def, root, seen);
+    return event_log::hash64_hex(signature.str());
+}
+
+void collect_subtree_nodes(const definition& def, node_id root, std::unordered_set<node_id>& out) {
+    if (!out.insert(root).second) {
+        return;
+    }
+    const node& n = get_node(def, root);
+    for (node_id child : n.children) {
+        collect_subtree_nodes(def, child, out);
+    }
+}
+
+void clear_subtree_runtime_state(instance& inst, const definition& def, node_id root) {
+    std::unordered_set<node_id> ids;
+    collect_subtree_nodes(def, root, ids);
+    for (node_id id : ids) {
+        inst.memory.erase(id);
+        inst.active_vla_jobs.erase(id);
+        inst.halt_warning_emitted.erase(id);
+        inst.node_stats.erase(id);
+    }
+}
+
+void ensure_owned_definition(instance& inst) {
+    if (!inst.def) {
+        throw bt_runtime_error("BT subtree install: instance has no definition");
+    }
+    if (!inst.owned_definition || inst.def != inst.owned_definition.get()) {
+        inst.owned_definition = std::make_unique<definition>(*inst.def);
+        inst.def = inst.owned_definition.get();
+    }
+}
+
+void emit_subtree_lifecycle_event(services& svc,
+                                  std::string_view type,
+                                  std::uint64_t tick,
+                                  const subtree_install_result& result,
+                                  std::string_view reason_code = "") {
+    event_log* events = svc.obs.events;
+    if (!events) {
+        return;
+    }
+    events->ensure_run_started();
+    std::ostringstream data;
+    data << "{\"slot\":\"" << event_log::json_escape(result.slot) << "\"";
+    if (!result.proposal_id.empty()) {
+        data << ",\"proposal_id\":\"" << event_log::json_escape(result.proposal_id) << "\"";
+    }
+    if (!result.source_hash.empty()) {
+        data << ",\"source_hash\":\"" << event_log::json_escape(result.source_hash) << "\"";
+    }
+    if (!result.canonical_dsl_hash.empty()) {
+        data << ",\"canonical_dsl_hash\":\"" << event_log::json_escape(result.canonical_dsl_hash) << "\"";
+    }
+    if (!result.validation_result_hash.empty()) {
+        data << ",\"validation_result_hash\":\"" << event_log::json_escape(result.validation_result_hash) << "\"";
+    }
+    if (!result.old_subtree_hash.empty()) {
+        data << ",\"old_subtree_hash\":\"" << event_log::json_escape(result.old_subtree_hash) << "\"";
+    }
+    if (!result.new_subtree_hash.empty()) {
+        data << ",\"new_subtree_hash\":\"" << event_log::json_escape(result.new_subtree_hash) << "\"";
+    }
+    if (!result.rollback_id.empty()) {
+        data << ",\"rollback_id\":\"" << event_log::json_escape(result.rollback_id) << "\"";
+    }
+    if (!reason_code.empty()) {
+        data << ",\"reason_code\":\"" << event_log::json_escape(reason_code) << "\"";
+    }
+    data << ",\"install_mode\":\"at-tick-boundary\"}";
+    (void)events->emit(type, tick, data.str());
+}
+
+node_id append_remapped_subtree(definition& target,
+                                const definition& fragment,
+                                node_id fragment_root,
+                                std::unordered_map<node_id, node_id>& remap) {
+    if (const auto it = remap.find(fragment_root); it != remap.end()) {
+        return it->second;
+    }
+    const node& src = get_node(fragment, fragment_root);
+    node copy = src;
+    copy.id = static_cast<node_id>(target.nodes.size());
+    copy.children.clear();
+    const node_id new_id = copy.id;
+    remap.emplace(fragment_root, new_id);
+    target.nodes.push_back(std::move(copy));
+    std::vector<node_id> remapped_children;
+    for (node_id child : src.children) {
+        remapped_children.push_back(append_remapped_subtree(target, fragment, child, remap));
+    }
+    target.nodes[new_id].children = std::move(remapped_children);
+    return new_id;
 }
 
 muslisp::value materialize_arg(const arg_value& arg) {
@@ -2097,6 +2265,226 @@ void halt_all_children(tick_context& ctx, const node& parent, std::string_view r
     }
 }
 
+subtree_install_result make_install_result(const subtree_install_request& request) {
+    subtree_install_result result;
+    result.slot = request.slot;
+    result.proposal_id = request.proposal_id;
+    result.source_hash = request.source_hash;
+    result.canonical_dsl_hash = request.canonical_dsl_hash;
+    result.validation_result_hash = request.validation_result_hash;
+    result.new_subtree_hash = request.canonical_dsl_hash;
+    result.rollback_id = "rollback:" + (request.proposal_id.empty() ? request.canonical_dsl_hash : request.proposal_id);
+    return result;
+}
+
+subtree_install_result make_rollback_result(const subtree_rollback_request& request,
+                                            const subtree_slot_rollback_state* state = nullptr) {
+    subtree_install_result result;
+    result.slot = request.slot;
+    result.rollback_id = request.rollback_id;
+    result.old_subtree_hash = request.installed_subtree_hash;
+    result.new_subtree_hash = request.previous_subtree_hash;
+    if (state) {
+        result.proposal_id = state->proposal_id;
+        if (result.rollback_id.empty()) {
+            result.rollback_id = state->rollback_id;
+        }
+        if (result.old_subtree_hash.empty()) {
+            result.old_subtree_hash = state->installed_subtree_hash;
+        }
+        if (result.new_subtree_hash.empty()) {
+            result.new_subtree_hash = state->previous_subtree_hash;
+        }
+    }
+    return result;
+}
+
+void reject_subtree_install(services& svc, std::uint64_t tick, subtree_install_result& result, std::string reason_code) {
+    result.queued = false;
+    result.reason_code = std::move(reason_code);
+    emit_subtree_lifecycle_event(
+        svc, muesli_bt::contract::kEventSubtreeInstallRejected, tick, result, result.reason_code);
+}
+
+void reject_subtree_rollback(services& svc, std::uint64_t tick, subtree_install_result& result, std::string reason_code) {
+    result.queued = false;
+    result.reason_code = std::move(reason_code);
+    emit_subtree_lifecycle_event(
+        svc, muesli_bt::contract::kEventSubtreeRollbackRejected, tick, result, result.reason_code);
+}
+
+std::string active_slot_child_hash(const definition& def, std::string_view slot) {
+    const std::optional<node_id> slot_id = find_slot_node(def, slot);
+    if (!slot_id.has_value()) {
+        return "";
+    }
+    const node& slot_node = get_node(def, *slot_id);
+    if (slot_node.children.size() != 1) {
+        return "";
+    }
+    return subtree_hash(def, slot_node.children[0]);
+}
+
+std::optional<std::string> validate_install_request_shape(const instance& inst,
+                                                          const subtree_install_request& request,
+                                                          subtree_install_result& result) {
+    if (!inst.def) {
+        return "no_definition";
+    }
+    if (inst.pending_subtree_install.has_value() || inst.pending_subtree_rollback.has_value()) {
+        return "pending_request_exists";
+    }
+    if (request.validation_status != "accepted") {
+        return "validation_not_accepted";
+    }
+    if (request.install_mode != "at-tick-boundary") {
+        return "unsupported_install_mode";
+    }
+    if (request.slot.empty()) {
+        return "missing_slot";
+    }
+
+    const std::optional<node_id> slot_id = find_slot_node(*inst.def, request.slot);
+    if (!slot_id.has_value()) {
+        return "missing_slot";
+    }
+    const node& active_slot = get_node(*inst.def, *slot_id);
+    if (active_slot.children.size() != 1) {
+        return "malformed_slot";
+    }
+    result.old_subtree_hash = subtree_hash(*inst.def, active_slot.children[0]);
+
+    const std::optional<std::string> contract = node_arg_option(active_slot, ":contract");
+    if (contract.value_or("") != request.fragment_contract) {
+        return "contract_mismatch";
+    }
+
+    if (request.fragment.root >= request.fragment.nodes.size()) {
+        return "malformed_fragment";
+    }
+    const node& fragment_root = get_node(request.fragment, request.fragment.root);
+    if (fragment_root.kind != node_kind::slot) {
+        return "fragment_root_not_slot";
+    }
+    if (fragment_root.leaf_name != request.slot) {
+        return "fragment_slot_mismatch";
+    }
+    if (fragment_root.children.size() != 1) {
+        return "malformed_fragment";
+    }
+    const std::optional<std::string> fragment_contract = node_arg_option(fragment_root, ":contract");
+    if (fragment_contract.value_or("") != request.fragment_contract) {
+        return "contract_mismatch";
+    }
+
+    return std::nullopt;
+}
+
+subtree_install_result apply_pending_subtree_install(tick_context& ctx, subtree_install_request request) {
+    subtree_install_result result = make_install_result(request);
+    if (const std::optional<std::string> error = validate_install_request_shape(ctx.inst, request, result);
+        error.has_value()) {
+        reject_subtree_install(ctx.svc, ctx.tick_index, result, *error);
+        return result;
+    }
+
+    const definition previous_definition = *ctx.inst.def;
+    ensure_owned_definition(ctx.inst);
+    definition& active = *ctx.inst.owned_definition;
+    const std::optional<node_id> slot_id = find_slot_node(active, request.slot);
+    if (!slot_id.has_value()) {
+        reject_subtree_install(ctx.svc, ctx.tick_index, result, "missing_slot");
+        return result;
+    }
+
+    node& active_slot = active.nodes[*slot_id];
+    const node_id old_child = active_slot.children[0];
+    result.old_subtree_hash = subtree_hash(active, old_child);
+    halt_subtree_impl(ctx, old_child, "subtree_install");
+    clear_subtree_runtime_state(ctx.inst, active, old_child);
+
+    const node& fragment_root = get_node(request.fragment, request.fragment.root);
+    std::unordered_map<node_id, node_id> remap;
+    const node_id new_child = append_remapped_subtree(active, request.fragment, fragment_root.children[0], remap);
+    active.nodes[*slot_id].children[0] = new_child;
+    const std::string installed_child_hash = subtree_hash(active, new_child);
+
+    active.source_hash = request.source_hash;
+    active.canonical_dsl_hash = event_log::hash64_hex("live-subtree:" + request.slot + ":" + installed_child_hash);
+    active.canonical_dsl = "<runtime-live-subtree-install>";
+
+    subtree_slot_rollback_state rollback;
+    rollback.rollback_id = result.rollback_id;
+    rollback.proposal_id = request.proposal_id;
+    rollback.slot = request.slot;
+    rollback.previous_subtree_hash = result.old_subtree_hash;
+    rollback.installed_subtree_hash = installed_child_hash;
+    rollback.previous_definition = previous_definition;
+    ctx.inst.subtree_rollbacks[request.slot] = std::move(rollback);
+
+    result.queued = true;
+    result.reason_code = "installed";
+    result.new_subtree_hash = installed_child_hash;
+    emit_subtree_lifecycle_event(ctx.svc, muesli_bt::contract::kEventSubtreeInstalled, ctx.tick_index, result);
+    return result;
+}
+
+subtree_install_result apply_pending_subtree_rollback(tick_context& ctx, subtree_rollback_request request) {
+    auto state_it = ctx.inst.subtree_rollbacks.find(request.slot);
+    subtree_install_result result =
+        make_rollback_result(request, state_it == ctx.inst.subtree_rollbacks.end() ? nullptr : &state_it->second);
+    if (!ctx.inst.def) {
+        reject_subtree_rollback(ctx.svc, ctx.tick_index, result, "no_definition");
+        return result;
+    }
+    if (state_it == ctx.inst.subtree_rollbacks.end()) {
+        reject_subtree_rollback(ctx.svc, ctx.tick_index, result, "rollback_handle_not_found");
+        return result;
+    }
+
+    const subtree_slot_rollback_state& state = state_it->second;
+    const std::string expected_active_hash =
+        request.installed_subtree_hash.empty() ? state.installed_subtree_hash : request.installed_subtree_hash;
+    const std::string active_hash = active_slot_child_hash(*ctx.inst.def, request.slot);
+    if (active_hash.empty() || active_hash != expected_active_hash) {
+        reject_subtree_rollback(ctx.svc, ctx.tick_index, result, "active_subtree_hash_mismatch");
+        return result;
+    }
+
+    const std::optional<node_id> slot_id = find_slot_node(*ctx.inst.def, request.slot);
+    if (slot_id.has_value()) {
+        const node& active_slot = get_node(*ctx.inst.def, *slot_id);
+        if (active_slot.children.size() == 1) {
+            halt_subtree_impl(ctx, active_slot.children[0], "subtree_rollback");
+            clear_subtree_runtime_state(ctx.inst, *ctx.inst.def, active_slot.children[0]);
+        }
+    }
+
+    ctx.inst.owned_definition = std::make_unique<definition>(state.previous_definition);
+    ctx.inst.def = ctx.inst.owned_definition.get();
+    result.queued = true;
+    result.reason_code = "rolled_back";
+    result.old_subtree_hash = active_hash;
+    result.new_subtree_hash = state.previous_subtree_hash;
+    emit_subtree_lifecycle_event(ctx.svc, muesli_bt::contract::kEventSubtreeRolledBack, ctx.tick_index, result);
+    ctx.inst.subtree_rollbacks.erase(state_it);
+    return result;
+}
+
+void apply_pending_subtree_change(tick_context& ctx) {
+    if (ctx.inst.pending_subtree_install.has_value()) {
+        subtree_install_request request = std::move(*ctx.inst.pending_subtree_install);
+        ctx.inst.pending_subtree_install.reset();
+        (void)apply_pending_subtree_install(ctx, std::move(request));
+        return;
+    }
+    if (ctx.inst.pending_subtree_rollback.has_value()) {
+        subtree_rollback_request request = std::move(*ctx.inst.pending_subtree_rollback);
+        ctx.inst.pending_subtree_rollback.reset();
+        (void)apply_pending_subtree_rollback(ctx, std::move(request));
+    }
+}
+
 status tick_mem_seq(const node& n, tick_context& ctx) {
     node_memory& mem = node_memory_for(ctx.inst, n.id);
     std::size_t index = clamp_child_index(n, mem.i0);
@@ -2592,6 +2980,53 @@ void tick_context::scheduler_event(trace_event_kind kind, job_id job, job_status
     (void)events->emit(type, tick_index, data.str());
 }
 
+subtree_install_result request_subtree_install(instance& inst, services& svc, subtree_install_request request) {
+    subtree_install_result result = make_install_result(request);
+    emit_subtree_lifecycle_event(svc, muesli_bt::contract::kEventSubtreeInstallRequested, inst.tick_index, result);
+    if (const std::optional<std::string> error = validate_install_request_shape(inst, request, result); error.has_value()) {
+        reject_subtree_install(svc, inst.tick_index, result, *error);
+        return result;
+    }
+    result.queued = true;
+    result.reason_code = "queued";
+    inst.pending_subtree_install = std::move(request);
+    return result;
+}
+
+subtree_install_result request_subtree_rollback(instance& inst, services& svc, subtree_rollback_request request) {
+    const auto state_it = inst.subtree_rollbacks.find(request.slot);
+    subtree_install_result result =
+        make_rollback_result(request, state_it == inst.subtree_rollbacks.end() ? nullptr : &state_it->second);
+    emit_subtree_lifecycle_event(svc, muesli_bt::contract::kEventSubtreeRollbackRequested, inst.tick_index, result);
+    if (!inst.def) {
+        reject_subtree_rollback(svc, inst.tick_index, result, "no_definition");
+        return result;
+    }
+    if (inst.pending_subtree_install.has_value() || inst.pending_subtree_rollback.has_value()) {
+        reject_subtree_rollback(svc, inst.tick_index, result, "pending_request_exists");
+        return result;
+    }
+    if (request.slot.empty()) {
+        reject_subtree_rollback(svc, inst.tick_index, result, "missing_slot");
+        return result;
+    }
+    if (state_it == inst.subtree_rollbacks.end()) {
+        reject_subtree_rollback(svc, inst.tick_index, result, "rollback_handle_not_found");
+        return result;
+    }
+    const std::string expected_active_hash =
+        request.installed_subtree_hash.empty() ? state_it->second.installed_subtree_hash : request.installed_subtree_hash;
+    const std::string active_hash = active_slot_child_hash(*inst.def, request.slot);
+    if (active_hash.empty() || active_hash != expected_active_hash) {
+        reject_subtree_rollback(svc, inst.tick_index, result, "active_subtree_hash_mismatch");
+        return result;
+    }
+    result.queued = true;
+    result.reason_code = "queued";
+    inst.pending_subtree_rollback = std::move(request);
+    return result;
+}
+
 status tick(instance& inst, registry& reg, services& svc) {
     if (!inst.def) {
         throw bt_runtime_error("BT tick: instance has no definition");
@@ -2645,6 +3080,9 @@ status tick(instance& inst, registry& reg, services& svc) {
             (void)svc.obs.events->emit("bb_snapshot", inst.tick_index, snap.str());
         }
     }
+
+    apply_pending_subtree_change(ctx);
+    ctx.current_node = inst.def->root;
 
     trace_event ev = make_trace_event(trace_event_kind::tick_begin);
     ev.node = inst.def->root;

@@ -1,7 +1,7 @@
 # agent-proposed task logic
 
 !!! note "status"
-    Status: experimental. The current path covers proposal envelopes, manifests, validation results, dry-run reports, semantic diffs, slot metadata, rollback handles, and fixture evidence. Live mutable subtree installation remains a pre-`v1.0.0` hardening item.
+    Status: experimental. The current path covers proposal envelopes, manifests, validation results, dry-run reports, semantic diffs, slot metadata, rollback handles, fixture evidence, and the first narrow live C++ tick-boundary install API for `slot` nodes.
 
 ## what this is
 
@@ -27,7 +27,7 @@ agent_proposal.v1
   -> install policy gates
   -> semantic diff
   -> dry-run report
-  -> tick-boundary install evidence
+  -> tick-boundary install request
   -> rollback handle
   -> replay artefacts
 ```
@@ -88,6 +88,13 @@ The exported manifests are:
 
 The schema directory is `schemas/agent_task_logic/v1/`.
 
+The first live runtime API is C++-facing and experimental:
+
+- `bt::request_subtree_install(instance&, services&, subtree_install_request)`;
+- `bt::request_subtree_rollback(instance&, services&, subtree_rollback_request)`.
+
+The runtime accepts only validated `at-tick-boundary` requests for an existing `slot`. The compiled runtime fragment must also be rooted at a matching `slot` node. The agent proposal envelope can still carry the child fragment text; host tooling is responsible for wrapping or compiling that fragment into the runtime install shape.
+
 ## example
 
 The accepted generated guarded recovery proposal lives under:
@@ -105,7 +112,7 @@ The validation output includes:
 
 ## gotchas
 
-The current runtime supports `slot` as a transparent BT node that preserves slot metadata and ticks its child. The proposal tooling records install and rollback evidence. Production-grade live subtree mutation is still experimental work before `v1.0.0`.
+The current runtime keeps live subtree mutation deliberately narrow. It supports one pending install or rollback per instance, commits only at a tick boundary, preserves non-slot runtime state, and clears replaced-subtree memory, active VLA jobs, halt warnings, and profile state.
 
 Rejected proposals keep `host_reached=false`. A rejected proposal must not reach robot execution.
 

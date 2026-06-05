@@ -100,7 +100,7 @@ The accepted proposal validation result also includes a semantic diff, dry-run r
 
 ## gotchas
 
-The current slice uses deterministic fixture events for the install lifecycle. It proves the artefact and event contract first. A later runtime implementation still needs to perform live tick-boundary subtree installation in C++.
+The fixture evidence remains deterministic. The C++ runtime now also has an experimental live tick-boundary install and rollback path for matching `slot` fragments, covered by core unit tests. The generated guarded recovery fixture still stays as the reproducible artefact path for proposal validation, replay, and comparison.
 
 The generated subtree is intentionally small. The value is the validated lifecycle and replay evidence, not a clever recovery strategy.
 

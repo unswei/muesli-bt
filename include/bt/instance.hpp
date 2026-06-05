@@ -3,6 +3,8 @@
 #include <any>
 #include <chrono>
 #include <cstdint>
+#include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -63,10 +65,53 @@ struct services {
     vla_service* vla = nullptr;
 };
 
+struct subtree_install_request {
+    std::string proposal_id;
+    std::string source;
+    std::string slot;
+    std::string fragment_contract;
+    std::string install_mode = "at-tick-boundary";
+    std::string validation_status;
+    std::string source_hash;
+    std::string canonical_dsl_hash;
+    std::string validation_result_hash;
+    definition fragment;
+};
+
+struct subtree_rollback_request {
+    std::string rollback_id;
+    std::string slot;
+    std::string installed_subtree_hash;
+    std::string previous_subtree_hash;
+};
+
+struct subtree_install_result {
+    bool queued = false;
+    std::string reason_code;
+    std::string slot;
+    std::string proposal_id;
+    std::string source_hash;
+    std::string canonical_dsl_hash;
+    std::string validation_result_hash;
+    std::string old_subtree_hash;
+    std::string new_subtree_hash;
+    std::string rollback_id;
+};
+
+struct subtree_slot_rollback_state {
+    std::string rollback_id;
+    std::string proposal_id;
+    std::string slot;
+    std::string previous_subtree_hash;
+    std::string installed_subtree_hash;
+    definition previous_definition;
+};
+
 struct instance {
     explicit instance(const definition* definition_ptr = nullptr, std::size_t trace_capacity = 4096);
 
     const definition* def = nullptr;
+    std::unique_ptr<definition> owned_definition;
     std::int64_t instance_handle = 0;
     std::unordered_map<node_id, node_memory> memory;
     std::unordered_map<node_id, std::uint64_t> active_vla_jobs;
@@ -80,6 +125,9 @@ struct instance {
     tree_profile_stats tree_stats{};
     std::unordered_map<node_id, node_profile_stats> node_stats;
     std::vector<node_id> halt_stack;
+    std::optional<subtree_install_request> pending_subtree_install;
+    std::optional<subtree_rollback_request> pending_subtree_rollback;
+    std::unordered_map<std::string, subtree_slot_rollback_state> subtree_rollbacks;
 
     trace_buffer trace;
 };

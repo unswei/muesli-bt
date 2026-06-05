@@ -42,6 +42,8 @@ struct tick_context {
 status tick(instance& inst, registry& reg, services& svc);
 void reset(instance& inst);
 void halt_subtree(instance& inst, registry& reg, services& svc, node_id root, std::string_view reason = "halt");
+subtree_install_result request_subtree_install(instance& inst, services& svc, subtree_install_request request);
+subtree_install_result request_subtree_rollback(instance& inst, services& svc, subtree_rollback_request request);
 
 std::string dump_stats(const instance& inst);
 std::string dump_trace(const instance& inst);
