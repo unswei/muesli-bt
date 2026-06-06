@@ -14,6 +14,7 @@ GENERATOR = REPO_ROOT / "tools" / "generate_guarded_recovery_subtree.py"
 VALIDATOR = REPO_ROOT / "tools" / "validate_generated_bt_fragment.py"
 LOG_VALIDATOR = REPO_ROOT / "tools" / "validate_log.py"
 TRACE_VALIDATOR = REPO_ROOT / "tools" / "validate_trace.py"
+FLAGSHIP_EVIDENCE = REPO_ROOT / "tools" / "run_flagship_generated_recovery_evidence.py"
 SCHEMA = REPO_ROOT / "schemas" / "event_log" / "v1" / "mbt.evt.v1.schema.json"
 FIXTURE_ROOT = REPO_ROOT / "fixtures" / "dsl" / "generated_guarded_recovery"
 ACCEPTED = FIXTURE_ROOT / "accepted-blocked-path"
@@ -145,6 +146,9 @@ def main() -> int:
         raise AssertionError("flagship fixed recovery should preserve branch id 1")
     if comparison.get("generated_recovery", {}).get("fragment_contract") != "guarded-recovery.v1":
         raise AssertionError("flagship generated recovery should use guarded-recovery.v1")
+
+    completed = run_cli(str(FLAGSHIP_EVIDENCE), "--check")
+    assert_ok(completed, "flagship generated-recovery evidence manifest check")
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         generated = Path(tmp_dir) / "accepted-blocked-path"

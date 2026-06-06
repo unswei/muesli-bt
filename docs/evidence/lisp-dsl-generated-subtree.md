@@ -94,9 +94,16 @@ The experimental flagship artefacts are:
 ```text
 examples/flagship_wheeled/lisp/bt_goal_flagship_generated_recovery.lisp
 fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/fragment.lisp
+fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/evidence_manifest.json
 fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/fixed_vs_generated_report.json
 fixtures/dsl/generated_guarded_recovery/proposal-flagship-accepted/proposal.json
 fixtures/dsl/generated_guarded_recovery/proposal-flagship-rejected-contract/proposal.json
+```
+
+Check the release-style flagship evidence manifest:
+
+```bash
+python3 tools/run_flagship_generated_recovery_evidence.py --check
 ```
 
 The experimental flagship BT source is:
@@ -135,6 +142,7 @@ The generated subtree is intentionally small. The value is the validated lifecyc
 ## see also
 
 - [agent-proposed task logic](../integration/agent-proposed-task-logic.md)
+- [flagship generated-recovery evidence](flagship-generated-recovery.md)
 - [generated guarded recovery tutorial](../tutorials/generated-guarded-recovery.md)
 - [why Lisp as DSL](../getting-oriented/why-lisp-dsl.md)
 - [canonical event log](../observability/event-log.md)

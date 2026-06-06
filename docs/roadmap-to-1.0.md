@@ -338,7 +338,7 @@ Status vocabulary for this milestone:
 - released: async cancellation lifecycle evidence, ROS-level pre-emption fixture, and `cap.echo.v1` registry smoke coverage
 - experimental: Lisp DSL round-trip/hash evidence and generated-fragment rejection fixtures
 - contract-only: host capability bundle contracts
-- planned: real capability lifecycle events, production VLA providers, generated subtree execution, Nav2 adapters, and MoveIt adapters
+- planned: real capability lifecycle events, production VLA providers, generated-subtree promotion into ROS or simulator lanes, Nav2 adapters, and MoveIt adapters
 
 Focus:
 
@@ -667,7 +667,7 @@ docs/tutorials/embedding-muesli-bt.md
 Lisp-specific evidence path: generated guarded recovery subtree:
 
 - add one evaluation demonstration where Lisp clearly enables useful runtime task-logic handling beyond hand-written BT execution
-- current slice on `main`: deterministic fixture generation, accepted/rejected validation fixtures, agent proposal envelopes, `guarded-recovery.v1`, manifests, validation result objects, semantic diffs, dry-run reports, rollback handles, `slot` DSL metadata, canonical DSL hashes, generated-fragment lifecycle events, replay report, tutorial, CTest coverage, and the first narrow live C++ tick-boundary install/rollback path exist as an experimental evidence path
+- current slice on `main`: deterministic fixture generation, accepted/rejected validation fixtures, agent proposal envelopes, `guarded-recovery.v1`, manifests, validation result objects, semantic diffs, dry-run reports, rollback handles, `slot` DSL metadata, canonical DSL hashes, generated-fragment lifecycle events, replay report, tutorial, CTest coverage, a release-style flagship generated-recovery evidence manifest/checker, and the first narrow live C++ tick-boundary install/rollback path exist as an experimental evidence path
 - recommended demo: `generated guarded recovery subtree`
 - start with a normal wheeled goal-seeking BT used in the existing cross-transport path
 - when a deterministic blocked-path or degraded-model condition is observed, generate a guarded recovery subtree as Lisp data using either quasiquote/templates or a deterministic generator

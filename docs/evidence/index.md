@@ -31,6 +31,7 @@ Benchmark pages should include hardware, commit, compiler, build flags, commands
 - [deterministic fixtures](https://github.com/unswei/muesli-bt/tree/main/tests/fixtures/mbt.evt.v1)
 - [fixture bundles](https://github.com/unswei/muesli-bt/tree/main/fixtures)
 - [Lisp DSL generated subtree evidence](lisp-dsl-generated-subtree.md)
+- [flagship generated-recovery evidence](flagship-generated-recovery.md)
 
 Reproduction commands live in the linked contract and conformance pages.
 

@@ -10,6 +10,7 @@ muesli-bt
 - Added the first experimental live C++ tick-boundary subtree install path for `slot` nodes, including install and rollback request APIs, rollback snapshots, non-destructive rejection gates, replaced-subtree cleanup, and unit coverage for install, rejection, rollback, and halt cleanup.
 - Added `B9` generated-subtree contract benchmarks for deterministic proposal generation, normalisation, validation, compile, tick-boundary install, rollback, rejected-policy handling, replay parity, first-divergence detection, allocation accounting, canonical events, and per-repetition sidecar reports.
 - Added an experimental wheeled flagship generated-recovery variant with a patchable `recovery-policy` slot, deterministic accepted/rejected proposal fixtures, fixed-versus-generated recovery evidence, and core runtime coverage for install, rejection, and rollback.
+- Added a release-style evidence manifest and checker for the experimental wheeled flagship generated-recovery variant, covering proposal validation, event-log shape, replay, rollback hashes, fixed-versus-generated comparison, and artefact drift.
 - Added the first deterministic generated guarded recovery subtree evidence slice, including a blocked-path generator, accepted and rejected generated-fragment fixtures, canonical DSL hashes, lifecycle events, replay report, tutorial, evidence page, and CTest coverage.
 
 ### Changed

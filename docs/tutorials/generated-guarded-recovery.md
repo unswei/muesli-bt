@@ -86,6 +86,12 @@ Run the CTest slice:
 ctest --preset core-only -R muesli_bt_generated_guarded_recovery --output-on-failure
 ```
 
+Check the flagship generated-recovery evidence manifest:
+
+```bash
+python3 tools/run_flagship_generated_recovery_evidence.py --check
+```
+
 ## example
 
 The generated source is also checked in as `examples/bt/generated_guarded_recovery.lisp`:
@@ -111,6 +117,7 @@ Hashes identify artefacts for replay and comparison. They are not a safety bound
 ## see also
 
 - [generated guarded recovery evidence](../evidence/lisp-dsl-generated-subtree.md)
+- [flagship generated-recovery evidence](../evidence/flagship-generated-recovery.md)
 - [agent-proposed task logic](../integration/agent-proposed-task-logic.md)
 - [why Lisp as DSL](../getting-oriented/why-lisp-dsl.md)
 - [canonical event log](../observability/event-log.md)

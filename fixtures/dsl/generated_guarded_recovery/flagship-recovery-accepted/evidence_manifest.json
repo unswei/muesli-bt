@@ -1,0 +1,169 @@
+{
+  "artefacts": {
+    "accepted_proposal": {
+      "path": "fixtures/dsl/generated_guarded_recovery/proposal-flagship-accepted/proposal.json",
+      "sha256": "sha256:3f6bdf4bded4e1b6a6748fe2d1a146fa22d10ca80df9964dc87faf3b44d9997d"
+    },
+    "bt_source": {
+      "path": "examples/flagship_wheeled/lisp/bt_goal_flagship_generated_recovery.lisp",
+      "sha256": "sha256:34b8f38854d0ec492bb1a21f247f5e450a737bb87c7568f9e72ecb06f6b99584"
+    },
+    "canonical_fragment": {
+      "path": "fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/canonical_fragment.lisp",
+      "sha256": "sha256:6b6b4a2c2dbc99cb7f2da321446dea818ce3d9511e18b1d9512dd75e79acbd8f"
+    },
+    "comparison_report": {
+      "path": "fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/fixed_vs_generated_report.json",
+      "sha256": "sha256:efe4518ba79c1f33f87d93a7e41778fcd4cd2ab754256ba5faeebf5dec48aba5"
+    },
+    "context": {
+      "path": "fixtures/dsl/generated_guarded_recovery/context-flagship-blocked-recovery.json",
+      "sha256": "sha256:7583054aa414c6ad0bc7514d74db2107237230a16f7c8c2c326e4f8fc0527ea2"
+    },
+    "events": {
+      "path": "fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/events.jsonl",
+      "sha256": "sha256:4388298080df5909dec856795cdcf364c55ac1ae1dca90f657cb7d7662b833e7"
+    },
+    "fragment": {
+      "path": "fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/fragment.lisp",
+      "sha256": "sha256:342e6f42ae11f902f012de3de5f1f12ed794e717cbb75a7778a259a7554d876c"
+    },
+    "rejected_contract": {
+      "path": "fixtures/dsl/generated_guarded_recovery/proposal-flagship-rejected-contract/fragment_contracts.json",
+      "sha256": "sha256:fa9553f8c3826b5b5484fd61ba7767bf09d43a6756ac8397021c1cdb6bfffb7c"
+    },
+    "rejected_proposal": {
+      "path": "fixtures/dsl/generated_guarded_recovery/proposal-flagship-rejected-contract/proposal.json",
+      "sha256": "sha256:c808f7cbffc844cd1b47c2f23938b4cb4f3bd44da728e24ab2d735e2fa5e683e"
+    },
+    "replay_report": {
+      "path": "fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/replay_report.json",
+      "sha256": "sha256:0326adfd47feb57b3d234248f773c48238fa343a6f41fd164b8eee6936bd209e"
+    },
+    "validation_report": {
+      "path": "fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/validation_report.json",
+      "sha256": "sha256:7382c1d13037d9114901cbd03baf2bf6d42aa5ec4a0bdb2cb9a3d3021e61558c"
+    }
+  },
+  "canonical_baseline_promoted": false,
+  "comparison": {
+    "checks": {
+      "contract_matches": true,
+      "fixed_branch_preserved_as_rollback_target": true,
+      "generated_fragment_validated_before_host_reach": true,
+      "rollback_hash_available": true,
+      "same_slot": true
+    },
+    "passed": true,
+    "path": "fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/fixed_vs_generated_report.json",
+    "sha256": "sha256:efe4518ba79c1f33f87d93a7e41778fcd4cd2ab754256ba5faeebf5dec48aba5"
+  },
+  "events": {
+    "count": 15,
+    "path": "fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/events.jsonl",
+    "run_id": "fixture-flagship-generated-recovery",
+    "sha256": "sha256:4388298080df5909dec856795cdcf364c55ac1ae1dca90f657cb7d7662b833e7",
+    "type_counts": {
+      "dsl_fragment_compiled": 1,
+      "dsl_fragment_generated": 1,
+      "dsl_fragment_normalised": 1,
+      "dsl_fragment_validation_ok": 1,
+      "run_end": 1,
+      "run_start": 1,
+      "subtree_install_requested": 1,
+      "subtree_installed": 1,
+      "subtree_replay_loaded": 1,
+      "subtree_rollback_requested": 1,
+      "subtree_rolled_back": 1,
+      "tick_begin": 2,
+      "tick_end": 2
+    },
+    "types": [
+      "run_start",
+      "dsl_fragment_generated",
+      "dsl_fragment_normalised",
+      "dsl_fragment_validation_ok",
+      "dsl_fragment_compiled",
+      "tick_begin",
+      "subtree_install_requested",
+      "subtree_installed",
+      "tick_end",
+      "tick_begin",
+      "subtree_rollback_requested",
+      "subtree_rolled_back",
+      "tick_end",
+      "subtree_replay_loaded",
+      "run_end"
+    ]
+  },
+  "fallback": "safe-stop",
+  "fragment_contract": "guarded-recovery.v1",
+  "hashes": {
+    "canonical_dsl_hash": "fnv1a64:a66df0ada137354c",
+    "installed_subtree_hash": "fnv1a64:a66df0ada137354c",
+    "previous_subtree_hash": "fnv1a64:aaaaaaaaaaaaaaaa",
+    "restored_subtree_hash": "fnv1a64:aaaaaaaaaaaaaaaa",
+    "source_hash": "fnv1a64:8da798d01a066784"
+  },
+  "install_mode": "at_tick_boundary",
+  "promotion_boundary": {
+    "physical_robot_dependency": false,
+    "ros2_nav2_dependency": false,
+    "shared_flagship_baseline_unchanged": true,
+    "simulator_wrappers_unchanged": true
+  },
+  "proposals": {
+    "accepted": {
+      "canonical_dsl_hash": "fnv1a64:a66df0ada137354c",
+      "host_reached": false,
+      "path": "fixtures/dsl/generated_guarded_recovery/proposal-flagship-accepted/proposal.json",
+      "proposal_id": "proposal-flagship-recovery-001",
+      "reason_code": "accepted",
+      "source_hash": "fnv1a64:8da798d01a066784",
+      "status": "accepted"
+    },
+    "rejected_contract": {
+      "field_path": "fragment",
+      "host_reached": false,
+      "path": "fixtures/dsl/generated_guarded_recovery/proposal-flagship-rejected-contract/proposal.json",
+      "proposal_id": "proposal-flagship-recovery-rejected-001",
+      "reason_code": "excessive_depth",
+      "status": "rejected"
+    }
+  },
+  "replay": {
+    "checks": {
+      "fragment_generated": true,
+      "installed_at_tick_boundary": true,
+      "normalised": true,
+      "replay_loaded_same_canonical_hash": true,
+      "rollback_restored_previous_hash": true,
+      "validation_accepted": true
+    },
+    "passed": true,
+    "path": "fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/replay_report.json",
+    "sha256": "sha256:0326adfd47feb57b3d234248f773c48238fa343a6f41fd164b8eee6936bd209e"
+  },
+  "schema_version": "flagship_generated_recovery_evidence_manifest.v1",
+  "slot": "recovery-policy",
+  "status": "experimental",
+  "validation": {
+    "accepted_reason_code": "accepted",
+    "accepted_status": "accepted",
+    "event_log_schema": "mbt.evt.v1",
+    "event_log_validation": "schema_enum_checked",
+    "regeneration": "passed",
+    "rejected_field_path": "fragment",
+    "rejected_reason_code": "excessive_depth",
+    "rejected_status": "rejected"
+  },
+  "validation_report": {
+    "canonical_dsl_hash": "fnv1a64:a66df0ada137354c",
+    "fallback_policy": "required_and_present",
+    "node_count": 9,
+    "path": "fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/validation_report.json",
+    "sha256": "sha256:7382c1d13037d9114901cbd03baf2bf6d42aa5ec4a0bdb2cb9a3d3021e61558c"
+  },
+  "variant": "wheeled-goal-flagship-generated-recovery",
+  "wrappers_promoted": false
+}

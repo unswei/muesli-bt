@@ -21,4 +21,5 @@ python3 tools/validate_generated_bt_fragment.py fixtures/dsl/generated_guarded_r
 python3 tools/validate_log.py fixtures/dsl/generated_guarded_recovery/accepted-blocked-path/events.jsonl
 python3 tools/validate_log.py fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/events.jsonl
 python3 tools/validate_trace.py check fixtures/dsl/generated_guarded_recovery/accepted-blocked-path/events.jsonl
+python3 tools/run_flagship_generated_recovery_evidence.py --check
 ```
