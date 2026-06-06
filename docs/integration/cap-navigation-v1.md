@@ -48,7 +48,18 @@ Stable result fields:
 - `host_reached`
 - `request_hash`
 - `response_hash`
+- `validation_status`
 - optional `job_id`, `progress`, and `path`
+
+Mock validation currently checks:
+
+- `navigate-to-pose` and `get-path` require `target`
+- `target` must be a map with `frame`, numeric `x`, and numeric `y`
+- `target.frame` must be `map` or `odom`
+- `navigate-through-poses` requires a non-empty `poses` list
+- `cancel` and `status` require `job_id`
+- `timeout_ms` and `deadline_ms`, when present, must be non-negative integers
+- an explicit `adapter` must be `mock-nav2`
 
 ## example
 

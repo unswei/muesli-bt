@@ -2832,11 +2832,14 @@ void test_capability_registry_call_echo() {
     value timed_motion = eval_text(
         "(define timed_motion "
         " (begin "
+        "  (define target (map.make)) "
+        "  (map.set! target 'frame \"world\") "
         "  (define req (map.make)) "
         "  (map.set! req 'schema_version \"cap.motion.request.v1\") "
         "  (map.set! req 'capability \"cap.motion.v1\") "
         "  (map.set! req 'operation \"move-to-pose\") "
         "  (map.set! req 'request_id \"motion-timeout\") "
+        "  (map.set! req 'target target) "
         "  (map.set! req 'mock_status \"timeout\") "
         "  (cap.call req)))",
         env);
@@ -2878,6 +2881,126 @@ void test_capability_registry_call_echo() {
     check(!boolean_value(eval_text("(map.get rejected_motion 'host_reached #t)", env)),
           "unsupported cap.motion.v1 operation should not reach adapter");
 
+    value missing_nav_target = eval_text(
+        "(define missing_nav_target "
+        " (begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.navigation.request.v1\") "
+        "  (map.set! req 'capability \"cap.navigation.v1\") "
+        "  (map.set! req 'operation \"navigate-to-pose\") "
+        "  (cap.call req)))",
+        env);
+    check(symbol_name(eval_text("(map.get missing_nav_target 'status ':none)", env)) == ":rejected",
+          "missing navigation target should be rejected");
+    check(string_value(eval_text("(map.get missing_nav_target 'validation_reason_code \"\")", env)) == "missing_target",
+          "missing navigation target reason mismatch");
+    check(!boolean_value(eval_text("(map.get missing_nav_target 'host_reached #t)", env)),
+          "missing navigation target should not reach adapter");
+
+    value invalid_nav_frame = eval_text(
+        "(define invalid_nav_frame "
+        " (begin "
+        "  (define target (map.make)) "
+        "  (map.set! target 'frame \"camera\") "
+        "  (map.set! target 'x 1.0) "
+        "  (map.set! target 'y 2.0) "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.navigation.request.v1\") "
+        "  (map.set! req 'capability \"cap.navigation.v1\") "
+        "  (map.set! req 'operation \"navigate-to-pose\") "
+        "  (map.set! req 'target target) "
+        "  (cap.call req)))",
+        env);
+    check(string_value(eval_text("(map.get invalid_nav_frame 'validation_reason_code \"\")", env)) == "invalid_frame",
+          "invalid navigation frame reason mismatch");
+
+    value invalid_motion_group = eval_text(
+        "(define invalid_motion_group "
+        " (begin "
+        "  (define target (map.make)) "
+        "  (map.set! target 'frame \"world\") "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.motion.request.v1\") "
+        "  (map.set! req 'capability \"cap.motion.v1\") "
+        "  (map.set! req 'operation \"validate-target\") "
+        "  (map.set! req 'target target) "
+        "  (map.set! req 'group \"leg\") "
+        "  (cap.call req)))",
+        env);
+    check(string_value(eval_text("(map.get invalid_motion_group 'validation_reason_code \"\")", env)) == "invalid_group",
+          "invalid motion group reason mismatch");
+
+    value missing_motion_job = eval_text(
+        "(define missing_motion_job "
+        " (begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.motion.request.v1\") "
+        "  (map.set! req 'capability \"cap.motion.v1\") "
+        "  (map.set! req 'operation \"cancel\") "
+        "  (cap.call req)))",
+        env);
+    check(string_value(eval_text("(map.get missing_motion_job 'validation_reason_code \"\")", env)) == "missing_job_id",
+          "missing motion job_id reason mismatch");
+
+    value invalid_timeout = eval_text(
+        "(define invalid_timeout "
+        " (begin "
+        "  (define target (map.make)) "
+        "  (map.set! target 'frame \"map\") "
+        "  (map.set! target 'x 1.0) "
+        "  (map.set! target 'y 2.0) "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.navigation.request.v1\") "
+        "  (map.set! req 'capability \"cap.navigation.v1\") "
+        "  (map.set! req 'operation \"navigate-to-pose\") "
+        "  (map.set! req 'target target) "
+        "  (map.set! req 'timeout_ms -1) "
+        "  (cap.call req)))",
+        env);
+    check(string_value(eval_text("(map.get invalid_timeout 'validation_reason_code \"\")", env)) == "invalid_timeout",
+          "invalid timeout reason mismatch");
+
+    value invalid_status = eval_text(
+        "(define invalid_status "
+        " (begin "
+        "  (define target (map.make)) "
+        "  (map.set! target 'frame \"world\") "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.motion.request.v1\") "
+        "  (map.set! req 'capability \"cap.motion.v1\") "
+        "  (map.set! req 'operation \"validate-target\") "
+        "  (map.set! req 'target target) "
+        "  (map.set! req 'mock_status \"teleported\") "
+        "  (cap.call req)))",
+        env);
+    check(string_value(eval_text("(map.get invalid_status 'validation_reason_code \"\")", env)) == "invalid_status",
+          "invalid mock status reason mismatch");
+
+    value adapter_mismatch = eval_text(
+        "(define adapter_mismatch "
+        " (begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.tamp.request.v1\") "
+        "  (map.set! req 'capability \"cap.tamp.v1\") "
+        "  (map.set! req 'operation \"solve\") "
+        "  (map.set! req 'adapter \"nav2\") "
+        "  (cap.call req)))",
+        env);
+    check(string_value(eval_text("(map.get adapter_mismatch 'validation_reason_code \"\")", env)) == "adapter_mismatch",
+          "adapter mismatch reason mismatch");
+
+    value invalid_tamp = eval_text(
+        "(define invalid_tamp "
+        " (begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.tamp.request.v1\") "
+        "  (map.set! req 'capability \"cap.tamp.v1\") "
+        "  (map.set! req 'operation \"validate-plan\") "
+        "  (cap.call req)))",
+        env);
+    check(string_value(eval_text("(map.get invalid_tamp 'validation_reason_code \"\")", env)) == "missing_plan",
+          "missing TAMP plan reason mismatch");
+
     const std::vector<std::string> adapter_events = bt::default_runtime_host().events().snapshot();
     std::size_t cap_start_count = 0;
     std::size_t cap_end_count = 0;
@@ -2893,8 +3016,8 @@ void test_capability_registry_call_echo() {
         saw_nav_event = saw_nav_event || line.find("\"capability\":\"cap.navigation.v1\"") != std::string::npos;
         saw_tamp_event = saw_tamp_event || line.find("\"capability\":\"cap.tamp.v1\"") != std::string::npos;
     }
-    check(cap_start_count >= 5, "mock adapter cap.call should emit cap_call_start events");
-    check(cap_end_count >= 5, "mock adapter cap.call should emit cap_call_end events");
+    check(cap_start_count >= 13, "mock adapter cap.call should emit cap_call_start events");
+    check(cap_end_count >= 13, "mock adapter cap.call should emit cap_call_end events");
     check(saw_nav_event, "mock adapter events should include cap.navigation.v1");
     check(saw_tamp_event, "mock adapter events should include cap.tamp.v1");
 

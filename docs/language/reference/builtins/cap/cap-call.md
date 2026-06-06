@@ -72,6 +72,13 @@ The model-service result uses:
 - `validation_reason_code`: reason code when validation rejects the output
 - `validation_message`: human-readable validation message when available
 
+Experimental mock adapter results also include:
+
+- `validation_status`: `:accepted` or `:rejected`
+- `validation_reason_code`: stable reason code when mock request validation rejects the request
+- `error_code`: same stable reason code for rejected mock adapter requests
+- `error`: short diagnostic string for rejected mock adapter requests
+
 ## Errors And Edge Cases
 
 - missing `capability` raises a runtime error
@@ -82,6 +89,27 @@ The model-service result uses:
 - missing `operation` raises a runtime error
 - unsupported `cap.echo.v1` operations return a result map with `status` set to `:rejected`
 - unsupported experimental mock adapter operations return a result map with `status` set to `:rejected`
+- malformed experimental mock adapter requests return a result map with `status` set to `:rejected`, `host_reached` set to false, and a stable `validation_reason_code`
+- mock adapter request validation currently checks adapter id, operation id, non-negative timeout fields, required job ids for `cancel` and `status`, selected frames/groups, and operation-specific target or plan fields
+
+Stable mock adapter rejection codes include:
+
+- `adapter_mismatch`
+- `unsupported_operation`
+- `invalid_timeout`
+- `missing_job_id`
+- `missing_target`
+- `invalid_target`
+- `missing_frame`
+- `invalid_frame`
+- `missing_poses`
+- `invalid_poses`
+- `invalid_group`
+- `invalid_planner`
+- `invalid_context`
+- `missing_plan`
+- `invalid_plan`
+- `invalid_status`
 
 ## Examples
 

@@ -3017,6 +3017,246 @@ bool adapter_host_reached(bool operation_allowed, const std::string& status) {
     return operation_allowed && status != "unavailable";
 }
 
+bool adapter_operation_allowed(const std::string& capability, const std::string& operation);
+std::string adapter_name_for_capability(const std::string& capability);
+
+struct adapter_validation_result {
+    bool accepted = true;
+    std::string reason_code;
+    std::string message;
+};
+
+bool text_in(std::string_view text, const std::vector<std::string>& allowed) {
+    return std::find(allowed.begin(), allowed.end(), text) != allowed.end();
+}
+
+bool is_number_value(value v) {
+    return is_integer(v) || is_float(v);
+}
+
+bool map_has_field(value map_obj, const std::string& key) {
+    return map_lookup_option(map_obj, key).has_value();
+}
+
+std::optional<std::string> map_lookup_text_or_symbol_option(value map_obj, const std::string& key, const std::string& where) {
+    const std::optional<value> found = map_lookup_option(map_obj, key);
+    if (!found.has_value()) {
+        return std::nullopt;
+    }
+    if (!is_string(*found) && !is_symbol(*found)) {
+        return "__mbt_invalid_text__";
+    }
+    return text_from_value_or_empty(*found, where);
+}
+
+adapter_validation_result adapter_rejection(std::string reason_code, std::string message) {
+    adapter_validation_result out;
+    out.accepted = false;
+    out.reason_code = std::move(reason_code);
+    out.message = std::move(message);
+    return out;
+}
+
+adapter_validation_result validate_non_negative_timeout(value request_map) {
+    for (const std::string& field : {"timeout_ms", "deadline_ms"}) {
+        const std::optional<value> found = map_lookup_option(request_map, field);
+        if (!found.has_value()) {
+            continue;
+        }
+        if (!is_integer(*found) || integer_value(*found) < 0) {
+            return adapter_rejection("invalid_timeout", field + " must be a non-negative integer");
+        }
+    }
+    return {};
+}
+
+adapter_validation_result validate_adapter_id(const std::string& requested_adapter, const std::string& expected_adapter) {
+    if (requested_adapter != expected_adapter) {
+        return adapter_rejection("adapter_mismatch", "adapter must be " + expected_adapter);
+    }
+    return {};
+}
+
+adapter_validation_result validate_job_id(value request_map) {
+    const std::optional<value> job_id = map_lookup_option(request_map, "job_id");
+    if (!job_id.has_value() || !(is_string(*job_id) || is_symbol(*job_id)) ||
+        text_from_value_or_empty(*job_id, "cap.call job_id").empty()) {
+        return adapter_rejection("missing_job_id", "operation requires job_id");
+    }
+    return {};
+}
+
+adapter_validation_result validate_target_map(value request_map) {
+    const std::optional<value> target = map_lookup_option(request_map, "target");
+    if (!target.has_value()) {
+        return adapter_rejection("missing_target", "operation requires target map");
+    }
+    if (!is_map(*target)) {
+        return adapter_rejection("invalid_target", "target must be a map");
+    }
+    return {};
+}
+
+adapter_validation_result validate_target_frame(value target,
+                                                const std::vector<std::string>& allowed_frames,
+                                                bool required,
+                                                const std::string& where) {
+    const std::optional<std::string> frame = map_lookup_text_or_symbol_option(target, "frame", where);
+    if (!frame.has_value()) {
+        if (required) {
+            return adapter_rejection("missing_frame", "target frame is required");
+        }
+        return {};
+    }
+    if (*frame == "__mbt_invalid_text__") {
+        return adapter_rejection("invalid_frame", "target frame must be a string or symbol");
+    }
+    if (!text_in(*frame, allowed_frames)) {
+        return adapter_rejection("invalid_frame", "target frame is not supported");
+    }
+    return {};
+}
+
+adapter_validation_result validate_navigation_target(value request_map) {
+    adapter_validation_result target_ok = validate_target_map(request_map);
+    if (!target_ok.accepted) {
+        return target_ok;
+    }
+    const value target = *map_lookup_option(request_map, "target");
+    adapter_validation_result frame_ok = validate_target_frame(target, {"map", "odom"}, true, "cap.call target.frame");
+    if (!frame_ok.accepted) {
+        return frame_ok;
+    }
+    const std::optional<value> x = map_lookup_option(target, "x");
+    const std::optional<value> y = map_lookup_option(target, "y");
+    if (!x.has_value() || !y.has_value() || !is_number_value(*x) || !is_number_value(*y)) {
+        return adapter_rejection("invalid_target", "navigation target requires numeric x and y");
+    }
+    return {};
+}
+
+adapter_validation_result validate_pose_list(value request_map) {
+    const std::optional<value> poses = map_lookup_option(request_map, "poses");
+    if (!poses.has_value()) {
+        return adapter_rejection("missing_poses", "operation requires poses list");
+    }
+    if (!is_proper_list(*poses) || vector_from_list(*poses).empty()) {
+        return adapter_rejection("invalid_poses", "poses must be a non-empty list");
+    }
+    return {};
+}
+
+adapter_validation_result validate_motion_group(value request_map) {
+    const std::optional<std::string> group = map_lookup_text_or_symbol_option(request_map, "group", "cap.call group");
+    if (!group.has_value()) {
+        return {};
+    }
+    if (*group == "__mbt_invalid_text__") {
+        return adapter_rejection("invalid_group", "motion group must be a string or symbol");
+    }
+    if (!text_in(*group, {"arm", "manipulator"})) {
+        return adapter_rejection("invalid_group", "motion group is not supported");
+    }
+    return {};
+}
+
+adapter_validation_result validate_motion_target(value request_map, bool pose_target) {
+    adapter_validation_result target_ok = validate_target_map(request_map);
+    if (!target_ok.accepted) {
+        return target_ok;
+    }
+    adapter_validation_result group_ok = validate_motion_group(request_map);
+    if (!group_ok.accepted) {
+        return group_ok;
+    }
+    const value target = *map_lookup_option(request_map, "target");
+    if (pose_target) {
+        adapter_validation_result frame_ok =
+            validate_target_frame(target, {"world", "base_link", "tool0"}, false, "cap.call target.frame");
+        if (!frame_ok.accepted) {
+            return frame_ok;
+        }
+        return {};
+    }
+    if (!map_has_field(target, "joints") && !map_has_field(target, "named_state")) {
+        return adapter_rejection("invalid_target", "joint target requires joints or named_state");
+    }
+    return {};
+}
+
+adapter_validation_result validate_tamp_request(value request_map, const std::string& operation) {
+    const std::optional<std::string> planner = map_lookup_text_or_symbol_option(request_map, "planner", "cap.call planner");
+    if (planner.has_value() && (*planner == "__mbt_invalid_text__" ||
+                                !text_in(*planner, {"pddlstream-pybullet", "mock-pddlstream-pybullet"}))) {
+        return adapter_rejection("invalid_planner", "TAMP planner is not supported");
+    }
+    if (const std::optional<value> context = map_lookup_option(request_map, "context"); context.has_value() && !is_map(*context)) {
+        return adapter_rejection("invalid_context", "context must be a map");
+    }
+    if (operation == "validate-plan") {
+        const std::optional<value> plan = map_lookup_option(request_map, "plan");
+        if (!plan.has_value()) {
+            return adapter_rejection("missing_plan", "validate-plan requires plan");
+        }
+        if (!is_proper_list(*plan)) {
+            return adapter_rejection("invalid_plan", "plan must be a list");
+        }
+    }
+    return {};
+}
+
+adapter_validation_result validate_adapter_request(value request_map,
+                                                   const std::string& capability,
+                                                   const std::string& operation,
+                                                   const std::string& adapter) {
+    adapter_validation_result adapter_ok = validate_adapter_id(adapter, adapter_name_for_capability(capability));
+    if (!adapter_ok.accepted) {
+        return adapter_ok;
+    }
+    adapter_validation_result timeout_ok = validate_non_negative_timeout(request_map);
+    if (!timeout_ok.accepted) {
+        return timeout_ok;
+    }
+    if (!adapter_operation_allowed(capability, operation)) {
+        return adapter_rejection("unsupported_operation", "operation is not supported by capability");
+    }
+    if (operation == "cancel" || operation == "status") {
+        return validate_job_id(request_map);
+    }
+    if (capability == "cap.navigation.v1") {
+        if (operation == "navigate-to-pose" || operation == "get-path") {
+            return validate_navigation_target(request_map);
+        }
+        if (operation == "navigate-through-poses") {
+            return validate_pose_list(request_map);
+        }
+    }
+    if (capability == "cap.motion.v1") {
+        if (operation == "move-to-pose" || operation == "validate-target") {
+            return validate_motion_target(request_map, true);
+        }
+        if (operation == "move-to-joints") {
+            return validate_motion_target(request_map, false);
+        }
+    }
+    if (capability == "cap.tamp.v1") {
+        return validate_tamp_request(request_map, operation);
+    }
+    return {};
+}
+
+std::int64_t adapter_deadline_ms_or_zero(value request_map) {
+    if (const std::optional<value> deadline = map_lookup_option(request_map, "deadline_ms");
+        deadline.has_value() && is_integer(*deadline) && integer_value(*deadline) >= 0) {
+        return integer_value(*deadline);
+    }
+    if (const std::optional<value> timeout = map_lookup_option(request_map, "timeout_ms");
+        timeout.has_value() && is_integer(*timeout) && integer_value(*timeout) >= 0) {
+        return integer_value(*timeout);
+    }
+    return 0;
+}
+
 std::string default_status_for_adapter_operation(const std::string& capability, const std::string& operation) {
     if (operation == "cancel") {
         return "cancelled";
@@ -3062,6 +3302,15 @@ bool adapter_operation_allowed(const std::string& capability, const std::string&
         return operation == "solve" || operation == "validate-plan";
     }
     return false;
+}
+
+bool adapter_status_allowed(const std::string& capability, const std::string& status) {
+    static const std::vector<std::string> common_statuses = {
+        "accepted", "running", "ok", "cancelled", "timeout", "rejected", "unreachable", "error", "unavailable"};
+    if (text_in(status, common_statuses)) {
+        return true;
+    }
+    return capability == "cap.motion.v1" && status == "collision";
 }
 
 std::string adapter_name_for_capability(const std::string& capability) {
@@ -3177,21 +3426,30 @@ value call_mock_adapter_capability(value request_map, const std::string& capabil
     if (request_id.empty()) {
         request_id = "cap-call-" + request_hash.substr(std::string("fnv1a64:").size());
     }
-    const std::int64_t deadline_ms =
-        map_lookup_int_or(request_map, "deadline_ms", map_lookup_int_or(request_map, "timeout_ms", 0, "cap.call timeout_ms"),
-                          "cap.call deadline_ms");
-    const std::string adapter = map_lookup_text_or(request_map, "adapter", adapter_name_for_capability(capability),
-                                                   "cap.call adapter");
-    const bool operation_allowed = adapter_operation_allowed(capability, operation);
-    std::string status = default_status_for_adapter_operation(capability, operation);
-    if (!operation_allowed) {
+    std::string adapter = adapter_name_for_capability(capability);
+    if (const std::optional<value> adapter_value = map_lookup_option(request_map, "adapter"); adapter_value.has_value()) {
+        if (is_string(*adapter_value) || is_symbol(*adapter_value)) {
+            adapter = text_from_value_or_empty(*adapter_value, "cap.call adapter");
+        } else {
+            adapter = "__mbt_invalid_adapter__";
+        }
+    }
+    adapter_validation_result validation = validate_adapter_request(request_map, capability, operation, adapter);
+    const std::int64_t deadline_ms = adapter_deadline_ms_or_zero(request_map);
+    std::string status = validation.accepted ? default_status_for_adapter_operation(capability, operation) : "rejected";
+    if (validation.accepted) {
+        status = map_lookup_text_or_symbol_or(request_map, "mock_status", status, "cap.call mock_status");
+        if (!status.empty() && status.front() == ':') {
+            status.erase(status.begin());
+        }
+        if (!adapter_status_allowed(capability, status)) {
+            validation = adapter_rejection("invalid_status", "mock_status is not in the capability status vocabulary");
+            status = "rejected";
+        }
+    } else {
         status = "rejected";
     }
-    status = map_lookup_text_or_symbol_or(request_map, "mock_status", status, "cap.call mock_status");
-    if (!status.empty() && status.front() == ':') {
-        status.erase(status.begin());
-    }
-    const bool host_reached = adapter_host_reached(operation_allowed, status);
+    const bool host_reached = validation.accepted && adapter_host_reached(true, status);
 
     emit_adapter_cap_call_event("cap_call_start", request_id, capability, operation, deadline_ms, adapter);
 
@@ -3207,6 +3465,10 @@ value call_mock_adapter_capability(value request_map, const std::string& capabil
     map_set_symbol(out, "adapter_schema", make_string(capability + "." + adapter + ".adapter.v1"));
     map_set_symbol(out, "host_reached", make_boolean(host_reached));
     map_set_symbol(out, "request_hash", make_string(request_hash));
+    map_set_symbol(out, "validation_status", keyword_symbol(validation.accepted ? "accepted" : "rejected"));
+    if (!validation.accepted) {
+        map_set_symbol(out, "validation_reason_code", make_string(validation.reason_code));
+    }
 
     if (status == "accepted" || status == "running" || operation == "status" || operation == "cancel") {
         map_set_symbol(out, "job_id", make_string(map_lookup_text_or(request_map, "job_id", request_id + "-job", "cap.call job_id")));
@@ -3235,9 +3497,12 @@ value call_mock_adapter_capability(value request_map, const std::string& capabil
         roots.add(&proposal);
         map_set_symbol(out, "proposal", proposal);
     }
-    if (status == "rejected") {
-        map_set_symbol(out, "error_code", make_string("capability_operation_rejected"));
-        map_set_symbol(out, "error", make_string("unsupported or rejected mock adapter operation"));
+    if (!validation.accepted) {
+        map_set_symbol(out, "error_code", make_string(validation.reason_code));
+        map_set_symbol(out, "error", make_string(validation.message));
+    } else if (status == "rejected") {
+        map_set_symbol(out, "error_code", make_string("capability_mock_rejected"));
+        map_set_symbol(out, "error", make_string("mock adapter returned rejected status"));
     }
 
     const std::string response_hash = fnv1a64_for_text(value_to_json(out));

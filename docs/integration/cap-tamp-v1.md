@@ -52,7 +52,18 @@ Stable result fields:
 - `host_reached`
 - `request_hash`
 - `response_hash`
+- `validation_status`
 - optional `plan`, `proposal`, `job_id`, and `progress`
+
+Mock validation currently checks:
+
+- `planner`, when present, must be `pddlstream-pybullet` or `mock-pddlstream-pybullet`
+- `context`, when present, must be a map
+- `validate-plan` requires `plan`
+- `plan` must be a list
+- `cancel` and `status` require `job_id`
+- `timeout_ms` and `deadline_ms`, when present, must be non-negative integers
+- an explicit `adapter` must be `mock-pddlstream-pybullet`
 
 ## example
 

@@ -83,6 +83,17 @@ Common optional:
 - `safety`: map of host fallback or collision-policy hints
 - `metadata`: map for caller-owned annotations
 
+The built-in mock adapter rejects malformed requests before host reach.
+It currently checks:
+
+- `move-to-pose` and `validate-target` require `target`
+- pose targets may use `frame` values `world`, `base_link`, or `tool0`
+- `move-to-joints` requires a target with `joints` or `named_state`
+- `group`, when present, must be `arm` or `manipulator`
+- `cancel` and `status` require `job_id`
+- `timeout_ms` and `deadline_ms`, when present, must be non-negative integers
+- an explicit `adapter` must be `mock-moveit`
+
 ### common result fields
 
 Required:
@@ -101,6 +112,8 @@ Common optional:
 - `adapter_schema`: adapter-specific metadata schema id
 - `progress`: normalised progress map
 - `result`: operation-specific result map
+- `validation_status`: `:accepted` or `:rejected`
+- `validation_reason_code`: stable reason code when mock validation rejects the request
 - `error`: short diagnostic string for human debugging
 
 ### status values
