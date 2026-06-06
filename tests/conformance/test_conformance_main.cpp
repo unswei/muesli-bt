@@ -15,6 +15,7 @@
 #include "bt/compiler.hpp"
 #include "bt/runtime_host.hpp"
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
+#include "muslisp/cap_api.hpp"
 #include "muslisp/env.hpp"
 #include "muslisp/env_api.hpp"
 #include "muslisp/error.hpp"
@@ -589,10 +590,11 @@ int main() {
 
     const auto cleanup = []() {
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
+        muslisp::cap_api_reset();
+        muslisp::env_api_reset();
         if (rclcpp::ok()) {
             rclcpp::shutdown();
         }
-        muslisp::env_api_reset();
 #endif
     };
 

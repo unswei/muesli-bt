@@ -22,6 +22,7 @@
 #include <rclcpp/executors/single_threaded_executor.hpp>
 #include <rclcpp/rclcpp.hpp>
 
+#include "muslisp/cap_api.hpp"
 #include "muslisp/gc.hpp"
 
 namespace muslisp::integrations::ros2 {
@@ -254,13 +255,14 @@ value make_twist_map(double vx, double vy, double vz, double wx, double wy, doub
 }
 
 void shutdown_ros2_backend_process_runtime() {
-    if (rclcpp::ok()) {
-        rclcpp::shutdown();
-    }
     try {
+        cap_api_reset();
         env_api_reset();
     } catch (const std::exception&) {
         // best effort during process shutdown
+    }
+    if (rclcpp::ok()) {
+        rclcpp::shutdown();
     }
 }
 

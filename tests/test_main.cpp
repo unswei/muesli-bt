@@ -5713,6 +5713,37 @@ value wait_for_nav2_status(muslisp::env_ptr env,
     return last;
 }
 
+value wait_for_nav2_status_with_progress(muslisp::env_ptr env,
+                                         const std::string& job_id,
+                                         const std::string& request_id,
+                                         const std::string& action_name,
+                                         const std::string& expected_status,
+                                         const std::string& required_progress_field,
+                                         std::chrono::milliseconds timeout) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    value last = make_nil();
+    gc_root_scope roots(default_gc());
+    roots.add(&last);
+    while (std::chrono::steady_clock::now() < deadline) {
+        last = eval_text(
+            nav2_request_script("status",
+                                request_id,
+                                action_name,
+                                "  (map.set! req 'job_id " + lisp_string_literal(job_id) + ") ",
+                                false),
+            env);
+        const std::optional<value> status_value = map_lookup_symbol_value(last, "status");
+        const std::string status = status_value.has_value() && is_symbol(*status_value) ? symbol_name(*status_value) : "";
+        const std::optional<value> progress = map_lookup_symbol_value(last, "progress");
+        if (status == expected_status && progress.has_value() && is_map(*progress) &&
+            map_lookup_symbol_value(*progress, required_progress_field).has_value()) {
+            return last;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return last;
+}
+
 std::string map_symbol_text(value map_obj, const std::string& key_name) {
     const std::optional<value> found = map_lookup_symbol_value(map_obj, key_name);
     if (!found.has_value()) {
@@ -5800,7 +5831,13 @@ void test_ros2_nav2_fake_server_accept_running_and_success() {
     check_close(goal.pose.pose.position.x, 1.25, 1e-6, "Nav2 fake server received pose.x mismatch");
     check_close(goal.pose.pose.position.y, -0.5, 1e-6, "Nav2 fake server received pose.y mismatch");
 
-    value running = wait_for_nav2_status(env, job_id, "nav2-status-running", action_name, ":running", std::chrono::milliseconds(500));
+    value running = wait_for_nav2_status_with_progress(env,
+                                                       job_id,
+                                                       "nav2-status-running",
+                                                       action_name,
+                                                       ":running",
+                                                       "distance_remaining_m",
+                                                       std::chrono::milliseconds(500));
     check(map_symbol_text(running, "status") == ":running", "Nav2 status should report :running before delayed success");
     const std::optional<value> progress = map_lookup_symbol_value(running, "progress");
     check(progress.has_value() && is_map(*progress), "Nav2 running status should include progress");
@@ -6443,10 +6480,11 @@ void test_ros2_cleanup_with_live_transport_peer() {
     harness.publish_odom(0.25, 0.0, 0.0, 0.1, 0.0, 0.0);
     check(string_value(eval_text("(map.get (env.observe) 'obs_schema \"\")", env)) == "ros2.obs.v1",
           "ros2 cleanup observe should return canonical obs_schema");
+    muslisp::cap_api_reset();
+    muslisp::env_api_reset();
     if (rclcpp::ok()) {
         rclcpp::shutdown();
     }
-    muslisp::env_api_reset();
     env = nullptr;
 }
 #endif
@@ -6574,10 +6612,11 @@ int main() {
 
     const auto cleanup = []() {
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
+        muslisp::cap_api_reset();
+        muslisp::env_api_reset();
         if (rclcpp::ok()) {
             rclcpp::shutdown();
         }
-        muslisp::env_api_reset();
 #endif
     };
 

@@ -369,6 +369,17 @@ private:
         goal.pose = target_to_pose(request_map, *node_);
         const std::string job_id = next_job_id(request_id);
 
+        {
+            const std::lock_guard<std::mutex> lock(mutex_);
+            jobs_[job_id] = job_record{
+                .job_id = job_id,
+                .action_name = action_name,
+                .handle = {},
+                .last_feedback = {},
+                .result = std::nullopt,
+            };
+        }
+
         rclcpp_action::Client<NavigateToPose>::SendGoalOptions options;
         options.feedback_callback =
             [this, job_id](NavigateGoalHandle::SharedPtr, const std::shared_ptr<const NavigateToPose::Feedback> feedback) {
@@ -389,24 +400,29 @@ private:
         auto goal_future = client->async_send_goal(goal, options);
         if (executor_->spin_until_future_complete(goal_future, std::chrono::milliseconds(timeout_ms)) !=
             rclcpp::FutureReturnCode::SUCCESS) {
+            {
+                const std::lock_guard<std::mutex> lock(mutex_);
+                jobs_.erase(job_id);
+            }
             return result_map("navigate-to-pose", request_id, "timeout", true, {}, make_nil(), "goal_accept_timeout",
                               "NavigateToPose goal acceptance timed out");
         }
         NavigateGoalHandle::SharedPtr handle = goal_future.get();
         if (!handle) {
+            {
+                const std::lock_guard<std::mutex> lock(mutex_);
+                jobs_.erase(job_id);
+            }
             return result_map("navigate-to-pose", request_id, "rejected", true, {}, make_nil(), "goal_rejected",
                               "NavigateToPose action server rejected the goal");
         }
 
         {
             const std::lock_guard<std::mutex> lock(mutex_);
-            jobs_[job_id] = job_record{
-                .job_id = job_id,
-                .action_name = action_name,
-                .handle = handle,
-                .last_feedback = {},
-                .result = std::nullopt,
-            };
+            auto it = jobs_.find(job_id);
+            if (it != jobs_.end()) {
+                it->second.handle = handle;
+            }
         }
         return result_map("navigate-to-pose", request_id, "accepted", true, job_id, make_progress_map(nullptr));
     }
