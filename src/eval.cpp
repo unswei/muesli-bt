@@ -9,6 +9,7 @@
 
 #include "bt/compiler.hpp"
 #include "bt/runtime_host.hpp"
+#include "muslisp/cap_api.hpp"
 #include "muslisp/env_api.hpp"
 #include "muslisp/env_builtins.hpp"
 #include "muslisp/error.hpp"
@@ -821,6 +822,7 @@ value eval_source(std::string_view source, env_ptr scope) {
 
 env_ptr create_global_env(runtime_config config) {
     env_api_reset();
+    cap_api_reset();
     reset_env_capability_runtime_state();
     env_ptr global = make_env();
     install_core_builtins(global);

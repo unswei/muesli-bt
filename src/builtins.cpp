@@ -24,6 +24,7 @@
 #include "bt/serialisation.hpp"
 #include "bt/status.hpp"
 #include "bt/vla.hpp"
+#include "muslisp/cap_api.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/env_builtins.hpp"
 #include "muslisp/gc.hpp"
@@ -2637,6 +2638,8 @@ std::vector<std::string> builtin_capability_names() {
 value builtin_cap_list(const std::vector<value>& args) {
     require_arity("cap.list", args, 0);
     std::vector<std::string> names = bt::default_runtime_host().vla_ref().capabilities().list();
+    const std::vector<std::string> registered_names = cap_api_registered_capabilities();
+    names.insert(names.end(), registered_names.begin(), registered_names.end());
     const std::vector<std::string> builtin_names = builtin_capability_names();
     names.insert(names.end(), builtin_names.begin(), builtin_names.end());
     std::sort(names.begin(), names.end());
@@ -2655,7 +2658,10 @@ value builtin_cap_list(const std::vector<value>& args) {
 value builtin_cap_describe(const std::vector<value>& args) {
     require_arity("cap.describe", args, 1);
     const std::string name = require_text_value(args[0], "cap.describe");
-    std::optional<bt::capability_descriptor> cap = bt::default_runtime_host().vla_ref().capabilities().describe(name);
+    std::optional<bt::capability_descriptor> cap = cap_api_describe(name);
+    if (!cap.has_value()) {
+        cap = bt::default_runtime_host().vla_ref().capabilities().describe(name);
+    }
     if (!cap.has_value()) {
         cap = describe_builtin_capability(name);
     }
@@ -3011,6 +3017,105 @@ value call_model_service_capability(value request_map, const std::string& capabi
     const bt::model_service_response response = bt::default_runtime_host().call_model_service(request);
     emit_cap_call_event("cap_call_end", request, &response);
     return model_service_response_to_lisp(response, capability);
+}
+
+std::string value_status_text(value status_value) {
+    std::string status = text_from_value_or_empty(status_value, "cap.call result status");
+    if (!status.empty() && status.front() == ':') {
+        status.erase(status.begin());
+    }
+    return status;
+}
+
+std::string response_status_or(value response_map, std::string fallback) {
+    if (!is_map(response_map)) {
+        return fallback;
+    }
+    const std::optional<value> status = map_lookup_option(response_map, "status");
+    if (!status.has_value()) {
+        return fallback;
+    }
+    return value_status_text(*status);
+}
+
+bool response_host_reached_or(value response_map, bool fallback) {
+    if (!is_map(response_map)) {
+        return fallback;
+    }
+    const std::optional<value> host_reached = map_lookup_option(response_map, "host_reached");
+    if (!host_reached.has_value() || !is_boolean(*host_reached)) {
+        return fallback;
+    }
+    return boolean_value(*host_reached);
+}
+
+std::string response_hash_or_empty(value response_map) {
+    if (!is_map(response_map)) {
+        return {};
+    }
+    const std::optional<value> hash = map_lookup_option(response_map, "response_hash");
+    if (!hash.has_value() || !is_string(*hash)) {
+        return {};
+    }
+    return string_value(*hash);
+}
+
+std::int64_t registered_cap_deadline_ms(value request_map) {
+    if (const std::optional<value> deadline = map_lookup_option(request_map, "deadline_ms");
+        deadline.has_value() && is_integer(*deadline) && integer_value(*deadline) >= 0) {
+        return integer_value(*deadline);
+    }
+    if (const std::optional<value> timeout = map_lookup_option(request_map, "timeout_ms");
+        timeout.has_value() && is_integer(*timeout) && integer_value(*timeout) >= 0) {
+        return integer_value(*timeout);
+    }
+    return 0;
+}
+
+value call_registered_capability(value request_map, const std::string& capability) {
+    const std::optional<bt::capability_descriptor> descriptor = cap_api_describe(capability);
+    const std::string adapter =
+        descriptor.has_value() && !descriptor->adapter_id.empty() ? descriptor->adapter_id : "registered";
+    const std::string operation = map_lookup_text_or(request_map, "operation", "", "cap.call operation");
+    if (operation.empty()) {
+        throw lisp_error("cap.call: missing required operation");
+    }
+    const std::string request_json = value_to_json(request_map);
+    const std::string request_hash = fnv1a64_for_text(request_json);
+    std::string request_id = map_lookup_text_or_empty(request_map, "request_id", "cap.call request_id");
+    if (request_id.empty()) {
+        request_id = "cap-call-" + request_hash.substr(std::string("fnv1a64:").size());
+    }
+    const std::int64_t deadline_ms = registered_cap_deadline_ms(request_map);
+
+    emit_adapter_cap_call_event("cap_call_start", request_id, capability, operation, deadline_ms, adapter);
+    value response = cap_api_call(capability, request_map);
+    if (!is_map(response)) {
+        throw lisp_error("cap.call: registered capability returned non-map result");
+    }
+    gc_root_scope roots(default_gc());
+    roots.add(&response);
+    if (!map_lookup_option(response, "request_hash").has_value()) {
+        map_set_symbol(response, "request_hash", make_string(request_hash));
+    }
+    std::string response_hash = response_hash_or_empty(response);
+    if (response_hash.empty()) {
+        response_hash = fnv1a64_for_text(value_to_json(response));
+        map_set_symbol(response, "response_hash", make_string(response_hash));
+    }
+    const std::string status = response_status_or(response, "error");
+    const bool host_reached = response_host_reached_or(response, false);
+    emit_adapter_cap_call_event("cap_call_end",
+                                request_id,
+                                capability,
+                                operation,
+                                deadline_ms,
+                                adapter,
+                                &status,
+                                &request_hash,
+                                &response_hash,
+                                host_reached);
+    return response;
 }
 
 bool adapter_host_reached(bool operation_allowed, const std::string& status) {
@@ -3528,6 +3633,9 @@ value builtin_cap_call(const std::vector<value>& args) {
         throw lisp_error("cap.call: missing required capability");
     }
     const std::string capability = require_text_value(*capability_v, "cap.call capability");
+    if (cap_api_has_backend(capability)) {
+        return call_registered_capability(request_map, capability);
+    }
     if (is_model_service_capability(capability)) {
         return call_model_service_capability(request_map, capability);
     }

@@ -18,6 +18,8 @@ The experimental mock adapter capabilities are:
 
 They prove the generic capability boundary, request/result hashes, and canonical events without requiring ROS2, Nav2, MoveIt, PyBullet, or PDDLStream.
 
+Optional integrations can register real capability backends. Registered backends are tried before the model-service bridge, built-in mock adapters, and the `cap.echo.v1` smoke path. The first optional registered backend is the ROS2/Nav2 adapter for `cap.navigation.v1`.
+
 When the optional `muesli-model-service` bridge is built and configured, `cap.call` can also invoke bounded model capabilities such as `cap.model.world.rollout.v1` and `cap.model.world.score_trajectory.v1`.
 Those outputs remain proposals. Host-side validation still decides whether any downstream action can observe them.
 
@@ -79,16 +81,20 @@ Experimental mock adapter results also include:
 - `error_code`: same stable reason code for rejected mock adapter requests
 - `error`: short diagnostic string for rejected mock adapter requests
 
+Registered backend results also receive wrapper-provided `request_hash` and `response_hash` fields when the backend does not provide them itself. Registered runtime-affecting backends emit `cap_call_start` and `cap_call_end`.
+
 ## Errors And Edge Cases
 
 - missing `capability` raises a runtime error
 - unknown capability raises a runtime error
+- if a capability has a registered backend, `cap.call` dispatches to that backend before built-in mocks
 - configured but unreachable model service returns `:unavailable`, not a direct host action
 - invalid, stale, unsafe, or policy-violating model-service outputs are rejected before host reach
 - missing or unsupported `schema_version` raises a runtime error
 - missing `operation` raises a runtime error
 - unsupported `cap.echo.v1` operations return a result map with `status` set to `:rejected`
 - unsupported experimental mock adapter operations return a result map with `status` set to `:rejected`
+- unsupported registered backend operations return a result map with a backend-specific stable rejection code
 - malformed experimental mock adapter requests return a result map with `status` set to `:rejected`, `host_reached` set to false, and a stable `validation_reason_code`
 - mock adapter request validation currently checks adapter id, operation id, non-negative timeout fields, required job ids for `cancel` and `status`, selected frames/groups, and operation-specific target or plan fields
 
@@ -192,8 +198,10 @@ Stable mock adapter rejection codes include:
 - The initial `cap.echo.v1` fixture exists to prove the registry and call path without adding real external service adapters.
 - Bounded model-service calls such as `cap.model.world.rollout.v1` use the same capability-first shape once the optional bridge is configured.
 - Navigation, motion, perception, and TAMP adapters should stay behind their capability contracts.
+- Optional ROS2/Nav2 support registers a `cap.navigation.v1` backend with `adapter_id="nav2"` when the ROS2 integration target is enabled.
 - Model-service calls emit canonical `mbt.evt.v1` lifecycle events named `cap_call_start` and `cap_call_end`.
 - Experimental navigation, motion, and TAMP mock adapter calls also emit `cap_call_start` and `cap_call_end`.
+- Registered runtime-affecting capability backends also emit `cap_call_start` and `cap_call_end`.
 - `cap_call_end` includes request and response hashes when available.
 - `cap_call_end` includes validation status and rejection reason codes when validation runs.
 - The deterministic `cap.echo.v1` smoke path does not need those events until it stops being a pure registry/API fixture.

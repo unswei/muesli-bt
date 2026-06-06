@@ -1,4 +1,5 @@
 #include <cmath>
+#include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -6,6 +7,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -28,12 +30,14 @@
 #include "bt/trace.hpp"
 #include "../src/compiled_eval.hpp"
 #include "../src/repl_support.hpp"
+#include "muslisp/cap_api.hpp"
 #if MUESLI_BT_WITH_PYBULLET_INTEGRATION
 #include "pybullet/extension.hpp"
 #include "pybullet/racecar_demo.hpp"
 #endif
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
 #include "ros2/extension.hpp"
+#include "ros2_nav2_test_harness.hpp"
 #include "ros2_test_harness.hpp"
 #endif
 #include "muslisp/env.hpp"
@@ -2698,6 +2702,84 @@ void test_capability_registry_call_echo() {
 
     reset_bt_runtime_host();
     env_ptr env = create_global_env();
+
+    class test_navigation_backend final : public cap_backend {
+    public:
+        [[nodiscard]] bt::capability_descriptor describe() const override {
+            bt::capability_descriptor cap;
+            cap.name = "cap.navigation.v1";
+            cap.safety_class = "test";
+            cap.cost_category = "low";
+            cap.adapter_id = "test-nav";
+            cap.operations = {"navigate-to-pose"};
+            cap.supports_cancellation = true;
+            cap.supports_replay = true;
+            cap.request_schema = {
+                {"schema_version", "string", true},
+                {"capability", "string", true},
+                {"operation", "string", true},
+            };
+            cap.response_schema = {
+                {"schema_version", "string", true},
+                {"capability", "string", true},
+                {"operation", "string", true},
+                {"status", "keyword", true},
+                {"adapter", "string", true},
+                {"host_reached", "boolean", true},
+            };
+            return cap;
+        }
+
+        [[nodiscard]] value call(value request_map) override {
+            value out = make_map();
+            gc_root_scope roots(default_gc());
+            roots.add(&out);
+            map_set(out, "schema_version", make_string("cap.navigation.result.v1"));
+            map_set(out, "capability", make_string("cap.navigation.v1"));
+            map_set(out, "operation", lookup(request_map, "operation"));
+            map_set(out, "status", make_symbol(":accepted"));
+            map_set(out, "adapter", make_string("test-nav"));
+            map_set(out, "host_reached", make_boolean(true));
+            return out;
+        }
+
+    private:
+        static value lookup(value map_obj, const std::string& key_name) {
+            map_key key;
+            key.type = map_key_type::symbol;
+            key.text_data = key_name;
+            return map_obj->map_data[key];
+        }
+
+        static void map_set(value map_obj, const std::string& key_name, value v) {
+            map_key key;
+            key.type = map_key_type::symbol;
+            key.text_data = key_name;
+            map_obj->map_data[key] = v;
+        }
+    };
+
+    cap_api_register_backend("cap.navigation.v1", std::make_shared<test_navigation_backend>());
+    check(string_value(eval_text("(map.get (cap.describe \"cap.navigation.v1\") 'adapter_id \"\")", env)) == "test-nav",
+          "registered cap.navigation.v1 descriptor should override built-in mock descriptor");
+    value registered_nav = eval_text(
+        "(define registered_nav "
+        " (begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.navigation.request.v1\") "
+        "  (map.set! req 'capability \"cap.navigation.v1\") "
+        "  (map.set! req 'operation \"navigate-to-pose\") "
+        "  (cap.call req)))",
+        env);
+    check(is_map(registered_nav), "registered capability should return map");
+    check(string_value(eval_text("(map.get registered_nav 'adapter \"\")", env)) == "test-nav",
+          "cap.call should dispatch to registered capability before built-in mock");
+    check(!string_value(eval_text("(map.get registered_nav 'request_hash \"\")", env)).empty(),
+          "registered capability wrapper should add request_hash");
+    check(!string_value(eval_text("(map.get registered_nav 'response_hash \"\")", env)).empty(),
+          "registered capability wrapper should add response_hash");
+
+    env = create_global_env();
 
     value caps = eval_text("(cap.list)", env);
     check(is_proper_list(caps), "cap.list should return list");
@@ -5530,6 +5612,279 @@ void test_pybullet_backend_present_with_extension() {
 #endif
 
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
+using namespace muslisp;
+
+std::string unique_nav2_action_name(const std::string& stem) {
+    static std::atomic<std::uint64_t> next_id{1};
+    return "/muesli_bt_" + stem + "_" + std::to_string(next_id.fetch_add(1, std::memory_order_relaxed)) +
+           "/navigate_to_pose";
+}
+
+std::string nav2_request_script(const std::string& operation,
+                                const std::string& request_id,
+                                const std::string& action_name,
+                                const std::string& extra_fields,
+                                bool include_target = true) {
+    std::string script =
+        "(begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.navigation.request.v1\") "
+        "  (map.set! req 'capability \"cap.navigation.v1\") "
+        "  (map.set! req 'operation " +
+        lisp_string_literal(operation) +
+        ") "
+        "  (map.set! req 'request_id " +
+        lisp_string_literal(request_id) +
+        ") "
+        "  (map.set! req 'action_name " +
+        lisp_string_literal(action_name) +
+        ") ";
+    if (include_target) {
+        script +=
+            "  (define target (map.make)) "
+            "  (map.set! target 'frame \"map\") "
+            "  (map.set! target 'x 1.25) "
+            "  (map.set! target 'y -0.5) "
+            "  (map.set! target 'yaw 0.5) "
+            "  (map.set! req 'target target) ";
+    }
+    script += extra_fields + "  (cap.call req))";
+    return script;
+}
+
+void check_nav2_cap_events(bool expected_host_reached) {
+    const std::vector<std::string> events = bt::default_runtime_host().events().snapshot();
+    bool saw_start = false;
+    bool saw_end = false;
+    bool saw_adapter = false;
+    bool saw_host = false;
+    for (const std::string& line : events) {
+        saw_start = saw_start || line.find("\"type\":\"cap_call_start\"") != std::string::npos;
+        saw_end = saw_end || line.find("\"type\":\"cap_call_end\"") != std::string::npos;
+        saw_adapter = saw_adapter || line.find("\"adapter\":\"nav2\"") != std::string::npos;
+        saw_host = saw_host || line.find(expected_host_reached ? "\"host_reached\":true" : "\"host_reached\":false") !=
+                                   std::string::npos;
+    }
+    check(saw_start, "Nav2 capability call should emit cap_call_start");
+    check(saw_end, "Nav2 capability call should emit cap_call_end");
+    check(saw_adapter, "Nav2 capability events should include adapter id");
+    check(saw_host, "Nav2 capability events should include host_reached state");
+}
+
+std::optional<value> map_lookup_symbol_value(value map_obj, const std::string& key_name) {
+    if (!is_map(map_obj)) {
+        return std::nullopt;
+    }
+    map_key key;
+    key.type = map_key_type::symbol;
+    key.text_data = key_name;
+    const auto it = map_obj->map_data.find(key);
+    if (it == map_obj->map_data.end()) {
+        return std::nullopt;
+    }
+    return it->second;
+}
+
+value wait_for_nav2_status(muslisp::env_ptr env,
+                           const std::string& job_id,
+                           const std::string& request_id,
+                           const std::string& action_name,
+                           const std::string& expected_status,
+                           std::chrono::milliseconds timeout) {
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+    value last = make_nil();
+    gc_root_scope roots(default_gc());
+    roots.add(&last);
+    while (std::chrono::steady_clock::now() < deadline) {
+        last = eval_text(
+            nav2_request_script("status",
+                                request_id,
+                                action_name,
+                                "  (map.set! req 'job_id " + lisp_string_literal(job_id) + ") ",
+                                false),
+            env);
+        const std::optional<value> status_value = map_lookup_symbol_value(last, "status");
+        const std::string status = status_value.has_value() && is_symbol(*status_value) ? symbol_name(*status_value) : "";
+        if (status == expected_status) {
+            return last;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return last;
+}
+
+std::string map_symbol_text(value map_obj, const std::string& key_name) {
+    const std::optional<value> found = map_lookup_symbol_value(map_obj, key_name);
+    if (!found.has_value()) {
+        return "";
+    }
+    if (is_symbol(*found)) {
+        return symbol_name(*found);
+    }
+    if (is_string(*found)) {
+        return string_value(*found);
+    }
+    return "";
+}
+
+std::string map_string_text(value map_obj, const std::string& key_name) {
+    const std::optional<value> found = map_lookup_symbol_value(map_obj, key_name);
+    if (!found.has_value() || !is_string(*found)) {
+        return "";
+    }
+    return string_value(*found);
+}
+
+bool map_bool_value(value map_obj, const std::string& key_name, bool default_value) {
+    const std::optional<value> found = map_lookup_symbol_value(map_obj, key_name);
+    if (!found.has_value() || !is_boolean(*found)) {
+        return default_value;
+    }
+    return boolean_value(*found);
+}
+
+void test_ros2_nav2_capability_descriptor_and_unavailable() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_env_with_ros2_extension();
+
+    value desc = eval_text("(cap.describe \"cap.navigation.v1\")", env);
+    check(is_map(desc), "cap.describe cap.navigation.v1 should return map for ROS2 Nav2 adapter");
+    check(string_value(eval_text("(map.get (cap.describe \"cap.navigation.v1\") 'adapter_id \"\")", env)) == "nav2",
+          "Nav2 capability descriptor should report nav2 adapter id");
+    const auto operations = vector_from_list(eval_text("(map.get (cap.describe \"cap.navigation.v1\") 'operations nil)", env));
+    bool saw_navigate = false;
+    bool saw_status = false;
+    bool saw_cancel = false;
+    for (value op : operations) {
+        saw_navigate = saw_navigate || string_value(op) == "navigate-to-pose";
+        saw_status = saw_status || string_value(op) == "status";
+        saw_cancel = saw_cancel || string_value(op) == "cancel";
+    }
+    check(saw_navigate && saw_status && saw_cancel, "Nav2 descriptor should expose navigate/status/cancel operations");
+
+    bt::default_runtime_host().events().clear_ring();
+    const std::string action_name = unique_nav2_action_name("unavailable");
+    value unavailable =
+        eval_text(nav2_request_script("navigate-to-pose",
+                                      "nav2-unavailable",
+                                      action_name,
+                                      "  (map.set! req 'timeout_ms 5) "),
+                  env);
+    check(is_map(unavailable), "Nav2 unavailable response should be a map");
+    check(map_symbol_text(unavailable, "status") == ":unavailable", "Nav2 missing server should return :unavailable");
+    check(!map_bool_value(unavailable, "host_reached", true), "Nav2 missing server should not reach host");
+    check_nav2_cap_events(false);
+}
+
+void test_ros2_nav2_fake_server_accept_running_and_success() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_env_with_ros2_extension();
+    const std::string action_name = unique_nav2_action_name("success");
+    test_support::nav2_fake_action_server server(action_name, test_support::nav2_fake_action_server::mode::accept_delay);
+
+    bt::default_runtime_host().events().clear_ring();
+    value accepted = eval_text(nav2_request_script("navigate-to-pose",
+                                                   "nav2-accepted",
+                                                   action_name,
+                                                   "  (map.set! req 'timeout_ms 500) "),
+                               env);
+    check(map_symbol_text(accepted, "status") == ":accepted", "Nav2 accepted fake goal should return :accepted");
+    const std::string job_id = map_string_text(accepted, "job_id");
+    check(!job_id.empty(), "Nav2 accepted fake goal should return job_id");
+    check(server.wait_for_goal_count(1, std::chrono::milliseconds(500)), "fake Nav2 server should receive one goal");
+    const auto goal = server.last_goal();
+    check_close(goal.pose.pose.position.x, 1.25, 1e-6, "Nav2 fake server received pose.x mismatch");
+    check_close(goal.pose.pose.position.y, -0.5, 1e-6, "Nav2 fake server received pose.y mismatch");
+
+    value running = wait_for_nav2_status(env, job_id, "nav2-status-running", action_name, ":running", std::chrono::milliseconds(500));
+    check(map_symbol_text(running, "status") == ":running", "Nav2 status should report :running before delayed success");
+    const std::optional<value> progress = map_lookup_symbol_value(running, "progress");
+    check(progress.has_value() && is_map(*progress), "Nav2 running status should include progress");
+    const std::optional<value> distance = map_lookup_symbol_value(*progress, "distance_remaining_m");
+    check(distance.has_value() && is_float(*distance), "Nav2 running status should include distance_remaining_m");
+    check_close(float_value(*distance), 0.75, 1e-6, "Nav2 running status distance_remaining_m mismatch");
+    const std::optional<value> recoveries = map_lookup_symbol_value(*progress, "number_of_recoveries");
+    check(recoveries.has_value() && is_integer(*recoveries) && integer_value(*recoveries) == 1,
+          "Nav2 running status should include number_of_recoveries");
+    check(map_bool_value(running, "host_reached", false), "Nav2 running status should reach host");
+
+    value ok = wait_for_nav2_status(env, job_id, "nav2-status-ok", action_name, ":ok", std::chrono::milliseconds(1000));
+    check(map_symbol_text(ok, "status") == ":ok", "Nav2 fake server success should map to :ok");
+    check_nav2_cap_events(true);
+}
+
+void test_ros2_nav2_fake_server_reject_abort_cancel_and_timeout() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_env_with_ros2_extension();
+
+    {
+        const std::string action_name = unique_nav2_action_name("reject");
+        test_support::nav2_fake_action_server server(action_name, test_support::nav2_fake_action_server::mode::reject_goal);
+        value rejected = eval_text(nav2_request_script("navigate-to-pose",
+                                                       "nav2-rejected",
+                                                       action_name,
+                                                       "  (map.set! req 'timeout_ms 500) "),
+                                   env);
+        check(map_symbol_text(rejected, "status") == ":rejected", "Nav2 fake server rejection should map to :rejected");
+        check(map_bool_value(rejected, "host_reached", false), "Nav2 fake server rejection should reach host");
+    }
+
+    {
+        const std::string action_name = unique_nav2_action_name("abort");
+        test_support::nav2_fake_action_server server(action_name, test_support::nav2_fake_action_server::mode::accept_abort);
+        value accepted = eval_text(nav2_request_script("navigate-to-pose",
+                                                       "nav2-abort",
+                                                       action_name,
+                                                       "  (map.set! req 'timeout_ms 500) "),
+                                   env);
+        const std::string job_id = map_string_text(accepted, "job_id");
+        value aborted = wait_for_nav2_status(env, job_id, "nav2-status-abort", action_name, ":error", std::chrono::milliseconds(1000));
+        check(map_symbol_text(aborted, "status") == ":error", "Nav2 fake server abort should map to :error");
+    }
+
+    {
+        const std::string action_name = unique_nav2_action_name("cancel");
+        test_support::nav2_fake_action_server server(action_name, test_support::nav2_fake_action_server::mode::accept_delay);
+        value accepted = eval_text(nav2_request_script("navigate-to-pose",
+                                                       "nav2-cancel",
+                                                       action_name,
+                                                       "  (map.set! req 'timeout_ms 500) "),
+                                   env);
+        const std::string job_id = map_string_text(accepted, "job_id");
+        value cancelled = eval_text(
+            nav2_request_script("cancel",
+                                "nav2-cancel-request",
+                                action_name,
+                                "  (map.set! req 'job_id " + lisp_string_literal(job_id) + ") "
+                                "  (map.set! req 'timeout_ms 500) ",
+                                false),
+            env);
+        check(map_symbol_text(cancelled, "status") == ":cancelled", "Nav2 fake server cancel should map to :cancelled");
+        check(server.wait_for_cancel_count(1, std::chrono::milliseconds(500)), "fake Nav2 server should observe cancel request");
+    }
+
+    {
+        const std::string action_name = unique_nav2_action_name("timeout");
+        test_support::nav2_fake_action_server server(action_name, test_support::nav2_fake_action_server::mode::slow_goal_accept);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        value timeout = eval_text(nav2_request_script("navigate-to-pose",
+                                                      "nav2-timeout",
+                                                      action_name,
+                                                      "  (map.set! req 'timeout_ms 50) "),
+                                  env);
+        check(map_symbol_text(timeout, "status") == ":timeout", "Nav2 slow goal acceptance should map to :timeout");
+        check(map_bool_value(timeout, "host_reached", false), "Nav2 goal-accept timeout should report host reached");
+        check(!map_string_text(timeout, "request_hash").empty(), "Nav2 timeout should expose request hash");
+        check(!map_string_text(timeout, "response_hash").empty(), "Nav2 timeout should expose response hash");
+    }
+}
+
 void test_env_generic_ros2_backend_contract() {
     using namespace muslisp;
 
@@ -6200,6 +6555,10 @@ int main() {
 #endif
         {"shared flagship planner model in core runtime", test_shared_flagship_planner_model_in_core_runtime},
 #if MUESLI_BT_WITH_ROS2_INTEGRATION
+        {"ros2 Nav2 capability descriptor and unavailable path", test_ros2_nav2_capability_descriptor_and_unavailable},
+        {"ros2 Nav2 fake action server accept running and success", test_ros2_nav2_fake_server_accept_running_and_success},
+        {"ros2 Nav2 fake action server reject abort cancel and timeout",
+         test_ros2_nav2_fake_server_reject_abort_cancel_and_timeout},
         {"env generic ros2 backend contract", test_env_generic_ros2_backend_contract},
         {"ros2 backend config validation and reset policy", test_ros2_backend_config_validation_and_reset_policy},
         {"ros2 backend invalid action fallback", test_ros2_backend_invalid_action_fallback},

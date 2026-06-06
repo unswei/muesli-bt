@@ -13,6 +13,7 @@ muesli-bt
 - Added a release-style evidence manifest and checker for the experimental wheeled flagship generated-recovery variant, covering proposal validation, event-log shape, replay, rollback hashes, fixed-versus-generated comparison, and artefact drift.
 - Added experimental mock `cap.navigation.v1`, `cap.motion.v1`, and `cap.tamp.v1` capability adapters behind the existing `cap.call` path, including deterministic results, request/response hashes, and canonical `cap_call_start` / `cap_call_end` events.
 - Hardened those mock capability adapters with operation-specific request validation, stable `validation_reason_code` values, and non-host-reaching `:rejected` results for malformed adapter requests.
+- Added the first optional ROS2/Nav2 `cap.navigation.v1` backend registry path, including a real `NavigateToPose` action client, fake-action-server coverage for accept, reject, feedback, success, abort, cancellation, timeout, and unavailable paths, and canonical capability-call events.
 - Added `guarded-task-plan.v1` generated-fragment validation support for TAMP-produced task-plan proposals.
 - Added the first deterministic generated guarded recovery subtree evidence slice, including a blocked-path generator, accepted and rejected generated-fragment fixtures, canonical DSL hashes, lifecycle events, replay report, tutorial, evidence page, and CTest coverage.
 

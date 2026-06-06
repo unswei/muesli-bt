@@ -48,12 +48,14 @@ What is implemented today:
 
 - Linux ROS-backed tests, installed-package consumer smoke coverage, and live runner validation via `muslisp_ros2`
 - Linux `L2` replay corpus covering nominal replay, clamped actions, invalid-action fallback, safe-action pre-emption, and reset-unsupported artefacts
+- an experimental optional `cap.navigation.v1` Nav2 adapter that proves the ROS2 `NavigateToPose` action-client boundary against an in-process fake action server
 
 What is still intentionally incomplete:
 
 - simulator or robot reset beyond the explicit unsupported/stub policy
 - broader transport coverage beyond the current `Odometry` / `Twist` path
 - explicit ROS time-source reporting and replay-verification tooling beyond the direct canonical event-log path
+- real Nav2 deployment evidence against a lifecycle manager, map server, planner server, simulator, or physical robot
 
 ### first supported baseline
 
@@ -70,9 +72,11 @@ The first supported ROS2 baseline is intentionally narrow:
 Non-goals for this first baseline:
 
 - MoveIt integration
-- ROS actions or services
+- ROS actions or services in the `env.*` transport baseline
 - multi-robot orchestration
 - simulator-specific reset integration
+
+The optional Nav2 capability adapter is separate from the released thin transport baseline. It is reached through `(cap.call request-map)` with `capability="cap.navigation.v1"`, not through `env.attach`, `env.observe`, or `env.act`.
 
 ## how it works
 
@@ -218,6 +222,24 @@ Exit target:
 - add a usable perception path for the manipulator scenario rather than relying on hidden oracle state
 - preferred target: a bounded Towers of Hanoi arm demo if the simulator, MoveIt path, and perception stack stay reproducible
 - acceptable fallback: a simpler manipulator benchmark with the same host-capability split if Hanoi proves too heavy before `v1.0.0`
+
+`phase 13: v0.9.0 optional Nav2 capability proof`
+
+Delivered first slice:
+
+- `cap.navigation.v1` can be serviced by a registered ROS2/Nav2 backend when the optional ROS2 integration target is enabled
+- the adapter implements `navigate-to-pose`, `status`, and `cancel`
+- tests use a fake `nav2_msgs/action/NavigateToPose` action server for accept, reject, feedback, success, abort, cancellation, timeout, and unavailable paths
+- canonical `cap_call_start` and `cap_call_end` events carry capability, operation, adapter, host reach, status, request hash, and response hash
+
+Still out of scope for this slice:
+
+- `NavigateThroughPoses`
+- path-service integration
+- rosbag evidence
+- simulator evidence
+- physical robot evidence
+- changing the canonical shared flagship wrapper to require Nav2
 
 ### acceptance criteria
 

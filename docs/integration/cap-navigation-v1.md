@@ -1,14 +1,14 @@
 # cap.navigation.v1
 
 !!! note "status"
-    Status: experimental mock adapter.
-    This page defines the public navigation capability boundary. The built-in mock adapter is deterministic. A real Nav2 adapter is still optional roadmap work.
+    Status: experimental mock adapter plus optional ROS2/Nav2 action-client adapter.
+    This page defines the public navigation capability boundary. The built-in mock adapter is deterministic. The optional Nav2 adapter is fake-action-server tested and does not claim a live Nav2 stack, map, simulator, or physical robot deployment.
 
 ## what this is
 
 `cap.navigation.v1` is the generic host capability contract for navigation tasks that are broader than direct `env.act` velocity commands.
 
-The first intended real adapter is Nav2. Nav2 is adapter metadata, not BT syntax.
+The first real adapter boundary is Nav2 `NavigateToPose`. Nav2 is adapter metadata, not BT syntax.
 
 ## when to use it
 
@@ -20,7 +20,11 @@ Do not use it for direct wheel commands, low-level obstacle avoidance, or raw Na
 
 BT logic calls `(cap.call request-map)`.
 
-The current built-in mock adapter returns deterministic results and emits canonical `cap_call_start` and `cap_call_end` events. A future Nav2 adapter should map the same request shape to ROS2 action clients, starting with `NavigateToPose`.
+`cap.call` dispatches registered host capability backends before falling back to model-service capabilities, built-in mock adapters, and `cap.echo.v1`.
+
+The built-in mock adapter returns deterministic results and emits canonical `cap_call_start` and `cap_call_end` events.
+
+When `MUESLI_BT_BUILD_INTEGRATION_ROS2=ON`, the ROS2 extension registers a `cap.navigation.v1` backend with `adapter_id="nav2"`. The first Nav2 adapter implements a real ROS2 action client for `nav2_msgs/action/NavigateToPose` and is tested against an in-process fake action server.
 
 ## api / syntax
 
@@ -36,6 +40,7 @@ Common optional fields:
 - `target` or `poses`
 - `timeout_ms` or `deadline_ms`
 - `job_id` for `cancel` and `status`
+- `action_name` for adapter tests or non-default Nav2 action names; the Nav2 adapter defaults to `/navigate_to_pose`
 
 Stable result fields:
 
@@ -61,6 +66,22 @@ Mock validation currently checks:
 - `timeout_ms` and `deadline_ms`, when present, must be non-negative integers
 - an explicit `adapter` must be `mock-nav2`
 
+The optional Nav2 adapter currently implements:
+
+- `navigate-to-pose`
+- `status`
+- `cancel`
+
+The optional Nav2 adapter intentionally rejects unsupported operations such as `navigate-through-poses` and `get-path` until those ROS action or service boundaries are added deliberately.
+
+The optional Nav2 adapter maps feedback into `progress` fields:
+
+- `current_pose`
+- `navigation_time_ms`
+- `estimated_time_remaining_ms`
+- `number_of_recoveries`
+- `distance_remaining_m`
+
 ## example
 
 ```lisp
@@ -84,7 +105,9 @@ Mock validation currently checks:
 
 The built-in adapter is a mock. It proves the user-facing contract, event shape, and replay hashes. It does not prove Nav2, a physical robot, or a live ROS action server.
 
-The real Nav2 adapter must stay optional and default-off.
+The optional Nav2 adapter proves the ROS2 action-client boundary against a fake action server. It does not prove a configured Nav2 lifecycle stack, map server, planner server, simulator, or physical robot.
+
+Core-only builds keep using the deterministic mock adapter and do not require ROS2, Nav2, or `nav2_msgs`.
 
 ## see also
 

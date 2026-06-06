@@ -43,6 +43,7 @@ add_library(
   src/bt/trace.cpp
   src/bt/vla.cpp
   src/builtins.cpp
+  src/cap_api.cpp
   src/compiled_eval.cpp
   src/env.cpp
   src/env_api.cpp
@@ -209,16 +210,24 @@ if (MUESLI_BT_BUILD_INTEGRATION_ROS2)
   endif ()
 
   find_package(rclcpp REQUIRED)
+  find_package(rclcpp_action REQUIRED)
   find_package(nav_msgs REQUIRED)
+  find_package(nav2_msgs REQUIRED)
   find_package(geometry_msgs REQUIRED)
 
-  add_library(muesli_bt_integration_ros2 integrations/ros2/backend.cpp integrations/ros2/extension.cpp)
+  add_library(
+    muesli_bt_integration_ros2
+    integrations/ros2/backend.cpp
+    integrations/ros2/extension.cpp
+    integrations/ros2/nav2_capability.cpp
+  )
 
   target_link_libraries(
     muesli_bt_integration_ros2
-    PUBLIC muesli_bt_core rclcpp::rclcpp nav_msgs::nav_msgs__rosidl_generator_cpp
+    PUBLIC muesli_bt_core rclcpp::rclcpp rclcpp_action::rclcpp_action nav_msgs::nav_msgs__rosidl_generator_cpp
            nav_msgs::nav_msgs__rosidl_typesupport_cpp geometry_msgs::geometry_msgs__rosidl_generator_cpp
-           geometry_msgs::geometry_msgs__rosidl_typesupport_cpp
+           geometry_msgs::geometry_msgs__rosidl_typesupport_cpp nav2_msgs::nav2_msgs__rosidl_generator_cpp
+           nav2_msgs::nav2_msgs__rosidl_typesupport_cpp
   )
   target_include_directories(
     muesli_bt_integration_ros2
