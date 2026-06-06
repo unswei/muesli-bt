@@ -1,0 +1,11 @@
+{
+  "schema_version": "generated_guarded_recovery.context.v1",
+  "scenario": "flagship_blocked_recovery",
+  "generator": "deterministic-template-v1",
+  "collision_imminent": true,
+  "blocked_path": true,
+  "observation_fresh": true,
+  "planner": "mcts",
+  "budget_ms": 20,
+  "work_max": 64
+}

@@ -35,6 +35,8 @@ agent_proposal.v1
 The first built-in fragment contract is `guarded-recovery.v1`.
 It requires a guarded subtree, bounded long-running work, a fallback for long-running work, known callbacks or capabilities, and size limits.
 
+The wheeled flagship now has an experimental generated-recovery variant that uses the same contract. It is fixture/runtime evidence only; the existing PyBullet, Webots, and ROS2 wrappers continue to use the original shared flagship until the variant is deliberately promoted.
+
 ## api / syntax
 
 Patchable BT slots use this DSL shape:
@@ -103,6 +105,12 @@ The accepted generated guarded recovery proposal lives under:
 fixtures/dsl/generated_guarded_recovery/proposal-accepted/
 ```
 
+The experimental wheeled flagship proposal lives under:
+
+```text
+fixtures/dsl/generated_guarded_recovery/proposal-flagship-accepted/
+```
+
 The validation output includes:
 
 - `fragment_validation_result.v1`: status, reason code, field path, slot, contract, hashes, and `host_reached=false`;
@@ -115,6 +123,8 @@ The validation output includes:
 The current runtime keeps live subtree mutation deliberately narrow. It supports one pending install or rollback per instance, commits only at a tick boundary, preserves non-slot runtime state, and clears replaced-subtree memory, active VLA jobs, halt warnings, and profile state.
 
 Rejected proposals keep `host_reached=false`. A rejected proposal must not reach robot execution.
+
+The wheeled flagship fixture maps `collision_imminent=true` to the generated recovery context as `blocked_path=true`. The fixed collision branch remains the rollback target for `recovery-policy`.
 
 ## see also
 

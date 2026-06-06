@@ -1,0 +1,26 @@
+{
+  "guarded-recovery.v1": {
+    "schema_version": "fragment_contract.v1",
+    "id": "guarded-recovery.v1",
+    "must_start_with_guard": true,
+    "min_guard_count": 1,
+    "requires_fallback_for_long_running": true,
+    "allowed_nodes": [
+      "act",
+      "cond",
+      "plan-action",
+      "reactive-sel",
+      "seq",
+      "slot"
+    ],
+    "allowed_actions": [
+      "blocked-path?",
+      "execute-recovery-turn",
+      "observation-fresh?",
+      "recovery-exit?",
+      "safe-stop"
+    ],
+    "max_nodes": 16,
+    "max_depth": 2
+  }
+}

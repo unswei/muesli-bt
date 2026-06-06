@@ -5,7 +5,7 @@
 
 ## what this is
 
-This page records the evidence for the generated guarded recovery subtree slice.
+This page records the evidence for the generated guarded recovery subtree slice and the experimental wheeled flagship recovery-slot variant.
 
 The slice demonstrates that Lisp BT fragments can be generated as structured data, wrapped in an agent proposal envelope, normalised, validated, hashed, represented in canonical events, and replay-loaded from a canonical artefact.
 
@@ -21,6 +21,14 @@ The accepted fixture is generated from a blocked-path context:
 
 ```bash
 python3 tools/generate_guarded_recovery_subtree.py
+```
+
+The flagship recovery fixture is generated from the matching wheeled blocked-path context:
+
+```bash
+python3 tools/generate_guarded_recovery_subtree.py \
+  --context fixtures/dsl/generated_guarded_recovery/context-flagship-blocked-recovery.json \
+  --out-dir fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted
 ```
 
 The validator accepts the generated fragment only when:
@@ -81,6 +89,22 @@ fixtures/dsl/generated_guarded_recovery/accepted-blocked-path/replay_report.json
 fixtures/dsl/generated_guarded_recovery/proposal-accepted/proposal.json
 ```
 
+The experimental flagship artefacts are:
+
+```text
+examples/flagship_wheeled/lisp/bt_goal_flagship_generated_recovery.lisp
+fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/fragment.lisp
+fixtures/dsl/generated_guarded_recovery/flagship-recovery-accepted/fixed_vs_generated_report.json
+fixtures/dsl/generated_guarded_recovery/proposal-flagship-accepted/proposal.json
+fixtures/dsl/generated_guarded_recovery/proposal-flagship-rejected-contract/proposal.json
+```
+
+The experimental flagship BT source is:
+
+```lisp
+--8<-- "examples/flagship_wheeled/lisp/bt_goal_flagship_generated_recovery.lisp"
+```
+
 ## example
 
 The accepted validation report records:
@@ -98,9 +122,13 @@ The replay report requires the same canonical DSL hash to appear in generation, 
 
 The accepted proposal validation result also includes a semantic diff, dry-run report, and rollback handle. All rejected proposal fixtures report `host_reached=false`.
 
+The flagship comparison report proves that the fixed recovery branch remains the rollback target for slot `recovery-policy`, while the generated recovery proposal is validated before host reach.
+
 ## gotchas
 
 The fixture evidence remains deterministic. The C++ runtime now also has an experimental live tick-boundary install and rollback path for matching `slot` fragments, covered by core unit tests. The generated guarded recovery fixture still stays as the reproducible artefact path for proposal validation, replay, and comparison.
+
+The wheeled flagship generated-recovery BT is not the canonical cross-transport baseline yet. Existing PyBullet, Webots, and ROS2 wrappers still load the original shared flagship BT.
 
 The generated subtree is intentionally small. The value is the validated lifecycle and replay evidence, not a clever recovery strategy.
 

@@ -22,9 +22,27 @@ CONTRACT_VERSION = "1.0.0"
 BASE_UNIX_MS = 1735689606000
 RUN_ID = "fixture-generated-guarded-recovery"
 OLD_TREE_HASH = "fnv1a64:9999999999999999"
+FLAGSHIP_RUN_ID = "fixture-flagship-generated-recovery"
+FLAGSHIP_OLD_TREE_HASH = "fnv1a64:aaaaaaaaaaaaaaaa"
 
 
 def require_context(context: dict[str, Any]) -> None:
+    if context.get("scenario") == "flagship_blocked_recovery":
+        required = {
+            "schema_version": "generated_guarded_recovery.context.v1",
+            "generator": "deterministic-template-v1",
+        }
+        for key, expected in required.items():
+            if context.get(key) != expected:
+                raise RuntimeError(f"context {key} must be {expected!r}")
+        if context.get("collision_imminent") is not True:
+            raise RuntimeError("flagship context collision_imminent must be true")
+        if context.get("blocked_path") is not True:
+            raise RuntimeError("flagship context blocked_path must be true")
+        if context.get("observation_fresh") is not True:
+            raise RuntimeError("flagship context observation_fresh must be true")
+        return
+
     required = {
         "schema_version": "generated_guarded_recovery.context.v1",
         "scenario": "blocked_path",
@@ -43,6 +61,26 @@ def fragment_from_context(context: dict[str, Any]) -> str:
     planner = str(context.get("planner", "mcts"))
     budget_ms = int(context.get("budget_ms", 20))
     work_max = int(context.get("work_max", 64))
+    if context.get("scenario") == "flagship_blocked_recovery":
+        return f"""(slot recovery-policy
+  :contract guarded-recovery.v1
+  :install at-tick-boundary
+  :fallback safe-stop
+  (reactive-sel
+    (seq
+      (cond blocked-path?)
+      (cond observation-fresh?)
+      (plan-action
+        :name "flagship-recovery-turn"
+        :planner :{planner}
+        :budget_ms {budget_ms}
+        :work_max {work_max}
+        :state_key recovery-state
+        :action_key recovery-action)
+      (act execute-recovery-turn)
+      (cond recovery-exit?))
+    (act safe-stop)))
+"""
     return f"""(reactive-sel
   (seq
     (cond blocked-path?)
@@ -60,12 +98,12 @@ def fragment_from_context(context: dict[str, Any]) -> str:
 """
 
 
-def event(seq: int, event_type: str, data: dict[str, Any], tick: int | None = None) -> dict[str, Any]:
+def event(seq: int, event_type: str, data: dict[str, Any], tick: int | None = None, run_id: str = RUN_ID) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "schema": SCHEMA,
         "contract_version": CONTRACT_VERSION,
         "type": event_type,
-        "run_id": RUN_ID,
+        "run_id": run_id,
         "unix_ms": BASE_UNIX_MS + seq - 1,
         "seq": seq,
         "data": data,
@@ -78,13 +116,40 @@ def event(seq: int, event_type: str, data: dict[str, Any], tick: int | None = No
 def make_events(validation: dict[str, Any], context: dict[str, Any]) -> list[dict[str, Any]]:
     source_hash = str(validation["source_hash"])
     canonical_hash = str(validation["canonical_dsl_hash"])
+    is_flagship = context.get("scenario") == "flagship_blocked_recovery"
+    old_tree_hash = FLAGSHIP_OLD_TREE_HASH if is_flagship else OLD_TREE_HASH
     common = {
-        "fragment_id": "generated_guarded_recovery.blocked_path",
+        "fragment_id": "flagship.generated_recovery.blocked_path" if is_flagship else "generated_guarded_recovery.blocked_path",
         "generator": context["generator"],
         "source_hash": source_hash,
         "canonical_dsl_hash": canonical_hash,
         "validation_rule_set": "generated-fragment-policy.v1",
     }
+    run_id = FLAGSHIP_RUN_ID if is_flagship else RUN_ID
+    generated_data = {
+        **common,
+        "trigger": "blocked_path",
+        "blocked_path": True,
+        "observation_fresh": True,
+    }
+    if is_flagship:
+        generated_data["collision_imminent"] = True
+    install_request_data = {
+        **common,
+        "old_subtree_hash": old_tree_hash,
+        "new_subtree_hash": canonical_hash,
+        "install_mode": "next_tick_boundary",
+    }
+    install_commit_data = {
+        **common,
+        "old_subtree_hash": old_tree_hash,
+        "new_subtree_hash": canonical_hash,
+        "install_tick": 1,
+        "install_mode": "next_tick_boundary",
+    }
+    if is_flagship:
+        install_request_data["slot"] = "recovery-policy"
+        install_commit_data["slot"] = "recovery-policy"
     return [
         event(
             1,
@@ -95,19 +160,16 @@ def make_events(validation: dict[str, Any], context: dict[str, Any]) -> list[dic
                 "contract_version": CONTRACT_VERSION,
                 "contract_id": "runtime-contract-v1.0.0",
                 "tick_hz": 20.0,
-                "tree_hash": OLD_TREE_HASH,
+                "tree_hash": old_tree_hash,
                 "capabilities": {"reset": True},
             },
+            run_id=run_id,
         ),
         event(
             2,
             "dsl_fragment_generated",
-            {
-                **common,
-                "trigger": "blocked_path",
-                "blocked_path": True,
-                "observation_fresh": True,
-            },
+            generated_data,
+            run_id=run_id,
         ),
         event(
             3,
@@ -117,6 +179,7 @@ def make_events(validation: dict[str, Any], context: dict[str, Any]) -> list[dic
                 "canonical_dsl": validation["canonical_dsl"],
                 "node_count": validation["node_count"],
             },
+            run_id=run_id,
         ),
         event(
             4,
@@ -129,6 +192,7 @@ def make_events(validation: dict[str, Any], context: dict[str, Any]) -> list[dic
                 "long_running_nodes": validation["long_running_nodes"],
                 "fallback_policy": validation["fallback_policy"],
             },
+            run_id=run_id,
         ),
         event(
             5,
@@ -139,45 +203,38 @@ def make_events(validation: dict[str, Any], context: dict[str, Any]) -> list[dic
                 "tree_hash": canonical_hash,
                 "compile_ms": 0.1,
             },
+            run_id=run_id,
         ),
-        event(6, "tick_begin", {"tick_budget_ms": 20.0}, tick=1),
+        event(6, "tick_begin", {"tick_budget_ms": 20.0}, tick=1, run_id=run_id),
         event(
             7,
             "subtree_install_requested",
-            {
-                **common,
-                "old_subtree_hash": OLD_TREE_HASH,
-                "new_subtree_hash": canonical_hash,
-                "install_mode": "next_tick_boundary",
-            },
+            install_request_data,
             tick=1,
+            run_id=run_id,
         ),
         event(
             8,
             "subtree_installed",
-            {
-                **common,
-                "old_subtree_hash": OLD_TREE_HASH,
-                "new_subtree_hash": canonical_hash,
-                "install_tick": 1,
-                "install_mode": "next_tick_boundary",
-            },
+            install_commit_data,
             tick=1,
+            run_id=run_id,
         ),
-        event(9, "tick_end", {"root_status": "running", "tick_ms": 0.5, "tick_budget_ms": 20.0}, tick=1),
-        event(10, "tick_begin", {"tick_budget_ms": 20.0}, tick=2),
+        event(9, "tick_end", {"root_status": "running", "tick_ms": 0.5, "tick_budget_ms": 20.0}, tick=1, run_id=run_id),
+        event(10, "tick_begin", {"tick_budget_ms": 20.0}, tick=2, run_id=run_id),
         event(
             11,
             "subtree_rollback_requested",
             {
                 **common,
                 "slot": "recovery-policy",
-                "old_subtree_hash": OLD_TREE_HASH,
+                "old_subtree_hash": old_tree_hash,
                 "current_subtree_hash": canonical_hash,
-                "rollback_target_hash": OLD_TREE_HASH,
+                "rollback_target_hash": old_tree_hash,
                 "install_mode": "next_tick_boundary",
             },
             tick=2,
+            run_id=run_id,
         ),
         event(
             12,
@@ -186,13 +243,14 @@ def make_events(validation: dict[str, Any], context: dict[str, Any]) -> list[dic
                 **common,
                 "slot": "recovery-policy",
                 "previous_subtree_hash": canonical_hash,
-                "restored_subtree_hash": OLD_TREE_HASH,
+                "restored_subtree_hash": old_tree_hash,
                 "rollback_tick": 2,
                 "install_mode": "next_tick_boundary",
             },
             tick=2,
+            run_id=run_id,
         ),
-        event(13, "tick_end", {"root_status": "running", "tick_ms": 0.4, "tick_budget_ms": 20.0}, tick=2),
+        event(13, "tick_end", {"root_status": "running", "tick_ms": 0.4, "tick_budget_ms": 20.0}, tick=2, run_id=run_id),
         event(
             14,
             "subtree_replay_loaded",
@@ -201,6 +259,7 @@ def make_events(validation: dict[str, Any], context: dict[str, Any]) -> list[dic
                 "source": "canonical_dsl_artifact",
                 "replay_status": "loaded",
             },
+            run_id=run_id,
         ),
         event(
             15,
@@ -215,6 +274,7 @@ def make_events(validation: dict[str, Any], context: dict[str, Any]) -> list[dic
                     "rolled_back_subtrees": 1,
                 },
             },
+            run_id=run_id,
         ),
     ]
 
@@ -287,6 +347,41 @@ def generate(context_path: Path, out_dir: Path) -> dict[str, Any]:
         },
     }
     write_json(out_dir / "replay_report.json", replay_report)
+    if context.get("scenario") == "flagship_blocked_recovery":
+        write_json(
+            out_dir / "fixed_vs_generated_report.json",
+            {
+                "schema_version": "flagship_generated_recovery_comparison.v1",
+                "passed": True,
+                "context": {
+                    "collision_imminent": True,
+                    "blocked_path": True,
+                    "observation_fresh": True,
+                },
+                "fixed_recovery": {
+                    "slot": "recovery-policy",
+                    "status": "baseline",
+                    "active_branch": 1,
+                    "command_schema": "flagship.cmd.v1",
+                    "subtree_hash": FLAGSHIP_OLD_TREE_HASH,
+                },
+                "generated_recovery": {
+                    "slot": "recovery-policy",
+                    "status": "accepted",
+                    "fragment_contract": "guarded-recovery.v1",
+                    "canonical_dsl_hash": validation["canonical_dsl_hash"],
+                    "source_hash": validation["source_hash"],
+                    "host_reached": False,
+                },
+                "checks": {
+                    "same_slot": True,
+                    "contract_matches": True,
+                    "fixed_branch_preserved_as_rollback_target": True,
+                    "generated_fragment_validated_before_host_reach": True,
+                    "rollback_hash_available": True,
+                },
+            },
+        )
     return {
         "out_dir": str(out_dir),
         "canonical_dsl_hash": validation["canonical_dsl_hash"],

@@ -11,6 +11,7 @@
 #include <thread>
 #include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "bt/instance.hpp"
@@ -19,6 +20,7 @@
 #include "bt/logging.hpp"
 #include "bt/model_service.hpp"
 #include "bt/node_options.hpp"
+#include "bt/planner.hpp"
 #include "bt/registry.hpp"
 #include "bt/runtime.hpp"
 #include "bt/runtime_host.hpp"
@@ -1094,11 +1096,87 @@ bt::arg_value bt_symbol_arg(std::string text) {
     return arg;
 }
 
-bt::node bt_action_node(bt::node_id id, std::string name) {
+bt::arg_value bt_string_arg(std::string text) {
+    bt::arg_value arg;
+    arg.kind = bt::arg_kind::string;
+    arg.text = std::move(text);
+    return arg;
+}
+
+bt::arg_value bt_int_arg(std::int64_t value) {
+    bt::arg_value arg;
+    arg.kind = bt::arg_kind::integer;
+    arg.int_v = value;
+    return arg;
+}
+
+bt::node bt_composite_node(bt::node_id id, bt::node_kind kind, std::vector<bt::node_id> children) {
+    bt::node n;
+    n.kind = kind;
+    n.id = id;
+    n.children = std::move(children);
+    return n;
+}
+
+bt::node bt_condition_node(bt::node_id id, std::string name) {
+    bt::node n;
+    n.kind = bt::node_kind::cond;
+    n.id = id;
+    n.leaf_name = std::move(name);
+    return n;
+}
+
+bt::node bt_action_node(bt::node_id id, std::string name, std::vector<bt::arg_value> args = {}) {
     bt::node n;
     n.kind = bt::node_kind::act;
     n.id = id;
     n.leaf_name = std::move(name);
+    n.args = std::move(args);
+    return n;
+}
+
+bt::node bt_constant_node(bt::node_id id, bt::node_kind kind) {
+    bt::node n;
+    n.kind = kind;
+    n.id = id;
+    return n;
+}
+
+bt::node bt_plan_action_node(bt::node_id id, std::string name, std::string state_key, std::string action_key) {
+    bt::node n;
+    n.kind = bt::node_kind::plan_action;
+    n.id = id;
+    n.args = {
+        bt_symbol_arg(":name"),
+        bt_string_arg(std::move(name)),
+        bt_symbol_arg(":planner"),
+        bt_symbol_arg(":mcts"),
+        bt_symbol_arg(":budget_ms"),
+        bt_int_arg(20),
+        bt_symbol_arg(":work_max"),
+        bt_int_arg(64),
+        bt_symbol_arg(":state_key"),
+        bt_symbol_arg(std::move(state_key)),
+        bt_symbol_arg(":action_key"),
+        bt_symbol_arg(std::move(action_key)),
+        bt_symbol_arg(":action_schema"),
+        bt_string_arg("flagship.cmd.v1"),
+    };
+    return n;
+}
+
+bt::node bt_slot_node(bt::node_id id, std::string slot, std::vector<bt::node_id> children) {
+    bt::node n;
+    n.kind = bt::node_kind::slot;
+    n.id = id;
+    n.leaf_name = std::move(slot);
+    n.args = {bt_symbol_arg(":contract"),
+              bt_symbol_arg("guarded-recovery.v1"),
+              bt_symbol_arg(":install"),
+              bt_symbol_arg("at-tick-boundary"),
+              bt_symbol_arg(":fallback"),
+              bt_symbol_arg("safe-stop")};
+    n.children = std::move(children);
     return n;
 }
 
@@ -1336,6 +1414,219 @@ void test_bt_live_subtree_install_cleans_replaced_running_subtree() {
     check(inst.halt_warning_emitted.find(1) == inst.halt_warning_emitted.end(),
           "old subtree halt warning state should be erased");
     check(inst.node_stats.find(1) == inst.node_stats.end(), "old subtree profile state should be erased");
+}
+
+void test_shared_flagship_generated_recovery_variant_compiles_and_preserves_fixed_recovery() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    const std::filesystem::path repo = find_repo_root();
+    const std::string variant_path =
+        lisp_string_literal((repo / "examples" / "flagship_wheeled" / "lisp" /
+                             "bt_goal_flagship_generated_recovery.lisp")
+                                .string());
+    (void)eval_text("(load " + variant_path + ")", env);
+
+    const std::string canonical =
+        string_value(eval_text("(write-to-string (bt.to-dsl wheeled-goal-flagship-generated-recovery))", env));
+    check(canonical.find("(slot recovery-policy") != std::string::npos,
+          "experimental flagship variant should expose recovery-policy slot");
+    check(canonical.find(":contract guarded-recovery.v1") != std::string::npos,
+          "experimental flagship variant should preserve guarded recovery contract");
+    check(canonical.find("(act select-action act_avoid 1 action_cmd)") != std::string::npos,
+          "default slot child should preserve the fixed collision recovery action");
+
+    (void)eval_text("(define flagship-recovery-inst (bt.new-instance wheeled-goal-flagship-generated-recovery))", env);
+    const value status = eval_text(
+        "(bt.tick flagship-recovery-inst "
+        "  '((goal_reached #f) "
+        "    (collision_imminent #t) "
+        "    (act_avoid (0.10 -0.35)) "
+        "    (act_goal_direct (0.45 0.0)) "
+        "    (planner_state (1.0 0.0 0.9 0.0))))",
+        env);
+    check(symbol_name(status) == "running", "fixed recovery slot branch should keep the flagship running");
+
+    bt::runtime_host& host = bt::default_runtime_host();
+    bt::instance* inst = host.find_instance(bt_handle(eval_text("flagship-recovery-inst", env)));
+    check(inst != nullptr, "experimental flagship instance should exist");
+
+    const bt::bb_entry* branch = inst->bb.get("active_branch");
+    check(branch && std::get<std::int64_t>(branch->value) == 1, "fixed recovery branch should preserve active_branch=1");
+
+    const bt::bb_entry* action = inst->bb.get("action_cmd");
+    check(action != nullptr, "fixed recovery branch should write action_cmd");
+    const auto* action_vec = std::get_if<std::vector<double>>(&action->value);
+    check(action_vec && action_vec->size() == 2u, "action_cmd should be a two-value flagship command");
+    check_close((*action_vec)[0], 0.10, 1e-9, "fixed recovery should copy avoid linear command");
+    check_close((*action_vec)[1], -0.35, 1e-9, "fixed recovery should copy avoid angular command");
+}
+
+bt::definition make_flagship_recovery_slot_definition() {
+    bt::definition def;
+    def.nodes.push_back(bt_composite_node(0, bt::node_kind::sel, {1, 3, 8}));
+    def.nodes.push_back(bt_composite_node(1, bt::node_kind::seq, {2, 12}));
+    def.nodes.push_back(bt_condition_node(2, "goal-reached?"));
+    def.nodes.push_back(bt_slot_node(3, "recovery-policy", {4}));
+    def.nodes.push_back(bt_composite_node(4, bt::node_kind::seq, {5, 6, 7}));
+    def.nodes.push_back(bt_condition_node(5, "collision-imminent?"));
+    def.nodes.push_back(bt_action_node(6, "fixed-recovery"));
+    def.nodes.push_back(bt_constant_node(7, bt::node_kind::running));
+    def.nodes.push_back(bt_composite_node(8, bt::node_kind::seq, {9, 10}));
+    def.nodes.push_back(bt_action_node(9, "direct-goal"));
+    def.nodes.push_back(bt_constant_node(10, bt::node_kind::running));
+    def.nodes.push_back(bt_constant_node(11, bt::node_kind::fail));
+    def.nodes.push_back(bt_constant_node(12, bt::node_kind::succeed));
+    def.root = 0;
+    return def;
+}
+
+bt::definition make_flagship_generated_recovery_fragment() {
+    bt::definition def;
+    def.nodes.push_back(bt_slot_node(0, "recovery-policy", {1}));
+    def.nodes.push_back(bt_composite_node(1, bt::node_kind::reactive_sel, {2, 8}));
+    def.nodes.push_back(bt_composite_node(2, bt::node_kind::seq, {3, 4, 5, 6, 7}));
+    def.nodes.push_back(bt_condition_node(3, "blocked-path?"));
+    def.nodes.push_back(bt_condition_node(4, "observation-fresh?"));
+    def.nodes.push_back(bt_plan_action_node(5, "flagship-recovery-turn", "recovery-state", "recovery-action"));
+    def.nodes.push_back(bt_action_node(6, "execute-recovery-turn"));
+    def.nodes.push_back(bt_condition_node(7, "recovery-exit?"));
+    def.nodes.push_back(bt_action_node(8, "safe-stop"));
+    def.root = 0;
+    return def;
+}
+
+bt::subtree_install_request make_flagship_generated_recovery_request(std::string proposal_id,
+                                                                     std::string validation_status = "accepted") {
+    bt::subtree_install_request request;
+    request.proposal_id = std::move(proposal_id);
+    request.source = "flagship-deterministic-fixture";
+    request.slot = "recovery-policy";
+    request.fragment_contract = "guarded-recovery.v1";
+    request.install_mode = "at-tick-boundary";
+    request.validation_status = std::move(validation_status);
+    request.source_hash = "fnv1a64:flagship-source";
+    request.canonical_dsl_hash = "fnv1a64:flagship-canonical";
+    request.validation_result_hash = "fnv1a64:flagship-validation";
+    request.fragment = make_flagship_generated_recovery_fragment();
+    return request;
+}
+
+void seed_flagship_recovery_blackboard(bt::instance& inst) {
+    const auto now = std::chrono::steady_clock::now();
+    inst.bb.put("collision_imminent", bt::bb_value{true}, inst.tick_index, now, 0, "test");
+    inst.bb.put("blocked_path", bt::bb_value{true}, inst.tick_index, now, 0, "test");
+    inst.bb.put("observation_fresh", bt::bb_value{true}, inst.tick_index, now, 0, "test");
+    inst.bb.put("recovery-state", bt::bb_value{std::vector<double>{1.0, 0.0, 0.9, 0.0}}, inst.tick_index, now, 0, "test");
+    inst.bb.put("act_avoid", bt::bb_value{std::vector<double>{0.10, -0.35}}, inst.tick_index, now, 0, "test");
+}
+
+void test_flagship_generated_recovery_live_install_reject_and_rollback() {
+    bt::definition base = make_flagship_recovery_slot_definition();
+    bt::instance inst(&base);
+    bt::registry reg;
+    bt::planner_service planner;
+    bt::event_log events;
+    events.set_deterministic_time(4000);
+    bt::services svc;
+    svc.planner = &planner;
+    svc.obs.events = &events;
+
+    int fixed_calls = 0;
+    int generated_calls = 0;
+    int safe_stop_calls = 0;
+    int direct_calls = 0;
+
+    reg.register_condition("goal-reached?", [](bt::tick_context&, std::span<const muslisp::value>) { return false; });
+    reg.register_condition("collision-imminent?", [](bt::tick_context& ctx, std::span<const muslisp::value>) {
+        const bt::bb_entry* entry = ctx.bb_get("collision_imminent");
+        return entry && std::get<bool>(entry->value);
+    });
+    reg.register_condition("blocked-path?", [](bt::tick_context& ctx, std::span<const muslisp::value>) {
+        const bt::bb_entry* entry = ctx.bb_get("blocked_path");
+        return entry && std::get<bool>(entry->value);
+    });
+    reg.register_condition("observation-fresh?", [](bt::tick_context& ctx, std::span<const muslisp::value>) {
+        const bt::bb_entry* entry = ctx.bb_get("observation_fresh");
+        return entry && std::get<bool>(entry->value);
+    });
+    reg.register_condition("recovery-exit?", [](bt::tick_context&, std::span<const muslisp::value>) { return true; });
+    reg.register_action("fixed-recovery",
+                        [&](bt::tick_context& ctx, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+                            ++fixed_calls;
+                            ctx.bb_put("action_cmd", bt::bb_value{std::vector<double>{0.10, -0.35}}, "fixed-recovery");
+                            ctx.bb_put("active_branch", bt::bb_value{std::int64_t{1}}, "fixed-recovery");
+                            return bt::status::success;
+                        });
+    reg.register_action("execute-recovery-turn",
+                        [&](bt::tick_context& ctx, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+                            ++generated_calls;
+                            ctx.bb_put("action_cmd", bt::bb_value{std::vector<double>{0.20, -0.40}},
+                                       "execute-recovery-turn");
+                            ctx.bb_put("active_branch", bt::bb_value{std::int64_t{1}}, "execute-recovery-turn");
+                            return bt::status::success;
+                        });
+    reg.register_action("safe-stop",
+                        [&](bt::tick_context& ctx, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+                            ++safe_stop_calls;
+                            ctx.bb_put("action_cmd", bt::bb_value{std::vector<double>{0.0, 0.0}}, "safe-stop");
+                            return bt::status::success;
+                        });
+    reg.register_action("direct-goal",
+                        [&](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+                            ++direct_calls;
+                            return bt::status::success;
+                        });
+
+    seed_flagship_recovery_blackboard(inst);
+    check(bt::tick(inst, reg, svc) == bt::status::running, "fixed flagship recovery should return running");
+    check(fixed_calls == 1 && generated_calls == 0 && direct_calls == 0,
+          "baseline tick should use only the fixed recovery branch");
+
+    bt::subtree_install_result rejected =
+        bt::request_subtree_install(inst, svc, make_flagship_generated_recovery_request("proposal-flagship-rejected", "rejected"));
+    check(!rejected.queued && rejected.reason_code == "validation_not_accepted",
+          "rejected flagship proposal should not queue");
+    seed_flagship_recovery_blackboard(inst);
+    check(bt::tick(inst, reg, svc) == bt::status::running, "rejected proposal should leave fixed recovery active");
+    check(fixed_calls == 2 && generated_calls == 0 && safe_stop_calls == 0,
+          "rejected proposal must not reach generated recovery callbacks");
+
+    bt::subtree_install_result queued =
+        bt::request_subtree_install(inst, svc, make_flagship_generated_recovery_request("proposal-flagship-accepted"));
+    check(queued.queued, "accepted flagship generated recovery proposal should queue");
+    check(generated_calls == 0, "queued proposal should not tick before the next boundary");
+
+    seed_flagship_recovery_blackboard(inst);
+    check(bt::tick(inst, reg, svc) == bt::status::success,
+          "installed generated recovery should tick at the next boundary");
+    check(fixed_calls == 2 && generated_calls == 1 && safe_stop_calls == 0,
+          "installed generated recovery should replace the fixed recovery branch");
+    check(event_lines_contain(events, "subtree_install_rejected"), "rejected install event should be emitted");
+    check(event_lines_contain(events, "subtree_installed"), "accepted install event should be emitted");
+
+    const bt::bb_entry* generated_action = inst.bb.get("action_cmd");
+    check(generated_action != nullptr, "generated recovery should write action_cmd");
+    const auto* generated_vec = std::get_if<std::vector<double>>(&generated_action->value);
+    check(generated_vec && generated_vec->size() == 2u, "generated action_cmd should be a two-value command");
+    check_close((*generated_vec)[0], 0.20, 1e-9, "generated recovery should write deterministic linear command");
+    check_close((*generated_vec)[1], -0.40, 1e-9, "generated recovery should write deterministic angular command");
+
+    const auto rollback_it = inst.subtree_rollbacks.find("recovery-policy");
+    check(rollback_it != inst.subtree_rollbacks.end(), "generated install should keep rollback state");
+    bt::subtree_rollback_request rollback;
+    rollback.rollback_id = rollback_it->second.rollback_id;
+    rollback.slot = "recovery-policy";
+    rollback.installed_subtree_hash = rollback_it->second.installed_subtree_hash;
+    rollback.previous_subtree_hash = rollback_it->second.previous_subtree_hash;
+    check(bt::request_subtree_rollback(inst, svc, rollback).queued, "flagship generated recovery rollback should queue");
+
+    seed_flagship_recovery_blackboard(inst);
+    check(bt::tick(inst, reg, svc) == bt::status::running, "rollback should restore fixed recovery behaviour");
+    check(fixed_calls == 3 && generated_calls == 1, "rolled-back tree should tick fixed recovery again");
+    check(event_lines_contain(events, "subtree_rolled_back"), "rollback event should be emitted");
 }
 
 void test_bt_export_dot_builtin() {
@@ -5560,6 +5851,10 @@ int main() {
          test_bt_live_subtree_install_rejections_are_non_destructive},
         {"bt live subtree install cleans replaced running subtree",
          test_bt_live_subtree_install_cleans_replaced_running_subtree},
+        {"shared flagship generated recovery variant compiles and preserves fixed recovery",
+         test_shared_flagship_generated_recovery_variant_compiles_and_preserves_fixed_recovery},
+        {"flagship generated recovery live install reject and rollback",
+         test_flagship_generated_recovery_live_install_reject_and_rollback},
         {"bt export-dot builtin", test_bt_export_dot_builtin},
         {"bt binary save/load roundtrip and validation", test_bt_binary_save_load_roundtrip_and_validation},
         {"list and predicate builtins", test_list_and_predicate_builtins},

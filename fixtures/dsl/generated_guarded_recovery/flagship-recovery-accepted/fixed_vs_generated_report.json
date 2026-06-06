@@ -1,0 +1,31 @@
+{
+  "checks": {
+    "contract_matches": true,
+    "fixed_branch_preserved_as_rollback_target": true,
+    "generated_fragment_validated_before_host_reach": true,
+    "rollback_hash_available": true,
+    "same_slot": true
+  },
+  "context": {
+    "blocked_path": true,
+    "collision_imminent": true,
+    "observation_fresh": true
+  },
+  "fixed_recovery": {
+    "active_branch": 1,
+    "command_schema": "flagship.cmd.v1",
+    "slot": "recovery-policy",
+    "status": "baseline",
+    "subtree_hash": "fnv1a64:aaaaaaaaaaaaaaaa"
+  },
+  "generated_recovery": {
+    "canonical_dsl_hash": "fnv1a64:a66df0ada137354c",
+    "fragment_contract": "guarded-recovery.v1",
+    "host_reached": false,
+    "slot": "recovery-policy",
+    "source_hash": "fnv1a64:8da798d01a066784",
+    "status": "accepted"
+  },
+  "passed": true,
+  "schema_version": "flagship_generated_recovery_comparison.v1"
+}

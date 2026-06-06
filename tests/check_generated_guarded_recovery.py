@@ -18,6 +18,8 @@ SCHEMA = REPO_ROOT / "schemas" / "event_log" / "v1" / "mbt.evt.v1.schema.json"
 FIXTURE_ROOT = REPO_ROOT / "fixtures" / "dsl" / "generated_guarded_recovery"
 ACCEPTED = FIXTURE_ROOT / "accepted-blocked-path"
 CONTEXT = FIXTURE_ROOT / "context-blocked-path.json"
+FLAGSHIP_ACCEPTED = FIXTURE_ROOT / "flagship-recovery-accepted"
+FLAGSHIP_CONTEXT = FIXTURE_ROOT / "context-flagship-blocked-recovery.json"
 
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
@@ -120,6 +122,30 @@ def main() -> int:
     if accepted.get("rollback_handle", {}).get("previous_subtree_hash") != "fnv1a64:9999999999999999":
         raise AssertionError("accepted proposal should include rollback handle for previous subtree")
 
+    completed = run_cli(str(VALIDATOR), str(FIXTURE_ROOT / "proposal-flagship-accepted"), "--json")
+    assert_ok(completed, "accepted flagship recovery proposal validation")
+    flagship_accepted = json.loads(completed.stdout)["results"][0]
+    if flagship_accepted.get("semantic_diff", {}).get("slot") != "recovery-policy":
+        raise AssertionError("flagship proposal semantic diff should name recovery-policy")
+    if flagship_accepted.get("rollback_handle", {}).get("previous_subtree_hash") != "fnv1a64:aaaaaaaaaaaaaaaa":
+        raise AssertionError("flagship proposal should include the fixed recovery rollback hash")
+
+    completed = run_cli(str(VALIDATOR), str(FIXTURE_ROOT / "proposal-flagship-rejected-contract"), "--json")
+    assert_ok(completed, "rejected flagship recovery proposal validation")
+    flagship_rejected = json.loads(completed.stdout)["results"][0]
+    if flagship_rejected.get("code") != "excessive_depth":
+        raise AssertionError("flagship rejected proposal should fail the tightened contract gate")
+    if flagship_rejected.get("host_reached") is not False:
+        raise AssertionError("flagship rejected proposal should not reach host execution")
+
+    comparison = read_json(FLAGSHIP_ACCEPTED / "fixed_vs_generated_report.json")
+    if comparison.get("passed") is not True:
+        raise AssertionError("flagship fixed-versus-generated comparison should pass")
+    if comparison.get("fixed_recovery", {}).get("active_branch") != 1:
+        raise AssertionError("flagship fixed recovery should preserve branch id 1")
+    if comparison.get("generated_recovery", {}).get("fragment_contract") != "guarded-recovery.v1":
+        raise AssertionError("flagship generated recovery should use guarded-recovery.v1")
+
     with tempfile.TemporaryDirectory() as tmp_dir:
         generated = Path(tmp_dir) / "accepted-blocked-path"
         completed = run_cli(str(GENERATOR), "--context", str(CONTEXT), "--out-dir", str(generated))
@@ -127,6 +153,21 @@ def main() -> int:
         for name in ("canonical_fragment.lisp", "validation_report.json", "events.jsonl", "replay_report.json"):
             if (generated / name).read_text(encoding="utf-8") != (ACCEPTED / name).read_text(encoding="utf-8"):
                 raise AssertionError(f"regenerated {name} does not match checked-in fixture")
+        flagship_generated = Path(tmp_dir) / "flagship-recovery-accepted"
+        completed = run_cli(str(GENERATOR), "--context", str(FLAGSHIP_CONTEXT), "--out-dir", str(flagship_generated))
+        assert_ok(completed, "regenerating flagship guarded recovery fixture")
+        for name in (
+            "fragment.lisp",
+            "canonical_fragment.lisp",
+            "validation_report.json",
+            "events.jsonl",
+            "replay_report.json",
+            "fixed_vs_generated_report.json",
+        ):
+            if (flagship_generated / name).read_text(encoding="utf-8") != (FLAGSHIP_ACCEPTED / name).read_text(
+                encoding="utf-8"
+            ):
+                raise AssertionError(f"regenerated flagship {name} does not match checked-in fixture")
         manifest_dir = Path(tmp_dir) / "manifests"
         completed = run_cli(str(VALIDATOR), "--export-manifests", str(manifest_dir), "--json")
         assert_ok(completed, "exporting agent manifests")

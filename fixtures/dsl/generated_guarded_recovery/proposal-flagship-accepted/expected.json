@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "code": "accepted",
+  "status": "accepted",
+  "reason_code": "accepted",
+  "field_path": "",
+  "slot": "recovery-policy",
+  "fragment_contract": "guarded-recovery.v1",
+  "host_reached": false,
+  "canonical_dsl_hash": "fnv1a64:a66df0ada137354c"
+}
