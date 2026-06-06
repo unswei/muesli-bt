@@ -44,6 +44,10 @@ void test_catalogue_contains_new_benchmarks() {
     check(find_scenario("B8-async-cancel-before-start") != nullptr, "missing B8 cancel-before-start scenario");
     check(find_scenario("B8-async-late-completion-after-cancel") != nullptr,
           "missing B8 late-completion-after-cancel scenario");
+    check(find_scenario("B9-generated-subtree-accepted-small") != nullptr,
+          "missing B9 generated-subtree accepted-small scenario");
+    check(find_scenario("B9-generated-subtree-first-divergence") != nullptr,
+          "missing B9 generated-subtree first-divergence scenario");
 }
 
 void test_runner_writes_expected_csv_files() {
@@ -309,6 +313,82 @@ void test_b8_async_contract_benchmarks_run() {
     }
 }
 
+void test_b9_generated_subtree_contract_benchmarks_run() {
+    using namespace muesli_bt::bench;
+
+    const std::filesystem::path output_dir =
+        std::filesystem::temp_directory_path() / "muesli_bt_bench_b9_smoke";
+    std::filesystem::remove_all(output_dir);
+
+    run_request request;
+    request.output_dir = output_dir;
+    request.scenarios.push_back(*find_scenario("B9-generated-subtree-install-rollback"));
+    request.scenarios.push_back(*find_scenario("B9-generated-subtree-rejected-policy"));
+    request.scenarios.push_back(*find_scenario("B9-generated-subtree-replay-parity"));
+    request.scenarios.push_back(*find_scenario("B9-generated-subtree-first-divergence"));
+    request.warmup_override = std::chrono::milliseconds(0);
+    request.run_override = std::chrono::milliseconds(5);
+    request.repetitions_override = 1u;
+
+    benchmark_runner runner;
+    const run_result result = runner.run(request);
+
+    check(result.run_rows.size() == 4u, "expected four B9 run rows");
+    check(result.aggregate_rows.size() == 4u, "expected four B9 aggregate rows");
+    for (const run_summary_row& row : result.run_rows) {
+        check(row.group_id == "B9", "B9 row should use B9 group id");
+        check(row.ticks_total == 1u, "B9 should record one lifecycle operation per repetition");
+        check(row.latency_ns_median > 0u, "B9 should record lifecycle latency");
+        check(row.semantic_errors == 0u, "B9 contract scenario should be semantically clean");
+        check(row.notes.find("generated_subtree_report.json") != std::string::npos,
+              "B9 notes should point at the generated-subtree report");
+        check(row.notes.find("events.jsonl") != std::string::npos,
+              "B9 notes should point at canonical events");
+        check(std::filesystem::exists(output_dir / row.scenario_id / "rep-0" / "events.jsonl"),
+              "B9 should write canonical events.jsonl");
+        check(std::filesystem::exists(output_dir / row.scenario_id / "rep-0" / "generated_subtree_report.json"),
+              "B9 should write generated_subtree_report.json");
+    }
+
+    const std::string rollback_report =
+        read_text(output_dir / "B9-generated-subtree-install-rollback" / "rep-0" / "generated_subtree_report.json");
+    check(rollback_report.find("\"installed\": true") != std::string::npos,
+          "B9 rollback report should record successful install");
+    check(rollback_report.find("\"rolled_back\": true") != std::string::npos,
+          "B9 rollback report should record successful rollback");
+    check(rollback_report.find("\"host_reached\": true") != std::string::npos,
+          "B9 rollback report should record host callback reachability after install");
+
+    const std::string rejected_report =
+        read_text(output_dir / "B9-generated-subtree-rejected-policy" / "rep-0" / "generated_subtree_report.json");
+    check(rejected_report.find("\"accepted\": false") != std::string::npos,
+          "B9 rejected report should record rejected validation");
+    check(rejected_report.find("\"host_reached\": false") != std::string::npos,
+          "B9 rejected report should keep proposed host callbacks unreachable");
+
+    const std::string replay_report =
+        read_text(output_dir / "B9-generated-subtree-replay-parity" / "rep-0" / "generated_subtree_report.json");
+    check(replay_report.find("\"replay_parity\": true") != std::string::npos,
+          "B9 replay report should record parity success");
+
+    const std::string divergence_report =
+        read_text(output_dir / "B9-generated-subtree-first-divergence" / "rep-0" / "generated_subtree_report.json");
+    check(divergence_report.find("\"first_divergence_detected\": true") != std::string::npos,
+          "B9 divergence report should record the expected divergence");
+
+    const std::string rollback_events =
+        read_text(output_dir / "B9-generated-subtree-install-rollback" / "rep-0" / "events.jsonl");
+    check(rollback_events.find("\"type\":\"subtree_installed\"") != std::string::npos,
+          "B9 rollback event log should include install event");
+    check(rollback_events.find("\"type\":\"subtree_rolled_back\"") != std::string::npos,
+          "B9 rollback event log should include rollback event");
+
+    const std::string rejected_events =
+        read_text(output_dir / "B9-generated-subtree-rejected-policy" / "rep-0" / "events.jsonl");
+    check(rejected_events.find("\"type\":\"subtree_install_rejected\"") != std::string::npos,
+          "B9 rejected event log should include install rejection event");
+}
+
 class fail_on_unwhitelisted_allocation_scope final {
 public:
     fail_on_unwhitelisted_allocation_scope() {
@@ -550,6 +630,27 @@ void test_btcpp_rejects_unsupported_b6() {
     }
     check(threw, "btcpp should reject unsupported B6 scenarios");
 }
+
+void test_btcpp_rejects_unsupported_b9() {
+    using namespace muesli_bt::bench;
+
+    run_request request;
+    request.runtime_name = "btcpp";
+    request.output_dir = std::filesystem::temp_directory_path() / "muesli_bt_bench_btcpp_reject_b9";
+    request.scenarios.push_back(*find_scenario("B9-generated-subtree-accepted-small"));
+    request.warmup_override = std::chrono::milliseconds(5);
+    request.run_override = std::chrono::milliseconds(10);
+    request.repetitions_override = 1u;
+
+    benchmark_runner runner;
+    bool threw = false;
+    try {
+        (void)runner.run(request);
+    } catch (const std::invalid_argument& error) {
+        threw = std::string(error.what()).find("no scenarios supported by runtime btcpp") != std::string::npos;
+    }
+    check(threw, "btcpp should reject unsupported B9 scenarios");
+}
 #endif
 
 }  // namespace
@@ -572,6 +673,7 @@ int main(int argc, char** argv) {
     test_b5_lifecycle_benchmarks_run();
     test_b7_gc_memory_benchmark_runs();
     test_b8_async_contract_benchmarks_run();
+    test_b9_generated_subtree_contract_benchmarks_run();
     test_allocation_whitelist_allows_explicit_logging_paths_only();
     test_precompiled_ticks_fail_on_unwhitelisted_allocations();
     test_precompiled_strict_allocation_covers_static_shapes();
@@ -581,6 +683,7 @@ int main(int argc, char** argv) {
     test_btcpp_runner_writes_expected_csv_files();
     test_btcpp_reactive_and_b5_benchmarks_run();
     test_btcpp_rejects_unsupported_b6();
+    test_btcpp_rejects_unsupported_b9();
 #endif
     return 0;
 }

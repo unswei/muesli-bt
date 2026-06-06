@@ -18,7 +18,8 @@ enum class benchmark_kind {
     reactive_interrupt,
     compile_lifecycle,
     memory_gc,
-    async_contract
+    async_contract,
+    generated_subtree_contract
 };
 
 enum class lifecycle_phase {
@@ -68,6 +69,17 @@ enum class async_contract_case {
     late_completion_after_cancel
 };
 
+enum class generated_subtree_case {
+    none,
+    accepted_small,
+    accepted_medium,
+    accepted_large,
+    rejected_policy,
+    install_rollback,
+    replay_parity,
+    first_divergence
+};
+
 struct timing_config {
     std::chrono::milliseconds warmup{2000};
     std::chrono::milliseconds run{10000};
@@ -85,6 +97,7 @@ struct scenario_definition {
     lifecycle_phase lifecycle = lifecycle_phase::none;
     gc_benchmark_mode gc_mode = gc_benchmark_mode::none;
     async_contract_case async_case = async_contract_case::none;
+    generated_subtree_case generated_case = generated_subtree_case::none;
     std::string variant;
     timing_config timing{};
     std::uint64_t seed = 20260315ull;

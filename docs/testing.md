@@ -186,6 +186,7 @@ Current harness coverage includes:
 - `B6` logging overhead
 - `B7` GC and memory evidence smoke runs
 - `B8` async cancellation contract edge smoke runs
+- `B9` generated-subtree contract evidence smoke runs
 
 For `BehaviorTree.CPP`, the harness currently covers:
 
@@ -195,7 +196,7 @@ For `BehaviorTree.CPP`, the harness currently covers:
 - `B2` reactive interruption
 - `B5` `compile`, `inst1`, `inst100`, and `loaddsl`
 
-`B6`, `B5 parse`, and `B5 loadbin` are intentionally omitted from the cross-runtime run because they are not a fair shared subset.
+`B6`, `B7`, `B8`, `B9`, `B5 parse`, and `B5 loadbin` are intentionally omitted from the cross-runtime run because they are not a fair shared subset.
 
 Run one `B5` phase benchmark:
 
@@ -223,6 +224,14 @@ Run the async cancellation contract edge benchmark group:
 
 `B8` covers cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. These scenarios mirror the checked-in `fixtures/async-*` bundles and record cancellation latency, deadline miss count/rate, fallback activation count/rate, dropped-completion count/rate, and semantic-error counts in the normal benchmark CSV files. Each repetition also keeps the matching canonical `events.jsonl` under the scenario result directory.
 
+Run the generated-subtree contract evidence benchmark group:
+
+```bash
+./build/bench-release/bench/bench run-group B9
+```
+
+`B9` is `muesli-bt` only. It covers accepted generated recovery fragments at small, medium, and large sizes, rejected policy proposals, install plus rollback, replay parity, and first-divergence detection. Each repetition writes canonical `mbt.evt.v1` lifecycle events and a `generated_subtree_report.json` sidecar with phase timings, hashes, validation status, install or rejection status, rollback handles, replay parity, divergence status, allocation counts, and `host_reached`.
+
 Run the strict precompiled-tick allocation lane:
 
 ```bash
@@ -247,11 +256,11 @@ python3 bench/scripts/figure_memory_gc.py bench/results/my-run --event-log build
 python3 bench/scripts/write_evidence_report.py bench/results/my-run --event-log build/dev/gc-events.jsonl
 ```
 
-The tail-latency script reads `aggregate_summary.csv` and writes `tail_latency.svg`. The memory/GC script reads benchmark allocation/RSS columns and canonical `gc_end` lifecycle events when supplied or found under the result directory. `B7` result directories already contain those GC event logs. `B8` result directories keep the canonical async lifecycle logs. The evidence report records which figures exist and lists missing GC or long-run heap-live evidence explicitly.
+The tail-latency script reads `aggregate_summary.csv` and writes `tail_latency.svg`. The memory/GC script reads benchmark allocation/RSS columns and canonical `gc_end` lifecycle events when supplied or found under the result directory. `B7` result directories already contain those GC event logs. `B8` result directories keep the canonical async lifecycle logs. `B9` result directories keep generated-subtree lifecycle logs and JSON sidecars. The evidence report records which figures exist and lists missing GC, long-run heap-live, or generated-subtree sidecar evidence explicitly.
 
-Treat benchmark CSV files as summaries. Keep the canonical `events.jsonl` artefacts with any result set used for GC, heap-live, cancellation, timeout, or late-completion claims.
+Treat benchmark CSV files as summaries. Keep the canonical `events.jsonl` artefacts with any result set used for GC, heap-live, cancellation, timeout, late-completion, generated-subtree install, generated-subtree rejection, rollback, replay, or divergence claims.
 
-The analysis summary reports `A1`, `A2`, `B1`, `B2`, `B5`, `B6`, `B7`, and `B8` when those rows are present.
+The analysis summary reports `A1`, `A2`, `B1`, `B2`, `B5`, `B6`, `B7`, `B8`, and `B9` when those rows are present.
 That same summary works for the optional `btcpp` result sets; absent groups are reported as absent rather than treated as failures.
 
 Compare two benchmark result sets directly:

@@ -1,0 +1,31 @@
+{
+  "schema_version": "generated_subtree_contract_report.v1",
+  "scenario_id": "B9-generated-subtree-install-rollback",
+  "repetition_index": 0,
+  "generated_subtree_case": "install_rollback",
+  "subtree_size_nodes": 17,
+  "accepted": true,
+  "installed": true,
+  "rolled_back": true,
+  "replay_parity": false,
+  "first_divergence_detected": false,
+  "host_reached": true,
+  "reason_code": "queued",
+  "source_hash": "fnv1a64:1111111111111111",
+  "canonical_dsl_hash": "fnv1a64:2222222222222222",
+  "validation_result_hash": "fnv1a64:3333333333333333",
+  "previous_subtree_hash": "fnv1a64:4444444444444444",
+  "installed_subtree_hash": "fnv1a64:5555555555555555",
+  "rollback_id": "rollback-0",
+  "latency_ns": 500000,
+  "alloc_count_total": 12,
+  "alloc_bytes_total": 4096,
+  "log_events_total": 4,
+  "log_bytes_total": 1024,
+  "events": "B9-generated-subtree-install-rollback/rep-0/events.jsonl",
+  "phases": [
+    {"name": "generate", "duration_ns": 10000, "alloc_count": 2, "alloc_bytes": 512},
+    {"name": "install_commit", "duration_ns": 30000, "alloc_count": 3, "alloc_bytes": 1024},
+    {"name": "rollback_commit", "duration_ns": 25000, "alloc_count": 3, "alloc_bytes": 1024}
+  ]
+}

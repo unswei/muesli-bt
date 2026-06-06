@@ -13,10 +13,14 @@
 #include <stdexcept>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 #include "bt/event_log.hpp"
+#include "bt/registry.hpp"
+#include "bt/runtime.hpp"
 #include "bt/scheduler.hpp"
+#include "bt/status.hpp"
 #include "bt/vla.hpp"
 #include "harness/allocation_tracker.hpp"
 #include "harness/metadata.hpp"
@@ -182,6 +186,28 @@ std::string async_case_name(async_contract_case async_case) {
     return "unknown";
 }
 
+std::string generated_subtree_case_name(generated_subtree_case generated_case) {
+    switch (generated_case) {
+        case generated_subtree_case::none:
+            return "none";
+        case generated_subtree_case::accepted_small:
+            return "accepted_small";
+        case generated_subtree_case::accepted_medium:
+            return "accepted_medium";
+        case generated_subtree_case::accepted_large:
+            return "accepted_large";
+        case generated_subtree_case::rejected_policy:
+            return "rejected_policy";
+        case generated_subtree_case::install_rollback:
+            return "install_rollback";
+        case generated_subtree_case::replay_parity:
+            return "replay_parity";
+        case generated_subtree_case::first_divergence:
+            return "first_divergence";
+    }
+    return "unknown";
+}
+
 std::string scenario_description(const scenario_definition& scenario) {
     switch (scenario.group_id[0]) {
         case 'A':
@@ -252,6 +278,9 @@ std::string scenario_description(const scenario_definition& scenario) {
             }
             if (scenario.group_id == "B8") {
                 return "async contract edge (" + scenario.variant + ")";
+            }
+            if (scenario.group_id == "B9") {
+                return "generated subtree contract (" + scenario.variant + ")";
             }
             break;
     }
@@ -465,6 +494,39 @@ struct async_contract_sample {
     std::uint64_t operations = 1u;
 };
 
+struct generated_subtree_phase_sample {
+    std::string name;
+    std::uint64_t duration_ns = 0u;
+    std::uint64_t alloc_count = 0u;
+    std::uint64_t alloc_bytes = 0u;
+};
+
+struct generated_subtree_sample {
+    std::uint64_t latency_ns = 0u;
+    std::uint64_t operations = 1u;
+    std::uint64_t semantic_errors = 0u;
+    std::uint64_t alloc_count_total = 0u;
+    std::uint64_t alloc_bytes_total = 0u;
+    std::uint64_t log_events_total = 0u;
+    std::uint64_t log_bytes_total = 0u;
+    bool accepted = false;
+    bool installed = false;
+    bool rolled_back = false;
+    bool replay_parity = false;
+    bool first_divergence_detected = false;
+    bool host_reached = false;
+    std::string reason_code = "ok";
+    std::string source_hash;
+    std::string canonical_dsl_hash;
+    std::string validation_result_hash;
+    std::string previous_subtree_hash;
+    std::string installed_subtree_hash;
+    std::string rollback_id;
+    std::filesystem::path event_path;
+    std::filesystem::path report_path;
+    std::vector<generated_subtree_phase_sample> phases;
+};
+
 async_contract_sample run_async_contract_operation(async_contract_case async_case, std::uint64_t operation_index) {
     const auto started = std::chrono::steady_clock::now();
     async_contract_sample sample;
@@ -559,6 +621,425 @@ async_contract_sample run_async_contract_operation(async_contract_case async_cas
     const auto finished = std::chrono::steady_clock::now();
     sample.latency_ns = static_cast<std::uint64_t>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(finished - started).count());
+    return sample;
+}
+
+bt::arg_value b9_symbol_arg(std::string text) {
+    bt::arg_value arg;
+    arg.kind = bt::arg_kind::symbol;
+    arg.text = std::move(text);
+    return arg;
+}
+
+bt::node b9_action_node(bt::node_id id, std::string name) {
+    bt::node n;
+    n.kind = bt::node_kind::act;
+    n.id = id;
+    n.leaf_name = std::move(name);
+    return n;
+}
+
+bt::node b9_condition_node(bt::node_id id, std::string name) {
+    bt::node n;
+    n.kind = bt::node_kind::cond;
+    n.id = id;
+    n.leaf_name = std::move(name);
+    return n;
+}
+
+bt::definition make_b9_base_definition() {
+    bt::definition def;
+    bt::node slot;
+    slot.kind = bt::node_kind::slot;
+    slot.id = 0;
+    slot.leaf_name = "recovery-policy";
+    slot.args = {b9_symbol_arg(":contract"),
+                 b9_symbol_arg("guarded-recovery.v1"),
+                 b9_symbol_arg(":install"),
+                 b9_symbol_arg("at-tick-boundary"),
+                 b9_symbol_arg(":fallback"),
+                 b9_symbol_arg("safe-stop")};
+    slot.children.push_back(1);
+    def.nodes.push_back(std::move(slot));
+    def.nodes.push_back(b9_action_node(1, "old-recovery"));
+    def.root = 0;
+    def.source_hash = bt::event_log::hash64_hex("b9-base");
+    def.canonical_dsl_hash = bt::event_log::hash64_hex("b9-base-slot");
+    def.canonical_dsl = "(slot recovery-policy :contract guarded-recovery.v1 :install at-tick-boundary :fallback safe-stop (act old-recovery))";
+    return def;
+}
+
+std::string make_b9_generated_dsl(std::size_t subtree_size_nodes, std::uint64_t seed) {
+    const std::size_t guard_count = subtree_size_nodes > 5u ? subtree_size_nodes - 5u : 1u;
+    std::ostringstream out;
+    out << "(slot recovery-policy :contract guarded-recovery.v1 :install at-tick-boundary :fallback safe-stop "
+        << "(reactive-sel (seq";
+    for (std::size_t i = 0; i < guard_count; ++i) {
+        out << " (cond generated-guard-" << ((seed + i) % 97u) << ")";
+    }
+    out << " (act execute-generated-recovery)) (act safe-stop)))";
+    return out.str();
+}
+
+std::string normalise_b9_dsl(std::string_view dsl) {
+    std::ostringstream out;
+    bool in_space = false;
+    for (const char ch : dsl) {
+        if (ch == '\n' || ch == '\r' || ch == '\t' || ch == ' ') {
+            if (!in_space) {
+                out << ' ';
+                in_space = true;
+            }
+            continue;
+        }
+        out << ch;
+        in_space = false;
+    }
+    std::string normalised = out.str();
+    if (!normalised.empty() && normalised.front() == ' ') {
+        normalised.erase(normalised.begin());
+    }
+    if (!normalised.empty() && normalised.back() == ' ') {
+        normalised.pop_back();
+    }
+    return normalised;
+}
+
+bt::definition compile_b9_generated_fragment(std::size_t subtree_size_nodes, std::uint64_t seed) {
+    const std::size_t guard_count = subtree_size_nodes > 5u ? subtree_size_nodes - 5u : 1u;
+    bt::definition def;
+    bt::node slot;
+    slot.kind = bt::node_kind::slot;
+    slot.id = 0;
+    slot.leaf_name = "recovery-policy";
+    slot.args = {b9_symbol_arg(":contract"),
+                 b9_symbol_arg("guarded-recovery.v1"),
+                 b9_symbol_arg(":install"),
+                 b9_symbol_arg("at-tick-boundary"),
+                 b9_symbol_arg(":fallback"),
+                 b9_symbol_arg("safe-stop")};
+    slot.children.push_back(1);
+    def.nodes.push_back(std::move(slot));
+
+    bt::node reactive;
+    reactive.kind = bt::node_kind::reactive_sel;
+    reactive.id = 1;
+    reactive.children = {2, static_cast<bt::node_id>(3u + guard_count)};
+    def.nodes.push_back(std::move(reactive));
+
+    bt::node seq;
+    seq.kind = bt::node_kind::seq;
+    seq.id = 2;
+    for (std::size_t i = 0; i < guard_count; ++i) {
+        seq.children.push_back(static_cast<bt::node_id>(3u + i));
+    }
+    seq.children.push_back(static_cast<bt::node_id>(3u + guard_count + 1u));
+    def.nodes.push_back(std::move(seq));
+
+    for (std::size_t i = 0; i < guard_count; ++i) {
+        def.nodes.push_back(b9_condition_node(static_cast<bt::node_id>(3u + i),
+                                              "generated-guard-" + std::to_string((seed + i) % 97u)));
+    }
+    def.nodes.push_back(b9_action_node(static_cast<bt::node_id>(3u + guard_count), "safe-stop"));
+    def.nodes.push_back(b9_action_node(static_cast<bt::node_id>(3u + guard_count + 1u), "execute-generated-recovery"));
+    def.root = 0;
+    def.canonical_dsl = make_b9_generated_dsl(subtree_size_nodes, seed);
+    def.source_hash = bt::event_log::hash64_hex(def.canonical_dsl);
+    def.canonical_dsl_hash = bt::event_log::hash64_hex(normalise_b9_dsl(def.canonical_dsl));
+    return def;
+}
+
+template <typename Fn>
+auto measure_generated_subtree_phase(generated_subtree_sample& sample, std::string name, Fn&& fn) {
+    allocation_tracker::reset();
+    allocation_tracker::set_enabled(true);
+    const auto started = std::chrono::steady_clock::now();
+    if constexpr (std::is_void_v<std::invoke_result_t<Fn>>) {
+        fn();
+        const auto finished = std::chrono::steady_clock::now();
+        allocation_tracker::set_enabled(false);
+        const auto allocations = allocation_tracker::read();
+        const std::uint64_t duration_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(finished - started).count());
+        sample.alloc_count_total += allocations.allocation_count;
+        sample.alloc_bytes_total += allocations.allocation_bytes;
+        sample.phases.push_back(generated_subtree_phase_sample{
+            .name = std::move(name),
+            .duration_ns = duration_ns,
+            .alloc_count = allocations.allocation_count,
+            .alloc_bytes = allocations.allocation_bytes,
+        });
+    } else {
+        auto result = fn();
+        const auto finished = std::chrono::steady_clock::now();
+        allocation_tracker::set_enabled(false);
+        const auto allocations = allocation_tracker::read();
+        const std::uint64_t duration_ns = static_cast<std::uint64_t>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(finished - started).count());
+        sample.alloc_count_total += allocations.allocation_count;
+        sample.alloc_bytes_total += allocations.allocation_bytes;
+        sample.phases.push_back(generated_subtree_phase_sample{
+            .name = std::move(name),
+            .duration_ns = duration_ns,
+            .alloc_count = allocations.allocation_count,
+            .alloc_bytes = allocations.allocation_bytes,
+        });
+        return result;
+    }
+}
+
+void emit_b9_fragment_event(bt::event_log& events,
+                            std::string_view type,
+                            std::uint64_t tick,
+                            std::string_view source_hash,
+                            std::string_view canonical_dsl_hash,
+                            std::string_view status) {
+    std::ostringstream data;
+    data << "{\"source_hash\":\"" << json_escape(source_hash) << "\","
+         << "\"canonical_dsl_hash\":\"" << json_escape(canonical_dsl_hash) << "\","
+         << "\"status\":\"" << json_escape(status) << "\"}";
+    (void)events.emit(type, tick, data.str());
+}
+
+void write_b9_report(const generated_subtree_sample& sample,
+                     const scenario_definition& scenario,
+                     std::size_t repetition,
+                     std::string_view generated_case) {
+    std::ofstream out(sample.report_path);
+    if (!out) {
+        throw std::runtime_error("B9 generated subtree report: failed to open " + sample.report_path.string());
+    }
+    out << "{\n"
+        << "  \"schema_version\": \"generated_subtree_contract_report.v1\",\n"
+        << "  \"scenario_id\": " << json_string(scenario.scenario_id) << ",\n"
+        << "  \"repetition_index\": " << repetition << ",\n"
+        << "  \"generated_subtree_case\": " << json_string(generated_case) << ",\n"
+        << "  \"subtree_size_nodes\": " << scenario.tree_size_nodes << ",\n"
+        << "  \"accepted\": " << (sample.accepted ? "true" : "false") << ",\n"
+        << "  \"installed\": " << (sample.installed ? "true" : "false") << ",\n"
+        << "  \"rolled_back\": " << (sample.rolled_back ? "true" : "false") << ",\n"
+        << "  \"replay_parity\": " << (sample.replay_parity ? "true" : "false") << ",\n"
+        << "  \"first_divergence_detected\": " << (sample.first_divergence_detected ? "true" : "false") << ",\n"
+        << "  \"host_reached\": " << (sample.host_reached ? "true" : "false") << ",\n"
+        << "  \"reason_code\": " << json_string(sample.reason_code) << ",\n"
+        << "  \"source_hash\": " << json_string(sample.source_hash) << ",\n"
+        << "  \"canonical_dsl_hash\": " << json_string(sample.canonical_dsl_hash) << ",\n"
+        << "  \"validation_result_hash\": " << json_string(sample.validation_result_hash) << ",\n"
+        << "  \"previous_subtree_hash\": " << json_string(sample.previous_subtree_hash) << ",\n"
+        << "  \"installed_subtree_hash\": " << json_string(sample.installed_subtree_hash) << ",\n"
+        << "  \"rollback_id\": " << json_string(sample.rollback_id) << ",\n"
+        << "  \"latency_ns\": " << sample.latency_ns << ",\n"
+        << "  \"alloc_count_total\": " << sample.alloc_count_total << ",\n"
+        << "  \"alloc_bytes_total\": " << sample.alloc_bytes_total << ",\n"
+        << "  \"log_events_total\": " << sample.log_events_total << ",\n"
+        << "  \"log_bytes_total\": " << sample.log_bytes_total << ",\n"
+        << "  \"events\": " << json_string(sample.event_path.string()) << ",\n"
+        << "  \"phases\": [\n";
+    for (std::size_t i = 0; i < sample.phases.size(); ++i) {
+        const generated_subtree_phase_sample& phase = sample.phases[i];
+        out << "    {\"name\": " << json_string(phase.name) << ", \"duration_ns\": " << phase.duration_ns
+            << ", \"alloc_count\": " << phase.alloc_count << ", \"alloc_bytes\": " << phase.alloc_bytes << "}";
+        if (i + 1u != sample.phases.size()) {
+            out << ',';
+        }
+        out << '\n';
+    }
+    out << "  ]\n"
+        << "}\n";
+}
+
+generated_subtree_sample run_generated_subtree_contract_operation(const scenario_definition& scenario,
+                                                                  std::size_t repetition,
+                                                                  const std::filesystem::path& output_dir,
+                                                                  bool write_artifacts) {
+    generated_subtree_sample sample;
+    const std::filesystem::path event_dir = output_dir / scenario.scenario_id / ("rep-" + std::to_string(repetition));
+    sample.event_path = event_dir / "events.jsonl";
+    sample.report_path = event_dir / "generated_subtree_report.json";
+    if (write_artifacts) {
+        std::filesystem::create_directories(event_dir);
+        std::filesystem::remove(sample.event_path);
+    }
+
+    const auto operation_started = std::chrono::steady_clock::now();
+    const std::uint64_t seed = scenario.seed + repetition;
+    std::string generated_dsl = measure_generated_subtree_phase(sample, "generate", [&] {
+        return make_b9_generated_dsl(scenario.tree_size_nodes, seed);
+    });
+    sample.source_hash = bt::event_log::hash64_hex(generated_dsl);
+    std::string normalised_dsl = measure_generated_subtree_phase(sample, "normalise", [&] {
+        return normalise_b9_dsl(generated_dsl);
+    });
+    sample.canonical_dsl_hash = bt::event_log::hash64_hex(normalised_dsl);
+    sample.validation_result_hash = bt::event_log::hash64_hex("validation:" + sample.canonical_dsl_hash);
+
+    bt::event_log events(0u);
+    if (write_artifacts) {
+        events.set_path(sample.event_path.string());
+        events.set_file_enabled(true);
+        events.set_flush_each_message(true);
+        events.set_flush_on_tick_end(false);
+    }
+    events.set_capture_stats_enabled(true);
+    events.set_run_id(scenario.scenario_id + "-rep-" + std::to_string(repetition));
+    events.set_git_sha(MUESLI_BT_BENCH_GIT_COMMIT);
+    events.set_host_info("muesli-bt-bench", MUESLI_BT_BENCH_PROJECT_VERSION, "bench");
+    events.ensure_run_started("", "{\"reset\":false,\"benchmark_group\":\"B9\"}");
+    emit_b9_fragment_event(events,
+                           muesli_bt::contract::kEventDslFragmentGenerated,
+                           0u,
+                           sample.source_hash,
+                           sample.canonical_dsl_hash,
+                           "generated");
+    emit_b9_fragment_event(events,
+                           muesli_bt::contract::kEventDslFragmentNormalised,
+                           0u,
+                           sample.source_hash,
+                           sample.canonical_dsl_hash,
+                           "normalised");
+
+    const bool should_reject = scenario.generated_case == generated_subtree_case::rejected_policy;
+    const bool validation_ok = measure_generated_subtree_phase(sample, "validate", [&] { return !should_reject; });
+    sample.accepted = validation_ok;
+    emit_b9_fragment_event(events,
+                           validation_ok ? muesli_bt::contract::kEventDslFragmentValidationOk
+                                         : muesli_bt::contract::kEventDslFragmentValidationFailed,
+                           0u,
+                           sample.source_hash,
+                           sample.canonical_dsl_hash,
+                           validation_ok ? "accepted" : "rejected");
+
+    bt::definition fragment = measure_generated_subtree_phase(sample, "compile", [&] {
+        return compile_b9_generated_fragment(scenario.tree_size_nodes, seed);
+    });
+    emit_b9_fragment_event(events,
+                           muesli_bt::contract::kEventDslFragmentCompiled,
+                           0u,
+                           sample.source_hash,
+                           sample.canonical_dsl_hash,
+                           "compiled");
+
+    bt::definition base = make_b9_base_definition();
+    bt::instance instance(&base, 0u);
+    instance.trace_enabled = false;
+    instance.read_trace_enabled = false;
+    bt::registry registry;
+    int host_calls = 0;
+    registry.register_action("old-recovery", [](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+        return bt::status::success;
+    });
+    registry.register_action("execute-generated-recovery",
+                             [&](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+                                 ++host_calls;
+                                 return bt::status::success;
+                             });
+    registry.register_action("safe-stop", [](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>) {
+        return bt::status::success;
+    });
+    for (std::size_t i = 0; i < 97u; ++i) {
+        registry.register_condition("generated-guard-" + std::to_string(i), [](bt::tick_context&, std::span<const muslisp::value>) {
+            return true;
+        });
+    }
+
+    bt::services services;
+    services.obs.events = &events;
+    bt::subtree_install_request request;
+    request.proposal_id = scenario.scenario_id + "-proposal-" + std::to_string(repetition);
+    request.source = "b9-deterministic-fixture";
+    request.slot = "recovery-policy";
+    request.fragment_contract = "guarded-recovery.v1";
+    request.install_mode = "at-tick-boundary";
+    request.validation_status = validation_ok ? "accepted" : "rejected";
+    request.source_hash = sample.source_hash;
+    request.canonical_dsl_hash = sample.canonical_dsl_hash;
+    request.validation_result_hash = sample.validation_result_hash;
+    request.fragment = std::move(fragment);
+
+    bt::subtree_install_result install_result = measure_generated_subtree_phase(sample, "install_request", [&] {
+        return bt::request_subtree_install(instance, services, request);
+    });
+    sample.reason_code = install_result.reason_code;
+    sample.previous_subtree_hash = install_result.old_subtree_hash;
+    sample.rollback_id = install_result.rollback_id;
+
+    if (validation_ok) {
+        (void)measure_generated_subtree_phase(sample, "install_commit", [&] {
+            return bt::tick(instance, registry, services);
+        });
+        sample.host_reached = host_calls > 0;
+        sample.installed = sample.host_reached;
+        const auto rollback_it = instance.subtree_rollbacks.find("recovery-policy");
+        if (rollback_it != instance.subtree_rollbacks.end()) {
+            sample.installed_subtree_hash = rollback_it->second.installed_subtree_hash;
+            sample.previous_subtree_hash = rollback_it->second.previous_subtree_hash;
+            sample.rollback_id = rollback_it->second.rollback_id;
+        }
+    }
+
+    if (scenario.generated_case == generated_subtree_case::install_rollback && sample.installed) {
+        bt::subtree_rollback_request rollback;
+        rollback.rollback_id = sample.rollback_id;
+        rollback.slot = "recovery-policy";
+        rollback.installed_subtree_hash = sample.installed_subtree_hash;
+        rollback.previous_subtree_hash = sample.previous_subtree_hash;
+        (void)measure_generated_subtree_phase(sample, "rollback_request", [&] {
+            return bt::request_subtree_rollback(instance, services, rollback);
+        });
+        const bt::status rollback_status = measure_generated_subtree_phase(sample, "rollback_commit", [&] {
+            return bt::tick(instance, registry, services);
+        });
+        sample.rolled_back = rollback_status == bt::status::success && instance.subtree_rollbacks.empty();
+    }
+
+    if (scenario.generated_case == generated_subtree_case::replay_parity && sample.installed) {
+        sample.replay_parity = measure_generated_subtree_phase(sample, "replay_load", [&] {
+            return sample.canonical_dsl_hash == bt::event_log::hash64_hex(normalised_dsl);
+        });
+        emit_b9_fragment_event(events,
+                               muesli_bt::contract::kEventSubtreeReplayLoaded,
+                               instance.tick_index,
+                               sample.source_hash,
+                               sample.canonical_dsl_hash,
+                               sample.replay_parity ? "parity" : "mismatch");
+    }
+
+    if (scenario.generated_case == generated_subtree_case::first_divergence && sample.installed) {
+        sample.first_divergence_detected = measure_generated_subtree_phase(sample, "first_divergence", [&] {
+            return sample.canonical_dsl_hash != bt::event_log::hash64_hex(normalised_dsl + " changed");
+        });
+        emit_b9_fragment_event(events,
+                               muesli_bt::contract::kEventSubtreeReplayLoaded,
+                               instance.tick_index,
+                               sample.source_hash,
+                               bt::event_log::hash64_hex(normalised_dsl + " changed"),
+                               sample.first_divergence_detected ? "first_divergence" : "missed_divergence");
+    }
+
+    const auto operation_finished = std::chrono::steady_clock::now();
+    sample.latency_ns = static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(operation_finished - operation_started).count());
+    const bt::event_log_stats event_stats = events.capture_stats();
+    sample.log_events_total = event_stats.event_count;
+    sample.log_bytes_total = event_stats.byte_count;
+    if (!validation_ok && sample.host_reached) {
+        ++sample.semantic_errors;
+    }
+    if (validation_ok && !sample.installed) {
+        ++sample.semantic_errors;
+    }
+    if (scenario.generated_case == generated_subtree_case::install_rollback && !sample.rolled_back) {
+        ++sample.semantic_errors;
+    }
+    if (scenario.generated_case == generated_subtree_case::replay_parity && !sample.replay_parity) {
+        ++sample.semantic_errors;
+    }
+    if (scenario.generated_case == generated_subtree_case::first_divergence && !sample.first_divergence_detected) {
+        ++sample.semantic_errors;
+    }
+    if (write_artifacts) {
+        write_b9_report(sample, scenario, repetition, generated_subtree_case_name(scenario.generated_case));
+    }
     return sample;
 }
 
@@ -888,6 +1369,7 @@ aggregate_summary_row build_aggregate_row(const environment_info& environment,
     std::vector<double> dropped_completion_rates;
 
     std::size_t semantic_error_runs = 0u;
+    std::string aggregate_notes;
     for (const run_summary_row& row : rows) {
         medians.push_back(row.latency_ns_median);
         p95s.push_back(row.latency_ns_p95);
@@ -921,6 +1403,9 @@ aggregate_summary_row build_aggregate_row(const environment_info& environment,
         }
         if (row.semantic_errors != 0u) {
             ++semantic_error_runs;
+        }
+        if (aggregate_notes.empty() && !row.notes.empty()) {
+            aggregate_notes = row.notes;
         }
     }
 
@@ -968,6 +1453,7 @@ aggregate_summary_row build_aggregate_row(const environment_info& environment,
     aggregate.dropped_completion_count_median = percentile_u64(dropped_completion_counts, 0.50);
     aggregate.dropped_completion_rate_median = percentile_double(dropped_completion_rates, 0.50);
     aggregate.semantic_error_runs = semantic_error_runs;
+    aggregate.notes = aggregate_notes;
     return aggregate;
 }
 
@@ -1174,6 +1660,54 @@ run_result benchmark_runner::run(const run_request& request) const {
             for (std::size_t repetition = 0; repetition < scenario.timing.repetitions; ++repetition) {
                 run_summary_row row =
                     run_async_contract_once(environment, *adapter, scenario, fixture, result.output_dir, repetition);
+                scenario_rows.push_back(row);
+                result.run_rows.push_back(row);
+            }
+            result.aggregate_rows.push_back(build_aggregate_row(environment, scenario, scenario_rows));
+            continue;
+        }
+
+        if (scenario.kind == benchmark_kind::generated_subtree_contract) {
+            if (adapter->name() != "muesli-bt") {
+                throw std::invalid_argument("B9 generated subtree contract benchmarks are muesli-bt only");
+            }
+            for (std::size_t repetition = 0; repetition < scenario.timing.repetitions; ++repetition) {
+                const auto warmup_started = std::chrono::steady_clock::now();
+                std::uint64_t warmup_operations = 0u;
+                while (std::chrono::steady_clock::now() - warmup_started < scenario.timing.warmup) {
+                    const generated_subtree_sample warmup_sample =
+                        run_generated_subtree_contract_operation(scenario, repetition, result.output_dir, false);
+                    if (warmup_sample.semantic_errors != 0u) {
+                        break;
+                    }
+                    ++warmup_operations;
+                }
+                const auto warmup_finished = std::chrono::steady_clock::now();
+
+                generated_subtree_sample sample =
+                    run_generated_subtree_contract_operation(scenario, repetition, result.output_dir, true);
+                const double run_seconds = static_cast<double>(sample.latency_ns) / 1'000'000'000.0;
+                run_summary_row row = make_base_run_row(environment, *adapter, scenario, fixture, repetition);
+                row.warmup_seconds = std::chrono::duration<double>(warmup_finished - warmup_started).count();
+                row.run_seconds = run_seconds;
+                row.ticks_total = sample.operations;
+                row.ticks_per_second =
+                    run_seconds > 0.0 ? static_cast<double>(sample.operations) / run_seconds : 0.0;
+                row.latency_ns_median = sample.latency_ns;
+                row.latency_ns_p95 = sample.latency_ns;
+                row.latency_ns_p99 = sample.latency_ns;
+                row.latency_ns_p999 = sample.latency_ns;
+                row.latency_ns_max = sample.latency_ns;
+                row.jitter_ratio_p99_over_median = sample.latency_ns == 0u ? 0.0 : 1.0;
+                row.alloc_count_total = sample.alloc_count_total;
+                row.alloc_bytes_total = sample.alloc_bytes_total;
+                row.rss_bytes_peak = peak_rss_bytes();
+                row.log_events_total = sample.log_events_total;
+                row.log_bytes_total = sample.log_bytes_total;
+                row.semantic_errors = sample.semantic_errors;
+                row.notes = "report=" + sample.report_path.string() + ";events=" + sample.event_path.string() +
+                            ";warmup_operations=" + std::to_string(warmup_operations);
+
                 scenario_rows.push_back(row);
                 result.run_rows.push_back(row);
             }

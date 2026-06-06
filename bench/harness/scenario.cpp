@@ -115,10 +115,34 @@ scenario_definition make_async_contract_scenario(std::string scenario_id,
     };
 }
 
+scenario_definition make_generated_subtree_contract_scenario(std::string scenario_id,
+                                                             generated_subtree_case generated_case,
+                                                             std::size_t subtree_size_nodes,
+                                                             std::string variant,
+                                                             timing_config timing) {
+    return scenario_definition{
+        .scenario_id = std::move(scenario_id),
+        .group_id = "B9",
+        .kind = benchmark_kind::generated_subtree_contract,
+        .family = tree_family::seq,
+        .tree_size_nodes = subtree_size_nodes,
+        .logging = logging_mode::off,
+        .schedule = schedule_kind::none,
+        .lifecycle = lifecycle_phase::none,
+        .gc_mode = gc_benchmark_mode::none,
+        .async_case = async_contract_case::none,
+        .generated_case = generated_case,
+        .variant = std::move(variant),
+        .timing = timing,
+        .seed = 20260315ull,
+        .capture_tick_trace = false,
+    };
+}
+
 const std::vector<scenario_definition>& scenario_catalogue() {
     static const std::vector<scenario_definition> catalogue = [] {
         std::vector<scenario_definition> scenarios;
-        scenarios.reserve(49);
+        scenarios.reserve(63);
 
         scenarios.push_back(
             make_static_scenario("A1-single-leaf-off", "A1", tree_family::single_leaf, 1, logging_mode::off, "base"));
@@ -253,6 +277,47 @@ const std::vector<scenario_definition>& scenario_catalogue() {
                                                          "late-completion-after-cancel",
                                                          b8_timing));
 
+        const timing_config b9_timing{
+            .warmup = std::chrono::milliseconds(25),
+            .run = std::chrono::milliseconds(75),
+            .repetitions = 3,
+        };
+        scenarios.push_back(make_generated_subtree_contract_scenario("B9-generated-subtree-accepted-small",
+                                                                     generated_subtree_case::accepted_small,
+                                                                     7u,
+                                                                     "accepted-small",
+                                                                     b9_timing));
+        scenarios.push_back(make_generated_subtree_contract_scenario("B9-generated-subtree-accepted-medium",
+                                                                     generated_subtree_case::accepted_medium,
+                                                                     15u,
+                                                                     "accepted-medium",
+                                                                     b9_timing));
+        scenarios.push_back(make_generated_subtree_contract_scenario("B9-generated-subtree-accepted-large",
+                                                                     generated_subtree_case::accepted_large,
+                                                                     31u,
+                                                                     "accepted-large",
+                                                                     b9_timing));
+        scenarios.push_back(make_generated_subtree_contract_scenario("B9-generated-subtree-rejected-policy",
+                                                                     generated_subtree_case::rejected_policy,
+                                                                     7u,
+                                                                     "rejected-policy",
+                                                                     b9_timing));
+        scenarios.push_back(make_generated_subtree_contract_scenario("B9-generated-subtree-install-rollback",
+                                                                     generated_subtree_case::install_rollback,
+                                                                     15u,
+                                                                     "install-rollback",
+                                                                     b9_timing));
+        scenarios.push_back(make_generated_subtree_contract_scenario("B9-generated-subtree-replay-parity",
+                                                                     generated_subtree_case::replay_parity,
+                                                                     15u,
+                                                                     "replay-parity",
+                                                                     b9_timing));
+        scenarios.push_back(make_generated_subtree_contract_scenario("B9-generated-subtree-first-divergence",
+                                                                     generated_subtree_case::first_divergence,
+                                                                     15u,
+                                                                     "first-divergence",
+                                                                     b9_timing));
+
         timing_config jitter_timing;
         jitter_timing.warmup = std::chrono::milliseconds(2000);
         jitter_timing.run = std::chrono::milliseconds(60000);
@@ -281,6 +346,8 @@ std::string_view benchmark_kind_name(benchmark_kind kind) noexcept {
             return "memory_gc";
         case benchmark_kind::async_contract:
             return "async_contract";
+        case benchmark_kind::generated_subtree_contract:
+            return "generated_subtree_contract";
     }
     return "unknown";
 }

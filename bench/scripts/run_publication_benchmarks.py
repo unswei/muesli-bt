@@ -71,12 +71,14 @@ def quality_specs(profile: str, with_btcpp: bool) -> list[RunSpec]:
         b5 = dict(repetitions=1)
         b7 = dict(warmup_ms=25, run_ms=75, repetitions=1)
         b8 = dict(warmup_ms=25, run_ms=75, repetitions=1)
+        b9 = dict(warmup_ms=25, run_ms=75, repetitions=1)
     else:
         core = dict(warmup_ms=1000, run_ms=5000, repetitions=10)
         jitter = dict(warmup_ms=3000, run_ms=60000, repetitions=5)
         b5 = dict(repetitions=200)
         b7 = dict(warmup_ms=1000, run_ms=30000, repetitions=5)
         b8 = dict(warmup_ms=500, run_ms=5000, repetitions=10)
+        b9 = dict(warmup_ms=500, run_ms=5000, repetitions=10)
 
     specs = [
         RunSpec("muesli-a1-baseline", "run-group", "A1", **core),
@@ -94,6 +96,7 @@ def quality_specs(profile: str, with_btcpp: bool) -> list[RunSpec]:
             **b7,
         ),
         RunSpec("muesli-b8-async-contract", "run-group", "B8", **b8),
+        RunSpec("muesli-b9-generated-subtree-contract", "run-group", "B9", make_evidence_report=True, **b9),
     ]
 
     if with_btcpp:
@@ -180,8 +183,10 @@ def append_manifest_run(path: Path, spec: RunSpec, output_dir: Path, cmd: list[s
             handle.write("  - figure: `memory_gc.svg`\n")
         if spec.make_evidence_report:
             handle.write("  - report: `evidence_report.md`\n")
-        if spec.selector in {"B7", "B8"}:
+        if spec.selector in {"B7", "B8", "B9"}:
             handle.write("  - evidence: `<scenario>/rep-*/events.jsonl`\n")
+        if spec.selector == "B9":
+            handle.write("  - sidecars: `<scenario>/rep-*/generated_subtree_report.json`\n")
 
 
 def post_process(spec: RunSpec, output_dir: Path, dry_run: bool) -> None:

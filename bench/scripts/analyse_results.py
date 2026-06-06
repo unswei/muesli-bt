@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import json
 import sys
 from pathlib import Path
 from typing import Iterable
@@ -150,6 +151,23 @@ def b5_phase_rows(
 
 def available_rows(rows: Iterable[dict[str, str]], prefix: str) -> list[dict[str, str]]:
     return [row for row in rows if row.get("scenario_id", "").startswith(prefix)]
+
+
+def read_generated_subtree_reports(result_dir: Path) -> list[dict[str, object]]:
+    reports: list[dict[str, object]] = []
+    for path in sorted(result_dir.glob("B9-generated-subtree-*/rep-*/generated_subtree_report.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{path}: invalid generated-subtree report JSON: {exc}") from exc
+        if not isinstance(data, dict):
+            raise ValueError(f"{path}: generated-subtree report must be a JSON object")
+        reports.append(data)
+    return reports
+
+
+def count_report_flag(reports: list[dict[str, object]], field: str) -> int:
+    return sum(1 for report in reports if report.get(field) is True)
 
 
 def format_machine_summary(environment: dict[str, str]) -> str:
@@ -357,6 +375,39 @@ def print_report(result_dir: Path) -> int:
         print("- no B8 scenarios present in this result set")
     print()
 
+    print("generated subtree contract")
+    b9_rows = available_rows(aggregate_rows, "B9-")
+    b9_reports = read_generated_subtree_reports(result_dir)
+    if b9_rows:
+        for row in b9_rows:
+            print(
+                f"- {row['scenario_id']}: "
+                f"{format_latency_ns(scenario_metric(row, 'latency_ns_median_of_medians'))} median operation, "
+                f"allocations {scenario_metric(row, 'alloc_count_total_median') or 0:.0f} count / "
+                f"{scenario_metric(row, 'alloc_bytes_total_median') or 0:.0f} bytes, "
+                f"semantic-error runs {maybe_int(row.get('semantic_error_runs')) or 0}"
+            )
+        if b9_reports:
+            rejected_host_blocked = sum(
+                1
+                for report in b9_reports
+                if report.get("accepted") is False and report.get("host_reached") is False
+            )
+            print(
+                "- sidecar reports: "
+                f"{len(b9_reports)} total, "
+                f"{count_report_flag(b9_reports, 'installed')} installed, "
+                f"{count_report_flag(b9_reports, 'rolled_back')} rolled back, "
+                f"{count_report_flag(b9_reports, 'replay_parity')} replay-parity passes, "
+                f"{count_report_flag(b9_reports, 'first_divergence_detected')} first divergences, "
+                f"{rejected_host_blocked} rejected proposals blocked before host callbacks"
+            )
+        else:
+            print("- sidecar reports: missing")
+    else:
+        print("- no B9 scenarios present in this result set")
+    print()
+
     recommendations: list[str] = []
     if semantic_error_runs > 0:
         recommendations.append("Fix semantic mismatches before using these numbers for optimisation work.")
@@ -391,6 +442,10 @@ def print_report(result_dir: Path) -> int:
         recommendations.append("Run B7 when memory/GC pause or heap-live evidence is needed.")
     if not b8_rows:
         recommendations.append("Run B8 when async cancellation contract edge evidence is needed.")
+    if not b9_rows:
+        recommendations.append("Run B9 when generated-subtree contract evidence is needed.")
+    elif not b9_reports:
+        recommendations.append("Keep B9 sidecar reports with the CSV files; the CSV is only an index for generated-subtree evidence.")
 
     print("recommended next work")
     if recommendations:

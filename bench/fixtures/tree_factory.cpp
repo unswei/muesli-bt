@@ -169,6 +169,7 @@ tree_fixture make_fixture(const scenario_definition& scenario) {
         case benchmark_kind::single_leaf:
         case benchmark_kind::memory_gc:
         case benchmark_kind::async_contract:
+        case benchmark_kind::generated_subtree_contract:
         case benchmark_kind::static_tick:
         case benchmark_kind::compile_lifecycle:
             return make_static_fixture(scenario.family, scenario.tree_size_nodes);

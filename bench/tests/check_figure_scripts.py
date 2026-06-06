@@ -112,7 +112,14 @@ def main() -> int:
         for fragment in ("Memory and GC evidence", "gc_end events: 2", "pause p99:", "Allocation pressure"):
             if fragment not in memory_text:
                 raise AssertionError(f"memory/GC SVG missing: {fragment}")
-        for fragment in ("benchmark evidence report", "GC end events: `2`", "heap-live delta:"):
+        for fragment in (
+            "benchmark evidence report",
+            "GC end events: `2`",
+            "heap-live delta:",
+            "generated subtree contract metrics",
+            "generated-subtree reports: `2`",
+            "rejected proposals blocked before host callbacks: `1`",
+        ):
             if fragment not in report_text:
                 raise AssertionError(f"evidence report missing: {fragment}")
 

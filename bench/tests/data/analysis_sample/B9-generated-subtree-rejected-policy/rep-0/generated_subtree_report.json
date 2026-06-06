@@ -1,0 +1,31 @@
+{
+  "schema_version": "generated_subtree_contract_report.v1",
+  "scenario_id": "B9-generated-subtree-rejected-policy",
+  "repetition_index": 0,
+  "generated_subtree_case": "rejected_policy",
+  "subtree_size_nodes": 17,
+  "accepted": false,
+  "installed": false,
+  "rolled_back": false,
+  "replay_parity": false,
+  "first_divergence_detected": false,
+  "host_reached": false,
+  "reason_code": "validation_status_not_accepted",
+  "source_hash": "fnv1a64:aaaaaaaaaaaaaaaa",
+  "canonical_dsl_hash": "fnv1a64:bbbbbbbbbbbbbbbb",
+  "validation_result_hash": "fnv1a64:cccccccccccccccc",
+  "previous_subtree_hash": "",
+  "installed_subtree_hash": "",
+  "rollback_id": "",
+  "latency_ns": 150000,
+  "alloc_count_total": 7,
+  "alloc_bytes_total": 2048,
+  "log_events_total": 3,
+  "log_bytes_total": 768,
+  "events": "B9-generated-subtree-rejected-policy/rep-0/events.jsonl",
+  "phases": [
+    {"name": "generate", "duration_ns": 8000, "alloc_count": 2, "alloc_bytes": 512},
+    {"name": "validate", "duration_ns": 5000, "alloc_count": 1, "alloc_bytes": 128},
+    {"name": "install_request", "duration_ns": 12000, "alloc_count": 2, "alloc_bytes": 512}
+  ]
+}

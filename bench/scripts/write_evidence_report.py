@@ -144,6 +144,23 @@ def count_gc_events(paths: list[Path]) -> tuple[int, int, list[float], list[floa
     return gc_begin, gc_end, pauses, heap_live_after
 
 
+def read_generated_subtree_reports(result_dir: Path) -> list[dict[str, object]]:
+    reports: list[dict[str, object]] = []
+    for path in sorted(result_dir.glob("B9-generated-subtree-*/rep-*/generated_subtree_report.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{path}: invalid generated-subtree report JSON: {exc}") from exc
+        if not isinstance(data, dict):
+            raise ValueError(f"{path}: generated-subtree report must be a JSON object")
+        reports.append(data)
+    return reports
+
+
+def count_report_flag(reports: list[dict[str, object]], field: str) -> int:
+    return sum(1 for report in reports if report.get(field) is True)
+
+
 def percentile(values: list[float], q: float) -> float | None:
     if not values:
         return None
@@ -179,6 +196,7 @@ def write_report(result_dir: Path, event_log_paths: list[Path], output: Path) ->
         key=lambda row: maybe_float(row.get("alloc_bytes_total_median")) or 0.0,
     )
     gc_begin, gc_end, pauses, heap_live_after = count_gc_events(event_log_paths)
+    generated_subtree_reports = read_generated_subtree_reports(result_dir)
 
     tail_figure = result_dir / "tail_latency.svg"
     memory_figure = result_dir / "memory_gc.svg"
@@ -254,6 +272,45 @@ def write_report(result_dir: Path, event_log_paths: list[Path], output: Path) ->
     else:
         lines.append("- B8 async contract rows: `missing`")
 
+    b9_rows = [row for row in aggregate_rows if row.get("scenario_id", "").startswith("B9-")]
+    lines.extend(
+        [
+            "",
+            "## generated subtree contract metrics",
+            "",
+        ]
+    )
+    if b9_rows:
+        lines.append("| scenario | operation median | semantic-error runs | allocations |")
+        lines.append("| --- | ---: | ---: | ---: |")
+        for row in b9_rows:
+            lines.append(
+                "| "
+                f"`{row.get('scenario_id', 'unknown')}` | "
+                f"{format_latency_ns(maybe_float(row.get('latency_ns_median_of_medians')))} | "
+                f"{int(row.get('semantic_error_runs') or 0)} | "
+                f"{maybe_float(row.get('alloc_count_total_median')) or 0:.0f} / "
+                f"{format_bytes(maybe_float(row.get('alloc_bytes_total_median')))} |"
+            )
+        rejected_host_blocked = sum(
+            1
+            for report in generated_subtree_reports
+            if report.get("accepted") is False and report.get("host_reached") is False
+        )
+        lines.extend(
+            [
+                "",
+                f"- generated-subtree reports: `{len(generated_subtree_reports)}`",
+                f"- installed proposals: `{count_report_flag(generated_subtree_reports, 'installed')}`",
+                f"- rolled-back proposals: `{count_report_flag(generated_subtree_reports, 'rolled_back')}`",
+                f"- replay-parity passes: `{count_report_flag(generated_subtree_reports, 'replay_parity')}`",
+                f"- first-divergence detections: `{count_report_flag(generated_subtree_reports, 'first_divergence_detected')}`",
+                f"- rejected proposals blocked before host callbacks: `{rejected_host_blocked}`",
+            ]
+        )
+    else:
+        lines.append("- B9 generated-subtree contract rows: `missing`")
+
     lines.extend(
         [
             "",
@@ -270,6 +327,8 @@ def write_report(result_dir: Path, event_log_paths: list[Path], output: Path) ->
         gaps.append("Run or attach a canonical event log with `gc_end` events for GC pause evidence.")
     if len(heap_live_after) < 2:
         gaps.append("Run a longer GC-producing benchmark to estimate heap-live slope.")
+    if b9_rows and not generated_subtree_reports:
+        gaps.append("Keep B9 `generated_subtree_report.json` sidecars with the CSV summary.")
     if not gaps:
         gaps.append("No immediate evidence gaps detected by this report.")
     lines.extend(f"- {gap}" for gap in gaps)

@@ -33,6 +33,9 @@ def main() -> int:
         "instantiate 100: total 31 nodes 62.50 us, 255 nodes 358.33 us, 1023 nodes 1.71 ms; per instance 31 nodes 625 ns, 255 nodes 3.58 us, 1023 nodes 17.12 us",
         "worst allocation pressure: B2-reactive-255-flip5-off at 33.00 alloc/tick",
         "single-leaf full trace: 54.07x slowdown",
+        "generated subtree contract",
+        "B9-generated-subtree-install-rollback: 500.00 us median operation",
+        "sidecar reports: 2 total, 1 installed, 1 rolled back",
         "Reactive interruption is the first optimisation target",
     ]
     for fragment in expected_fragments:

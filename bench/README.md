@@ -14,13 +14,14 @@ The current milestone covers:
 - `B6` logging overhead for one static and one reactive scenario
 - `B7` GC and memory evidence smoke runs
 - `B8` async cancellation contract edge smoke runs
+- `B9` generated-subtree contract evidence smoke runs
 
 The harness currently supports:
 
 - native `muesli-bt`
 - optional `BehaviorTree.CPP` comparison runs, pinned to `4.9.0`
 
-The comparison runtime is limited to the shared subset for `A1`, `A2`, `B1`, `B2`, and the comparable `B5` phases (`compile`, `inst1`, `inst100`, `loaddsl`). `B6`, `B7`, and `B8` remain `muesli-bt` only.
+The comparison runtime is limited to the shared subset for `A1`, `A2`, `B1`, `B2`, and the comparable `B5` phases (`compile`, `inst1`, `inst100`, `loaddsl`). `B6`, `B7`, `B8`, and `B9` remain `muesli-bt` only.
 
 ## when to use it
 
@@ -39,6 +40,7 @@ The harness uses two execution paths:
 
 - `A1`, `A2`, `B1`, `B2`, and `B6` build tree fixtures directly against the C++ runtime API so executor cost is isolated cleanly
 - `B5` generates DSL source from the same fixtures so parse, compile, load, and instantiation phases can be measured separately
+- `B9` builds deterministic slot-backed runtime fixtures and measures the generated-subtree lifecycle through validation, compile, tick-boundary install, rollback, replay, and first-divergence checks
 
 Each run:
 
@@ -49,6 +51,8 @@ Each run:
 - writes `jitter_trace.csv` for `A2`
 
 For `B6`, the current harness records full-trace capture with deferred JSONL serialisation when no file or ring sink is enabled. `log_bytes_total` still reports the canonical `mbt.evt.v1` line size that would be emitted.
+
+For `B9`, CSV files remain a summary index. Each repetition also writes `events.jsonl` and `generated_subtree_report.json` under the scenario result directory. The sidecar report carries phase timings, hashes, install or rejection status, rollback handles, replay parity, first-divergence status, allocation counts, and `host_reached`.
 
 `schema_version=5` adds paper-facing async/fallback rate columns: fallback activation rate, dropped-completion rate, and aggregate deadline miss counts. `schema_version=4` added first-class async outcome columns for deadline miss rate, fallback activation count, and dropped-completion count. `schema_version=3` added GC and memory evidence columns for `B7`, including GC pause quantiles, collection count, heap-live slope, RSS slope, and event-log bytes per tick.
 
@@ -85,7 +89,7 @@ Run the comparison subset against `BehaviorTree.CPP`:
 ./build/bench-release-btcpp/bench/bench run-all --runtime btcpp
 ```
 
-Unsupported scenarios are skipped automatically for the selected runtime. For `btcpp`, that means `B6`, `B5` `parse`, and `B5` `loadbin` are omitted.
+Unsupported scenarios are skipped automatically for the selected runtime. For `btcpp`, that means `B6`, `B7`, `B8`, `B9`, `B5` `parse`, and `B5` `loadbin` are omitted.
 
 `run-all` is the reasonable whole-catalogue runner. It keeps the default smoke-quality `B7` and `B8` settings and is useful for regression sweeps. Use the publication script below when collecting paper-facing evidence.
 
@@ -105,7 +109,7 @@ Run the curated publication suite:
 python3 bench/scripts/run_publication_benchmarks.py
 ```
 
-This writes one timestamped bundle under `bench/results/` with separate result directories for the baseline, static tick, reactive interruption, logging, tail-latency, lifecycle, memory/GC, and async contract groups. It also writes per-directory `analysis.txt` summaries and generates the checked-in figure/report outputs where applicable.
+This writes one timestamped bundle under `bench/results/` with separate result directories for the baseline, static tick, reactive interruption, logging, tail-latency, lifecycle, memory/GC, async contract, and generated-subtree contract groups. It also writes per-directory `analysis.txt` summaries and generates the checked-in figure/report outputs where applicable.
 
 Run the same suite with the optional `BehaviorTree.CPP` comparison subset:
 
@@ -154,6 +158,14 @@ Run the async cancellation contract edge smoke group:
 ```
 
 `B8` covers the five checked-in async fixture edges: cancel before start, cancel while running, cancel after timeout, repeated cancel, and late completion after cancellation. The benchmark records operation latency, cancellation latency, deadline miss count/rate, fallback activation count/rate, dropped-completion count/rate, and semantic-error counts. Each repetition also keeps the matching canonical `events.jsonl` under the scenario result directory, so async lifecycle claims can be inspected from the event stream rather than only from CSV summaries.
+
+Run the generated-subtree contract evidence smoke group:
+
+```bash
+./build/bench-release/bench/bench run-group B9
+```
+
+`B9` covers accepted generated recovery fragments at small, medium, and large sizes, rejected policy proposals, install plus rollback, replay parity, and first-divergence detection. The benchmark uses deterministic in-process C++ fixtures and the live tick-boundary subtree install API. Each repetition writes canonical lifecycle events plus a `generated_subtree_report.json` sidecar. Use the sidecar for detailed contract evidence; the CSV row only indexes the primary operation latency, semantic-error count, and sidecar paths.
 
 Run one group against `BehaviorTree.CPP`:
 
@@ -207,7 +219,7 @@ python3 bench/scripts/write_evidence_report.py \
 ```
 
 If you omit the path, the script picks the latest result directory under `bench/results/`.
-The summary covers `A1`, `A2`, `B1`, `B2`, `B5`, `B6`, `B7`, and `B8` when those rows are present.
+The summary covers `A1`, `A2`, `B1`, `B2`, `B5`, `B6`, `B7`, `B8`, and `B9` when those rows are present.
 The same script also summarises `BehaviorTree.CPP` result sets; unsupported groups simply report as absent.
 
 Compare two completed result sets directly:
