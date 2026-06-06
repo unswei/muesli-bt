@@ -2702,12 +2702,24 @@ void test_capability_registry_call_echo() {
     value caps = eval_text("(cap.list)", env);
     check(is_proper_list(caps), "cap.list should return list");
     bool saw_echo = false;
+    bool saw_navigation = false;
+    bool saw_motion = false;
+    bool saw_tamp = false;
     for (value cap_name : vector_from_list(caps)) {
         if (is_string(cap_name) && string_value(cap_name) == "cap.echo.v1") {
             saw_echo = true;
+        } else if (is_string(cap_name) && string_value(cap_name) == "cap.navigation.v1") {
+            saw_navigation = true;
+        } else if (is_string(cap_name) && string_value(cap_name) == "cap.motion.v1") {
+            saw_motion = true;
+        } else if (is_string(cap_name) && string_value(cap_name) == "cap.tamp.v1") {
+            saw_tamp = true;
         }
     }
     check(saw_echo, "cap.list should include cap.echo.v1");
+    check(saw_navigation, "cap.list should include cap.navigation.v1");
+    check(saw_motion, "cap.list should include cap.motion.v1");
+    check(saw_tamp, "cap.list should include cap.tamp.v1");
 
     value desc = eval_text("(cap.describe \"cap.echo.v1\")", env);
     check(is_map(desc), "cap.describe cap.echo.v1 should return map");
@@ -2715,6 +2727,35 @@ void test_capability_registry_call_echo() {
           "cap.describe echo name mismatch");
     check(string_value(eval_text("(map.get (cap.describe \"cap.echo.v1\") 'safety_class \"\")", env)) == "safe",
           "cap.describe echo safety_class mismatch");
+    check(string_value(eval_text("(map.get (cap.describe \"cap.navigation.v1\") 'safety_class \"\")", env)) ==
+              "mock_adapter",
+          "cap.describe navigation safety_class mismatch");
+    check(string_value(eval_text("(map.get (cap.describe \"cap.motion.v1\") 'name \"\")", env)) == "cap.motion.v1",
+          "cap.describe motion name mismatch");
+    check(string_value(eval_text("(map.get (cap.describe \"cap.tamp.v1\") 'cost_category \"\")", env)) == "low",
+          "cap.describe tamp cost_category mismatch");
+    check(string_value(eval_text("(map.get (cap.describe \"cap.navigation.v1\") 'adapter_id \"\")", env)) == "mock-nav2",
+          "cap.describe navigation adapter_id mismatch");
+    check(integer_value(eval_text("(map.get (cap.describe \"cap.navigation.v1\") 'default_timeout_ms 0)", env)) == 1000,
+          "cap.describe navigation default timeout mismatch");
+    check(boolean_value(eval_text("(map.get (cap.describe \"cap.navigation.v1\") 'supports_cancellation #f)", env)),
+          "cap.describe navigation should expose cancellation support");
+    check(boolean_value(eval_text("(map.get (cap.describe \"cap.navigation.v1\") 'supports_replay #f)", env)),
+          "cap.describe navigation should expose replay support");
+    const auto nav_ops = vector_from_list(eval_text("(map.get (cap.describe \"cap.navigation.v1\") 'operations nil)", env));
+    bool saw_nav_to_pose = false;
+    bool saw_nav_status = false;
+    for (value op : nav_ops) {
+        saw_nav_to_pose = saw_nav_to_pose || string_value(op) == "navigate-to-pose";
+        saw_nav_status = saw_nav_status || string_value(op) == "status";
+    }
+    check(saw_nav_to_pose && saw_nav_status, "cap.describe navigation should expose supported operations");
+    const auto motion_groups = vector_from_list(eval_text("(map.get (cap.describe \"cap.motion.v1\") 'groups nil)", env));
+    bool saw_arm_group = false;
+    for (value group : motion_groups) {
+        saw_arm_group = saw_arm_group || string_value(group) == "arm";
+    }
+    check(saw_arm_group, "cap.describe motion should expose supported groups");
 
     value response = eval_text(
         "(begin "
@@ -2738,6 +2779,124 @@ void test_capability_registry_call_echo() {
           "cap.call should echo payload");
     check(integer_value(eval_text("(map.get (map.get response 'echo (map.make)) 'n -1)", env)) == 7,
           "cap.call should preserve payload fields");
+
+    bt::default_runtime_host().events().clear_ring();
+    value nav_response = eval_text(
+        "(define nav_response "
+        " (begin "
+        "  (define target (map.make)) "
+        "  (map.set! target 'frame \"map\") "
+        "  (map.set! target 'x 1.0) "
+        "  (map.set! target 'y 2.0) "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.navigation.request.v1\") "
+        "  (map.set! req 'capability \"cap.navigation.v1\") "
+        "  (map.set! req 'operation \"navigate-to-pose\") "
+        "  (map.set! req 'request_id \"nav-1\") "
+        "  (map.set! req 'target target) "
+        "  (map.set! req 'timeout_ms 1000) "
+        "  (cap.call req)))",
+        env);
+    check(is_map(nav_response), "cap.navigation.v1 result should be a map");
+    check(symbol_name(eval_text("(map.get nav_response 'status ':none)", env)) == ":accepted",
+          "cap.navigation.v1 navigate-to-pose should be accepted by mock adapter");
+    check(string_value(eval_text("(map.get nav_response 'adapter \"\")", env)) == "mock-nav2",
+          "cap.navigation.v1 should report mock-nav2 adapter");
+    check(!string_value(eval_text("(map.get nav_response 'request_hash \"\")", env)).empty(),
+          "cap.navigation.v1 should expose request hash");
+    check(!string_value(eval_text("(map.get nav_response 'response_hash \"\")", env)).empty(),
+          "cap.navigation.v1 should expose response hash");
+    check(boolean_value(eval_text("(map.get nav_response 'host_reached #f)", env)),
+          "accepted cap.navigation.v1 call should reach mock adapter");
+
+    value motion_response = eval_text(
+        "(define motion_response "
+        " (begin "
+        "  (define target (map.make)) "
+        "  (map.set! target 'frame \"world\") "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.motion.request.v1\") "
+        "  (map.set! req 'capability \"cap.motion.v1\") "
+        "  (map.set! req 'operation \"validate-target\") "
+        "  (map.set! req 'request_id \"motion-1\") "
+        "  (map.set! req 'group \"arm\") "
+        "  (map.set! req 'target target) "
+        "  (cap.call req)))",
+        env);
+    check(is_map(motion_response), "cap.motion.v1 result should be a map");
+    check(symbol_name(eval_text("(map.get motion_response 'status ':none)", env)) == ":ok",
+          "cap.motion.v1 validate-target should return :ok by default");
+    check(boolean_value(eval_text("(map.get (map.get motion_response 'result (map.make)) 'feasible #f)", env)),
+          "cap.motion.v1 validate-target should report feasible target");
+
+    value timed_motion = eval_text(
+        "(define timed_motion "
+        " (begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.motion.request.v1\") "
+        "  (map.set! req 'capability \"cap.motion.v1\") "
+        "  (map.set! req 'operation \"move-to-pose\") "
+        "  (map.set! req 'request_id \"motion-timeout\") "
+        "  (map.set! req 'mock_status \"timeout\") "
+        "  (cap.call req)))",
+        env);
+    check(symbol_name(eval_text("(map.get timed_motion 'status ':none)", env)) == ":timeout",
+          "cap.motion.v1 mock_status should force timeout result");
+    check(boolean_value(eval_text("(map.get timed_motion 'host_reached #f)", env)),
+          "timeout cap.motion.v1 call should still report host_reached");
+
+    value tamp_response = eval_text(
+        "(define tamp_response "
+        " (begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.tamp.request.v1\") "
+        "  (map.set! req 'capability \"cap.tamp.v1\") "
+        "  (map.set! req 'operation \"solve\") "
+        "  (map.set! req 'request_id \"tamp-1\") "
+        "  (map.set! req 'planner \"pddlstream-pybullet\") "
+        "  (cap.call req)))",
+        env);
+    check(is_map(tamp_response), "cap.tamp.v1 result should be a map");
+    check(symbol_name(eval_text("(map.get tamp_response 'status ':none)", env)) == ":ok",
+          "cap.tamp.v1 solve should return :ok by default");
+    check(is_proper_list(eval_text("(map.get tamp_response 'plan nil)", env)), "cap.tamp.v1 should return a plan list");
+    check(string_value(eval_text("(map.get (map.get tamp_response 'proposal (map.make)) 'fragment_contract \"\")", env)) ==
+              "guarded-task-plan.v1",
+          "cap.tamp.v1 should expose guarded-task-plan proposal metadata");
+
+    value rejected_motion = eval_text(
+        "(define rejected_motion "
+        " (begin "
+        "  (define req (map.make)) "
+        "  (map.set! req 'schema_version \"cap.motion.request.v1\") "
+        "  (map.set! req 'capability \"cap.motion.v1\") "
+        "  (map.set! req 'operation \"unsupported\") "
+        "  (cap.call req)))",
+        env);
+    check(symbol_name(eval_text("(map.get rejected_motion 'status ':none)", env)) == ":rejected",
+          "unsupported cap.motion.v1 operation should return :rejected");
+    check(!boolean_value(eval_text("(map.get rejected_motion 'host_reached #t)", env)),
+          "unsupported cap.motion.v1 operation should not reach adapter");
+
+    const std::vector<std::string> adapter_events = bt::default_runtime_host().events().snapshot();
+    std::size_t cap_start_count = 0;
+    std::size_t cap_end_count = 0;
+    bool saw_nav_event = false;
+    bool saw_tamp_event = false;
+    for (const std::string& line : adapter_events) {
+        if (line.find("\"type\":\"cap_call_start\"") != std::string::npos) {
+            ++cap_start_count;
+        }
+        if (line.find("\"type\":\"cap_call_end\"") != std::string::npos) {
+            ++cap_end_count;
+        }
+        saw_nav_event = saw_nav_event || line.find("\"capability\":\"cap.navigation.v1\"") != std::string::npos;
+        saw_tamp_event = saw_tamp_event || line.find("\"capability\":\"cap.tamp.v1\"") != std::string::npos;
+    }
+    check(cap_start_count >= 5, "mock adapter cap.call should emit cap_call_start events");
+    check(cap_end_count >= 5, "mock adapter cap.call should emit cap_call_end events");
+    check(saw_nav_event, "mock adapter events should include cap.navigation.v1");
+    check(saw_tamp_event, "mock adapter events should include cap.tamp.v1");
 
     value model_desc = eval_text("(cap.describe \"cap.model.world.rollout.v1\")", env);
     check(is_map(model_desc), "cap.describe model rollout should return map");

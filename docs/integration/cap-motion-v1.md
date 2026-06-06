@@ -1,8 +1,8 @@
 # cap.motion.v1
 
 !!! note "status"
-    Status: contract-only.
-    This page defines the intended host capability boundary for motion services. It is not a released MoveIt adapter.
+    Status: experimental mock adapter.
+    This page defines the intended host capability boundary for motion services. The built-in mock adapter is deterministic. It is not a released MoveIt adapter.
 
 ## what this is
 
@@ -62,10 +62,8 @@ The host must document what safe fallback means for failed, rejected, or timed-o
 ## api / syntax
 
 This page specifies the contract shape for `cap.motion.v1`.
-It does not add a released Lisp built-in by itself.
-
-Future APIs should pass these maps through the host capability bundle mechanism.
-Until that mechanism exists, examples on this page are contract examples rather than executable snippets.
+The built-in mock adapter is callable through `(cap.call request-map)`.
+A future MoveIt adapter should pass the same maps through the host capability bundle mechanism.
 
 ### common request fields
 
@@ -247,6 +245,7 @@ Illustrative asynchronous acceptance:
 ## gotchas
 
 - `cap.motion.v1` does not guarantee that MoveIt is present.
+- The built-in adapter is a deterministic mock named `mock-moveit`.
 - Adapter names are metadata, not BT semantics.
 - Raw middleware messages must stay behind the adapter.
 - Frames, units, and tolerances must be explicit in every adapter-facing example.

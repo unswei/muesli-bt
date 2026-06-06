@@ -10,6 +10,14 @@ The released baseline includes a deterministic mock capability named `cap.echo.v
 It is for contract tests and API smoke coverage.
 It is not a motion, perception, ROS, MoveIt, or detector adapter.
 
+The experimental mock adapter capabilities are:
+
+- `cap.navigation.v1`
+- `cap.motion.v1`
+- `cap.tamp.v1`
+
+They prove the generic capability boundary, request/result hashes, and canonical events without requiring ROS2, Nav2, MoveIt, PyBullet, or PDDLStream.
+
 When the optional `muesli-model-service` bridge is built and configured, `cap.call` can also invoke bounded model capabilities such as `cap.model.world.rollout.v1` and `cap.model.world.score_trajectory.v1`.
 Those outputs remain proposals. Host-side validation still decides whether any downstream action can observe them.
 
@@ -73,6 +81,7 @@ The model-service result uses:
 - missing or unsupported `schema_version` raises a runtime error
 - missing `operation` raises a runtime error
 - unsupported `cap.echo.v1` operations return a result map with `status` set to `:rejected`
+- unsupported experimental mock adapter operations return a result map with `status` set to `:rejected`
 
 ## Examples
 
@@ -131,13 +140,32 @@ The model-service result uses:
   (cap.call req))
 ```
 
+### Navigation mock
+
+```lisp
+(begin
+  (define target (map.make))
+  (map.set! target 'frame "map")
+  (map.set! target 'x 1.0)
+  (map.set! target 'y 2.0)
+
+  (define req (map.make))
+  (map.set! req 'schema_version "cap.navigation.request.v1")
+  (map.set! req 'capability "cap.navigation.v1")
+  (map.set! req 'operation "navigate-to-pose")
+  (map.set! req 'request_id "nav-1")
+  (map.set! req 'target target)
+  (cap.call req))
+```
+
 ## Notes
 
 - `cap.call` is intentionally generic and map-based.
 - The initial `cap.echo.v1` fixture exists to prove the registry and call path without adding real external service adapters.
 - Bounded model-service calls such as `cap.model.world.rollout.v1` use the same capability-first shape once the optional bridge is configured.
-- Future motion and perception adapters should stay behind their capability contracts.
+- Navigation, motion, perception, and TAMP adapters should stay behind their capability contracts.
 - Model-service calls emit canonical `mbt.evt.v1` lifecycle events named `cap_call_start` and `cap_call_end`.
+- Experimental navigation, motion, and TAMP mock adapter calls also emit `cap_call_start` and `cap_call_end`.
 - `cap_call_end` includes request and response hashes when available.
 - `cap_call_end` includes validation status and rejection reason codes when validation runs.
 - The deterministic `cap.echo.v1` smoke path does not need those events until it stops being a pure registry/API fixture.

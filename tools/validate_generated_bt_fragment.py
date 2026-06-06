@@ -45,21 +45,36 @@ KNOWN_CALLBACKS = {
     "observation-fresh?",
     "execute-recovery-turn",
     "recovery-exit?",
+    "scene-fresh?",
+    "validate-target",
+    "execute-motion",
+    "execute-navigation",
     "stop",
     "safe-stop",
     "move-towards-goal",
 }
-KNOWN_CAPABILITIES = {"vla.rt2", "vision", "planner.mcts", "env.move"}
+KNOWN_CAPABILITIES = {
+    "vla.rt2",
+    "vision",
+    "planner.mcts",
+    "env.move",
+    "cap.navigation.v1",
+    "cap.motion.v1",
+    "cap.perception.scene.v1",
+    "cap.tamp.v1",
+}
 FALLBACK_ACTIONS = {"stop", "safe-stop", "always-success"}
 DEFAULT_SLOT = "recovery-policy"
 DEFAULT_FRAGMENT_CONTRACT = "guarded-recovery.v1"
+TASK_PLAN_SLOT = "task-plan"
+TASK_PLAN_FRAGMENT_CONTRACT = "guarded-task-plan.v1"
 DEFAULT_INSTALL_MODE = "at_tick_boundary"
 DEFAULT_INSTALL_POLICY = {
     "schema_version": "install_policy.v1",
-    "allowed_slots": [DEFAULT_SLOT],
+    "allowed_slots": [DEFAULT_SLOT, TASK_PLAN_SLOT],
     "denied_capabilities": ["unsupported.force", "raw-velocity", "unsafe-force"],
-    "max_nodes": 16,
-    "max_depth": 8,
+    "max_nodes": 24,
+    "max_depth": 10,
     "requires_validation": True,
     "requires_dry_run": True,
     "install_mode": DEFAULT_INSTALL_MODE,
@@ -76,6 +91,23 @@ DEFAULT_FRAGMENT_CONTRACTS = {
         "allowed_actions": sorted(KNOWN_CALLBACKS),
         "max_nodes": 16,
         "max_depth": 8,
+    },
+    TASK_PLAN_FRAGMENT_CONTRACT: {
+        "schema_version": "fragment_contract.v1",
+        "id": TASK_PLAN_FRAGMENT_CONTRACT,
+        "must_start_with_guard": True,
+        "min_guard_count": 1,
+        "requires_fallback_for_long_running": True,
+        "allowed_nodes": sorted(KNOWN_NODE_TYPES),
+        "allowed_actions": sorted(KNOWN_CALLBACKS),
+        "allowed_capabilities": [
+            "cap.navigation.v1",
+            "cap.motion.v1",
+            "cap.perception.scene.v1",
+            "cap.tamp.v1",
+        ],
+        "max_nodes": 24,
+        "max_depth": 10,
     }
 }
 DEFAULT_BLACKBOARD_MANIFEST = {
@@ -85,6 +117,8 @@ DEFAULT_BLACKBOARD_MANIFEST = {
         "observation_fresh": {"type": "bool", "max_age_ms": 200},
         "recovery-state": {"type": "vector", "max_age_ms": 200},
         "recovery-action": {"type": "map", "max_age_ms": 200},
+        "scene_fresh": {"type": "bool", "max_age_ms": 250},
+        "task_plan": {"type": "list", "max_age_ms": 1000},
     },
 }
 DEFAULT_CAPABILITY_MANIFEST = {

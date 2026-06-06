@@ -35,6 +35,9 @@ agent_proposal.v1
 The first built-in fragment contract is `guarded-recovery.v1`.
 It requires a guarded subtree, bounded long-running work, a fallback for long-running work, known callbacks or capabilities, and size limits.
 
+The first TAMP-facing fragment contract is `guarded-task-plan.v1`.
+It is experimental and is intended for guarded task-plan fragments produced from `cap.tamp.v1` results.
+
 The wheeled flagship now has an experimental generated-recovery variant that uses the same contract. It is fixture/runtime evidence only; the existing PyBullet, Webots, and ROS2 wrappers continue to use the original shared flagship until the variant is deliberately promoted.
 
 ## api / syntax

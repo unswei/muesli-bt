@@ -139,6 +139,22 @@ def main() -> int:
     if flagship_rejected.get("host_reached") is not False:
         raise AssertionError("flagship rejected proposal should not reach host execution")
 
+    completed = run_cli(str(VALIDATOR), str(FIXTURE_ROOT / "proposal-tamp-task-plan-accepted"), "--json")
+    assert_ok(completed, "accepted TAMP task-plan proposal validation")
+    tamp_accepted = json.loads(completed.stdout)["results"][0]
+    if tamp_accepted.get("fragment_contract") != "guarded-task-plan.v1":
+        raise AssertionError("TAMP proposal should use guarded-task-plan.v1")
+    if tamp_accepted.get("slot") != "task-plan":
+        raise AssertionError("TAMP proposal should target task-plan slot")
+
+    completed = run_cli(str(VALIDATOR), str(FIXTURE_ROOT / "proposal-tamp-task-plan-missing-guard"), "--json")
+    assert_ok(completed, "rejected TAMP task-plan proposal validation")
+    tamp_rejected = json.loads(completed.stdout)["results"][0]
+    if tamp_rejected.get("code") != "missing_guard":
+        raise AssertionError("TAMP proposal without leading guard should be rejected")
+    if tamp_rejected.get("host_reached") is not False:
+        raise AssertionError("TAMP rejected proposal should not reach host execution")
+
     comparison = read_json(FLAGSHIP_ACCEPTED / "fixed_vs_generated_report.json")
     if comparison.get("passed") is not True:
         raise AssertionError("flagship fixed-versus-generated comparison should pass")

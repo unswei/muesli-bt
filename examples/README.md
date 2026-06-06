@@ -16,6 +16,9 @@ This directory contains runnable muesli-bt examples.
 
 ## Existing examples
 
+- `capabilities/nav2_navigation/`: deterministic mock `cap.navigation.v1` request shape for future Nav2-backed work.
+- `capabilities/moveit_motion/`: deterministic mock `cap.motion.v1` request shape for future MoveIt-backed work.
+- `capabilities/tamp_pybullet/`: deterministic mock `cap.tamp.v1` request shape for future PDDLStream/PyBullet-backed work.
 - `bt/`: small BT language/runtime examples.
 - `repl_scripts/`: standalone Lisp algorithm and planner scripts.
 - `repl_scripts/ros2-live-odom-twist.lisp`: minimal live ROS2 control-loop script for the Ubuntu 22.04 + Humble `Odometry` -> `Twist` baseline.

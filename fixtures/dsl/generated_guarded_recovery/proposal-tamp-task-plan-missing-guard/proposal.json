@@ -1,0 +1,18 @@
+{
+  "schema_version": "agent_proposal.v1",
+  "proposal_id": "proposal-tamp-task-plan-rejected-001",
+  "source": "mock-pddlstream-pybullet",
+  "intent": "try to install an unguarded TAMP task plan",
+  "context_hash": "fnv1a64:7878787878787878",
+  "slot": "task-plan",
+  "fragment_contract": "guarded-task-plan.v1",
+  "previous_subtree_hash": "fnv1a64:bbbbbbbbbbbbbbbb",
+  "blackboard": {
+    "scene_fresh": {
+      "type": "bool",
+      "value": true,
+      "age_ms": 25
+    }
+  },
+  "fragment": "(slot task-plan\n  :contract guarded-task-plan.v1\n  :install at-tick-boundary\n  :fallback safe-stop\n  (reactive-sel\n    (seq\n      (act validate-target)\n      (act execute-motion))\n    (act safe-stop)))\n"
+}

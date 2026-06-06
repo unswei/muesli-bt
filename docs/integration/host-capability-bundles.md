@@ -44,8 +44,9 @@ The bundle id describes the generic capability, not the first library used to im
 Good bundle ids:
 
 - [`cap.motion.v1`](cap-motion-v1.md)
-- `cap.navigation.v1`
+- [`cap.navigation.v1`](cap-navigation-v1.md)
 - [`cap.perception.scene.v1`](cap-perception-scene-v1.md)
+- [`cap.tamp.v1`](cap-tamp-v1.md)
 
 Avoid bundle ids that expose implementation details as core semantics:
 
@@ -119,6 +120,12 @@ The navigation bundle is for host-owned navigation services that are broader tha
 The first ROS-facing adapter might use Nav2, but the public contract should stay generic.
 BT logic should request goals, constraints, progress, cancellation, and final status through the capability contract.
 
+### task-and-motion planning
+
+[`cap.tamp.v1`](cap-tamp-v1.md) is for host-owned task-and-motion planning.
+
+The first intended concrete backend is PDDLStream with PyBullet fixtures. The public contract should stay generic so later backends can use MoveIt Task Constructor or another TAMP engine without changing BT logic.
+
 ## example
 
 For a BT-facing sketch, see [host capability BT example](host-capability-bt-example.md).
@@ -162,6 +169,8 @@ They are not released runtime APIs until a concrete bundle contract lands.
 
 - [integration overview](overview.md)
 - [cap.motion.v1](cap-motion-v1.md)
+- [cap.navigation.v1](cap-navigation-v1.md)
+- [cap.tamp.v1](cap-tamp-v1.md)
 - [cap.perception.scene.v1](cap-perception-scene-v1.md)
 - [host capability BT example](host-capability-bt-example.md)
 - [environment api (`env.*`)](env-api.md)

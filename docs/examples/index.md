@@ -67,12 +67,16 @@ Most examples follow the same pattern:
 - [H1 locomotion demo](isaac-h1-ros2-demo.md) - advanced integration
 - [TurtleBot3 ROS2 demo](isaac-wheeled-ros2-showcase.md) - advanced integration
 - [ROS2 tutorial](../integration/ros2-tutorial.md) - advanced integration
+- [choosing planner and capability surfaces](../integration/choosing-planner-capabilities.md) - capability integration guide
 
 ## More Scripted Examples
 
 For pure Lisp algorithms and smaller BT samples, see:
 
 - [examples directory overview](https://github.com/unswei/muesli-bt/blob/main/examples/README.md)
+- `examples/capabilities/nav2_navigation/` - mock `cap.navigation.v1` request shape
+- `examples/capabilities/moveit_motion/` - mock `cap.motion.v1` request shape
+- `examples/capabilities/tamp_pybullet/` - mock `cap.tamp.v1` request shape
 - [Memoryful Sequence Demo](memoryful-sequence-demo.md) - semantics
 - [Reactive Guard Demo](reactive-guard-demo.md) - intermediate semantics
 - [minimal real BT](minimal-real-bt.md) - task-shaped BT without a simulator

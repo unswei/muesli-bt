@@ -5,16 +5,17 @@
 ## What It Does
 
 Returns schema and policy metadata for one capability.
-The initial built-in fixture capability is `cap.echo.v1`.
+The built-in fixture capabilities include `cap.echo.v1`, `cap.navigation.v1`, `cap.motion.v1`, and `cap.tamp.v1`.
 
 ## Arguments And Return
 
 - Arguments: capability name (string or symbol)
-- Return: map with `name`, `request_schema`, `response_schema`, `safety_class`, `cost_category`
+- Return: map with `name`, `request_schema`, `response_schema`, `safety_class`, `cost_category`, and optional adapter metadata
 
 ## Errors And Edge Cases
 
 - unknown capability raises runtime error
+- adapter metadata can include `adapter_id`, `operations`, `frames`, `groups`, `default_timeout_ms`, `supports_cancellation`, and `supports_replay`
 
 ## Examples
 
@@ -28,13 +29,14 @@ The initial built-in fixture capability is `cap.echo.v1`.
 
 ```lisp
 (begin
-  (define d (cap.describe "vla.rt2"))
-  (map.get d 'request_schema nil))
+  (define d (cap.describe "cap.navigation.v1"))
+  (map.get d 'operations nil))
 ```
 
 ## Notes
 
 - Schema entries include `name`, `type`, and `required`.
+- Mock planner capabilities expose enough metadata for agents to choose operations without reading C++ internals.
 
 ## See Also
 

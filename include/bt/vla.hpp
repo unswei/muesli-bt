@@ -55,6 +55,13 @@ struct capability_descriptor {
     std::vector<capability_field> response_schema;
     std::string safety_class = "safe";
     std::string cost_category = "medium";
+    std::string adapter_id;
+    std::vector<std::string> operations;
+    std::vector<std::string> frames;
+    std::vector<std::string> groups;
+    std::int64_t default_timeout_ms = 0;
+    bool supports_cancellation = false;
+    bool supports_replay = false;
 };
 
 class capability_registry {

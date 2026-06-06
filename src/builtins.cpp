@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <limits>
 #include <optional>
@@ -2485,9 +2486,95 @@ bt::capability_descriptor echo_capability_descriptor() {
     return cap;
 }
 
+bt::capability_descriptor adapter_capability_descriptor(const std::string& name,
+                                                        const std::string& adapter_id,
+                                                        std::vector<std::string> operations,
+                                                        std::vector<std::string> frames,
+                                                        std::vector<std::string> groups,
+                                                        std::vector<bt::capability_field> extra_request_fields,
+                                                        std::vector<bt::capability_field> extra_response_fields) {
+    bt::capability_descriptor cap;
+    cap.name = name;
+    cap.safety_class = "mock_adapter";
+    cap.cost_category = "low";
+    cap.adapter_id = adapter_id;
+    cap.operations = std::move(operations);
+    cap.frames = std::move(frames);
+    cap.groups = std::move(groups);
+    cap.default_timeout_ms = 1000;
+    cap.supports_cancellation = true;
+    cap.supports_replay = true;
+    cap.request_schema = {
+        {"schema_version", "string", true},
+        {"capability", "string", true},
+        {"operation", "string", true},
+        {"request_id", "string", false},
+        {"timeout_ms", "int", false},
+        {"deadline_ms", "int", false},
+        {"mock_status", "keyword|string", false},
+    };
+    cap.request_schema.insert(cap.request_schema.end(), extra_request_fields.begin(), extra_request_fields.end());
+    cap.response_schema = {
+        {"schema_version", "string", true},
+        {"capability", "string", true},
+        {"operation", "string", true},
+        {"request_id", "string", false},
+        {"status", "keyword", true},
+        {"adapter", "string", true},
+        {"adapter_schema", "string", true},
+        {"host_reached", "boolean", true},
+        {"request_hash", "string", true},
+        {"response_hash", "string", true},
+    };
+    cap.response_schema.insert(cap.response_schema.end(), extra_response_fields.begin(), extra_response_fields.end());
+    return cap;
+}
+
+bt::capability_descriptor navigation_capability_descriptor() {
+    return adapter_capability_descriptor(
+        "cap.navigation.v1",
+        "mock-nav2",
+        {"navigate-to-pose", "navigate-through-poses", "get-path", "cancel", "status"},
+        {"map", "odom", "base_link"},
+        {},
+        {{"target", "map", false}, {"poses", "list", false}, {"path", "map", false}},
+        {{"job_id", "string", false}, {"progress", "map", false}, {"path", "map", false}});
+}
+
+bt::capability_descriptor motion_capability_descriptor() {
+    return adapter_capability_descriptor(
+        "cap.motion.v1",
+        "mock-moveit",
+        {"move-to-pose", "move-to-joints", "validate-target", "cancel", "status"},
+        {"world", "base_link", "tool0"},
+        {"arm", "manipulator"},
+        {{"target", "map", false}, {"group", "string", false}, {"link", "string", false}, {"constraints", "map", false}},
+        {{"job_id", "string", false}, {"progress", "map", false}, {"result", "map", false}});
+}
+
+bt::capability_descriptor tamp_capability_descriptor() {
+    return adapter_capability_descriptor(
+        "cap.tamp.v1",
+        "mock-pddlstream-pybullet",
+        {"solve", "validate-plan", "cancel", "status"},
+        {"world", "map"},
+        {},
+        {{"problem", "map", false}, {"context", "map", false}, {"planner", "string", false}},
+        {{"job_id", "string", false}, {"plan", "list", false}, {"proposal", "map", false}});
+}
+
 std::optional<bt::capability_descriptor> describe_builtin_capability(const std::string& name) {
     if (name == "cap.echo.v1") {
         return echo_capability_descriptor();
+    }
+    if (name == "cap.navigation.v1") {
+        return navigation_capability_descriptor();
+    }
+    if (name == "cap.motion.v1") {
+        return motion_capability_descriptor();
+    }
+    if (name == "cap.tamp.v1") {
+        return tamp_capability_descriptor();
     }
     if (name == "cap.model.world.rollout.v1") {
         bt::capability_descriptor cap;
@@ -2537,7 +2624,14 @@ std::optional<bt::capability_descriptor> describe_builtin_capability(const std::
 }
 
 std::vector<std::string> builtin_capability_names() {
-    return {"cap.echo.v1", "cap.model.world.rollout.v1", "cap.model.world.score_trajectory.v1"};
+    return {
+        "cap.echo.v1",
+        "cap.model.world.rollout.v1",
+        "cap.model.world.score_trajectory.v1",
+        "cap.motion.v1",
+        "cap.navigation.v1",
+        "cap.tamp.v1",
+    };
 }
 
 value builtin_cap_list(const std::vector<value>& args) {
@@ -2591,17 +2685,53 @@ value builtin_cap_describe(const std::vector<value>& args) {
         return list_from_vector(rows);
     };
 
+    auto strings_to_list = [](const std::vector<std::string>& items) -> value {
+        std::vector<value> out;
+        out.reserve(items.size());
+        for (const auto& item : items) {
+            out.push_back(make_string(item));
+        }
+        return list_from_vector(out);
+    };
+
     value req_schema = schema_to_list(cap->request_schema);
     roots.add(&req_schema);
     value res_schema = schema_to_list(cap->response_schema);
     roots.add(&res_schema);
     map_set_symbol(out, "request_schema", req_schema);
     map_set_symbol(out, "response_schema", res_schema);
+    if (!cap->adapter_id.empty()) {
+        map_set_symbol(out, "adapter_id", make_string(cap->adapter_id));
+    }
+    if (!cap->operations.empty()) {
+        value operations = strings_to_list(cap->operations);
+        roots.add(&operations);
+        map_set_symbol(out, "operations", operations);
+    }
+    if (!cap->frames.empty()) {
+        value frames = strings_to_list(cap->frames);
+        roots.add(&frames);
+        map_set_symbol(out, "frames", frames);
+    }
+    if (!cap->groups.empty()) {
+        value groups = strings_to_list(cap->groups);
+        roots.add(&groups);
+        map_set_symbol(out, "groups", groups);
+    }
+    if (cap->default_timeout_ms > 0) {
+        map_set_symbol(out, "default_timeout_ms", make_integer(cap->default_timeout_ms));
+    }
+    map_set_symbol(out, "supports_cancellation", make_boolean(cap->supports_cancellation));
+    map_set_symbol(out, "supports_replay", make_boolean(cap->supports_replay));
     return out;
 }
 
 bool is_model_service_capability(const std::string& capability) {
     return capability == "cap.model.world.rollout.v1" || capability == "cap.model.world.score_trajectory.v1";
+}
+
+bool is_mock_adapter_capability(const std::string& capability) {
+    return capability == "cap.navigation.v1" || capability == "cap.motion.v1" || capability == "cap.tamp.v1";
 }
 
 bt::model_service_operation model_service_operation_from_text(const std::string& op) {
@@ -2635,6 +2765,38 @@ std::string map_lookup_text_or_empty(value map_obj, const std::string& key, cons
         return {};
     }
     return require_text_value(*found, where);
+}
+
+std::string fnv1a64_for_text(const std::string& text) {
+    std::uint64_t hash = 1469598103934665603ull;
+    for (unsigned char byte : text) {
+        hash ^= static_cast<std::uint64_t>(byte);
+        hash *= 1099511628211ull;
+    }
+    std::ostringstream out;
+    out << "fnv1a64:" << std::hex << std::setfill('0') << std::setw(16) << hash;
+    return out.str();
+}
+
+std::string text_from_value_or_empty(value v, const std::string& where) {
+    if (is_symbol(v)) {
+        return symbol_name(v);
+    }
+    if (is_string(v)) {
+        return string_value(v);
+    }
+    throw lisp_error(where + ": expected string or symbol");
+}
+
+std::string map_lookup_text_or_symbol_or(value map_obj,
+                                         const std::string& key,
+                                         std::string default_value,
+                                         const std::string& where) {
+    const std::optional<value> found = map_lookup_option(map_obj, key);
+    if (!found.has_value()) {
+        return default_value;
+    }
+    return text_from_value_or_empty(*found, where);
 }
 
 [[maybe_unused]] std::vector<std::string> split_csv_text(const std::string& text) {
@@ -2799,6 +2961,36 @@ void emit_cap_call_event(std::string_view event_type,
     (void)bt::default_runtime_host().events().emit(event_type, std::nullopt, data.str());
 }
 
+void emit_adapter_cap_call_event(std::string_view event_type,
+                                 const std::string& request_id,
+                                 const std::string& capability,
+                                 const std::string& operation,
+                                 std::int64_t deadline_ms,
+                                 const std::string& adapter,
+                                 const std::string* status = nullptr,
+                                 const std::string* request_hash = nullptr,
+                                 const std::string* response_hash = nullptr,
+                                 bool host_reached = false) {
+    std::ostringstream data;
+    data << "{\"request_id\":\"" << bt::event_log::json_escape(request_id) << "\","
+         << "\"capability\":\"" << bt::event_log::json_escape(capability) << "\","
+         << "\"operation\":\"" << bt::event_log::json_escape(operation) << "\","
+         << "\"deadline_ms\":" << deadline_ms << ","
+         << "\"adapter\":\"" << bt::event_log::json_escape(adapter) << "\"";
+    if (status != nullptr) {
+        data << ",\"status\":\"" << bt::event_log::json_escape(*status) << "\","
+             << "\"host_reached\":" << (host_reached ? "true" : "false");
+    }
+    if (request_hash != nullptr && !request_hash->empty()) {
+        data << ",\"request_hash\":\"" << bt::event_log::json_escape(*request_hash) << "\"";
+    }
+    if (response_hash != nullptr && !response_hash->empty()) {
+        data << ",\"response_hash\":\"" << bt::event_log::json_escape(*response_hash) << "\"";
+    }
+    data << '}';
+    (void)bt::default_runtime_host().events().emit(event_type, std::nullopt, data.str());
+}
+
 value call_model_service_capability(value request_map, const std::string& capability) {
     bt::model_service_request request;
     request.id = map_lookup_text_or_empty(request_map, "request_id", "cap.call request_id");
@@ -2821,6 +3013,248 @@ value call_model_service_capability(value request_map, const std::string& capabi
     return model_service_response_to_lisp(response, capability);
 }
 
+bool adapter_host_reached(bool operation_allowed, const std::string& status) {
+    return operation_allowed && status != "unavailable";
+}
+
+std::string default_status_for_adapter_operation(const std::string& capability, const std::string& operation) {
+    if (operation == "cancel") {
+        return "cancelled";
+    }
+    if (operation == "status") {
+        return "running";
+    }
+    if (capability == "cap.navigation.v1") {
+        if (operation == "navigate-to-pose" || operation == "navigate-through-poses") {
+            return "accepted";
+        }
+        if (operation == "get-path") {
+            return "ok";
+        }
+    }
+    if (capability == "cap.motion.v1") {
+        if (operation == "move-to-pose" || operation == "move-to-joints") {
+            return "accepted";
+        }
+        if (operation == "validate-target") {
+            return "ok";
+        }
+    }
+    if (capability == "cap.tamp.v1") {
+        if (operation == "solve" || operation == "validate-plan") {
+            return "ok";
+        }
+    }
+    return "rejected";
+}
+
+bool adapter_operation_allowed(const std::string& capability, const std::string& operation) {
+    if (operation == "cancel" || operation == "status") {
+        return true;
+    }
+    if (capability == "cap.navigation.v1") {
+        return operation == "navigate-to-pose" || operation == "navigate-through-poses" || operation == "get-path";
+    }
+    if (capability == "cap.motion.v1") {
+        return operation == "move-to-pose" || operation == "move-to-joints" || operation == "validate-target";
+    }
+    if (capability == "cap.tamp.v1") {
+        return operation == "solve" || operation == "validate-plan";
+    }
+    return false;
+}
+
+std::string adapter_name_for_capability(const std::string& capability) {
+    if (capability == "cap.navigation.v1") {
+        return "mock-nav2";
+    }
+    if (capability == "cap.motion.v1") {
+        return "mock-moveit";
+    }
+    return "mock-pddlstream-pybullet";
+}
+
+std::string result_schema_for_capability(const std::string& capability) {
+    if (capability == "cap.navigation.v1") {
+        return "cap.navigation.result.v1";
+    }
+    if (capability == "cap.motion.v1") {
+        return "cap.motion.result.v1";
+    }
+    return "cap.tamp.result.v1";
+}
+
+std::string request_schema_for_capability(const std::string& capability) {
+    if (capability == "cap.navigation.v1") {
+        return "cap.navigation.request.v1";
+    }
+    if (capability == "cap.motion.v1") {
+        return "cap.motion.request.v1";
+    }
+    return "cap.tamp.request.v1";
+}
+
+value make_progress_map(const std::string& capability, const std::string& status) {
+    value progress = make_map();
+    map_set_symbol(progress, "status", keyword_symbol(status));
+    if (capability == "cap.navigation.v1") {
+        map_set_symbol(progress, "distance_remaining_m", make_float(status == "ok" ? 0.0 : 1.25));
+        map_set_symbol(progress, "number_of_recoveries", make_integer(0));
+        map_set_symbol(progress, "estimated_time_remaining_ms", make_integer(status == "ok" ? 0 : 1200));
+    } else if (capability == "cap.motion.v1") {
+        map_set_symbol(progress, "fraction", make_float(status == "ok" ? 1.0 : 0.4));
+        map_set_symbol(progress, "planning_scene_age_ms", make_integer(20));
+    } else {
+        map_set_symbol(progress, "expanded_states", make_integer(7));
+        map_set_symbol(progress, "sampled_streams", make_integer(3));
+    }
+    return progress;
+}
+
+value make_mock_path() {
+    value path = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&path);
+    map_set_symbol(path, "frame", make_string("map"));
+    value poses = list_from_vector({make_string("start"), make_string("goal")});
+    roots.add(&poses);
+    map_set_symbol(path, "poses", poses);
+    return path;
+}
+
+value make_tamp_plan() {
+    gc_root_scope roots(default_gc());
+    std::vector<value> steps;
+    steps.reserve(3);
+
+    auto add_step = [&](std::int64_t index, const std::string& capability, const std::string& operation) {
+        value step = make_map();
+        roots.add(&step);
+        map_set_symbol(step, "index", make_integer(index));
+        map_set_symbol(step, "capability", make_string(capability));
+        map_set_symbol(step, "operation", make_string(operation));
+        map_set_symbol(step, "guard", make_string("scene-fresh?"));
+        steps.push_back(step);
+        roots.add(&steps.back());
+    };
+
+    add_step(0, "cap.perception.scene.v1", "get-scene");
+    add_step(1, "cap.motion.v1", "validate-target");
+    add_step(2, "cap.motion.v1", "move-to-pose");
+    return list_from_vector(steps);
+}
+
+value make_tamp_proposal(const std::string& request_id) {
+    value proposal = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&proposal);
+    map_set_symbol(proposal, "schema_version", make_string("agent_proposal.v1"));
+    map_set_symbol(proposal, "proposal_id", make_string(request_id.empty() ? "mock-tamp-proposal" : request_id));
+    map_set_symbol(proposal, "source", make_string("mock-pddlstream-pybullet"));
+    map_set_symbol(proposal, "slot", make_string("task-plan"));
+    map_set_symbol(proposal, "fragment_contract", make_string("guarded-task-plan.v1"));
+    map_set_symbol(proposal, "fragment",
+                   make_string("(slot task-plan :contract guarded-task-plan.v1 :install at-tick-boundary :fallback safe-stop "
+                               "(reactive-sel (seq (cond scene-fresh?) (act validate-target) (act execute-motion)) "
+                               "(act safe-stop)))"));
+    return proposal;
+}
+
+value call_mock_adapter_capability(value request_map, const std::string& capability) {
+    const std::string expected_schema = request_schema_for_capability(capability);
+    const std::string schema_version = map_lookup_text_or(request_map, "schema_version", expected_schema, "cap.call schema_version");
+    if (schema_version != expected_schema) {
+        throw lisp_error("cap.call: schema_version must be \"" + expected_schema + "\"");
+    }
+    const std::string operation = map_lookup_text_or(request_map, "operation", "", "cap.call operation");
+    if (operation.empty()) {
+        throw lisp_error("cap.call: missing required operation");
+    }
+
+    const std::string request_json = value_to_json(request_map);
+    const std::string request_hash = fnv1a64_for_text(request_json);
+    std::string request_id = map_lookup_text_or_empty(request_map, "request_id", "cap.call request_id");
+    if (request_id.empty()) {
+        request_id = "cap-call-" + request_hash.substr(std::string("fnv1a64:").size());
+    }
+    const std::int64_t deadline_ms =
+        map_lookup_int_or(request_map, "deadline_ms", map_lookup_int_or(request_map, "timeout_ms", 0, "cap.call timeout_ms"),
+                          "cap.call deadline_ms");
+    const std::string adapter = map_lookup_text_or(request_map, "adapter", adapter_name_for_capability(capability),
+                                                   "cap.call adapter");
+    const bool operation_allowed = adapter_operation_allowed(capability, operation);
+    std::string status = default_status_for_adapter_operation(capability, operation);
+    if (!operation_allowed) {
+        status = "rejected";
+    }
+    status = map_lookup_text_or_symbol_or(request_map, "mock_status", status, "cap.call mock_status");
+    if (!status.empty() && status.front() == ':') {
+        status.erase(status.begin());
+    }
+    const bool host_reached = adapter_host_reached(operation_allowed, status);
+
+    emit_adapter_cap_call_event("cap_call_start", request_id, capability, operation, deadline_ms, adapter);
+
+    value out = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&out);
+    map_set_symbol(out, "schema_version", make_string(result_schema_for_capability(capability)));
+    map_set_symbol(out, "capability", make_string(capability));
+    map_set_symbol(out, "operation", make_string(operation));
+    map_set_symbol(out, "request_id", make_string(request_id));
+    map_set_symbol(out, "status", keyword_symbol(status));
+    map_set_symbol(out, "adapter", make_string(adapter));
+    map_set_symbol(out, "adapter_schema", make_string(capability + "." + adapter + ".adapter.v1"));
+    map_set_symbol(out, "host_reached", make_boolean(host_reached));
+    map_set_symbol(out, "request_hash", make_string(request_hash));
+
+    if (status == "accepted" || status == "running" || operation == "status" || operation == "cancel") {
+        map_set_symbol(out, "job_id", make_string(map_lookup_text_or(request_map, "job_id", request_id + "-job", "cap.call job_id")));
+    }
+    value progress = make_progress_map(capability, status);
+    roots.add(&progress);
+    map_set_symbol(out, "progress", progress);
+
+    if (capability == "cap.navigation.v1" && (operation == "get-path" || operation == "status")) {
+        value path = make_mock_path();
+        roots.add(&path);
+        map_set_symbol(out, "path", path);
+    }
+    if (capability == "cap.motion.v1" && (operation == "validate-target" || status == "ok")) {
+        value result = make_map();
+        roots.add(&result);
+        map_set_symbol(result, "feasible", make_boolean(status == "ok"));
+        map_set_symbol(result, "planning_group", make_string(map_lookup_text_or(request_map, "group", "arm", "cap.call group")));
+        map_set_symbol(out, "result", result);
+    }
+    if (capability == "cap.tamp.v1" && (operation == "solve" || operation == "validate-plan")) {
+        value plan = make_tamp_plan();
+        roots.add(&plan);
+        map_set_symbol(out, "plan", plan);
+        value proposal = make_tamp_proposal(request_id);
+        roots.add(&proposal);
+        map_set_symbol(out, "proposal", proposal);
+    }
+    if (status == "rejected") {
+        map_set_symbol(out, "error_code", make_string("capability_operation_rejected"));
+        map_set_symbol(out, "error", make_string("unsupported or rejected mock adapter operation"));
+    }
+
+    const std::string response_hash = fnv1a64_for_text(value_to_json(out));
+    map_set_symbol(out, "response_hash", make_string(response_hash));
+    emit_adapter_cap_call_event("cap_call_end",
+                                request_id,
+                                capability,
+                                operation,
+                                deadline_ms,
+                                adapter,
+                                &status,
+                                &request_hash,
+                                &response_hash,
+                                host_reached);
+    return out;
+}
+
 value builtin_cap_call(const std::vector<value>& args) {
     require_arity("cap.call", args, 1);
     const value request_map = require_map_arg(args[0], "cap.call");
@@ -2831,6 +3265,9 @@ value builtin_cap_call(const std::vector<value>& args) {
     const std::string capability = require_text_value(*capability_v, "cap.call capability");
     if (is_model_service_capability(capability)) {
         return call_model_service_capability(request_map, capability);
+    }
+    if (is_mock_adapter_capability(capability)) {
+        return call_mock_adapter_capability(request_map, capability);
     }
     if (capability != "cap.echo.v1") {
         throw lisp_error("cap.call: unknown capability");

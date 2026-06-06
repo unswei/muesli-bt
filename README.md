@@ -73,13 +73,14 @@ Status vocabulary used in this repository:
 | Generated-fragment rejection fixtures | experimental | [why Lisp as DSL?](docs/getting-oriented/why-lisp-dsl.md) |
 | Host capability bundles | contract-only | [host capability bundles](docs/integration/host-capability-bundles.md) |
 | `cap.echo.v1` registry smoke path | released | [cap.call](docs/language/reference/builtins/cap/cap-call.md) |
+| Navigation, motion, and TAMP mock capabilities | experimental | [choosing planner and capability surfaces](docs/integration/choosing-planner-capabilities.md) |
 | `muesli-model-service` bridge | experimental in v0.8, optional and disabled by default | [model-service bridge](docs/integration/model-service-bridge.md) |
 | Model-service stateless `cap.call` paths | experimental in v0.8 | [model-service bridge](docs/integration/model-service-bridge.md) |
 | VLA lifecycle hooks and deterministic stubs | released | [VLA integration](docs/bt/vla-integration.md) |
 | Model-service VLA sessions | experimental in v0.8 | [model-service bridge](docs/integration/model-service-bridge.md) |
 | MiniVLA smoke/evidence path | gated experimental evidence | [MiniVLA smoke evidence](docs/evidence/minivla-smoke-evidence.md) |
 | Production VLA providers | planned | [roadmap to 1.0](docs/roadmap-to-1.0.md) |
-| Nav2/MoveIt adapters | planned | [roadmap to 1.0](docs/roadmap-to-1.0.md) |
+| Nav2/MoveIt real adapters | planned | [roadmap to 1.0](docs/roadmap-to-1.0.md) |
 
 ## at a glance
 

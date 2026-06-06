@@ -11,6 +11,8 @@ muesli-bt
 - Added `B9` generated-subtree contract benchmarks for deterministic proposal generation, normalisation, validation, compile, tick-boundary install, rollback, rejected-policy handling, replay parity, first-divergence detection, allocation accounting, canonical events, and per-repetition sidecar reports.
 - Added an experimental wheeled flagship generated-recovery variant with a patchable `recovery-policy` slot, deterministic accepted/rejected proposal fixtures, fixed-versus-generated recovery evidence, and core runtime coverage for install, rejection, and rollback.
 - Added a release-style evidence manifest and checker for the experimental wheeled flagship generated-recovery variant, covering proposal validation, event-log shape, replay, rollback hashes, fixed-versus-generated comparison, and artefact drift.
+- Added experimental mock `cap.navigation.v1`, `cap.motion.v1`, and `cap.tamp.v1` capability adapters behind the existing `cap.call` path, including deterministic results, request/response hashes, and canonical `cap_call_start` / `cap_call_end` events.
+- Added `guarded-task-plan.v1` generated-fragment validation support for TAMP-produced task-plan proposals.
 - Added the first deterministic generated guarded recovery subtree evidence slice, including a blocked-path generator, accepted and rejected generated-fragment fixtures, canonical DSL hashes, lifecycle events, replay report, tutorial, evidence page, and CTest coverage.
 
 ### Changed

@@ -1,0 +1,10 @@
+{
+  "ok": false,
+  "code": "missing_guard",
+  "status": "rejected",
+  "reason_code": "missing_guard",
+  "slot": "task-plan",
+  "fragment_contract": "guarded-task-plan.v1",
+  "host_reached": false,
+  "message_contains": "start with a guard"
+}

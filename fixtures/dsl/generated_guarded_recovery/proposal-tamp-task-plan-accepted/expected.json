@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "code": "accepted",
+  "status": "accepted",
+  "reason_code": "accepted",
+  "field_path": "",
+  "slot": "task-plan",
+  "fragment_contract": "guarded-task-plan.v1",
+  "host_reached": false
+}
