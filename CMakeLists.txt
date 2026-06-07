@@ -449,6 +449,11 @@ if (TARGET muesli_bt_integration_ros2)
     muesli_bt_conformance_l2_rosbag_tests
     PROPERTIES ENVIRONMENT "MUESLI_BT_L2_ARTIFACT_DIR=${CMAKE_BINARY_DIR}/ros2_l2_artifacts"
   )
+
+  add_executable(nav2_capability_evidence tools/nav2_capability_evidence_main.cpp)
+  target_link_libraries(nav2_capability_evidence PRIVATE muesli_bt_integration_ros2)
+  target_include_directories(nav2_capability_evidence PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_compile_definitions(nav2_capability_evidence PRIVATE MUESLI_BT_WITH_ROS2_INTEGRATION=1)
 endif ()
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
@@ -475,6 +480,13 @@ if (Python3_Interpreter_FOUND)
     NAME muesli_bt_generated_guarded_recovery
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_generated_guarded_recovery.py"
   )
+  if (TARGET nav2_capability_evidence)
+    add_test(
+      NAME muesli_bt_nav2_capability_evidence
+      COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_nav2_capability_evidence.py"
+              --helper "$<TARGET_FILE:nav2_capability_evidence>" --check
+    )
+  endif ()
   add_test(
     NAME muesli_bt_bt_node_option_docs
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check-bt-node-option-docs.py"

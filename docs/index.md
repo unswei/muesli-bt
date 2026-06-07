@@ -54,7 +54,7 @@ If you want the longer setup page, use [getting started](getting-started.md).
 | Generated guarded recovery subtree | experimental evidence slice | [Lisp DSL generated subtree evidence](evidence/lisp-dsl-generated-subtree.md) |
 | Agent-proposed task logic | experimental pre-1.0 proposal path | [agent-proposed task logic](integration/agent-proposed-task-logic.md) |
 | Production VLA providers | planned unless listed in release notes | [roadmap to 1.0](roadmap-to-1.0.md) |
-| Nav2/MoveIt adapters | planned unless listed in release notes | [roadmap to 1.0](roadmap-to-1.0.md) |
+| Nav2/MoveIt adapters | Nav2 fake-server adapter evidence is experimental; MoveIt remains planned | [Nav2 capability fake-server evidence](evidence/nav2-capability-fake-server.md) |
 
 ## evidence and conformance
 

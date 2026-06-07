@@ -26,6 +26,8 @@ The built-in mock adapter returns deterministic results and emits canonical `cap
 
 When `MUESLI_BT_BUILD_INTEGRATION_ROS2=ON`, the ROS2 extension registers a `cap.navigation.v1` backend with `adapter_id="nav2"`. The first Nav2 adapter implements a real ROS2 action client for `nav2_msgs/action/NavigateToPose` and is tested against an in-process fake action server.
 
+The checked-in [Nav2 capability fake-server evidence](../evidence/nav2-capability-fake-server.md) runs the adapter through Lisp `(cap.call request-map)` and validates the representative capability-call event logs.
+
 ## api / syntax
 
 Required request fields:
@@ -112,6 +114,7 @@ Core-only builds keep using the deterministic mock adapter and do not require RO
 ## see also
 
 - [host capability bundles](host-capability-bundles.md)
+- [Nav2 capability fake-server evidence](../evidence/nav2-capability-fake-server.md)
 - [ROS2 backend scope](ros2-backend-scope.md)
 - [cap.call](../language/reference/builtins/cap/cap-call.md)
 - [cap.motion.v1](cap-motion-v1.md)

@@ -1,0 +1,88 @@
+{
+  "schema_version": "nav2_capability_evidence_report.v1",
+  "adapter_id": "nav2",
+  "capability": "cap.navigation.v1",
+  "status": "experimental",
+  "fake_action_server": true,
+  "real_nav2_stack": false,
+  "scenarios": [
+    {
+      "name": "accepted_success",
+      "operations": ["navigate-to-pose","status","status"],
+      "statuses": [":accepted",":running",":ok"],
+      "host_reached": [true,true,true],
+      "job_id": "nav2-evidence-accepted-success-nav2-1",
+      "request_hashes": ["fnv1a64:c6dd248b08f9bcf7","fnv1a64:da6103d7f9a36106","fnv1a64:3e578daa695c3521"],
+      "response_hashes": ["fnv1a64:b2da2ef4d56b7bb6","fnv1a64:5c3d74b2b22ba251","fnv1a64:3013af78a54eac3d"],
+      "progress_summary": "distance_remaining_m=0.75;number_of_recoveries=1;navigation_time_ms=1000;estimated_time_remaining_ms=2000",
+      "fake_server_goal_count": 1,
+      "fake_server_cancel_count": 0,
+      "received_pose": {"x": 1.25, "y": -0.5, "qz": 0.247404, "qw": 0.968912}
+    },
+    {
+      "name": "rejected",
+      "operations": ["navigate-to-pose"],
+      "statuses": [":rejected"],
+      "host_reached": [true],
+      "job_id": "",
+      "request_hashes": ["fnv1a64:252aa502434179ff"],
+      "response_hashes": ["fnv1a64:133b65cb01b56cb3"],
+      "progress_summary": "",
+      "fake_server_goal_count": 1,
+      "fake_server_cancel_count": 0,
+      "received_pose": {"x": 1.25, "y": -0.5, "qz": 0.247404, "qw": 0.968912}
+    },
+    {
+      "name": "abort_error",
+      "operations": ["navigate-to-pose","status"],
+      "statuses": [":accepted",":error"],
+      "host_reached": [true,true],
+      "job_id": "nav2-evidence-abort-nav2-3",
+      "request_hashes": ["fnv1a64:e5603cf4739b325c","fnv1a64:79fed521a11ddcd1"],
+      "response_hashes": ["fnv1a64:48e7105ce93620e8","fnv1a64:ab0350a7a6beb5e7"],
+      "progress_summary": "",
+      "fake_server_goal_count": 1,
+      "fake_server_cancel_count": 0,
+      "received_pose": {"x": 1.25, "y": -0.5, "qz": 0.247404, "qw": 0.968912}
+    },
+    {
+      "name": "cancelled",
+      "operations": ["navigate-to-pose","cancel"],
+      "statuses": [":accepted",":cancelled"],
+      "host_reached": [true,true],
+      "job_id": "nav2-evidence-cancelled-nav2-4",
+      "request_hashes": ["fnv1a64:b4d5d563cdc437f5","fnv1a64:35ebb15c8229f45f"],
+      "response_hashes": ["fnv1a64:988b46bb82161859","fnv1a64:6f1c3b59ecf0ef39"],
+      "progress_summary": "",
+      "fake_server_goal_count": 1,
+      "fake_server_cancel_count": 1,
+      "received_pose": {"x": 1.25, "y": -0.5, "qz": 0.247404, "qw": 0.968912}
+    },
+    {
+      "name": "unavailable",
+      "operations": ["navigate-to-pose"],
+      "statuses": [":unavailable"],
+      "host_reached": [false],
+      "job_id": "",
+      "request_hashes": ["fnv1a64:f384553f668b88bd"],
+      "response_hashes": ["fnv1a64:4d20b157512f5ab2"],
+      "progress_summary": "",
+      "fake_server_goal_count": 0,
+      "fake_server_cancel_count": 0,
+      "received_pose": null
+    },
+    {
+      "name": "timeout",
+      "operations": ["navigate-to-pose"],
+      "statuses": [":timeout"],
+      "host_reached": [true],
+      "job_id": "",
+      "request_hashes": ["fnv1a64:322ad3b42a7e9b57"],
+      "response_hashes": ["fnv1a64:3830a1a53e5ac360"],
+      "progress_summary": "",
+      "fake_server_goal_count": 0,
+      "fake_server_cancel_count": 0,
+      "received_pose": null
+    }
+  ]
+}

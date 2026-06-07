@@ -48,6 +48,7 @@ Reproduction commands live in the linked contract and conformance pages.
 
 - [ROS2 tutorial](../integration/ros2-tutorial.md)
 - [ROS2 backend scope](../integration/ros2-backend-scope.md)
+- [Nav2 capability fake-server evidence](nav2-capability-fake-server.md)
 - [conformance L2](../contracts/conformance.md#how-it-works)
 - [Isaac Sim / ROS2 TurtleBot3 showcase](../examples/isaac-wheeled-ros2-showcase.md)
 

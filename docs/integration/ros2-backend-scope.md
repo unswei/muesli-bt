@@ -231,6 +231,7 @@ Delivered first slice:
 - the adapter implements `navigate-to-pose`, `status`, and `cancel`
 - tests use a fake `nav2_msgs/action/NavigateToPose` action server for accept, reject, feedback, success, abort, cancellation, timeout, and unavailable paths
 - canonical `cap_call_start` and `cap_call_end` events carry capability, operation, adapter, host reach, status, request hash, and response hash
+- a checked-in [Nav2 capability fake-server evidence](../evidence/nav2-capability-fake-server.md) bundle covers the helper report, manifest, and representative `mbt.evt.v1` event logs
 
 Still out of scope for this slice:
 

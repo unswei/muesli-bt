@@ -182,6 +182,7 @@ nav:
       - Evidence Index: evidence/index.md
       - Lisp DSL Generated Subtree Evidence: evidence/lisp-dsl-generated-subtree.md
       - Flagship Generated-recovery Evidence: evidence/flagship-generated-recovery.md
+      - Nav2 Capability Fake-server Evidence: evidence/nav2-capability-fake-server.md
       - Model-backed Async Evidence Report: evidence/model-backed-async-evidence-report.md
       - Release-safe Redaction Policy: evidence/redaction-policy.md
       - MiniVLA Smoke Evidence: evidence/minivla-smoke-evidence.md

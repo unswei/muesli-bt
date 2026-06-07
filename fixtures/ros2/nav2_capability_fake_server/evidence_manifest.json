@@ -1,0 +1,27 @@
+{
+  "schema_version": "nav2_capability_evidence_manifest.v1",
+  "status": "experimental",
+  "capability": "cap.navigation.v1",
+  "adapter_id": "nav2",
+  "action": "nav2_msgs/action/NavigateToPose",
+  "fixture_scope": "fake_action_server",
+  "real_nav2_stack": false,
+  "artefacts": {
+    "report": "nav2_capability_report.json",
+    "scenarios": [
+      {"name": "accepted_success", "events": "accepted_success/events.jsonl"},
+      {"name": "rejected", "events": "rejected/events.jsonl"},
+      {"name": "abort_error", "events": "abort_error/events.jsonl"},
+      {"name": "cancelled", "events": "cancelled/events.jsonl"},
+      {"name": "unavailable", "events": "unavailable/events.jsonl"},
+      {"name": "timeout", "events": "timeout/events.jsonl"}
+    ]
+  },
+  "non_goals": [
+    "real Nav2 lifecycle stack",
+    "map server",
+    "planner server",
+    "simulator evidence",
+    "physical robot evidence"
+  ]
+}

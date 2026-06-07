@@ -614,6 +614,7 @@ Scope:
 - extend the benchmark harness beyond microbenchmarks with contract benchmarks for async timeout, late cancellation, invalid action, hot subtree swap, replay parity, VLA latency sweep, ROS callback pressure, and long-run memory behaviour
 - implement a Nav2 host capability adapter as the main ROS2 bridge for the wheeled demo, with capability surfaces for navigate-to-pose, follow-waypoints if needed, cancel-goal, status, and clear-costmaps if needed
 - map Nav2 action feedback, result codes, cancellation acknowledgement, transform age, and planner/controller timing into canonical host capability events
+- current slice on `main`: the optional Nav2 adapter has fake-action-server evidence for `NavigateToPose` through Lisp `cap.call`, with a checked-in manifest, report, and representative canonical capability-call logs
 - keep the existing thin `Odometry` -> `Twist` lane as the baseline transport path; Nav2 is a host capability bundle, not a replacement for `env.*`
 - add a physical-demo runbook for a TurtleBot3-style or equivalent differential-drive platform, including required ROS distro, launch files, map, BT source hash, model backend, fault seed, rosbag, `events.jsonl`, replay report, and video/time-alignment artefacts
 - add a second serious scenario only if the wheeled flagship is already secure and the added path stays reproducible; preferred candidate remains Towers of Hanoi with a simulated robot arm, but a simpler manipulator benchmark is acceptable if Hanoi becomes too heavy
