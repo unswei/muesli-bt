@@ -184,6 +184,7 @@ nav:
       - Flagship Generated-recovery Evidence: evidence/flagship-generated-recovery.md
       - Wheeled Flagship Navigation-capability Evidence: evidence/wheeled-flagship-nav-capability.md
       - Nav2 Capability Fake-server Evidence: evidence/nav2-capability-fake-server.md
+      - Wheeled Flagship Nav2 Real-stack Evidence: evidence/wheeled-flagship-nav2-real-stack.md
       - Model-backed Async Evidence Report: evidence/model-backed-async-evidence-report.md
       - Release-safe Redaction Policy: evidence/redaction-policy.md
       - MiniVLA Smoke Evidence: evidence/minivla-smoke-evidence.md

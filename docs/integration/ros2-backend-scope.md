@@ -50,13 +50,14 @@ What is implemented today:
 - Linux `L2` replay corpus covering nominal replay, clamped actions, invalid-action fallback, safe-action pre-emption, and reset-unsupported artefacts
 - an experimental optional `cap.navigation.v1` Nav2 adapter that proves the ROS2 `NavigateToPose` action-client boundary against an in-process fake action server
 - an experimental `wheeled-goal-flagship-nav-capability` BT variant with core mock evidence and ROS2-gated fake-server unit coverage for the navigation-capability lane
+- a checked-in [wheeled flagship Nav2 real-stack evidence](../evidence/wheeled-flagship-nav2-real-stack.md) capture path with a pending marker until a live Nav2 stack run is captured
 
 What is still intentionally incomplete:
 
 - simulator or robot reset beyond the explicit unsupported/stub policy
 - broader transport coverage beyond the current `Odometry` / `Twist` path
 - explicit ROS time-source reporting and replay-verification tooling beyond the direct canonical event-log path
-- real Nav2 deployment evidence against a lifecycle manager, map server, planner server, simulator, or physical robot
+- captured real Nav2 deployment evidence against a lifecycle manager, map server, planner server, simulator, or physical robot
 
 ### first supported baseline
 
@@ -80,6 +81,8 @@ Non-goals for this first baseline:
 The optional Nav2 capability adapter is separate from the released thin transport baseline. It is reached through `(cap.call request-map)` with `capability="cap.navigation.v1"`, not through `env.attach`, `env.observe`, or `env.act`.
 
 The optional wheeled flagship navigation-capability variant is also separate from the released thin transport baseline. Existing ROS2 flagship wrappers keep loading the canonical shared flagship until a later promotion slice deliberately changes that.
+
+The real-stack evidence helper for that variant is also separate. It is a capture tool for a live Nav2 action server, not a wrapper promotion or `env.attach "ros2"` semantic change.
 
 ## how it works
 
@@ -534,6 +537,9 @@ ctest --test-dir build/linux-ros2 --output-on-failure
 
 - [integration overview](overview.md)
 - [environment api (`env.api.v1`)](env-api.md)
+- [cap.navigation.v1](cap-navigation-v1.md)
+- [Nav2 capability fake-server evidence](../evidence/nav2-capability-fake-server.md)
+- [wheeled flagship Nav2 real-stack evidence](../evidence/wheeled-flagship-nav2-real-stack.md)
 - [writing a backend](writing-a-backend.md)
 - [cross-transport flagship for v0.5](cross-transport-flagship.md)
 - [conformance levels](../contracts/conformance.md)

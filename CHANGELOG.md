@@ -16,6 +16,7 @@ muesli-bt
 - Added the first optional ROS2/Nav2 `cap.navigation.v1` backend registry path, including a real `NavigateToPose` action client, fake-action-server coverage for accept, reject, feedback, success, abort, cancellation, timeout, and unavailable paths, and canonical capability-call events.
 - Added a ROS2-gated Nav2 capability evidence runner and checked-in fake-action-server report bundle, covering Lisp `cap.call` requests, representative `mbt.evt.v1` capability-call logs, report drift checks, and event-log validation without claiming real Nav2 deployment evidence.
 - Added an experimental wheeled flagship `cap.navigation.v1` variant, core mock evidence bundle, drift checker, and ROS2-gated fake-server coverage for the flagship navigation-capability lane without promoting the variant into existing backend wrappers.
+- Added a ROS2-gated real-stack capture helper and runner for the experimental wheeled flagship `cap.navigation.v1` variant, with checked-in pending evidence metadata, scenario defaults, and docs for capturing live `NavigateToPose` stack artefacts without claiming physical robot evidence.
 - Added `guarded-task-plan.v1` generated-fragment validation support for TAMP-produced task-plan proposals.
 - Added the first deterministic generated guarded recovery subtree evidence slice, including a blocked-path generator, accepted and rejected generated-fragment fixtures, canonical DSL hashes, lifecycle events, replay report, tutorial, evidence page, and CTest coverage.
 

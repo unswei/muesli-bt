@@ -33,6 +33,7 @@ Benchmark pages should include hardware, commit, compiler, build flags, commands
 - [Lisp DSL generated subtree evidence](lisp-dsl-generated-subtree.md)
 - [flagship generated-recovery evidence](flagship-generated-recovery.md)
 - [wheeled flagship navigation-capability evidence](wheeled-flagship-nav-capability.md)
+- [wheeled flagship Nav2 real-stack evidence](wheeled-flagship-nav2-real-stack.md)
 
 Reproduction commands live in the linked contract and conformance pages.
 
@@ -51,6 +52,7 @@ Reproduction commands live in the linked contract and conformance pages.
 - [ROS2 backend scope](../integration/ros2-backend-scope.md)
 - [Nav2 capability fake-server evidence](nav2-capability-fake-server.md)
 - [wheeled flagship navigation-capability evidence](wheeled-flagship-nav-capability.md)
+- [wheeled flagship Nav2 real-stack evidence](wheeled-flagship-nav2-real-stack.md)
 - [conformance L2](../contracts/conformance.md#how-it-works)
 - [Isaac Sim / ROS2 TurtleBot3 showcase](../examples/isaac-wheeled-ros2-showcase.md)
 

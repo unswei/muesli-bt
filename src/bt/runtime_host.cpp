@@ -240,6 +240,16 @@ void store_navigation_capability_result(tick_context& ctx,
         if (const std::optional<double> distance = lisp_map_number(*progress, "distance_remaining_m"); distance.has_value()) {
             ctx.bb_put("nav_distance_remaining_m", bb_value{*distance}, writer_name);
         }
+        if (const std::optional<double> recoveries = lisp_map_number(*progress, "number_of_recoveries"); recoveries.has_value()) {
+            ctx.bb_put("nav_number_of_recoveries", bb_value{static_cast<std::int64_t>(*recoveries)}, writer_name);
+        }
+        if (const std::optional<double> navigation_time_ms = lisp_map_number(*progress, "navigation_time_ms");
+            navigation_time_ms.has_value()) {
+            ctx.bb_put("nav_navigation_time_ms", bb_value{static_cast<std::int64_t>(*navigation_time_ms)}, writer_name);
+        }
+        if (const std::optional<double> eta_ms = lisp_map_number(*progress, "estimated_time_remaining_ms"); eta_ms.has_value()) {
+            ctx.bb_put("nav_estimated_time_remaining_ms", bb_value{static_cast<std::int64_t>(*eta_ms)}, writer_name);
+        }
     }
     ctx.bb_put("active_branch", bb_value{branch_id}, writer_name);
 }

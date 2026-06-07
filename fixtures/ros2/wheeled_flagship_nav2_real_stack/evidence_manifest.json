@@ -1,0 +1,13 @@
+{
+  "adapter": "nav2",
+  "bt_source": "examples/flagship_wheeled/lisp/bt_goal_flagship_nav_capability.lisp",
+  "capability": "cap.navigation.v1",
+  "capture_status": "pending_real_stack_capture",
+  "event_log_schema": "mbt.evt.v1",
+  "nav2_action_name": "/navigate_to_pose",
+  "nav2_stack": false,
+  "notes": "Run tools/run_wheeled_flagship_nav2_real_stack_evidence.py --write on a ROS2/Nav2 machine with a live NavigateToPose action server to replace this marker with captured artefacts.",
+  "real_robot": false,
+  "schema_version": "wheeled_flagship_nav2_real_stack_manifest.v1",
+  "variant": "wheeled-goal-flagship-nav-capability"
+}

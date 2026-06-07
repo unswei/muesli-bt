@@ -26,7 +26,7 @@ The bundle contains:
 
 Use this evidence when you need to check whether the wheeled flagship can route goal navigation through the generic navigation capability contract.
 
-Do not use this evidence as proof of a real Nav2 deployment. The core bundle uses the deterministic `mock-nav2` adapter. ROS2 builds add fake-action-server unit coverage for the same BT variant and the real Nav2 action-client adapter.
+Do not use this evidence as proof of a real Nav2 deployment. The core bundle uses the deterministic `mock-nav2` adapter. ROS2 builds add fake-action-server unit coverage for the same BT variant and the real Nav2 action-client adapter. Real-stack capture uses the separate [wheeled flagship Nav2 real-stack evidence](wheeled-flagship-nav2-real-stack.md) path.
 
 ## how it works
 
@@ -76,6 +76,9 @@ The action writes:
 - `nav_response_hash`
 - `nav_host_reached`
 - `nav_distance_remaining_m`
+- `nav_number_of_recoveries`
+- `nav_navigation_time_ms`
+- `nav_estimated_time_remaining_ms`
 - `active_branch`
 
 ## example
@@ -111,10 +114,13 @@ The core artefacts use `mock-nav2`. They prove the BT-to-capability contract and
 
 The ROS2-gated unit test proves the fake-action-server boundary. It still does not prove a configured Nav2 lifecycle stack, map server, planner server, simulator, or physical robot.
 
+The real-stack evidence path is separate and currently checked in as pending capture until a Nav2 machine regenerates the artefacts.
+
 ## see also
 
 - [cap.navigation.v1](../integration/cap-navigation-v1.md)
 - [Nav2 capability fake-server evidence](nav2-capability-fake-server.md)
+- [wheeled flagship Nav2 real-stack evidence](wheeled-flagship-nav2-real-stack.md)
 - [ROS2 backend scope](../integration/ros2-backend-scope.md)
 - [cross-transport flagship](../integration/cross-transport-flagship.md)
 - [roadmap to 1.0](../roadmap-to-1.0.md)

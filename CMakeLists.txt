@@ -454,6 +454,17 @@ if (TARGET muesli_bt_integration_ros2)
   target_link_libraries(nav2_capability_evidence PRIVATE muesli_bt_integration_ros2)
   target_include_directories(nav2_capability_evidence PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
   target_compile_definitions(nav2_capability_evidence PRIVATE MUESLI_BT_WITH_ROS2_INTEGRATION=1)
+
+  add_executable(
+    wheeled_flagship_nav2_real_stack_evidence
+    tools/wheeled_flagship_nav2_real_stack_evidence_main.cpp
+  )
+  target_link_libraries(wheeled_flagship_nav2_real_stack_evidence PRIVATE muesli_bt_integration_ros2)
+  target_include_directories(wheeled_flagship_nav2_real_stack_evidence PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+  target_compile_definitions(
+    wheeled_flagship_nav2_real_stack_evidence
+    PRIVATE MUESLI_BT_WITH_ROS2_INTEGRATION=1
+  )
 endif ()
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
@@ -484,6 +495,11 @@ if (Python3_Interpreter_FOUND)
     NAME muesli_bt_wheeled_flagship_nav_capability_evidence
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_wheeled_flagship_nav_capability_evidence.py"
             --muslisp "$<TARGET_FILE:muslisp>" --check
+  )
+  add_test(
+    NAME muesli_bt_wheeled_flagship_nav2_real_stack_evidence_metadata
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_wheeled_flagship_nav2_real_stack_evidence.py"
+            --check
   )
   if (TARGET nav2_capability_evidence)
     add_test(

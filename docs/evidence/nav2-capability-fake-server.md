@@ -117,6 +117,8 @@ The event logs are representative scenario logs, not a full ROS bag, lifecycle t
 ## see also
 
 - [cap.navigation.v1](../integration/cap-navigation-v1.md)
+- [wheeled flagship navigation-capability evidence](wheeled-flagship-nav-capability.md)
+- [wheeled flagship Nav2 real-stack evidence](wheeled-flagship-nav2-real-stack.md)
 - [ROS2 backend scope](../integration/ros2-backend-scope.md)
 - [host capability bundles](../integration/host-capability-bundles.md)
 - [canonical event log](../observability/event-log.md)
