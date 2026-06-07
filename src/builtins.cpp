@@ -1415,7 +1415,7 @@ std::string map_key_to_json_object_key(const map_key& key) {
             return std::to_string(key.integer_data);
         case map_key_type::floating: {
             std::ostringstream out;
-            out << key.float_data;
+            out << std::setprecision(17) << key.float_data;
             return out.str();
         }
     }
@@ -1457,7 +1457,7 @@ std::string value_to_json(value v) {
             throw lisp_error("json.encode: non-finite floats are not supported");
         }
         std::ostringstream out;
-        out << d;
+        out << std::setprecision(17) << d;
         return out.str();
     }
     if (is_string(v)) {
@@ -1482,15 +1482,28 @@ std::string value_to_json(value v) {
         return out.str();
     }
     if (is_map(v)) {
+        struct json_entry {
+            std::string key;
+            std::string value;
+        };
+        std::vector<json_entry> entries;
+        entries.reserve(v->map_data.size());
+        for (const auto& [k, mapped] : v->map_data) {
+            entries.push_back(json_entry{map_key_to_json_object_key(k), value_to_json(mapped)});
+        }
+        std::sort(entries.begin(), entries.end(), [](const json_entry& lhs, const json_entry& rhs) {
+            if (lhs.key != rhs.key) {
+                return lhs.key < rhs.key;
+            }
+            return lhs.value < rhs.value;
+        });
         std::ostringstream out;
         out << '{';
-        bool first = true;
-        for (const auto& [k, mapped] : v->map_data) {
-            if (!first) {
+        for (std::size_t i = 0; i < entries.size(); ++i) {
+            if (i != 0) {
                 out << ',';
             }
-            first = false;
-            out << "\"" << json_escape(map_key_to_json_object_key(k)) << "\":" << value_to_json(mapped);
+            out << "\"" << json_escape(entries[i].key) << "\":" << entries[i].value;
         }
         out << '}';
         return out.str();
