@@ -8,8 +8,10 @@ set(muesli_bt_SHARE_DIR "${muesli_bt_SHARE_DIR}" CACHE INTERNAL "Installed muesl
 
 if("@MUESLI_BT_PACKAGE_HAS_ROS2_INTEGRATION_TARGET@" STREQUAL "TRUE")
   find_dependency(rclcpp REQUIRED)
+  find_dependency(rclcpp_action REQUIRED)
   find_dependency(nav_msgs REQUIRED)
   find_dependency(geometry_msgs REQUIRED)
+  find_dependency(nav2_msgs REQUIRED)
 endif()
 
 set(PACKAGE_PREFIX_DIR "${_muesli_bt_package_prefix}")
