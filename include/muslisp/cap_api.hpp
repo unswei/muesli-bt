@@ -24,5 +24,6 @@ std::vector<std::string> cap_api_registered_capabilities();
 [[nodiscard]] std::optional<bt::capability_descriptor> cap_api_describe(const std::string& capability);
 [[nodiscard]] bool cap_api_has_backend(const std::string& capability);
 [[nodiscard]] value cap_api_call(const std::string& capability, value request_map);
+[[nodiscard]] value cap_call(value request_map);
 
 }  // namespace muslisp

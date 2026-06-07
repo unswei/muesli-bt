@@ -1,0 +1,71 @@
+{
+  "adapter": "mock-nav2",
+  "capability": "cap.navigation.v1",
+  "real_nav2_stack": false,
+  "scenarios": [
+    {
+      "adapter": "mock-nav2",
+      "events": "accepted_success/events.jsonl",
+      "host_reached": [
+        true,
+        true
+      ],
+      "name": "accepted_success",
+      "operations": [
+        "navigate-to-pose",
+        "status"
+      ],
+      "statuses": [
+        "accepted",
+        "ok"
+      ]
+    },
+    {
+      "adapter": "mock-nav2",
+      "events": "rejected/events.jsonl",
+      "host_reached": [
+        true
+      ],
+      "name": "rejected",
+      "operations": [
+        "navigate-to-pose"
+      ],
+      "statuses": [
+        "rejected"
+      ]
+    },
+    {
+      "adapter": "mock-nav2",
+      "events": "timeout/events.jsonl",
+      "host_reached": [
+        true
+      ],
+      "name": "timeout",
+      "operations": [
+        "navigate-to-pose"
+      ],
+      "statuses": [
+        "timeout"
+      ]
+    },
+    {
+      "adapter": "mock-nav2",
+      "events": "cancel_on_collision/events.jsonl",
+      "host_reached": [
+        true,
+        true
+      ],
+      "name": "cancel_on_collision",
+      "operations": [
+        "navigate-to-pose",
+        "cancel"
+      ],
+      "statuses": [
+        "accepted",
+        "cancelled"
+      ]
+    }
+  ],
+  "schema_version": "wheeled_flagship_nav_capability_report.v1",
+  "variant": "wheeled-goal-flagship-nav-capability"
+}

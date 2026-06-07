@@ -32,6 +32,7 @@ Benchmark pages should include hardware, commit, compiler, build flags, commands
 - [fixture bundles](https://github.com/unswei/muesli-bt/tree/main/fixtures)
 - [Lisp DSL generated subtree evidence](lisp-dsl-generated-subtree.md)
 - [flagship generated-recovery evidence](flagship-generated-recovery.md)
+- [wheeled flagship navigation-capability evidence](wheeled-flagship-nav-capability.md)
 
 Reproduction commands live in the linked contract and conformance pages.
 
@@ -49,6 +50,7 @@ Reproduction commands live in the linked contract and conformance pages.
 - [ROS2 tutorial](../integration/ros2-tutorial.md)
 - [ROS2 backend scope](../integration/ros2-backend-scope.md)
 - [Nav2 capability fake-server evidence](nav2-capability-fake-server.md)
+- [wheeled flagship navigation-capability evidence](wheeled-flagship-nav-capability.md)
 - [conformance L2](../contracts/conformance.md#how-it-works)
 - [Isaac Sim / ROS2 TurtleBot3 showcase](../examples/isaac-wheeled-ros2-showcase.md)
 

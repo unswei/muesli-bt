@@ -115,6 +115,7 @@ The remaining path is:
 - use `muesli-model-service` as the optional capability-native service boundary for world-model and VLA calls, while keeping `muesli-bt` usable without it
 - build a fair comparison engine against BehaviorTree.CPP rather than relying only on internal microbenchmarks
 - add ROS2 host capability bridges, especially Nav2 and, if still feasible, MoveIt, without widening core runtime semantics
+- keep the experimental wheeled flagship `cap.navigation.v1` variant as opt-in evidence until a later promotion slice proves real Nav2 deployment behaviour
 - keep the existing Isaac showcase as supporting evidence rather than a second semantic surface
 - make the Lisp-as-DSL argument explicit and testable: Lisp is used as a compact structured representation for BTs, not as arbitrary scripting; before `v1.0.0`, include at least one implemented demonstration where a BT fragment is generated as Lisp data, validated, compiled, serialised, safely installed at a tick boundary, logged, and replayed
 - keep expected engine features inside `muesli-bt` itself: host capability authoring, blackboard/schema validation, diagnostics, CLI validation, metadata export, embedding, and replayable artefacts belong in the runtime rather than requiring a visual tool

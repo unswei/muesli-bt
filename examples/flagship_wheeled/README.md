@@ -6,6 +6,7 @@ It includes:
 
 - the canonical shared BT
 - an experimental generated-recovery BT variant
+- an experimental navigation-capability BT variant
 - shared helper formulas and blackboard shaping helpers
 - comparison and normalisation tooling
 - shared thresholds used by the wheeled runs
@@ -14,6 +15,7 @@ Current contents:
 
 - shared BT and helper files are checked in
 - the generated-recovery variant is checked in for fixture/runtime evidence only
+- the navigation-capability variant is checked in for `cap.navigation.v1` evidence only
 - Webots and PyBullet wrappers run against the shared behaviour
 - ROS2 flagship normalisation is supported by the shared tooling
 - normalisation and comparison tooling is available under `tools/`
@@ -31,11 +33,17 @@ variant that represents the collision recovery branch as a patchable
 `recovery-policy` slot. Use it for generated-subtree validation, install, and
 rollback evidence, not for cross-transport comparison baselines yet.
 
+`lisp/bt_goal_flagship_nav_capability.lisp` is an experimental pre-`v1.0`
+variant that delegates the goal-seeking lane to `cap.navigation.v1`. Use it for
+core mock capability evidence and ROS2 fake-action-server unit coverage, not for
+cross-transport comparison baselines yet.
+
 See also:
 
 - `docs/integration/cross-transport-flagship.md`
 - `docs/integration/cross-transport-shared-contract.md`
 - `docs/integration/cross-transport-comparison-protocol.md`
+- `docs/evidence/wheeled-flagship-nav-capability.md`
 
 ## comparison workflow
 

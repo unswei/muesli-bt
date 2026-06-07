@@ -28,6 +28,8 @@ When `MUESLI_BT_BUILD_INTEGRATION_ROS2=ON`, the ROS2 extension registers a `cap.
 
 The checked-in [Nav2 capability fake-server evidence](../evidence/nav2-capability-fake-server.md) runs the adapter through Lisp `(cap.call request-map)` and validates the representative capability-call event logs.
 
+The checked-in [wheeled flagship navigation-capability evidence](../evidence/wheeled-flagship-nav-capability.md) shows an experimental opt-in flagship variant delegating the goal-seeking lane to this capability contract while existing flagship wrappers keep using the canonical shared tree.
+
 ## api / syntax
 
 Required request fields:
@@ -115,6 +117,7 @@ Core-only builds keep using the deterministic mock adapter and do not require RO
 
 - [host capability bundles](host-capability-bundles.md)
 - [Nav2 capability fake-server evidence](../evidence/nav2-capability-fake-server.md)
+- [wheeled flagship navigation-capability evidence](../evidence/wheeled-flagship-nav-capability.md)
 - [ROS2 backend scope](ros2-backend-scope.md)
 - [cap.call](../language/reference/builtins/cap/cap-call.md)
 - [cap.motion.v1](cap-motion-v1.md)

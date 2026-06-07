@@ -3625,9 +3625,8 @@ value call_mock_adapter_capability(value request_map, const std::string& capabil
     return out;
 }
 
-value builtin_cap_call(const std::vector<value>& args) {
-    require_arity("cap.call", args, 1);
-    const value request_map = require_map_arg(args[0], "cap.call");
+value cap_call_impl(value request_map) {
+    request_map = require_map_arg(request_map, "cap.call");
     const std::optional<value> capability_v = map_lookup_option(request_map, "capability");
     if (!capability_v.has_value()) {
         throw lisp_error("cap.call: missing required capability");
@@ -3684,6 +3683,11 @@ value builtin_cap_call(const std::vector<value>& args) {
         map_set_symbol(out, "echo", request_map);
     }
     return out;
+}
+
+value builtin_cap_call(const std::vector<value>& args) {
+    require_arity("cap.call", args, 1);
+    return cap_call_impl(args[0]);
 }
 
 value builtin_model_service_configure(const std::vector<value>& args) {
@@ -4174,6 +4178,10 @@ value builtin_planner_get_base_seed(const std::vector<value>& args) {
 }
 
 }  // namespace
+
+value cap_call(value request_map) {
+    return cap_call_impl(request_map);
+}
 
 void install_core_builtins(env_ptr global_env) {
     if (!global_env) {

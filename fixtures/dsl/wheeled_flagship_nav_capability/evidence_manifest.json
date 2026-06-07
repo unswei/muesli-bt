@@ -1,0 +1,74 @@
+{
+  "bt_source": "examples/flagship_wheeled/lisp/bt_goal_flagship_nav_capability.lisp",
+  "capability": "cap.navigation.v1",
+  "core_adapter": "mock-nav2",
+  "event_log_schema": "mbt.evt.v1",
+  "real_nav2_stack": false,
+  "ros2_fake_server_extension": "covered by ROS2-gated unit tests",
+  "scenarios": [
+    {
+      "adapter": "mock-nav2",
+      "events": "accepted_success/events.jsonl",
+      "host_reached": [
+        true,
+        true
+      ],
+      "name": "accepted_success",
+      "operations": [
+        "navigate-to-pose",
+        "status"
+      ],
+      "statuses": [
+        "accepted",
+        "ok"
+      ]
+    },
+    {
+      "adapter": "mock-nav2",
+      "events": "rejected/events.jsonl",
+      "host_reached": [
+        true
+      ],
+      "name": "rejected",
+      "operations": [
+        "navigate-to-pose"
+      ],
+      "statuses": [
+        "rejected"
+      ]
+    },
+    {
+      "adapter": "mock-nav2",
+      "events": "timeout/events.jsonl",
+      "host_reached": [
+        true
+      ],
+      "name": "timeout",
+      "operations": [
+        "navigate-to-pose"
+      ],
+      "statuses": [
+        "timeout"
+      ]
+    },
+    {
+      "adapter": "mock-nav2",
+      "events": "cancel_on_collision/events.jsonl",
+      "host_reached": [
+        true,
+        true
+      ],
+      "name": "cancel_on_collision",
+      "operations": [
+        "navigate-to-pose",
+        "cancel"
+      ],
+      "statuses": [
+        "accepted",
+        "cancelled"
+      ]
+    }
+  ],
+  "schema_version": "wheeled_flagship_nav_capability_manifest.v1",
+  "variant": "wheeled-goal-flagship-nav-capability"
+}

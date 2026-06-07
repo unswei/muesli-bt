@@ -1468,6 +1468,131 @@ void test_shared_flagship_generated_recovery_variant_compiles_and_preserves_fixe
     check_close((*action_vec)[1], -0.35, 1e-9, "fixed recovery should copy avoid angular command");
 }
 
+void test_shared_flagship_navigation_capability_variant_uses_cap_navigation() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+
+    const std::filesystem::path repo = find_repo_root();
+    const std::string variant_path =
+        lisp_string_literal((repo / "examples" / "flagship_wheeled" / "lisp" /
+                             "bt_goal_flagship_nav_capability.lisp")
+                                .string());
+    (void)eval_text("(load " + variant_path + ")", env);
+
+    const std::string canonical =
+        string_value(eval_text("(write-to-string (bt.to-dsl wheeled-goal-flagship-nav-capability))", env));
+    check(canonical.find("(act cap-navigation-tick)") != std::string::npos,
+          "navigation capability variant should expose cap-navigation-tick action");
+    check(canonical.find("(act cap-navigation-cancel)") != std::string::npos,
+          "navigation capability variant should cancel active jobs before fixed recovery");
+    check(canonical.find("(act select-action act_avoid 1 action_cmd)") != std::string::npos,
+          "navigation capability variant should preserve fixed collision recovery action");
+
+    (void)eval_text("(define nav-inst (bt.new-instance wheeled-goal-flagship-nav-capability))", env);
+    value first_status = eval_text(
+        "(bt.tick nav-inst "
+        " '((goal_reached #f) "
+        "   (collision_imminent #f) "
+        "   (nav_goal_frame \"map\") "
+        "   (nav_goal_x 1.0) "
+        "   (nav_goal_y 2.0) "
+        "   (nav_goal_yaw 0.25) "
+        "   (nav_timeout_ms 1000) "
+        "   (nav_mock_status \"accepted\")))",
+        env);
+    check(symbol_name(first_status) == "running", "accepted navigation submit should keep the variant running");
+
+    bt::runtime_host& host = bt::default_runtime_host();
+    bt::instance* inst = host.find_instance(bt_handle(eval_text("nav-inst", env)));
+    check(inst != nullptr, "navigation capability flagship instance should exist");
+    const bt::bb_entry* branch = inst->bb.get("active_branch");
+    check(branch && std::get<std::int64_t>(branch->value) == 2, "navigation branch should set active_branch=2");
+    const bt::bb_entry* nav_status = inst->bb.get("nav_status");
+    check(nav_status && std::get<std::string>(nav_status->value) == "accepted",
+          "accepted navigation submit should store nav_status");
+    const bt::bb_entry* job_id = inst->bb.get("nav_job_id");
+    check(job_id && !std::get<std::string>(job_id->value).empty(), "accepted navigation submit should store job id");
+    check(inst->bb.get("nav_request_hash") != nullptr, "navigation submit should store request hash");
+    check(inst->bb.get("nav_response_hash") != nullptr, "navigation submit should store response hash");
+    const bt::bb_entry* host_reached = inst->bb.get("nav_host_reached");
+    check(host_reached && std::get<bool>(host_reached->value), "accepted navigation submit should reach mock host");
+
+    value success_status = eval_text(
+        "(bt.tick nav-inst "
+        " '((goal_reached #f) "
+        "   (collision_imminent #f) "
+        "   (nav_goal_frame \"map\") "
+        "   (nav_goal_x 1.0) "
+        "   (nav_goal_y 2.0) "
+        "   (nav_mock_status \"ok\")))",
+        env);
+    check(symbol_name(success_status) == "success", "ok navigation status should complete the navigation branch");
+    nav_status = inst->bb.get("nav_status");
+    check(nav_status && std::get<std::string>(nav_status->value) == "ok", "ok navigation status should be stored");
+    const bt::bb_entry* distance = inst->bb.get("nav_distance_remaining_m");
+    check(distance && std::get<double>(distance->value) == 0.0, "ok navigation status should store zero distance");
+
+    const auto tick_rejected_navigation = [&](const std::string& instance_name,
+                                             const std::string& mock_status,
+                                             const std::string& expected_status) {
+        (void)eval_text("(define " + instance_name + " (bt.new-instance wheeled-goal-flagship-nav-capability))", env);
+        value result = eval_text(
+            "(bt.tick " + instance_name +
+                " '((goal_reached #f) "
+                "   (collision_imminent #f) "
+                "   (nav_goal_x 1.0) "
+                "   (nav_goal_y 2.0) "
+                "   (nav_mock_status \"" +
+                mock_status + "\")))",
+            env);
+        check(symbol_name(result) == "failure", expected_status + " navigation status should fail the branch");
+        bt::instance* rejected_inst = host.find_instance(bt_handle(eval_text(instance_name, env)));
+        check(rejected_inst != nullptr, "navigation rejection instance should exist");
+        const bt::bb_entry* rejected_status = rejected_inst->bb.get("nav_status");
+        check(rejected_status && std::get<std::string>(rejected_status->value) == expected_status,
+              expected_status + " navigation status should be stored");
+    };
+
+    tick_rejected_navigation("nav-rejected-inst", "rejected", "rejected");
+    tick_rejected_navigation("nav-timeout-inst", "timeout", "timeout");
+    tick_rejected_navigation("nav-unavailable-inst", "unavailable", "unavailable");
+
+    (void)eval_text("(define nav-cancel-inst (bt.new-instance wheeled-goal-flagship-nav-capability))", env);
+    (void)eval_text(
+        "(bt.tick nav-cancel-inst "
+        " '((goal_reached #f) "
+        "   (collision_imminent #f) "
+        "   (nav_goal_x 1.0) "
+        "   (nav_goal_y 2.0) "
+        "   (nav_mock_status \"accepted\")))",
+        env);
+    value cancel_status = eval_text(
+        "(bt.tick nav-cancel-inst "
+        " '((goal_reached #f) "
+        "   (collision_imminent #t) "
+        "   (act_avoid (0.10 -0.35))))",
+        env);
+    check(symbol_name(cancel_status) == "running", "collision recovery should keep the navigation variant running");
+    bt::instance* cancel_inst = host.find_instance(bt_handle(eval_text("nav-cancel-inst", env)));
+    check(cancel_inst != nullptr, "navigation cancel instance should exist");
+    nav_status = cancel_inst->bb.get("nav_status");
+    check(nav_status && std::get<std::string>(nav_status->value) == "cancelled",
+          "collision recovery should cancel the active navigation job");
+    job_id = cancel_inst->bb.get("nav_job_id");
+    check(job_id && std::get<std::string>(job_id->value).empty(),
+          "cancelled navigation job should clear nav_job_id");
+    branch = cancel_inst->bb.get("active_branch");
+    check(branch && std::get<std::int64_t>(branch->value) == 1, "collision recovery should preserve active_branch=1");
+    const bt::bb_entry* action = cancel_inst->bb.get("action_cmd");
+    check(action != nullptr, "collision recovery should write action_cmd");
+    const auto* action_vec = std::get_if<std::vector<double>>(&action->value);
+    check(action_vec && action_vec->size() == 2u, "collision recovery action_cmd should be a two-value command");
+    check_close((*action_vec)[0], 0.10, 1e-9, "collision recovery should copy avoid linear command");
+    check_close((*action_vec)[1], -0.35, 1e-9, "collision recovery should copy avoid angular command");
+}
+
 bt::definition make_flagship_recovery_slot_definition() {
     bt::definition def;
     def.nodes.push_back(bt_composite_node(0, bt::node_kind::sel, {1, 3, 8}));
@@ -5922,6 +6047,96 @@ void test_ros2_nav2_fake_server_reject_abort_cancel_and_timeout() {
     }
 }
 
+void test_ros2_wheeled_flagship_navigation_capability_variant_fake_server() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_env_with_ros2_extension();
+    const std::filesystem::path repo = find_repo_root();
+    const std::string variant_path =
+        lisp_string_literal((repo / "examples" / "flagship_wheeled" / "lisp" /
+                             "bt_goal_flagship_nav_capability.lisp")
+                                .string());
+    (void)eval_text("(load " + variant_path + ")", env);
+
+    {
+        const std::string action_name = unique_nav2_action_name("flagship_success");
+        test_support::nav2_fake_action_server server(action_name, test_support::nav2_fake_action_server::mode::accept_delay);
+        (void)eval_text("(define ros2-nav-flagship-inst (bt.new-instance wheeled-goal-flagship-nav-capability))", env);
+        value accepted = eval_text(
+            "(bt.tick ros2-nav-flagship-inst "
+            " '((goal_reached #f) "
+            "   (collision_imminent #f) "
+            "   (nav_goal_frame \"map\") "
+            "   (nav_goal_x 1.25) "
+            "   (nav_goal_y -0.5) "
+            "   (nav_goal_yaw 0.5) "
+            "   (nav_timeout_ms 500) "
+            "   (nav_action_name " +
+                lisp_string_literal(action_name) +
+                ")))",
+            env);
+        check(symbol_name(accepted) == "running", "flagship Nav2 submit should keep tree running");
+        check(server.wait_for_goal_count(1, std::chrono::milliseconds(500)),
+              "flagship Nav2 fake server should receive one goal");
+        const auto goal = server.last_goal();
+        check_close(goal.pose.pose.position.x, 1.25, 1e-6, "flagship Nav2 received pose.x mismatch");
+        check_close(goal.pose.pose.position.y, -0.5, 1e-6, "flagship Nav2 received pose.y mismatch");
+
+        value final_status = make_nil();
+        gc_root_scope roots(default_gc());
+        roots.add(&final_status);
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(1000);
+        while (std::chrono::steady_clock::now() < deadline) {
+            final_status = eval_text(
+                "(bt.tick ros2-nav-flagship-inst "
+                " '((goal_reached #f) "
+                "   (collision_imminent #f)))",
+                env);
+            if (symbol_name(final_status) == "success") {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+        check(symbol_name(final_status) == "success", "flagship Nav2 status should reach success");
+        bt::instance* inst = bt::default_runtime_host().find_instance(bt_handle(eval_text("ros2-nav-flagship-inst", env)));
+        check(inst != nullptr, "flagship Nav2 instance should exist");
+        const bt::bb_entry* nav_status = inst->bb.get("nav_status");
+        check(nav_status && std::get<std::string>(nav_status->value) == "ok",
+              "flagship Nav2 success should store nav_status=ok");
+        const bt::bb_entry* host_reached = inst->bb.get("nav_host_reached");
+        check(host_reached && std::get<bool>(host_reached->value), "flagship Nav2 success should reach host");
+    }
+
+    {
+        const std::string action_name = unique_nav2_action_name("flagship_cancel");
+        test_support::nav2_fake_action_server server(action_name, test_support::nav2_fake_action_server::mode::accept_delay);
+        (void)eval_text("(define ros2-nav-cancel-inst (bt.new-instance wheeled-goal-flagship-nav-capability))", env);
+        (void)eval_text(
+            "(bt.tick ros2-nav-cancel-inst "
+            " '((goal_reached #f) "
+            "   (collision_imminent #f) "
+            "   (nav_goal_x 1.25) "
+            "   (nav_goal_y -0.5) "
+            "   (nav_timeout_ms 500) "
+            "   (nav_action_name " +
+                lisp_string_literal(action_name) +
+                ")))",
+            env);
+        check(server.wait_for_goal_count(1, std::chrono::milliseconds(500)),
+              "flagship Nav2 cancel scenario should submit one goal");
+        value cancelled = eval_text(
+            "(bt.tick ros2-nav-cancel-inst "
+            " '((goal_reached #f) "
+            "   (collision_imminent #t) "
+            "   (act_avoid (0.10 -0.35))))",
+            env);
+        check(symbol_name(cancelled) == "running", "flagship Nav2 collision recovery should keep running");
+        check(server.wait_for_cancel_count(1, std::chrono::milliseconds(500)),
+              "flagship Nav2 fake server should observe cancel request");
+    }
+}
+
 void test_env_generic_ros2_backend_contract() {
     using namespace muslisp;
 
@@ -6528,6 +6743,8 @@ int main() {
          test_bt_live_subtree_install_cleans_replaced_running_subtree},
         {"shared flagship generated recovery variant compiles and preserves fixed recovery",
          test_shared_flagship_generated_recovery_variant_compiles_and_preserves_fixed_recovery},
+        {"shared flagship navigation capability variant uses cap.navigation.v1",
+         test_shared_flagship_navigation_capability_variant_uses_cap_navigation},
         {"flagship generated recovery live install reject and rollback",
          test_flagship_generated_recovery_live_install_reject_and_rollback},
         {"bt export-dot builtin", test_bt_export_dot_builtin},
@@ -6597,6 +6814,8 @@ int main() {
         {"ros2 Nav2 fake action server accept running and success", test_ros2_nav2_fake_server_accept_running_and_success},
         {"ros2 Nav2 fake action server reject abort cancel and timeout",
          test_ros2_nav2_fake_server_reject_abort_cancel_and_timeout},
+        {"ros2 wheeled flagship navigation capability fake server",
+         test_ros2_wheeled_flagship_navigation_capability_variant_fake_server},
         {"env generic ros2 backend contract", test_env_generic_ros2_backend_contract},
         {"ros2 backend config validation and reset policy", test_ros2_backend_config_validation_and_reset_policy},
         {"ros2 backend invalid action fallback", test_ros2_backend_invalid_action_fallback},

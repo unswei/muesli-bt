@@ -14,6 +14,7 @@
 #include <utility>
 
 #include "muesli_bt/contract/events.hpp"
+#include "muslisp/cap_api.hpp"
 #include "muslisp/error.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
@@ -105,6 +106,202 @@ std::vector<double> bb_value_as_vector(const bb_value& value, const std::string&
         return *vec;
     }
     throw std::runtime_error(where + ": expected numeric or numeric-vector blackboard value");
+}
+
+muslisp::map_key lisp_symbol_key(const std::string& name) {
+    muslisp::map_key key;
+    key.type = muslisp::map_key_type::symbol;
+    key.text_data = name;
+    return key;
+}
+
+void lisp_map_set_symbol(muslisp::value map_obj, const std::string& key_name, muslisp::value v) {
+    map_obj->map_data[lisp_symbol_key(key_name)] = v;
+}
+
+std::optional<muslisp::value> lisp_map_get_symbol(muslisp::value map_obj, const std::string& key_name) {
+    if (!muslisp::is_map(map_obj)) {
+        return std::nullopt;
+    }
+    const auto it = map_obj->map_data.find(lisp_symbol_key(key_name));
+    if (it == map_obj->map_data.end()) {
+        return std::nullopt;
+    }
+    return it->second;
+}
+
+std::string lisp_text_value(muslisp::value v) {
+    if (muslisp::is_symbol(v)) {
+        std::string out = muslisp::symbol_name(v);
+        if (!out.empty() && out.front() == ':') {
+            out.erase(out.begin());
+        }
+        return out;
+    }
+    if (muslisp::is_string(v)) {
+        return muslisp::string_value(v);
+    }
+    return {};
+}
+
+std::string lisp_map_text_or_empty(muslisp::value map_obj, const std::string& key_name) {
+    const std::optional<muslisp::value> found = lisp_map_get_symbol(map_obj, key_name);
+    return found.has_value() ? lisp_text_value(*found) : std::string{};
+}
+
+bool lisp_map_bool_or(muslisp::value map_obj, const std::string& key_name, bool fallback) {
+    const std::optional<muslisp::value> found = lisp_map_get_symbol(map_obj, key_name);
+    if (!found.has_value() || !muslisp::is_boolean(*found)) {
+        return fallback;
+    }
+    return muslisp::boolean_value(*found);
+}
+
+std::optional<double> lisp_map_number(muslisp::value map_obj, const std::string& key_name) {
+    const std::optional<muslisp::value> found = lisp_map_get_symbol(map_obj, key_name);
+    if (!found.has_value()) {
+        return std::nullopt;
+    }
+    if (muslisp::is_integer(*found)) {
+        return static_cast<double>(muslisp::integer_value(*found));
+    }
+    if (muslisp::is_float(*found)) {
+        return muslisp::float_value(*found);
+    }
+    return std::nullopt;
+}
+
+std::string bb_string_or(tick_context& ctx, const std::string& key, std::string fallback) {
+    const bb_entry* entry = ctx.bb_get(key);
+    if (!entry) {
+        return fallback;
+    }
+    if (const auto* text = std::get_if<std::string>(&entry->value)) {
+        return *text;
+    }
+    return fallback;
+}
+
+std::optional<std::string> bb_string_option(tick_context& ctx, const std::string& key) {
+    const bb_entry* entry = ctx.bb_get(key);
+    if (!entry) {
+        return std::nullopt;
+    }
+    if (const auto* text = std::get_if<std::string>(&entry->value); text && !text->empty()) {
+        return *text;
+    }
+    return std::nullopt;
+}
+
+std::optional<double> bb_number_option(tick_context& ctx, const std::string& key) {
+    const bb_entry* entry = ctx.bb_get(key);
+    if (!entry) {
+        return std::nullopt;
+    }
+    if (const auto* number = std::get_if<double>(&entry->value)) {
+        return *number;
+    }
+    if (const auto* number = std::get_if<std::int64_t>(&entry->value)) {
+        return static_cast<double>(*number);
+    }
+    return std::nullopt;
+}
+
+std::int64_t bb_int_or(tick_context& ctx, const std::string& key, std::int64_t fallback) {
+    const bb_entry* entry = ctx.bb_get(key);
+    if (!entry) {
+        return fallback;
+    }
+    if (const auto* number = std::get_if<std::int64_t>(&entry->value)) {
+        return *number;
+    }
+    return fallback;
+}
+
+void store_navigation_capability_result(tick_context& ctx,
+                                        muslisp::value response,
+                                        const std::string& writer_name,
+                                        std::int64_t branch_id) {
+    const std::string status_text = lisp_map_text_or_empty(response, "status");
+    if (!status_text.empty()) {
+        ctx.bb_put("nav_status", bb_value{status_text}, writer_name);
+    }
+    if (const std::string job_id = lisp_map_text_or_empty(response, "job_id"); !job_id.empty()) {
+        ctx.bb_put("nav_job_id", bb_value{job_id}, writer_name);
+    }
+    if (const std::string request_hash = lisp_map_text_or_empty(response, "request_hash"); !request_hash.empty()) {
+        ctx.bb_put("nav_request_hash", bb_value{request_hash}, writer_name);
+    }
+    if (const std::string response_hash = lisp_map_text_or_empty(response, "response_hash"); !response_hash.empty()) {
+        ctx.bb_put("nav_response_hash", bb_value{response_hash}, writer_name);
+    }
+    ctx.bb_put("nav_host_reached", bb_value{lisp_map_bool_or(response, "host_reached", false)}, writer_name);
+    if (const std::optional<muslisp::value> progress = lisp_map_get_symbol(response, "progress"); progress.has_value()) {
+        if (const std::optional<double> distance = lisp_map_number(*progress, "distance_remaining_m"); distance.has_value()) {
+            ctx.bb_put("nav_distance_remaining_m", bb_value{*distance}, writer_name);
+        }
+    }
+    ctx.bb_put("active_branch", bb_value{branch_id}, writer_name);
+}
+
+muslisp::value make_navigation_request(tick_context& ctx,
+                                       const std::string& operation,
+                                       const std::string& request_id,
+                                       const std::optional<std::string>& job_id = std::nullopt) {
+    using namespace muslisp;
+    value request = make_map();
+    gc_root_scope roots(default_gc());
+    roots.add(&request);
+    lisp_map_set_symbol(request, "schema_version", make_string("cap.navigation.request.v1"));
+    lisp_map_set_symbol(request, "capability", make_string("cap.navigation.v1"));
+    lisp_map_set_symbol(request, "operation", make_string(operation));
+    lisp_map_set_symbol(request, "request_id", make_string(request_id));
+    lisp_map_set_symbol(request, "timeout_ms", make_integer(bb_int_or(ctx, "nav_timeout_ms", 1000)));
+    if (const std::optional<std::string> action_name = bb_string_option(ctx, "nav_action_name"); action_name.has_value()) {
+        lisp_map_set_symbol(request, "action_name", make_string(*action_name));
+    }
+    if (job_id.has_value()) {
+        lisp_map_set_symbol(request, "job_id", make_string(*job_id));
+    }
+    if (operation == "navigate-to-pose") {
+        const std::optional<double> x = bb_number_option(ctx, "nav_goal_x");
+        const std::optional<double> y = bb_number_option(ctx, "nav_goal_y");
+        if (!x.has_value() || !y.has_value()) {
+            throw std::runtime_error("cap-navigation-tick: nav_goal_x and nav_goal_y are required");
+        }
+        value target = make_map();
+        roots.add(&target);
+        lisp_map_set_symbol(target, "frame", make_string(bb_string_or(ctx, "nav_goal_frame", "map")));
+        lisp_map_set_symbol(target, "x", make_float(*x));
+        lisp_map_set_symbol(target, "y", make_float(*y));
+        lisp_map_set_symbol(target, "yaw", make_float(bb_number_option(ctx, "nav_goal_yaw").value_or(0.0)));
+        lisp_map_set_symbol(request, "target", target);
+        if (const std::optional<std::string> mock_status = bb_string_option(ctx, "nav_mock_status"); mock_status.has_value()) {
+            lisp_map_set_symbol(request, "mock_status", make_string(*mock_status));
+        }
+    }
+    if (operation == "status") {
+        if (const std::optional<std::string> mock_status = bb_string_option(ctx, "nav_mock_status"); mock_status.has_value()) {
+            lisp_map_set_symbol(request, "mock_status", make_string(*mock_status));
+        }
+    }
+    if (operation == "cancel") {
+        if (const std::optional<std::string> mock_status = bb_string_option(ctx, "nav_mock_cancel_status"); mock_status.has_value()) {
+            lisp_map_set_symbol(request, "mock_status", make_string(*mock_status));
+        }
+    }
+    return request;
+}
+
+status navigation_bt_status_from_result(muslisp::value response) {
+    const std::string result_status = lisp_map_text_or_empty(response, "status");
+    if (result_status == "accepted" || result_status == "running") {
+        return status::running;
+    }
+    if (result_status == "ok") {
+        return status::success;
+    }
+    return status::failure;
 }
 
 bool bb_value_truthy(const bb_value& value) {
@@ -1157,6 +1354,63 @@ void install_demo_callbacks(runtime_host& host) {
                             ctx.bb_put(out_key, bb_value{std::move(action)}, "select-action");
                             ctx.bb_put("active_branch", bb_value{branch_id}, "select-action");
                             return status::success;
+                        });
+
+    reg.register_action("cap-navigation-tick",
+                        [](tick_context& ctx, node_id, node_memory&, std::span<const muslisp::value>) {
+                            try {
+                                const std::optional<std::string> job_id = bb_string_option(ctx, "nav_job_id");
+                                const std::string request_id =
+                                    bb_string_or(ctx,
+                                                 "nav_request_id",
+                                                 job_id.has_value() ? "flagship-nav-status" : "flagship-nav-goal");
+                                muslisp::value request =
+                                    make_navigation_request(ctx,
+                                                            job_id.has_value() ? "status" : "navigate-to-pose",
+                                                            request_id,
+                                                            job_id);
+                                muslisp::gc_root_scope roots(muslisp::default_gc());
+                                roots.add(&request);
+                                muslisp::value response = muslisp::cap_call(request);
+                                roots.add(&response);
+                                store_navigation_capability_result(ctx, response, "cap-navigation-tick", 2);
+                                return navigation_bt_status_from_result(response);
+                            } catch (const std::exception& ex) {
+                                ctx.bb_put("nav_status", bb_value{std::string("error")}, "cap-navigation-tick");
+                                ctx.bb_put("nav_error", bb_value{std::string(ex.what())}, "cap-navigation-tick");
+                                ctx.bb_put("nav_host_reached", bb_value{false}, "cap-navigation-tick");
+                                ctx.bb_put("active_branch", bb_value{std::int64_t{2}}, "cap-navigation-tick");
+                                return status::failure;
+                            }
+                        });
+
+    reg.register_action("cap-navigation-cancel",
+                        [](tick_context& ctx, node_id, node_memory&, std::span<const muslisp::value>) {
+                            const std::optional<std::string> job_id = bb_string_option(ctx, "nav_job_id");
+                            if (!job_id.has_value()) {
+                                return status::success;
+                            }
+                            try {
+                                muslisp::value request =
+                                    make_navigation_request(ctx,
+                                                            "cancel",
+                                                            bb_string_or(ctx, "nav_cancel_request_id", "flagship-nav-cancel"),
+                                                            job_id);
+                                muslisp::gc_root_scope roots(muslisp::default_gc());
+                                roots.add(&request);
+                                muslisp::value response = muslisp::cap_call(request);
+                                roots.add(&response);
+                                store_navigation_capability_result(ctx, response, "cap-navigation-cancel", 1);
+                                if (lisp_map_text_or_empty(response, "status") == "cancelled") {
+                                    ctx.bb_put("nav_job_id", bb_value{std::string{}}, "cap-navigation-cancel");
+                                }
+                                return status::success;
+                            } catch (const std::exception& ex) {
+                                ctx.bb_put("nav_status", bb_value{std::string("error")}, "cap-navigation-cancel");
+                                ctx.bb_put("nav_error", bb_value{std::string(ex.what())}, "cap-navigation-cancel");
+                                ctx.bb_put("nav_host_reached", bb_value{false}, "cap-navigation-cancel");
+                                return status::success;
+                            }
                         });
 
     reg.register_condition("goal-reached-1d", [](tick_context& ctx, std::span<const muslisp::value> args) {

@@ -480,6 +480,11 @@ if (Python3_Interpreter_FOUND)
     NAME muesli_bt_generated_guarded_recovery
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_generated_guarded_recovery.py"
   )
+  add_test(
+    NAME muesli_bt_wheeled_flagship_nav_capability_evidence
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_wheeled_flagship_nav_capability_evidence.py"
+            --muslisp "$<TARGET_FILE:muslisp>" --check
+  )
   if (TARGET nav2_capability_evidence)
     add_test(
       NAME muesli_bt_nav2_capability_evidence

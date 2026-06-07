@@ -49,6 +49,7 @@ What is implemented today:
 - Linux ROS-backed tests, installed-package consumer smoke coverage, and live runner validation via `muslisp_ros2`
 - Linux `L2` replay corpus covering nominal replay, clamped actions, invalid-action fallback, safe-action pre-emption, and reset-unsupported artefacts
 - an experimental optional `cap.navigation.v1` Nav2 adapter that proves the ROS2 `NavigateToPose` action-client boundary against an in-process fake action server
+- an experimental `wheeled-goal-flagship-nav-capability` BT variant with core mock evidence and ROS2-gated fake-server unit coverage for the navigation-capability lane
 
 What is still intentionally incomplete:
 
@@ -77,6 +78,8 @@ Non-goals for this first baseline:
 - simulator-specific reset integration
 
 The optional Nav2 capability adapter is separate from the released thin transport baseline. It is reached through `(cap.call request-map)` with `capability="cap.navigation.v1"`, not through `env.attach`, `env.observe`, or `env.act`.
+
+The optional wheeled flagship navigation-capability variant is also separate from the released thin transport baseline. Existing ROS2 flagship wrappers keep loading the canonical shared flagship until a later promotion slice deliberately changes that.
 
 ## how it works
 

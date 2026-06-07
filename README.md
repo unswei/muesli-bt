@@ -80,7 +80,7 @@ Status vocabulary used in this repository:
 | Model-service VLA sessions | experimental in v0.8 | [model-service bridge](docs/integration/model-service-bridge.md) |
 | MiniVLA smoke/evidence path | gated experimental evidence | [MiniVLA smoke evidence](docs/evidence/minivla-smoke-evidence.md) |
 | Production VLA providers | planned | [roadmap to 1.0](docs/roadmap-to-1.0.md) |
-| Nav2/MoveIt real adapters | Nav2 fake-server action-client evidence is experimental; MoveIt remains planned | [Nav2 capability fake-server evidence](docs/evidence/nav2-capability-fake-server.md) |
+| Nav2/MoveIt real adapters | Nav2 fake-server action-client and opt-in flagship navigation-capability evidence are experimental; MoveIt remains planned | [Nav2 capability fake-server evidence](docs/evidence/nav2-capability-fake-server.md) |
 
 ## at a glance
 
@@ -141,7 +141,7 @@ Benchmark numbers are reported for curated evidence bundles. The README links to
 
 ROS2 support is a thin host integration layer. The released baseline is Humble-focused and keeps the core transport surface intentionally narrow: `nav_msgs/msg/Odometry` in, `geometry_msgs/msg/Twist` out, canonical logs through `mbt.evt.v1`.
 
-Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md), then read [ROS2 backend scope](docs/integration/ros2-backend-scope.md) and [host capability bundles](docs/integration/host-capability-bundles.md). The optional Nav2 capability adapter has checked-in [fake-server action-client evidence](docs/evidence/nav2-capability-fake-server.md). This proves the `NavigateToPose` action-client boundary, not a real Nav2 deployment. MoveIt remains roadmap work unless a release note says otherwise.
+Start with the [ROS2 tutorial](docs/integration/ros2-tutorial.md), then read [ROS2 backend scope](docs/integration/ros2-backend-scope.md) and [host capability bundles](docs/integration/host-capability-bundles.md). The optional Nav2 capability adapter has checked-in [fake-server action-client evidence](docs/evidence/nav2-capability-fake-server.md), and the wheeled flagship has opt-in [navigation-capability evidence](docs/evidence/wheeled-flagship-nav-capability.md). These prove the capability boundaries, not a real Nav2 deployment. MoveIt remains roadmap work unless a release note says otherwise.
 
 ## VLA and model-service status
 
