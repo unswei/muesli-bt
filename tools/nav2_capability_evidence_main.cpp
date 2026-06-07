@@ -236,11 +236,33 @@ bool is_cap_call_event(const std::string& line) {
            line.find("\"type\":\"cap_call_end\"") != std::string::npos;
 }
 
+std::string replace_json_number_field(std::string line, const std::string& field, std::uint64_t value) {
+    const std::string key = "\"" + field + "\":";
+    const std::size_t key_pos = line.find(key);
+    if (key_pos == std::string::npos) {
+        return line;
+    }
+    const std::size_t value_begin = key_pos + key.size();
+    std::size_t value_end = value_begin;
+    while (value_end < line.size() && line[value_end] >= '0' && line[value_end] <= '9') {
+        ++value_end;
+    }
+    line.replace(value_begin, value_end - value_begin, std::to_string(value));
+    return line;
+}
+
+std::string normalise_representative_event(std::string line, std::size_t ordinal) {
+    const std::uint64_t normalised_seq = static_cast<std::uint64_t>(ordinal);
+    const std::uint64_t normalised_unix_ms = 1760000000000ull + normalised_seq - 1ull;
+    line = replace_json_number_field(std::move(line), "unix_ms", normalised_unix_ms);
+    return replace_json_number_field(std::move(line), "seq", normalised_seq);
+}
+
 void append_new_cap_events(scenario_summary& summary, std::size_t before_count) {
     const std::vector<std::string> snapshot = bt::default_runtime_host().events().snapshot();
     for (std::size_t i = before_count; i < snapshot.size(); ++i) {
         if (is_cap_call_event(snapshot[i])) {
-            summary.events.push_back(snapshot[i]);
+            summary.events.push_back(normalise_representative_event(snapshot[i], summary.events.size() + 1));
         }
     }
 }
