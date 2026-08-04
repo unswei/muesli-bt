@@ -70,6 +70,7 @@
         "async_cancel_acknowledged",
         "async_completion_dropped",
         "async_authority_revoked",
+        "walking_target_dispatch",
         "dsl_fragment_generated",
         "dsl_fragment_normalised",
         "dsl_fragment_validation_ok",
@@ -292,6 +293,140 @@
               }
             },
             "additionalProperties": true
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": { "const": "vla_submit" },
+          "data": { "required": ["generation"] }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "required": [
+              "job_id",
+              "generation",
+              "requesting_node_id",
+              "authority_node_id",
+              "job_key",
+              "context_key",
+              "captured_context_id",
+              "submitted_at_ns",
+              "deadline_at_ns",
+              "acceptance_policy",
+              "authority_state"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": { "const": "vla_result" },
+          "data": { "required": ["generation"] }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "required": [
+              "job_id",
+              "generation",
+              "requesting_node_id",
+              "authority_node_id",
+              "job_key",
+              "captured_context_id",
+              "current_context_id",
+              "authority_state",
+              "decision",
+              "reason",
+              "digest"
+            ],
+            "properties": {
+              "decision": { "enum": ["accepted", "rejected"] },
+              "reason": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": { "const": "async_authority_revoked" }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "required": [
+              "job_id",
+              "generation",
+              "requesting_node_id",
+              "authority_node_id",
+              "job_key",
+              "captured_context_id",
+              "authority_state",
+              "reason",
+              "detail"
+            ],
+            "properties": {
+              "authority_state": { "const": "revoked" },
+              "reason": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": { "const": "walking_target_dispatch" }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "required": [
+              "job_id",
+              "generation",
+              "requesting_node_id",
+              "authority_node_id",
+              "dispatching_node_id",
+              "job_key",
+              "captured_context_id",
+              "current_context_id",
+              "action_frame",
+              "authority_state",
+              "decision",
+              "reason",
+              "dispatch_source",
+              "target",
+              "target_digest"
+            ],
+            "properties": {
+              "decision": { "enum": ["accepted", "rejected"] },
+              "reason": { "type": "string" },
+              "dispatch_source": {
+                "enum": ["runtime_structural", "host_callback", "unavailable"]
+              },
+              "target": {
+                "type": ["object", "null"],
+                "required": ["frame_id", "x_m", "y_m", "yaw_rad"],
+                "properties": {
+                  "frame_id": { "type": "string" },
+                  "x_m": { "type": "number" },
+                  "y_m": { "type": "number" },
+                  "yaw_rad": { "type": "number" }
+                },
+                "additionalProperties": false
+              }
+            }
           }
         }
       }

@@ -1123,6 +1123,146 @@ const vla_commit_validator* runtime_host::vla_commit_validator_ptr() const noexc
     return vla_commit_validator_;
 }
 
+void runtime_host::set_walking_target_dispatcher(walking_target_dispatcher* dispatcher) noexcept {
+    walking_target_dispatcher_ = dispatcher;
+}
+
+walking_target_dispatcher* runtime_host::walking_target_dispatcher_ptr() noexcept {
+    return walking_target_dispatcher_;
+}
+
+const walking_target_dispatcher* runtime_host::walking_target_dispatcher_ptr() const noexcept {
+    return walking_target_dispatcher_;
+}
+
+walking_target_dispatch_result runtime_host::dispatch_walking_target(std::int64_t instance_handle,
+                                                                     std::uint64_t job_id,
+                                                                     node_id dispatching_node,
+                                                                     const walking_target& target) {
+    instance* inst = find_instance(instance_handle);
+    if (!inst) {
+        throw std::invalid_argument("dispatch_walking_target: unknown instance handle");
+    }
+    const auto invocation_it = inst->vla_invocations.find(job_id);
+    if (invocation_it == inst->vla_invocations.end()) {
+        throw std::invalid_argument("dispatch_walking_target: unknown VLA job id");
+    }
+    vla_invocation& invocation = invocation_it->second;
+
+    std::string current_context_id;
+    if (!invocation.context_key.empty()) {
+        if (const bb_entry* current = inst->bb.get(invocation.context_key)) {
+            if (const auto* text = std::get_if<std::string>(&current->value)) {
+                current_context_id = *text;
+            } else if (const auto* integer = std::get_if<std::int64_t>(&current->value)) {
+                current_context_id = std::to_string(*integer);
+            }
+        }
+    }
+
+    const auto authority_state_name = [](vla_authority_state state) {
+        switch (state) {
+            case vla_authority_state::active:
+                return "active";
+            case vla_authority_state::revoked:
+                return "revoked";
+            case vla_authority_state::accepted:
+                return "accepted";
+            case vla_authority_state::rejected:
+                return "rejected";
+        }
+        return "rejected";
+    };
+    const bool target_finite = std::isfinite(target.x_m) && std::isfinite(target.y_m) &&
+                               std::isfinite(target.yaw_rad);
+    const auto emit_dispatch = [&](const walking_target_dispatch_result& result, std::string_view source) {
+        std::ostringstream target_json;
+        if (target_finite) {
+            target_json << "{\"frame_id\":\"" << event_log::json_escape(target.frame_id) << "\",\"x_m\":"
+                        << target.x_m << ",\"y_m\":" << target.y_m << ",\"yaw_rad\":" << target.yaw_rad << '}';
+        } else {
+            target_json << "null";
+        }
+        const std::string target_serialised = target_json.str();
+        std::ostringstream data;
+        data << "{\"job_id\":\"" << job_id << "\",\"generation\":" << invocation.generation
+             << ",\"requesting_node_id\":" << invocation.requesting_node << ",\"authority_node_id\":"
+             << invocation.authority_node << ",\"dispatching_node_id\":" << dispatching_node
+             << ",\"node_id\":" << dispatching_node << ",\"job_key\":\""
+             << event_log::json_escape(invocation.job_key) << "\",\"action_key\":\""
+             << event_log::json_escape(invocation.action_key) << "\",\"context_key\":\""
+             << event_log::json_escape(invocation.context_key) << "\",\"captured_context_id\":\""
+             << event_log::json_escape(invocation.captured_context_id) << "\",\"current_context_id\":\""
+             << event_log::json_escape(current_context_id) << "\",\"action_frame\":\""
+             << event_log::json_escape(invocation.action_frame) << "\",\"authority_state\":\""
+             << authority_state_name(invocation.authority_state) << "\",\"decision\":\""
+             << (result.accepted ? "accepted" : "rejected") << "\",\"reason\":\""
+             << event_log::json_escape(result.reason) << "\",\"dispatch_source\":\""
+             << event_log::json_escape(source) << "\",\"target\":" << target_serialised
+             << ",\"target_digest\":\"" << event_log::hash64_hex(target_serialised) << "\"}";
+        (void)events_.emit(muesli_bt::contract::kEventWalkingTargetDispatch, inst->tick_index, data.str());
+    };
+    const auto reject = [&](std::string reason, std::string_view source) {
+        walking_target_dispatch_result result{.accepted = false, .reason = std::move(reason)};
+        emit_dispatch(result, source);
+        return result;
+    };
+
+    if (invocation.authority_state != vla_authority_state::accepted) {
+        const std::string reason = invocation.authority_reason.empty() ? "host_policy_rejected"
+                                                                       : invocation.authority_reason;
+        return reject(reason, "runtime_structural");
+    }
+    if (invocation.walking_target_dispatched) {
+        return reject("duplicate_dispatch", "runtime_structural");
+    }
+    if (invocation.captured_context_id.empty() || current_context_id.empty()) {
+        return reject("ball_stale", "runtime_structural");
+    }
+    if (current_context_id != invocation.captured_context_id) {
+        return reject("context_changed", "runtime_structural");
+    }
+    if (target.frame_id.empty() || target.frame_id != invocation.action_frame) {
+        return reject("invalid_frame", "runtime_structural");
+    }
+    if (!target_finite || invocation.accepted_action.size() != 3 || target.x_m != invocation.accepted_action[0] ||
+        target.y_m != invocation.accepted_action[1] || target.yaw_rad != invocation.accepted_action[2]) {
+        return reject("invalid_pose", "runtime_structural");
+    }
+    if (!walking_target_dispatcher_) {
+        return reject("host_policy_rejected", "unavailable");
+    }
+
+    walking_target_dispatch_context context;
+    context.instance_handle = instance_handle;
+    context.job_id = job_id;
+    context.generation = invocation.generation;
+    context.requesting_node = invocation.requesting_node;
+    context.authority_node = invocation.authority_node;
+    context.dispatching_node = dispatching_node;
+    context.job_key = invocation.job_key;
+    context.captured_context_id = invocation.captured_context_id;
+    context.current_context_id = current_context_id;
+
+    walking_target_dispatch_result result;
+    try {
+        result = walking_target_dispatcher_->dispatch(context, target);
+    } catch (...) {
+        result = walking_target_dispatch_result{.accepted = false, .reason = "host_policy_rejected"};
+    }
+    if (result.accepted) {
+        result.reason.clear();
+        invocation.walking_target_dispatched = true;
+    } else if (result.reason != "robot_unstable" && result.reason != "invalid_pose" &&
+               result.reason != "invalid_frame" && result.reason != "ball_stale" &&
+               result.reason != "context_changed" && result.reason != "walking_controller_rejected" &&
+               result.reason != "host_policy_rejected") {
+        result.reason = "host_policy_rejected";
+    }
+    emit_dispatch(result, "host_callback");
+    return result;
+}
+
 void runtime_host::set_model_service_client(model_service_config config, std::unique_ptr<model_service_client> client) {
     model_service_config_ = std::move(config);
     model_service_client_ = std::move(client);

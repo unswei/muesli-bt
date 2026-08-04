@@ -90,6 +90,7 @@ void reset_bt_runtime_host() {
     bt::runtime_host& host = bt::default_runtime_host();
     host.clear_all();
     host.set_vla_commit_validator(nullptr);
+    host.set_walking_target_dispatcher(nullptr);
     bt::install_demo_callbacks(host);
 }
 
@@ -143,6 +144,29 @@ public:
 
 private:
     bt::vla_commit_validation result_;
+};
+
+class controlled_walking_target_dispatcher final : public bt::walking_target_dispatcher {
+public:
+    explicit controlled_walking_target_dispatcher(bt::walking_target_dispatch_result result)
+        : result_(std::move(result)) {}
+
+    bt::walking_target_dispatch_result dispatch(const bt::walking_target_dispatch_context& context,
+                                                 const bt::walking_target& target) override {
+        ++calls;
+        last_context = context;
+        last_target = target;
+        return result_;
+    }
+
+    void set_result(bt::walking_target_dispatch_result result) { result_ = std::move(result); }
+
+    std::size_t calls = 0;
+    bt::walking_target_dispatch_context last_context;
+    bt::walking_target last_target;
+
+private:
+    bt::walking_target_dispatch_result result_;
 };
 
 class manual_test_clock final : public bt::clock_interface {
@@ -3952,6 +3976,9 @@ void test_approach_pose_validator_registers_with_commit_gate() {
                        .max_yaw_rad = 3.141593}},
         [&host_state] { return host_state; });
     host.set_vla_commit_validator(&validator);
+    controlled_walking_target_dispatcher dispatcher(
+        bt::walking_target_dispatch_result{.accepted = false, .reason = "walking_controller_rejected"});
+    host.set_walking_target_dispatcher(&dispatcher);
     auto release = std::make_shared<std::atomic<bool>>(false);
     host.vla_ref().register_backend("approach-pose-test", std::make_shared<controlled_vla_backend>(release));
 
@@ -3970,7 +3997,8 @@ void test_approach_pose_validator_registers_with_commit_gate() {
 
     (void)eval_text(
         "(bt.tick approach-pose-inst '((state (0.0 0.0 0.0)) (ball-context \"ball-A\")))", env);
-    bt::instance* inst = host.find_instance(bt_handle(eval_text("approach-pose-inst", env)));
+    const std::int64_t instance_handle = bt_handle(eval_text("approach-pose-inst", env));
+    bt::instance* inst = host.find_instance(instance_handle);
     check(inst != nullptr && inst->vla_invocations.size() == 1,
           "approach pose request should create one invocation");
     const std::uint64_t job_id = inst->vla_invocations.begin()->first;
@@ -3997,14 +4025,75 @@ void test_approach_pose_validator_registers_with_commit_gate() {
               std::get<std::vector<double>>(accepted->value).size() == 3,
           "accepted approach pose should write a three-component action");
 
+    const bt::walking_target target{.frame_id = "ball_context", .x_m = 0.25, .y_m = 0.25, .yaw_rad = 0.25};
+    const bt::walking_target_dispatch_result controller_rejection =
+        host.dispatch_walking_target(instance_handle, job_id, 99, target);
+    check(!controller_rejection.accepted && controller_rejection.reason == "walking_controller_rejected",
+          "walking-controller rejection should retain its stable evidence reason");
+    check(dispatcher.calls == 1, "a rejected controller hand-off should call the dispatcher once");
+
+    dispatcher.set_result(bt::walking_target_dispatch_result{.accepted = true, .reason = {}});
+    const bt::walking_target_dispatch_result dispatch =
+        host.dispatch_walking_target(instance_handle, job_id, 99, target);
+    check(dispatch.accepted, "accepted invocation should reach the registered walking-target dispatcher");
+    check(dispatcher.calls == 2, "walking target should be accepted by the dispatcher exactly once");
+    check(dispatcher.last_context.job_id == job_id && dispatcher.last_context.generation == 1 &&
+              dispatcher.last_context.captured_context_id == "ball-A" &&
+              dispatcher.last_context.current_context_id == "ball-A",
+          "walking-target dispatcher should receive invocation generation and context");
+    check(dispatcher.last_target.frame_id == "ball_context" && dispatcher.last_target.x_m == 0.25,
+          "walking-target dispatcher should receive the validated target");
+
+    const bt::walking_target_dispatch_result duplicate =
+        host.dispatch_walking_target(instance_handle, job_id, 99, target);
+    check(!duplicate.accepted && duplicate.reason == "duplicate_dispatch",
+          "a second walking-target dispatch should be rejected deterministically");
+    check(dispatcher.calls == 2, "duplicate dispatch must not call the walking controller again");
+
     bool saw_action_frame = false;
+    bool saw_accepted_result_evidence = false;
+    bool saw_dispatch_evidence = false;
+    bool saw_controller_rejection_evidence = false;
+    bool saw_duplicate_dispatch_evidence = false;
     for (const std::string& line : host.events().snapshot()) {
         saw_action_frame = saw_action_frame ||
                            (line.find("\"type\":\"vla_submit\"") != std::string::npos &&
                             line.find("\"action_frame\":\"ball_context\"") != std::string::npos);
+        saw_accepted_result_evidence = saw_accepted_result_evidence ||
+                                       (line.find("\"type\":\"vla_result\"") != std::string::npos &&
+                                        line.find("\"generation\":1") != std::string::npos &&
+                                        line.find("\"captured_context_id\":\"ball-A\"") != std::string::npos &&
+                                        line.find("\"current_context_id\":\"ball-A\"") != std::string::npos &&
+                                        line.find("\"decision\":\"accepted\"") != std::string::npos);
+        saw_dispatch_evidence = saw_dispatch_evidence ||
+                                (line.find("\"type\":\"walking_target_dispatch\"") != std::string::npos &&
+                                 line.find("\"generation\":1") != std::string::npos &&
+                                 line.find("\"decision\":\"accepted\"") != std::string::npos &&
+                                 line.find("\"frame_id\":\"ball_context\"") != std::string::npos &&
+                                 line.find("\"x_m\":0.25") != std::string::npos);
+        saw_controller_rejection_evidence =
+            saw_controller_rejection_evidence ||
+            (line.find("\"type\":\"walking_target_dispatch\"") != std::string::npos &&
+             line.find("\"decision\":\"rejected\"") != std::string::npos &&
+             line.find("\"reason\":\"walking_controller_rejected\"") != std::string::npos &&
+             line.find("\"dispatch_source\":\"host_callback\"") != std::string::npos);
+        saw_duplicate_dispatch_evidence = saw_duplicate_dispatch_evidence ||
+                                          (line.find("\"type\":\"walking_target_dispatch\"") !=
+                                               std::string::npos &&
+                                           line.find("\"decision\":\"rejected\"") != std::string::npos &&
+                                           line.find("\"reason\":\"duplicate_dispatch\"") != std::string::npos);
     }
     check(saw_action_frame, "VLA invocation events should record the requested action frame");
+    check(saw_accepted_result_evidence,
+          "VLA result evidence should record generation, current context and acceptance");
+    check(saw_dispatch_evidence,
+          "walking-target dispatch evidence should record the correlated accepted target");
+    check(saw_controller_rejection_evidence,
+          "walking-target dispatch evidence should retain stable host rejection reasons");
+    check(saw_duplicate_dispatch_evidence,
+          "walking-target dispatch evidence should record rejected duplicate attempts and reasons");
     host.set_vla_commit_validator(nullptr);
+    host.set_walking_target_dispatcher(nullptr);
 }
 
 void test_vla_invocation_scoped_authority_accepts_current_result() {

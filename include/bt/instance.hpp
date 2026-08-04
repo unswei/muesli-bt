@@ -56,6 +56,7 @@ struct vla_invocation {
     std::string context_key;
     std::string captured_context_id;
     std::string action_frame;
+    std::vector<double> accepted_action;
     std::int64_t action_dims = 0;
     std::chrono::steady_clock::time_point submitted_at{};
     std::chrono::steady_clock::time_point deadline{};
@@ -63,6 +64,7 @@ struct vla_invocation {
     vla_authority_state authority_state = vla_authority_state::active;
     std::string authority_reason;
     bool cancel_requested = false;
+    bool walking_target_dispatched = false;
 };
 
 struct observability {

@@ -151,6 +151,8 @@ Safety rules:
   blackboard action write
 - invocation-scoped VLA commits fail closed when the host commit validator is
   unavailable
+- walking-target dispatch requires an accepted invocation, current context,
+  matching frame and exact accepted pose; successful dispatch is exactly once
 - subtree halt and service-aware reset revoke and cancel active VLA jobs before
   clearing their tracked job, action and metadata keys
 - job-key cleanup compares the stored backend ID so an obsolete invocation
@@ -164,6 +166,7 @@ Canonical async events:
 - `async_cancel_acknowledged`
 - `async_completion_dropped`
 - `async_authority_revoked`
+- `walking_target_dispatch`
 
 Code anchors:
 
@@ -177,6 +180,8 @@ Code anchors:
   `vla_commit_validator`)
 - approach-pose host policy: `include/bt/approach_pose_validator.hpp`
   (`approach_pose_validator` and its host-state provider)
+- walking-target dispatch boundary: `include/bt/walking_target_dispatch.hpp`
+  and `runtime_host::dispatch_walking_target`
 
 ### deterministic logging and replay
 

@@ -25,6 +25,12 @@ muesli-bt
   checks configured bounds, requested and reported frames, the current ball
   context and robot stability before an invocation-scoped result can reach the
   blackboard.
+- Added an exactly-once walking-target dispatch boundary and canonical
+  `walking_target_dispatch` evidence. The runtime correlates dispatch with the
+  accepted job generation and contexts, rechecks frame and target identity,
+  and records host acceptance or rejection with a stable reason.
+- Added a deterministic humanoid VLA evidence fixture covering an accepted and
+  dispatched result, a moved-ball rejection and higher-priority pre-emption.
 - Added the first experimental agent-proposed task-logic path, including `agent_proposal.v1` fixtures, `guarded-recovery.v1` contract checks, manifest export, validation result objects, semantic diffs, dry-run reports, rollback handles, proposal rejection fixtures, and an agent-facing integration page.
 - Added transparent `slot` BT DSL metadata for patchable subtree boundaries, with compile, tick, and `bt.to-dsl` round-trip coverage.
 - Added the first experimental live C++ tick-boundary subtree install path for `slot` nodes, including install and rollback request APIs, rollback snapshots, non-destructive rejection gates, replaced-subtree cleanup, and unit coverage for install, rejection, rollback, and halt cleanup.
@@ -51,6 +57,10 @@ muesli-bt
 - Extended VLA action spaces, action results, commit contexts and invocation
   events with optional action-frame metadata. Existing requests leave the
   field unset and retain their previous request hashes and behaviour.
+- Additively extended `mbt.evt.v1` with `walking_target_dispatch` and required
+  correlation fields for invocation-scoped submit/result, authority revocation
+  and walking-target dispatch payloads. The schema and contract version remain
+  unchanged.
 - Extended the canonical event schema and event-log docs with generated-fragment, subtree-install, and subtree-rollback lifecycle event names for the experimental generated-subtree evidence path.
 
 ## [0.8.0] - 2026-05-10

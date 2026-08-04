@@ -2464,6 +2464,7 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
 
         ctx.bb_put(opts.action_key, action_to_blackboard(*poll.partial->action_candidate), opts.node_name);
         if (invocation) {
+            invocation->accepted_action = poll.partial->action_candidate->u;
             invocation->authority_state = vla_authority_state::accepted;
             invocation->authority_reason.clear();
             erase_active_vla_job(ctx.inst, *invocation);
@@ -2546,6 +2547,7 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
 
         ctx.bb_put(opts.action_key, action_to_blackboard(poll.final->action), opts.node_name);
         if (invocation) {
+            invocation->accepted_action = poll.final->action.u;
             invocation->authority_state = vla_authority_state::accepted;
             invocation->authority_reason.clear();
             erase_active_vla_job(ctx.inst, *invocation);

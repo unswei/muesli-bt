@@ -12,6 +12,7 @@
 #include "bt/planner.hpp"
 #include "bt/runtime.hpp"
 #include "bt/vla.hpp"
+#include "bt/walking_target_dispatch.hpp"
 
 namespace bt {
 
@@ -43,6 +44,13 @@ public:
     void set_vla_commit_validator(vla_commit_validator* validator) noexcept;
     vla_commit_validator* vla_commit_validator_ptr() noexcept;
     const vla_commit_validator* vla_commit_validator_ptr() const noexcept;
+    void set_walking_target_dispatcher(walking_target_dispatcher* dispatcher) noexcept;
+    walking_target_dispatcher* walking_target_dispatcher_ptr() noexcept;
+    const walking_target_dispatcher* walking_target_dispatcher_ptr() const noexcept;
+    walking_target_dispatch_result dispatch_walking_target(std::int64_t instance_handle,
+                                                           std::uint64_t job_id,
+                                                           node_id dispatching_node,
+                                                           const walking_target& target);
     void set_model_service_client(model_service_config config, std::unique_ptr<model_service_client> client);
     void clear_model_service_client() noexcept;
     [[nodiscard]] bool model_service_configured() const noexcept;
@@ -97,6 +105,7 @@ private:
     planner_service planner_;
     vla_service vla_;
     vla_commit_validator* vla_commit_validator_ = nullptr;
+    walking_target_dispatcher* walking_target_dispatcher_ = nullptr;
     model_service_config model_service_config_{};
     std::unique_ptr<model_service_client> model_service_client_;
     std::size_t model_service_fault_index_ = 0;

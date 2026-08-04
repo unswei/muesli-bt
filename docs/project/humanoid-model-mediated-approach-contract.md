@@ -8,8 +8,9 @@
     runtime provides experimental invocation-scoped authority, pre-emption and
     reset cleanup, an explicit host commit-validation hook, and an
     SDK-independent three-component approach-pose validator for VLA BT nodes.
-    The repository does not yet provide the Booster K1 state adapter, walking
-    integration, complete experiment harness or overlay.
+    It also provides an exactly-once walking-target host callback and canonical
+    dispatch evidence. The repository does not yet provide the Booster K1 state
+    or walking-controller adapters, complete experiment harness or overlay.
 
 ## what this is
 
@@ -256,6 +257,8 @@ Rejection reasons are stable machine-readable codes:
 | `invalid_pose` | The pose contains non-finite or out-of-range values. |
 | `ball_stale` | The current observation exceeds the configured age limit. |
 | `robot_unstable` | The host stability policy rejects motion. |
+| `duplicate_dispatch` | A walking target was already dispatched for this invocation. |
+| `walking_controller_rejected` | The walking-controller boundary refused the target. |
 | `host_policy_rejected` | Another documented host safety check rejects the pose. |
 
 Before the full experiment is implemented, `mbt.evt.v1` must represent:
@@ -267,11 +270,14 @@ Before the full experiment is implemented, `mbt.evt.v1` must represent:
 - blackboard changes used by the overlay; and
 - host walking-target validation and dispatch.
 
-The generic commit gate, host-validation outcome and SDK-independent local pose
-policy are now implemented and observable. The local policy checks the action
-frame, configured pose bounds, current ball context and robot stability.
-Booster-specific state acquisition, observation-age and operating-area policy,
-and walking-target dispatch remain experiment integration work.
+The generic commit gate, host-validation outcome, SDK-independent local pose
+policy and canonical walking-target dispatch boundary are now implemented and
+observable. The local policy checks the action frame, configured pose bounds,
+current ball context and robot stability. Dispatch rechecks the invocation,
+context, frame, exact accepted target and exactly-once state before calling the
+host. Booster-specific state acquisition, observation-age and operating-area
+policy, and the actual walking-controller adapter remain experiment integration
+work.
 
 Existing canonical event types should be extended where their meaning already
 fits. Any new event type must be added to the v1 schema and documented in the
@@ -439,8 +445,9 @@ deadline. That difference is the experimental contrast.
 - The deadline-only policy is an experimental baseline, not a production mode.
 - Isaac H1 integration does not imply Booster K1 support. The Booster adapter,
   walking target interface and stability flag require their own integration.
-- The core approach-pose validator is not a Booster SDK adapter and does not
-  dispatch motion.
+- The core approach-pose validator and walking-target dispatcher are not
+  Booster SDK adapters. The registered host callback owns the real controller
+  hand-off.
 
 ## see also
 

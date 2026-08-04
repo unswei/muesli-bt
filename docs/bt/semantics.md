@@ -209,6 +209,11 @@ Uses per-node retry counter.
 - invocation-scoped commits fail closed when no host validator is registered
 - on timeout/error/cancel/invalid: returns `failure` (and clears `job_id` unless configured otherwise)
 
+An accepted three-component approach action may be handed to a registered
+walking-target dispatcher. The runtime rechecks invocation acceptance, current
+context, action frame, exact target identity and exactly-once dispatch before
+calling the host. The attempt emits `walking_target_dispatch`.
+
 ## `vla-cancel`
 
 - cancels job id at configured key when present

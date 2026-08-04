@@ -124,10 +124,17 @@ Required event families:
 - async authority and cancellation lifecycle: `async_authority_revoked`,
   `async_cancel_requested`, `async_cancel_acknowledged`,
   `async_completion_dropped`
+- validated host hand-off: `walking_target_dispatch`
 
 For commit decisions, Studio may display the optional `vla_result` fields
 `host_validation`, `host_validation_reason` and `host_validation_source`.
 Consumers must tolerate those fields being absent in older logs.
+
+For humanoid approach overlays, Studio may join `vla_submit`, `vla_result`,
+`async_authority_revoked` and `walking_target_dispatch` by `job_id` and
+`generation`. The dispatch event supplies the current walking target and its
+captured/current ball contexts. Only `decision=accepted` denotes a controller
+hand-off.
 
 ### requirement 9: deterministic mode for fixtures
 

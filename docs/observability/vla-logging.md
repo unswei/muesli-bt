@@ -7,6 +7,7 @@ VLA lifecycle is emitted through canonical event types:
 - `vla_cancel`
 - `vla_result`
 - `async_authority_revoked`
+- `walking_target_dispatch`
 
 BT-node `vla_submit` and `vla_poll` events include invocation fields when a
 runtime invocation record is available:
@@ -35,6 +36,29 @@ Structural or host-policy rejection also emits the existing
 `host_action_invalid` runtime outcome. `async_authority_revoked` records logical
 revocation before best-effort cancellation is requested. Pre-emption and reset
 then emit `bb_delete` for each tracked job or result key that still has a value.
+
+Invocation-scoped `vla_submit` and `vla_result` payloads are schema-checked for
+their correlation fields. Result payloads require generation, captured/current
+context, authority state, terminal decision and reason. The
+`async_authority_revoked` payload requires the generation, captured context,
+revoked state and pre-emption reason.
+
+`walking_target_dispatch` is the separate host hand-off record. Its payload
+contains:
+
+- job ID, generation and requesting, authority-owner and dispatching nodes;
+- job, action and context keys;
+- captured and dispatch-time current context IDs;
+- action frame and exact planar target `[x_m, y_m, yaw_rad]`;
+- target digest;
+- authority state;
+- `decision` (`accepted` or `rejected`) and stable `reason`; and
+- `dispatch_source` (`runtime_structural`, `host_callback` or `unavailable`).
+
+An accepted dispatch event is emitted only after the registered host callback
+reports that the walking-controller boundary accepted the target. Rejected or
+revoked VLA results do not produce accepted dispatch events. A second dispatch
+for the same invocation is rejected with `duplicate_dispatch`.
 
 Use the canonical event APIs:
 

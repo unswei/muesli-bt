@@ -36,6 +36,8 @@ Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated i
 - `vla_run.jsonl`
 - `vla_cancel_run.jsonl` (async cancellation edge case)
 - `vla_late_completion_drop_run.jsonl` (late completion dropped after cancellation)
+- `vla_authority_revoked_run.jsonl` (invocation-scoped pre-emption)
+- `humanoid_vla_evidence_run.jsonl` (accept, dispatch, moved-context reject and pre-emption)
 - `deadline_fallback_run.jsonl` (deadline exceeded with safe fallback)
 - `resetless_unsupported_run.jsonl` (multi-episode request on reset-less backend)
 

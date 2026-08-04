@@ -20,6 +20,7 @@ Implemented now:
   blackboard
 - an SDK-independent three-component approach-pose validator for frame, bounds,
   current ball context and robot stability
+- an exactly-once walking-target host callback with canonical dispatch evidence
 - canonical `mbt.evt.v1` logging for VLA events
 - optional `muesli-model-service` VLA session adapter for `cap.vla.action_chunk.v1`
 - validation gates for malformed, stale, unsafe, late, or policy-violating action chunks
