@@ -24,6 +24,10 @@ Do not send model output directly to actuators. The host must validate proposals
 
 `vla-request` creates a job and stores its id in the blackboard. `vla-wait` polls that id and writes a valid action to the blackboard. `vla-cancel` cancels and clears the idempotent job key.
 
+When `vla-wait` adopts a job, the invocation also records its configured
+`:action_key` and `:meta_key`. Subtree halt, explicit cancellation and
+service-aware reset clear the tracked job and result keys.
+
 `vla-request` also creates an invocation record. Existing trees use the
 `deadline_only` acceptance policy by default. Set `:acceptance_policy
 invocation_scoped` and provide `:context_key` when a result must remain bound to
@@ -148,6 +152,8 @@ Return status:
 - Use `invocation_scoped` when object identity or BT branch authority can change
   while the job is running.
 - Register a host commit validator before ticking an invocation-scoped tree.
+- Treat halt and reset as terminal cleanup: tracked VLA jobs are revoked,
+  cancelled and removed from the blackboard.
 - Keep a fallback branch after VLA work.
 - Treat model output as a proposal until the host validates it.
 - Prefer media handles such as `frame://camera1/latest` for remote calls instead of embedding image bytes in Lisp.

@@ -15,6 +15,7 @@ runtime invocation record is available:
 - `generation`;
 - `requesting_node_id` and `authority_node_id`;
 - `job_key`;
+- `action_key` and `meta_key` when a wait node has adopted the invocation;
 - `context_key`, `captured_context_id` and the current context on decisions;
 - `submitted_at_ns` and `deadline_at_ns`;
 - `acceptance_policy`; and
@@ -31,7 +32,8 @@ BT-node `vla_result` events add `decision` (`accepted` or `rejected`), a stable
 Authority failures short-circuit before host policy and use `not_run`.
 Structural or host-policy rejection also emits the existing
 `host_action_invalid` runtime outcome. `async_authority_revoked` records logical
-revocation before best-effort cancellation is requested.
+revocation before best-effort cancellation is requested. Pre-emption and reset
+then emit `bb_delete` for each tracked job or result key that still has a value.
 
 Use the canonical event APIs:
 

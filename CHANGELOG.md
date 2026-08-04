@@ -17,6 +17,10 @@ muesli-bt
   monotonic deadline, exactly-once state, action structure and host policy
   before writing an action. Invocation-scoped mode fails closed when the host
   validator is unavailable.
+- Added service-aware VLA cleanup on subtree halt and reset. Active work is
+  logically revoked, cancelled and removed from active tracking before the
+  matching job, action and metadata keys are cleared. Runtime host reset and
+  clear-all paths use this cleanup before discarding instance state.
 - Added the first experimental agent-proposed task-logic path, including `agent_proposal.v1` fixtures, `guarded-recovery.v1` contract checks, manifest export, validation result objects, semantic diffs, dry-run reports, rollback handles, proposal rejection fixtures, and an agent-facing integration page.
 - Added transparent `slot` BT DSL metadata for patchable subtree boundaries, with compile, tick, and `bt.to-dsl` round-trip coverage.
 - Added the first experimental live C++ tick-boundary subtree install path for `slot` nodes, including install and rollback request APIs, rollback snapshots, non-destructive rejection gates, replaced-subtree cleanup, and unit coverage for install, rejection, rollback, and halt cleanup.

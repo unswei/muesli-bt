@@ -505,7 +505,7 @@ void clear_subtree_runtime_state(instance& inst, const definition& def, node_id 
     std::unordered_set<node_id> ids;
     collect_subtree_nodes(def, root, ids);
     for (auto invocation = inst.vla_invocations.begin(); invocation != inst.vla_invocations.end();) {
-        if (ids.contains(invocation->second.requesting_node)) {
+        if (ids.contains(invocation->second.requesting_node) || ids.contains(invocation->second.authority_node)) {
             invocation = inst.vla_invocations.erase(invocation);
         } else {
             ++invocation;
@@ -1081,6 +1081,8 @@ void append_vla_invocation_fields(std::ostringstream& data, const vla_invocation
          << "\"requesting_node_id\":" << invocation.requesting_node << ','
          << "\"authority_node_id\":" << invocation.authority_node << ','
          << "\"job_key\":\"" << event_log::json_escape(invocation.job_key) << "\","
+         << "\"action_key\":\"" << event_log::json_escape(invocation.action_key) << "\","
+         << "\"meta_key\":\"" << event_log::json_escape(invocation.meta_key) << "\","
          << "\"captured_context_id\":\"" << event_log::json_escape(invocation.captured_context_id) << "\","
          << "\"context_key\":\"" << event_log::json_escape(invocation.context_key) << "\","
          << "\"submitted_at_ns\":" << ns_since_epoch(invocation.submitted_at) << ','
@@ -1512,10 +1514,27 @@ vla_cancel_options parse_vla_cancel_options(const node& n, const std::vector<mus
     return opts;
 }
 
-void clear_job_key_if_present(tick_context& ctx, const std::string& key, const std::string& writer_name) {
+void clear_blackboard_key_if_present(tick_context& ctx, const std::string& key, const std::string& writer_name) {
     const bb_entry* existing = ctx.bb_get(key);
-    if (existing) {
+    if (existing && !std::holds_alternative<std::monostate>(existing->value)) {
         ctx.bb_put(key, bb_value{std::monostate{}}, writer_name);
+    }
+}
+
+void clear_vla_invocation_keys(tick_context& ctx,
+                               const vla_invocation& invocation,
+                               const std::string& writer_name) {
+    if (const bb_entry* job = ctx.bb_get(invocation.job_key); job) {
+        const auto* job_id = std::get_if<std::int64_t>(&job->value);
+        if (job_id && *job_id > 0 && static_cast<std::uint64_t>(*job_id) == invocation.job_id) {
+            ctx.bb_put(invocation.job_key, bb_value{std::monostate{}}, writer_name);
+        }
+    }
+    if (!invocation.action_key.empty()) {
+        clear_blackboard_key_if_present(ctx, invocation.action_key, writer_name);
+    }
+    if (!invocation.meta_key.empty()) {
+        clear_blackboard_key_if_present(ctx, invocation.meta_key, writer_name);
     }
 }
 
@@ -2276,10 +2295,18 @@ status execute_vla_request(const node& n, tick_context& ctx, const std::vector<m
         return status::failure;
     }
 
+    std::string prior_action_key;
+    std::string prior_meta_key;
     for (auto invocation = ctx.inst.vla_invocations.begin(); invocation != ctx.inst.vla_invocations.end();) {
         if (invocation->second.job_key != opts.job_key) {
             ++invocation;
             continue;
+        }
+        if (prior_action_key.empty()) {
+            prior_action_key = invocation->second.action_key;
+        }
+        if (prior_meta_key.empty()) {
+            prior_meta_key = invocation->second.meta_key;
         }
         if (invocation->second.authority_state == vla_authority_state::active) {
             revoke_vla_invocation(
@@ -2307,6 +2334,8 @@ status execute_vla_request(const node& n, tick_context& ctx, const std::vector<m
     invocation.requesting_node = n.id;
     invocation.authority_node = n.id;
     invocation.job_key = opts.job_key;
+    invocation.action_key = std::move(prior_action_key);
+    invocation.meta_key = std::move(prior_meta_key);
     invocation.context_key = opts.context_key;
     invocation.captured_context_id = std::move(captured_context_id);
     invocation.action_dims = dims;
@@ -2355,9 +2384,12 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
 
     const auto id = static_cast<vla_service::vla_job_id>(*id_raw);
     vla_invocation* invocation = find_vla_invocation(ctx.inst, id);
-    if (invocation && invocation->acceptance_policy == vla_acceptance_policy::invocation_scoped &&
-        invocation->authority_state == vla_authority_state::active) {
-        invocation->authority_node = n.id;
+    if (invocation) {
+        invocation->action_key = opts.action_key;
+        invocation->meta_key = opts.meta_key;
+        if (invocation->authority_state == vla_authority_state::active) {
+            invocation->authority_node = n.id;
+        }
     }
     if (!budget_allows_decision_point(ctx, n.id, "vla_poll")) {
         return status::running;
@@ -2408,7 +2440,7 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
                                      commit.host_validation_reason,
                                      commit.host_validation_source);
             if (opts.clear_job) {
-                clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+                clear_blackboard_key_if_present(ctx, opts.job_key, opts.node_name);
             }
             if (invocation) {
                 erase_active_vla_job(ctx.inst, *invocation);
@@ -2444,7 +2476,7 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
             }
         }
         if (opts.clear_job) {
-            clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+            clear_blackboard_key_if_present(ctx, opts.job_key, opts.node_name);
         }
         emit_vla_result_decision(ctx,
                                  invocation,
@@ -2490,7 +2522,7 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
                                      commit.host_validation_reason,
                                      commit.host_validation_source);
             if (opts.clear_job) {
-                clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+                clear_blackboard_key_if_present(ctx, opts.job_key, opts.node_name);
             }
             if (invocation) {
                 erase_active_vla_job(ctx.inst, *invocation);
@@ -2506,7 +2538,7 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
             erase_active_vla_job(ctx.inst, *invocation);
         }
         if (opts.clear_job) {
-            clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+            clear_blackboard_key_if_present(ctx, opts.job_key, opts.node_name);
         }
         emit_log(ctx, log_level::info, "vla", "vla-wait: committed final action");
         emit_vla_result_decision(ctx,
@@ -2544,7 +2576,7 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
     }
 
     if (opts.clear_job) {
-        clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+        clear_blackboard_key_if_present(ctx, opts.job_key, opts.node_name);
     }
     const bool service_rejected_action = poll.final.has_value() && poll.final->status == vla_status::invalid;
     std::string service_validation_reason = "invalid_pose";
@@ -2620,7 +2652,7 @@ status execute_vla_cancel(const node& n, tick_context& ctx, const std::vector<mu
     }
     const auto* id_raw = std::get_if<std::int64_t>(&job_entry->value);
     if (!id_raw || *id_raw <= 0) {
-        clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
+        clear_blackboard_key_if_present(ctx, opts.job_key, opts.node_name);
         ctx.inst.active_vla_jobs.erase(n.id);
         return status::success;
     }
@@ -2640,10 +2672,11 @@ status execute_vla_cancel(const node& n, tick_context& ctx, const std::vector<mu
     if (invocation) {
         invocation->cancel_requested = true;
     }
-    clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
     if (invocation) {
+        clear_vla_invocation_keys(ctx, *invocation, opts.node_name);
         erase_active_vla_job(ctx.inst, *invocation);
     } else {
+        clear_blackboard_key_if_present(ctx, opts.job_key, opts.node_name);
         ctx.inst.active_vla_jobs.erase(n.id);
     }
     emit_log(ctx, log_level::info, "vla", "vla-cancel: cancelled job=" + std::to_string(id));
@@ -2778,19 +2811,45 @@ void halt_subtree_impl(tick_context& ctx, node_id root, std::string_view reason)
 
     halt_stack_scope stack_scope(ctx.inst);
     std::vector<node_id>& stack = stack_scope.get();
+    const node_id previous_current_node = ctx.current_node;
     stack.push_back(root);
     while (!stack.empty()) {
         const node_id id = stack.back();
         stack.pop_back();
         const node& n = get_node(*ctx.inst.def, id);
+        ctx.current_node = id;
 
         emit_node_halt(ctx, id, reason);
 
         for (auto& [_, invocation] : ctx.inst.vla_invocations) {
-            if (invocation.acceptance_policy == vla_acceptance_policy::invocation_scoped &&
-                invocation.authority_state == vla_authority_state::active && invocation.authority_node == id) {
+            if (invocation.authority_node != id) {
+                continue;
+            }
+            if (invocation.authority_state == vla_authority_state::active) {
                 revoke_vla_invocation(ctx, invocation, "branch_revoked", reason, true);
             }
+            clear_vla_invocation_keys(ctx, invocation, "vla-halt");
+            erase_active_vla_job(ctx.inst, invocation);
+        }
+
+        const auto untracked_job = ctx.inst.active_vla_jobs.find(id);
+        if (untracked_job != ctx.inst.active_vla_jobs.end() &&
+            !find_vla_invocation(ctx.inst, untracked_job->second)) {
+            const std::uint64_t job_id = untracked_job->second;
+            if (ctx.svc.vla) {
+                if (event_log* events = resolve_event_log(ctx); events) {
+                    (void)events->emit(muesli_bt::contract::kEventAsyncCancelRequested,
+                                       ctx.tick_index,
+                                       event_payload::job_node_reason(std::to_string(job_id), id, "branch_revoked"));
+                }
+                const bool accepted = ctx.svc.vla->cancel(job_id);
+                if (event_log* events = resolve_event_log(ctx); events) {
+                    (void)events->emit(muesli_bt::contract::kEventAsyncCancelAcknowledged,
+                                       ctx.tick_index,
+                                       event_payload::job_node_accepted(std::to_string(job_id), id, accepted));
+                }
+            }
+            ctx.inst.active_vla_jobs.erase(untracked_job);
         }
 
         const auto mem_it = ctx.inst.memory.find(id);
@@ -2825,6 +2884,7 @@ void halt_subtree_impl(tick_context& ctx, node_id root, std::string_view reason)
             stack.push_back(child);
         }
     }
+    ctx.current_node = previous_current_node;
 }
 
 void halt_child_subtree(tick_context& ctx, node_id from_child, node_id to_child, std::string_view reason) {
@@ -3687,6 +3747,13 @@ void reset(instance& inst) {
     inst.vla_generations.clear();
     inst.halt_warning_emitted.clear();
     inst.bb.clear();
+}
+
+void reset(instance& inst, registry& reg, services& svc) {
+    if (inst.def) {
+        halt_subtree(inst, reg, svc, inst.def->root, "reset");
+    }
+    reset(inst);
 }
 
 std::string dump_stats(const instance& inst) {

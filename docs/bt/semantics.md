@@ -233,8 +233,15 @@ If callback throws, runtime:
 
 `bt.reset` clears:
 
+- active VLA authority after logical revocation and best-effort cancellation
+- tracked VLA job, action and metadata keys
 - per-node memory
 - blackboard
+
+Subtree halt applies the same VLA cleanup when an authority-owner node belongs
+to the halted subtree. The runtime emits `async_authority_revoked`, cancellation
+lifecycle events and `bb_delete` evidence before reset discards the invocation
+record.
 
 It does not implicitly clear trace/log buffers.
 

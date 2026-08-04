@@ -151,6 +151,10 @@ Safety rules:
   blackboard action write
 - invocation-scoped VLA commits fail closed when the host commit validator is
   unavailable
+- subtree halt and service-aware reset revoke and cancel active VLA jobs before
+  clearing their tracked job, action and metadata keys
+- job-key cleanup compares the stored backend ID so an obsolete invocation
+  cannot clear a newer job
 
 Canonical async events:
 

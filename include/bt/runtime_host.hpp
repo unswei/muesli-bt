@@ -82,6 +82,8 @@ public:
     std::string dump_vla_records(std::size_t max_count = 200) const;
 
 private:
+    services make_services(instance& inst) noexcept;
+
     std::int64_t next_definition_handle_ = 1;
     std::int64_t next_instance_handle_ = 1;
 

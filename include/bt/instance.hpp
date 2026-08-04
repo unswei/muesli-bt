@@ -51,6 +51,8 @@ struct vla_invocation {
     node_id requesting_node = 0;
     node_id authority_node = 0;
     std::string job_key;
+    std::string action_key;
+    std::string meta_key;
     std::string context_key;
     std::string captured_context_id;
     std::int64_t action_dims = 0;

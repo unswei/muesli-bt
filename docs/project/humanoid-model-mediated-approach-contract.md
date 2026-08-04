@@ -5,10 +5,10 @@
     Status: contract-only.
 
     This page defines the intended experiment and evidence contract. The
-    runtime provides experimental invocation-scoped authority and an explicit
-    host commit-validation hook for VLA BT nodes. The repository does not yet
-    provide the Booster K1 validator, host integration, complete experiment
-    harness or overlay.
+    runtime provides experimental invocation-scoped authority, pre-emption and
+    reset cleanup, and an explicit host commit-validation hook for VLA BT nodes.
+    The repository does not yet provide the Booster K1 validator, host
+    integration, complete experiment harness or overlay.
 
 ## what this is
 

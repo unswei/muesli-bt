@@ -4084,11 +4084,13 @@ void test_vla_commit_gate_requires_host_validation_and_runs_it_once() {
                     "'((state 0.0) (ball-context \"ball-A\") (submit-enabled #f)))",
                     env);
     check(validator.calls == 1, "exactly-once gate must not repeat host validation after terminal rejection");
-    check(inst->bb.get("host-action") == nullptr, "duplicate rejected result must remain unable to write an action");
+    check(inst->bb.get("host-action") == nullptr, "halted rejected result must remain unable to write an action");
+    const bt::bb_entry* halted_host_job = inst->bb.get("host-job");
+    check(halted_host_job && std::holds_alternative<std::monostate>(halted_host_job->value),
+          "reactive branch halt should clear the rejected invocation job key");
 
     bool saw_host_invalid = false;
     bool saw_host_rejection = false;
-    bool saw_duplicate_rejection = false;
     for (const std::string& line : host.events().snapshot()) {
         saw_host_invalid = saw_host_invalid ||
                            (line.find("\"type\":\"host_action_invalid\"") != std::string::npos &&
@@ -4099,14 +4101,9 @@ void test_vla_commit_gate_requires_host_validation_and_runs_it_once() {
                               line.find("\"reason\":\"robot_unstable\"") != std::string::npos &&
                               line.find("\"host_validation\":\"rejected\"") != std::string::npos &&
                               line.find("\"host_validation_source\":\"host_callback\"") != std::string::npos);
-        saw_duplicate_rejection = saw_duplicate_rejection ||
-                                  (line.find("\"type\":\"vla_result\"") != std::string::npos &&
-                                   line.find("\"reason\":\"duplicate_terminal_result\"") != std::string::npos &&
-                                   line.find("\"host_validation\":\"not_run\"") != std::string::npos);
     }
     check(saw_host_invalid, "host rejection should emit canonical host_action_invalid evidence");
     check(saw_host_rejection, "vla_result should record the host rejection and validation source");
-    check(saw_duplicate_rejection, "duplicate result should be rejected before host validation runs again");
 
     host.set_vla_commit_validator(nullptr);
     inst->bb.put("host-job",
@@ -4283,7 +4280,8 @@ void test_vla_invocation_scoped_authority_revokes_on_higher_priority_preemption(
         "  (bt.compile "
         "    '(reactive-sel "
         "       (seq (cond bb-truthy emergency) (succeed)) "
-        "       (seq (vla-wait :name \"authority-preempt\" :job_key preempt-job :action_key preempt-action) "
+        "       (seq (vla-wait :name \"authority-preempt\" :job_key preempt-job :action_key preempt-action "
+        "                      :meta_key preempt-meta) "
         "            (succeed)) "
         "       (vla-request :name \"authority-preempt\" :job_key preempt-job :instruction \"approach\" "
         "                    :state_key state :model_name \"authority-preempt-test\" :deadline_ms 1000 :dims 1 "
@@ -4301,6 +4299,15 @@ void test_vla_invocation_scoped_authority_revokes_on_higher_priority_preemption(
         "(bt.tick authority-preempt-inst '((state 0.0) (ball-context \"ball-A\") (emergency #f)))", env);
     check(inst->vla_invocations.at(job_id).authority_state == bt::vla_authority_state::active,
           "request-to-wait hand-off should keep authority active");
+    check(inst->vla_invocations.at(job_id).action_key == "preempt-action" &&
+              inst->vla_invocations.at(job_id).meta_key == "preempt-meta",
+          "vla-wait should attach result keys to the invocation");
+    inst->bb.put("preempt-action",
+                 bt::bb_value{0.75},
+                 inst->tick_index,
+                 std::chrono::steady_clock::now(),
+                 0,
+                 "pre-emption-test");
 
     value interrupted = eval_text(
         "(bt.tick authority-preempt-inst '((state 0.0) (ball-context \"ball-A\") (emergency #t)))", env);
@@ -4311,9 +4318,21 @@ void test_vla_invocation_scoped_authority_revokes_on_higher_priority_preemption(
           "higher-priority pre-emption should revoke invocation authority");
     check(revoked.authority_reason == "branch_revoked", "pre-emption should use the stable branch_revoked reason");
     check(revoked.cancel_requested, "authority revocation should request best-effort backend cancellation");
-    check(inst->bb.get("preempt-action") == nullptr, "revoked invocation must not update the action key");
+    check(inst->active_vla_jobs.empty(), "pre-emption should remove the job from active VLA tracking");
+    const bt::bb_entry* cleared_job = inst->bb.get("preempt-job");
+    const bt::bb_entry* cleared_action = inst->bb.get("preempt-action");
+    const bt::bb_entry* cleared_meta = inst->bb.get("preempt-meta");
+    check(cleared_job && std::holds_alternative<std::monostate>(cleared_job->value),
+          "pre-emption should clear the invocation job key");
+    check(cleared_action && std::holds_alternative<std::monostate>(cleared_action->value),
+          "pre-emption should clear the invocation action key");
+    check(cleared_meta && std::holds_alternative<std::monostate>(cleared_meta->value),
+          "pre-emption should clear the invocation metadata key");
 
     bool saw_revocation = false;
+    bool saw_job_delete = false;
+    bool saw_action_delete = false;
+    bool saw_meta_delete = false;
     for (const std::string& line : host.events().snapshot()) {
         if (line.find("\"type\":\"async_authority_revoked\"") != std::string::npos &&
             line.find("\"reason\":\"branch_revoked\"") != std::string::npos &&
@@ -4321,8 +4340,112 @@ void test_vla_invocation_scoped_authority_revokes_on_higher_priority_preemption(
             line.find("\"authority_state\":\"revoked\"") != std::string::npos) {
             saw_revocation = true;
         }
+        saw_job_delete = saw_job_delete ||
+                         (line.find("\"type\":\"bb_delete\"") != std::string::npos &&
+                          line.find("\"key\":\"preempt-job\"") != std::string::npos);
+        saw_action_delete = saw_action_delete ||
+                            (line.find("\"type\":\"bb_delete\"") != std::string::npos &&
+                             line.find("\"key\":\"preempt-action\"") != std::string::npos);
+        saw_meta_delete = saw_meta_delete ||
+                          (line.find("\"type\":\"bb_delete\"") != std::string::npos &&
+                           line.find("\"key\":\"preempt-meta\"") != std::string::npos);
     }
     check(saw_revocation, "canonical event stream should record branch authority revocation");
+    check(saw_job_delete && saw_action_delete && saw_meta_delete,
+          "canonical blackboard events should record all pre-emption cleanup");
+}
+
+void test_vla_reset_revokes_running_work_and_clears_keys() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    bt::runtime_host& host = bt::default_runtime_host();
+    auto release = std::make_shared<std::atomic<bool>>(false);
+    host.vla_ref().register_backend("reset-cleanup-test", std::make_shared<controlled_vla_backend>(release));
+
+    (void)eval_text(
+        "(define reset-cleanup-tree "
+        "  (bt.compile "
+        "    '(reactive-sel "
+        "       (seq (vla-wait :name \"reset-cleanup\" :job_key reset-job :action_key reset-action "
+        "                      :meta_key reset-meta) "
+        "            (succeed)) "
+        "       (vla-request :name \"reset-cleanup\" :job_key reset-job :instruction \"approach\" "
+        "                    :state_key state :model_name \"reset-cleanup-test\" :deadline_ms 1000 :dims 1))))",
+        env);
+    (void)eval_text("(define reset-cleanup-inst (bt.new-instance reset-cleanup-tree))", env);
+    const std::int64_t instance_handle = bt_handle(eval_text("reset-cleanup-inst", env));
+
+    (void)eval_text("(bt.tick reset-cleanup-inst '((state 0.0)))", env);
+    bt::instance* inst = host.find_instance(instance_handle);
+    check(inst != nullptr && inst->vla_invocations.size() == 1, "reset cleanup test should submit one invocation");
+    const std::uint64_t job_id = inst->vla_invocations.begin()->first;
+    (void)eval_text("(bt.tick reset-cleanup-inst '((state 0.0)))", env);
+    check(inst->vla_invocations.at(job_id).acceptance_policy == bt::vla_acceptance_policy::deadline_only,
+          "reset cleanup should also cover the compatibility policy");
+    check(inst->vla_invocations.at(job_id).authority_node != inst->vla_invocations.at(job_id).requesting_node,
+          "wait node should own the running job before reset");
+    inst->bb.put("reset-action",
+                 bt::bb_value{0.5},
+                 inst->tick_index,
+                 std::chrono::steady_clock::now(),
+                 0,
+                 "reset-test");
+
+    host.reset_instance(instance_handle);
+
+    check(inst->vla_invocations.empty(), "reset should clear VLA invocation records after revocation");
+    check(inst->vla_generations.empty(), "reset should clear VLA generation records");
+    check(inst->active_vla_jobs.empty(), "reset should clear active VLA job tracking");
+    check(inst->bb.get("reset-job") == nullptr && inst->bb.get("reset-action") == nullptr &&
+              inst->bb.get("reset-meta") == nullptr,
+          "reset should clear job, action and metadata blackboard keys");
+
+    bool backend_cancelled = false;
+    for (int i = 0; i < 100; ++i) {
+        if (host.vla_ref().poll(job_id).status == bt::vla_job_status::cancelled) {
+            backend_cancelled = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    check(backend_cancelled, "reset should request cancellation of the running backend job");
+
+    bool saw_reset_revocation = false;
+    bool saw_cancel_request = false;
+    bool saw_cancel_acknowledgement = false;
+    bool saw_job_delete = false;
+    bool saw_action_delete = false;
+    bool saw_meta_delete = false;
+    for (const std::string& line : host.events().snapshot()) {
+        saw_reset_revocation = saw_reset_revocation ||
+                               (line.find("\"type\":\"async_authority_revoked\"") != std::string::npos &&
+                                line.find("\"job_id\":\"" + std::to_string(job_id) + "\"") != std::string::npos &&
+                                line.find("\"acceptance_policy\":\"deadline_only\"") != std::string::npos &&
+                                line.find("\"detail\":\"reset\"") != std::string::npos);
+        saw_cancel_request = saw_cancel_request ||
+                             (line.find("\"type\":\"async_cancel_requested\"") != std::string::npos &&
+                              line.find("\"job_id\":\"" + std::to_string(job_id) + "\"") != std::string::npos);
+        saw_cancel_acknowledgement = saw_cancel_acknowledgement ||
+                                     (line.find("\"type\":\"async_cancel_acknowledged\"") != std::string::npos &&
+                                      line.find("\"job_id\":\"" + std::to_string(job_id) + "\"") !=
+                                          std::string::npos);
+        saw_job_delete = saw_job_delete ||
+                         (line.find("\"type\":\"bb_delete\"") != std::string::npos &&
+                          line.find("\"key\":\"reset-job\"") != std::string::npos);
+        saw_action_delete = saw_action_delete ||
+                            (line.find("\"type\":\"bb_delete\"") != std::string::npos &&
+                             line.find("\"key\":\"reset-action\"") != std::string::npos);
+        saw_meta_delete = saw_meta_delete ||
+                          (line.find("\"type\":\"bb_delete\"") != std::string::npos &&
+                           line.find("\"key\":\"reset-meta\"") != std::string::npos);
+    }
+    check(saw_reset_revocation, "reset should record logical revocation before deleting invocation state");
+    check(saw_cancel_request && saw_cancel_acknowledgement,
+          "reset should record backend cancellation request and acknowledgement");
+    check(saw_job_delete && saw_action_delete && saw_meta_delete,
+          "reset should record deletion of every tracked invocation key");
 }
 
 void test_bt_compile_checks() {
@@ -7364,6 +7487,7 @@ int main() {
          test_vla_invocation_scoped_authority_rejects_changed_context_and_increments_generation},
         {"vla invocation authority revokes on higher-priority pre-emption",
          test_vla_invocation_scoped_authority_revokes_on_higher_priority_preemption},
+        {"vla reset revokes running work and clears keys", test_vla_reset_revokes_running_work_and_clears_keys},
     };
 
     const auto cleanup = []() {

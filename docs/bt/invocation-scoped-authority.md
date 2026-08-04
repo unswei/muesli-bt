@@ -122,15 +122,27 @@ exceptions are also rejected with that reason.
 
 ### branch pre-emption
 
-If an invocation-scoped authority-owner node is halted, the runtime sets the
-authority state to `revoked` with reason `branch_revoked`. It then requests
-best-effort backend cancellation.
+If a VLA authority-owner node is halted, the runtime sets an active invocation
+to `revoked` with reason `branch_revoked`. It then requests best-effort backend
+cancellation and removes the job from active runtime tracking. Halt cleanup
+applies to both acceptance policies.
+
+The invocation records the `vla-wait` action and metadata keys. Halt clears the
+matching job key plus those result keys before another branch can use them.
+Deletion is emitted through canonical `bb_delete` events. A job key is cleared
+only when it still contains the invocation's job ID, so an old invocation
+cannot erase a newer job.
 
 Logical revocation happens before cancellation is requested. A backend refusing
 or racing with cancellation cannot restore authority.
 
 `vla-cancel` also revokes the stored invocation before requesting backend
-cancellation and clearing the job key.
+cancellation and clearing the tracked job and result keys.
+
+`bt.reset` and `runtime_host::reset_instance` halt the tree before clearing its
+state. Active VLA work is therefore revoked and cancelled before invocation
+records disappear. `runtime_host::clear_all` performs the same cleanup before
+destroying instances.
 
 ### compatibility policy
 
@@ -244,6 +256,10 @@ commit gate rejects its result with `context_changed` when it arrives.
 - Use the same `:job_key` on request, wait and cancel nodes.
 - A request node and an authority-owner node are not always the same node.
 - Cancellation is resource management. Revocation is the acceptance rule.
+- Use the service-aware `reset(instance&, registry&, services&)` overload when
+  embedding the runtime directly. The one-argument overload clears in-memory
+  state only because it has no VLA service through which to request
+  cancellation.
 - `invocation_scoped` fails closed when the host has not registered a commit
   validator.
 - `vla.submit` and `vla.poll` Lisp built-ins do not create BT invocation

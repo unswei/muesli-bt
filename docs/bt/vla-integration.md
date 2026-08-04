@@ -14,6 +14,8 @@ Implemented now:
 - cancellation and timeout behaviour in runtime lifecycle
 - opt-in invocation-scoped authority with generation, context and branch
   pre-emption checks
+- subtree-halt and reset cleanup for VLA authority, backend jobs and tracked
+  blackboard outputs
 - an explicit host commit-validation callback before VLA BT actions reach the
   blackboard
 - canonical `mbt.evt.v1` logging for VLA events
@@ -32,6 +34,8 @@ Key principles:
 - mueslisp does not perform raw HTTP/model credential handling
 - BT ticks do not block on VLA calls
 - jobs are submitted, polled, and cancelled through scheduler-owned state
+- halted VLA branches revoke authority and clear their tracked job and result
+  keys
 - responses are validated before actions are written to blackboard
 - invocation-scoped results are committed only while their captured authority,
   generation, context and deadline remain current and the host commit validator

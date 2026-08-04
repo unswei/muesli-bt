@@ -996,15 +996,10 @@ const instance* runtime_host::find_instance(std::int64_t handle) const {
     return it == instances_.end() ? nullptr : it->second.get();
 }
 
-status runtime_host::tick_instance(std::int64_t handle) {
-    instance* inst = find_instance(handle);
-    if (!inst) {
-        throw std::invalid_argument("tick_instance: unknown instance handle");
-    }
-
+services runtime_host::make_services(instance& inst) noexcept {
     services svc;
     svc.sched = &scheduler_;
-    svc.obs.trace = &inst->trace;
+    svc.obs.trace = &inst.trace;
     svc.obs.logger = &logs_;
     svc.obs.events = &events_;
     svc.clock = clock_;
@@ -1012,7 +1007,16 @@ status runtime_host::tick_instance(std::int64_t handle) {
     svc.planner = &planner_;
     svc.vla = &vla_;
     svc.vla_commit = vla_commit_validator_;
+    return svc;
+}
 
+status runtime_host::tick_instance(std::int64_t handle) {
+    instance* inst = find_instance(handle);
+    if (!inst) {
+        throw std::invalid_argument("tick_instance: unknown instance handle");
+    }
+
+    services svc = make_services(*inst);
     return tick(*inst, registry_, svc);
 }
 
@@ -1021,7 +1025,8 @@ void runtime_host::reset_instance(std::int64_t handle) {
     if (!inst) {
         throw std::invalid_argument("reset_instance: unknown instance handle");
     }
-    reset(*inst);
+    services svc = make_services(*inst);
+    reset(*inst, registry_, svc);
 }
 
 registry& runtime_host::callbacks() noexcept {
@@ -1209,6 +1214,12 @@ void runtime_host::clear_logs() {
 }
 
 void runtime_host::clear_all() {
+    for (auto& [_, inst] : instances_) {
+        if (inst) {
+            services svc = make_services(*inst);
+            reset(*inst, registry_, svc);
+        }
+    }
     definitions_.clear();
     instances_.clear();
     registry_.clear();
