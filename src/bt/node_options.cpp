@@ -11,6 +11,7 @@ constexpr std::array<std::string_view, 3> kPlannerValues{":mcts"sv, ":mppi"sv, "
 constexpr std::array<std::string_view, 1> kWorkMaxAliases{":iters_max"sv};
 constexpr std::array<std::string_view, 1> kSafeActionAliases{":fallback_action"sv};
 constexpr std::array<std::string_view, 1> kDeadlineAliases{":budget_ms"sv};
+constexpr std::array<std::string_view, 2> kVlaAcceptancePolicyValues{"deadline_only"sv, "invocation_scoped"sv};
 
 constexpr std::array<node_option_spec, 34> kPlanActionOptions{{
     {":name", option_value_kind::text, ""},
@@ -57,7 +58,7 @@ constexpr std::array<node_option_spec, 5> kPlanActionConstraintOptions{{
     {":goal_tolerance", option_value_kind::number, ""},
 }};
 
-constexpr std::array<node_option_spec, 23> kVlaRequestOptions{{
+constexpr std::array<node_option_spec, 25> kVlaRequestOptions{{
     {":name", option_value_kind::text, ""},
     {":job_key", option_value_kind::text, "<name>.job_id"},
     {":instruction", option_value_kind::text, ""},
@@ -72,6 +73,8 @@ constexpr std::array<node_option_spec, 23> kVlaRequestOptions{{
     {":model_version", option_value_kind::text, "stub-1"},
     {":frame_id", option_value_kind::text, "base"},
     {":deadline_ms", option_value_kind::integer, "20", false, kDeadlineAliases},
+    {":acceptance_policy", option_value_kind::text, "deadline_only", false, {}, kVlaAcceptancePolicyValues},
+    {":context_key", option_value_kind::text, ""},
     {":dims", option_value_kind::integer, "state dimension"},
     {":bound_lo", option_value_kind::number, "-1.0"},
     {":bound_hi", option_value_kind::number, "1.0"},

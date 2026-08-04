@@ -154,12 +154,15 @@ Canonical async events:
 - `async_cancel_requested`
 - `async_cancel_acknowledged`
 - `async_completion_dropped`
+- `async_authority_revoked`
 
 Code anchors:
 
 - VLA request/wait/cancel nodes: `src/bt/runtime.cpp` (`execute_vla_request`, `execute_vla_wait`, `execute_vla_cancel`)
 - VLA service lifecycle and cancel idempotence: `src/bt/vla.cpp` (`vla_service::submit`, `vla_service::poll`, `vla_service::cancel`)
-- active async tracking: `include/bt/instance.hpp` (`instance::active_vla_jobs`)
+- active async tracking: `include/bt/instance.hpp`
+  (`instance::active_vla_jobs`, `instance::vla_invocations`, and
+  `instance::vla_generations`)
 
 ### deterministic logging and replay
 

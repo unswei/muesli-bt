@@ -91,6 +91,48 @@ void reset_bt_runtime_host() {
     bt::install_demo_callbacks(host);
 }
 
+class controlled_vla_backend final : public bt::vla_backend {
+public:
+    explicit controlled_vla_backend(std::shared_ptr<std::atomic<bool>> release) : release_(std::move(release)) {}
+
+    bt::vla_response infer(const bt::vla_request& request,
+                           std::function<bool(const bt::vla_partial&)>,
+                           std::atomic<bool>& cancel_flag) override {
+        while (!release_->load()) {
+            if (cancel_flag.load()) {
+                bt::vla_response cancelled;
+                cancelled.status = bt::vla_status::cancelled;
+                cancelled.model = request.model;
+                cancelled.explanation = "controlled test backend cancelled";
+                return cancelled;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+
+        bt::vla_response response;
+        response.status = bt::vla_status::ok;
+        response.model = request.model;
+        response.confidence = 1.0;
+        response.action.type = bt::vla_action_type::continuous;
+        response.action.u.assign(static_cast<std::size_t>(request.action_space.dims), 0.25);
+        return response;
+    }
+
+private:
+    std::shared_ptr<std::atomic<bool>> release_;
+};
+
+class manual_test_clock final : public bt::clock_interface {
+public:
+    explicit manual_test_clock(std::chrono::steady_clock::time_point now) : now_(now) {}
+
+    std::chrono::steady_clock::time_point now() const override { return now_; }
+    void advance(std::chrono::milliseconds delta) { now_ += delta; }
+
+private:
+    std::chrono::steady_clock::time_point now_;
+};
+
 muslisp::env_ptr create_env_with_pybullet_extension() {
 #if MUESLI_BT_WITH_PYBULLET_INTEGRATION
     muslisp::runtime_config config;
@@ -3804,6 +3846,274 @@ void test_vla_bt_nodes_flow_and_cancel() {
     check(saw_cancel_acknowledged, "VLA cancel should emit compact cancel_acknowledged outcome");
 }
 
+void test_vla_invocation_scoped_authority_accepts_current_result() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    bt::runtime_host& host = bt::default_runtime_host();
+    auto release = std::make_shared<std::atomic<bool>>(false);
+    host.vla_ref().register_backend("authority-accept-test", std::make_shared<controlled_vla_backend>(release));
+
+    (void)eval_text(
+        "(define authority-accept-tree "
+        "  (bt.compile "
+        "    '(reactive-sel "
+        "       (seq (vla-wait :name \"authority-accept\" :job_key authority-job :action_key authority-action "
+        "                      :clear_job #f) "
+        "            (succeed)) "
+        "       (vla-request :name \"authority-accept\" :job_key authority-job :instruction \"approach\" "
+        "                    :state_key state :model_name \"authority-accept-test\" :deadline_ms 1000 :dims 1 "
+        "                    :acceptance_policy invocation_scoped :context_key ball-context))))",
+        env);
+    (void)eval_text("(define authority-accept-inst (bt.new-instance authority-accept-tree))", env);
+
+    value first = eval_text("(bt.tick authority-accept-inst '((state 0.0) (ball-context \"ball-A\")))", env);
+    check(is_symbol(first) && symbol_name(first) == "running", "invocation-scoped request should start running");
+
+    bt::instance* inst = host.find_instance(bt_handle(eval_text("authority-accept-inst", env)));
+    check(inst != nullptr, "invocation-scoped acceptance instance should exist");
+    check(inst->vla_invocations.size() == 1, "request should create one invocation record");
+    const bt::vla_invocation& submitted = inst->vla_invocations.begin()->second;
+    const std::uint64_t job_id = submitted.job_id;
+    check(job_id > 0, "invocation should track its job id");
+    check(submitted.generation == 1, "first invocation generation should be one");
+    check(submitted.requesting_node != 0, "invocation should track the requesting node");
+    check(submitted.authority_node == submitted.requesting_node,
+          "requesting node should initially own invocation authority");
+    check(submitted.job_key == "authority-job", "invocation should track the configured job key");
+    check(submitted.context_key == "ball-context", "invocation should track the context key");
+    check(submitted.captured_context_id == "ball-A", "invocation should capture the context id");
+    check(submitted.deadline > submitted.submitted_at, "invocation should track an absolute deadline");
+    check(submitted.authority_state == bt::vla_authority_state::active,
+          "new invocation authority should be active");
+
+    value second = eval_text("(bt.tick authority-accept-inst '((state 0.0) (ball-context \"ball-A\")))", env);
+    check(is_symbol(second) && symbol_name(second) == "running", "wait should remain running before backend release");
+    const bt::vla_invocation& adopted = inst->vla_invocations.at(job_id);
+    check(adopted.authority_node != adopted.requesting_node, "vla-wait should adopt authority before request-branch halt");
+    check(adopted.authority_state == bt::vla_authority_state::active,
+          "normal request-to-wait hand-off must not revoke authority");
+
+    release->store(true);
+    bool succeeded = false;
+    for (int i = 0; i < 100; ++i) {
+        value result = eval_text("(bt.tick authority-accept-inst '((state 0.0) (ball-context \"ball-A\")))", env);
+        if (is_symbol(result) && symbol_name(result) == "success") {
+            succeeded = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    check(succeeded, "current invocation-scoped result should be accepted");
+    check(inst->bb.get("authority-action") != nullptr, "accepted result should update the action key");
+    check(inst->vla_invocations.at(job_id).authority_state == bt::vla_authority_state::accepted,
+          "accepted result should terminally consume invocation authority");
+    const std::uint64_t accepted_write_tick = inst->bb.get("authority-action")->last_write_tick;
+    value duplicate = eval_text("(bt.tick authority-accept-inst '((state 0.0) (ball-context \"ball-A\")))", env);
+    check(is_symbol(duplicate) && symbol_name(duplicate) == "running",
+          "duplicate result should fail its wait branch and leave the request branch running");
+    check(inst->bb.get("authority-action")->last_write_tick == accepted_write_tick,
+          "duplicate terminal result must not write the accepted action again");
+
+    bool saw_rich_submit = false;
+    bool saw_accepted_result = false;
+    bool saw_duplicate_rejection = false;
+    for (const std::string& line : host.events().snapshot()) {
+        saw_rich_submit = saw_rich_submit ||
+                          (line.find("\"type\":\"vla_submit\"") != std::string::npos &&
+                           line.find("\"generation\":1") != std::string::npos &&
+                           line.find("\"job_key\":\"authority-job\"") != std::string::npos &&
+                           line.find("\"captured_context_id\":\"ball-A\"") != std::string::npos);
+        saw_accepted_result = saw_accepted_result ||
+                              (line.find("\"type\":\"vla_result\"") != std::string::npos &&
+                               line.find("\"decision\":\"accepted\"") != std::string::npos &&
+                               line.find("\"authority_state\":\"accepted\"") != std::string::npos);
+        saw_duplicate_rejection = saw_duplicate_rejection ||
+                                  (line.find("\"type\":\"vla_result\"") != std::string::npos &&
+                                   line.find("\"decision\":\"rejected\"") != std::string::npos &&
+                                   line.find("\"reason\":\"duplicate_terminal_result\"") != std::string::npos);
+    }
+    check(saw_rich_submit, "vla_submit should record invocation identity and captured context");
+    check(saw_accepted_result, "vla_result should record the accepted authority decision");
+    check(saw_duplicate_rejection, "accepted invocation should reject a duplicate terminal result");
+}
+
+void test_vla_invocation_scoped_authority_rejects_expired_deadline() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    bt::runtime_host& host = bt::default_runtime_host();
+    manual_test_clock clock(std::chrono::steady_clock::time_point{std::chrono::seconds(100)});
+    host.set_clock_interface(&clock);
+    auto release = std::make_shared<std::atomic<bool>>(false);
+    host.vla_ref().register_backend("authority-deadline-test", std::make_shared<controlled_vla_backend>(release));
+
+    (void)eval_text(
+        "(define authority-deadline-tree "
+        "  (bt.compile "
+        "    '(reactive-sel "
+        "       (seq (vla-wait :name \"authority-deadline\" :job_key deadline-job :action_key deadline-action) "
+        "            (succeed)) "
+        "       (seq (cond bb-truthy submit-enabled) "
+        "            (vla-request :name \"authority-deadline\" :job_key deadline-job :instruction \"approach\" "
+        "                         :state_key state :model_name \"authority-deadline-test\" :deadline_ms 1000 :dims 1 "
+        "                         :acceptance_policy invocation_scoped :context_key ball-context)))))",
+        env);
+    (void)eval_text("(define authority-deadline-inst (bt.new-instance authority-deadline-tree))", env);
+
+    (void)eval_text(
+        "(bt.tick authority-deadline-inst '((state 0.0) (ball-context \"ball-A\") (submit-enabled #t)))", env);
+    bt::instance* inst = host.find_instance(bt_handle(eval_text("authority-deadline-inst", env)));
+    check(inst != nullptr && inst->vla_invocations.size() == 1, "deadline test should submit one invocation");
+    const std::uint64_t job_id = inst->vla_invocations.begin()->first;
+    (void)eval_text(
+        "(bt.tick authority-deadline-inst '((state 0.0) (ball-context \"ball-A\") (submit-enabled #f)))", env);
+
+    clock.advance(std::chrono::milliseconds(1001));
+    release->store(true);
+    bool rejected = false;
+    for (int i = 0; i < 100; ++i) {
+        (void)eval_text(
+            "(bt.tick authority-deadline-inst '((state 0.0) (ball-context \"ball-A\") (submit-enabled #f)))", env);
+        const bt::vla_invocation& invocation = inst->vla_invocations.at(job_id);
+        if (invocation.authority_state == bt::vla_authority_state::rejected) {
+            rejected = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    check(rejected, "result after the tracked monotonic deadline should be rejected");
+    check(inst->vla_invocations.at(job_id).authority_reason == "deadline_expired",
+          "expired invocation should use the stable deadline_expired reason");
+    check(inst->bb.get("deadline-action") == nullptr, "expired result must not update the action key");
+    host.set_clock_interface(nullptr);
+}
+
+void test_vla_invocation_scoped_authority_rejects_changed_context_and_increments_generation() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    bt::runtime_host& host = bt::default_runtime_host();
+    auto release = std::make_shared<std::atomic<bool>>(false);
+    host.vla_ref().register_backend("authority-context-test", std::make_shared<controlled_vla_backend>(release));
+
+    (void)eval_text(
+        "(define authority-context-tree "
+        "  (bt.compile "
+        "    '(reactive-sel "
+        "       (seq (vla-wait :name \"authority-context\" :job_key context-job :action_key context-action) "
+        "            (succeed)) "
+        "       (seq (cond bb-truthy submit-enabled) "
+        "            (vla-request :name \"authority-context\" :job_key context-job :instruction \"approach\" "
+        "                         :state_key state :model_name \"authority-context-test\" :deadline_ms 1000 :dims 1 "
+        "                         :acceptance_policy invocation_scoped :context_key ball-context)))))",
+        env);
+    (void)eval_text("(define authority-context-inst (bt.new-instance authority-context-tree))", env);
+
+    (void)eval_text(
+        "(bt.tick authority-context-inst '((state 0.0) (ball-context \"ball-A\") (submit-enabled #t)))", env);
+    bt::instance* inst = host.find_instance(bt_handle(eval_text("authority-context-inst", env)));
+    check(inst != nullptr && inst->vla_invocations.size() == 1, "changed-context test should submit one invocation");
+    const std::uint64_t first_job_id = inst->vla_invocations.begin()->first;
+
+    (void)eval_text(
+        "(bt.tick authority-context-inst '((state 0.0) (ball-context \"ball-B\") (submit-enabled #f)))", env);
+    check(inst->vla_invocations.at(first_job_id).authority_state == bt::vla_authority_state::active,
+          "context change while running should be decided at the result commit point");
+
+    release->store(true);
+    bool rejected = false;
+    for (int i = 0; i < 100; ++i) {
+        (void)eval_text(
+            "(bt.tick authority-context-inst '((state 0.0) (ball-context \"ball-B\") (submit-enabled #f)))", env);
+        const bt::vla_invocation& first_invocation = inst->vla_invocations.at(first_job_id);
+        if (first_invocation.authority_state == bt::vla_authority_state::rejected) {
+            rejected = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    check(rejected, "result captured for ball-A should be rejected when ball-B is current");
+    check(inst->vla_invocations.at(first_job_id).authority_reason == "context_changed",
+          "changed context should use the stable context_changed reason");
+    check(inst->bb.get("context-action") == nullptr, "rejected result must not update the action key");
+
+    (void)eval_text(
+        "(bt.tick authority-context-inst '((state 0.0) (ball-context \"ball-B\") (submit-enabled #t)))", env);
+    check(inst->vla_generations.at("context-job") == 2, "re-entry with the same job key should increment generation");
+
+    bool saw_context_rejection = false;
+    for (const std::string& line : host.events().snapshot()) {
+        if (line.find("\"type\":\"vla_result\"") != std::string::npos &&
+            line.find("\"decision\":\"rejected\"") != std::string::npos &&
+            line.find("\"reason\":\"context_changed\"") != std::string::npos &&
+            line.find("\"captured_context_id\":\"ball-A\"") != std::string::npos &&
+            line.find("\"current_context_id\":\"ball-B\"") != std::string::npos) {
+            saw_context_rejection = true;
+        }
+    }
+    check(saw_context_rejection, "canonical result event should explain the changed-context rejection");
+}
+
+void test_vla_invocation_scoped_authority_revokes_on_higher_priority_preemption() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    bt::runtime_host& host = bt::default_runtime_host();
+    auto release = std::make_shared<std::atomic<bool>>(false);
+    host.vla_ref().register_backend("authority-preempt-test", std::make_shared<controlled_vla_backend>(release));
+
+    (void)eval_text(
+        "(define authority-preempt-tree "
+        "  (bt.compile "
+        "    '(reactive-sel "
+        "       (seq (cond bb-truthy emergency) (succeed)) "
+        "       (seq (vla-wait :name \"authority-preempt\" :job_key preempt-job :action_key preempt-action) "
+        "            (succeed)) "
+        "       (vla-request :name \"authority-preempt\" :job_key preempt-job :instruction \"approach\" "
+        "                    :state_key state :model_name \"authority-preempt-test\" :deadline_ms 1000 :dims 1 "
+        "                    :acceptance_policy invocation_scoped :context_key ball-context))))",
+        env);
+    (void)eval_text("(define authority-preempt-inst (bt.new-instance authority-preempt-tree))", env);
+
+    (void)eval_text(
+        "(bt.tick authority-preempt-inst '((state 0.0) (ball-context \"ball-A\") (emergency #f)))", env);
+    bt::instance* inst = host.find_instance(bt_handle(eval_text("authority-preempt-inst", env)));
+    check(inst != nullptr && inst->vla_invocations.size() == 1, "pre-emption test should submit one invocation");
+    const std::uint64_t job_id = inst->vla_invocations.begin()->first;
+
+    (void)eval_text(
+        "(bt.tick authority-preempt-inst '((state 0.0) (ball-context \"ball-A\") (emergency #f)))", env);
+    check(inst->vla_invocations.at(job_id).authority_state == bt::vla_authority_state::active,
+          "request-to-wait hand-off should keep authority active");
+
+    value interrupted = eval_text(
+        "(bt.tick authority-preempt-inst '((state 0.0) (ball-context \"ball-A\") (emergency #t)))", env);
+    check(is_symbol(interrupted) && symbol_name(interrupted) == "success",
+          "higher-priority emergency branch should take control");
+    const bt::vla_invocation& revoked = inst->vla_invocations.at(job_id);
+    check(revoked.authority_state == bt::vla_authority_state::revoked,
+          "higher-priority pre-emption should revoke invocation authority");
+    check(revoked.authority_reason == "branch_revoked", "pre-emption should use the stable branch_revoked reason");
+    check(revoked.cancel_requested, "authority revocation should request best-effort backend cancellation");
+    check(inst->bb.get("preempt-action") == nullptr, "revoked invocation must not update the action key");
+
+    bool saw_revocation = false;
+    for (const std::string& line : host.events().snapshot()) {
+        if (line.find("\"type\":\"async_authority_revoked\"") != std::string::npos &&
+            line.find("\"reason\":\"branch_revoked\"") != std::string::npos &&
+            line.find("\"generation\":1") != std::string::npos &&
+            line.find("\"authority_state\":\"revoked\"") != std::string::npos) {
+            saw_revocation = true;
+        }
+    }
+    check(saw_revocation, "canonical event stream should record branch authority revocation");
+}
+
 void test_bt_compile_checks() {
     using namespace muslisp;
 
@@ -3872,6 +4182,12 @@ void test_bt_node_option_metadata() {
     const bt::node_option_spec* capability = bt::find_node_option_spec(*request, ":capability");
     check(capability != nullptr, "vla-request should expose :capability option");
     check(capability->default_value == "vla.rt2", "vla-request :capability default should be vla.rt2");
+    const bt::node_option_spec* acceptance_policy = bt::find_node_option_spec(*request, ":acceptance_policy");
+    check(acceptance_policy != nullptr, "vla-request should expose :acceptance_policy option");
+    check(acceptance_policy->default_value == "deadline_only",
+          "vla-request :acceptance_policy default should preserve deadline-only behaviour");
+    check(bt::find_node_option_spec(*request, ":context_key") != nullptr,
+          "vla-request should expose :context_key option");
 
     const bt::node_option_schema* wait = bt::find_node_option_schema("vla-wait");
     check(wait != nullptr, "vla-wait option schema should be registered");
@@ -6827,6 +7143,13 @@ int main() {
         {"phase5 ring buffer bounds", test_phase5_ring_buffer_bounds},
         {"phase6 sample wrappers tree", test_phase6_sample_wrappers_tree},
         {"phase6 custom robot interface", test_phase6_custom_robot_interface},
+        {"vla invocation authority accepts current result", test_vla_invocation_scoped_authority_accepts_current_result},
+        {"vla invocation authority rejects expired deadline",
+         test_vla_invocation_scoped_authority_rejects_expired_deadline},
+        {"vla invocation authority rejects changed context and increments generation",
+         test_vla_invocation_scoped_authority_rejects_changed_context_and_increments_generation},
+        {"vla invocation authority revokes on higher-priority pre-emption",
+         test_vla_invocation_scoped_authority_revokes_on_higher_priority_preemption},
     };
 
     const auto cleanup = []() {

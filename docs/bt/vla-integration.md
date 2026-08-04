@@ -12,6 +12,8 @@ Implemented now:
 
 - async submit/poll/cancel interface and BT node semantics
 - cancellation and timeout behaviour in runtime lifecycle
+- opt-in invocation-scoped authority with generation, context and branch
+  pre-emption checks
 - canonical `mbt.evt.v1` logging for VLA events
 - optional `muesli-model-service` VLA session adapter for `cap.vla.action_chunk.v1`
 - validation gates for malformed, stale, unsafe, late, or policy-violating action chunks
@@ -29,6 +31,8 @@ Key principles:
 - BT ticks do not block on VLA calls
 - jobs are submitted, polled, and cancelled through scheduler-owned state
 - responses are validated before actions are written to blackboard
+- invocation-scoped results are committed only while their captured authority,
+  generation, context and deadline remain current
 
 ## Capability Boundary
 
@@ -76,6 +80,7 @@ The selector lets `vla-wait` complete when ready, while fallback logic continues
 ## See Also
 
 - [VLA BT Nodes](vla-nodes.md)
+- [Invocation-Scoped Authority](invocation-scoped-authority.md)
 - [VLA Request/Response Schema](vla-request-response.md)
 - [VLA Logging Schema](../observability/vla-logging.md)
 - [muesli-model-service Bridge](../integration/model-service-bridge.md)

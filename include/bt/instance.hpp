@@ -32,6 +32,34 @@ struct node_memory {
     std::any payload;
 };
 
+enum class vla_acceptance_policy {
+    deadline_only,
+    invocation_scoped,
+};
+
+enum class vla_authority_state {
+    active,
+    revoked,
+    accepted,
+    rejected,
+};
+
+struct vla_invocation {
+    std::uint64_t job_id = 0;
+    std::uint64_t generation = 0;
+    node_id requesting_node = 0;
+    node_id authority_node = 0;
+    std::string job_key;
+    std::string context_key;
+    std::string captured_context_id;
+    std::chrono::steady_clock::time_point submitted_at{};
+    std::chrono::steady_clock::time_point deadline{};
+    vla_acceptance_policy acceptance_policy = vla_acceptance_policy::deadline_only;
+    vla_authority_state authority_state = vla_authority_state::active;
+    std::string authority_reason;
+    bool cancel_requested = false;
+};
+
 struct observability {
     trace_buffer* trace = nullptr;
     log_sink* logger = nullptr;
@@ -115,6 +143,8 @@ struct instance {
     std::int64_t instance_handle = 0;
     std::unordered_map<node_id, node_memory> memory;
     std::unordered_map<node_id, std::uint64_t> active_vla_jobs;
+    std::unordered_map<std::uint64_t, vla_invocation> vla_invocations;
+    std::unordered_map<std::string, std::uint64_t> vla_generations;
     std::unordered_set<node_id> halt_warning_emitted;
     blackboard bb;
     std::uint64_t tick_index = 0;

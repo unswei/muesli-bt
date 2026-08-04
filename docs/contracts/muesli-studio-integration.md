@@ -121,7 +121,9 @@ Required event families:
 - planner: `planner_call_start`, `planner_call_end`, `planner_v1`
 - scheduler: `sched_submit`, `sched_start`, `sched_finish`, `sched_cancel`
 - VLA: `vla_submit`, `vla_poll`, `vla_cancel`, `vla_result`
-- async cancellation lifecycle: `async_cancel_requested`, `async_cancel_acknowledged`, `async_completion_dropped`
+- async authority and cancellation lifecycle: `async_authority_revoked`,
+  `async_cancel_requested`, `async_cancel_acknowledged`,
+  `async_completion_dropped`
 
 ### requirement 9: deterministic mode for fixtures
 

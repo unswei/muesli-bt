@@ -5,8 +5,9 @@
     Status: contract-only.
 
     This page defines the intended experiment and evidence contract. The
-    released runtime does not yet provide the complete invocation-scoped
-    authority mechanism or a Booster K1 host integration.
+    The runtime provides experimental invocation-scoped authority for VLA BT
+    nodes. The repository does not yet provide a Booster K1 host integration or
+    the complete experiment harness and overlay.
 
 ## what this is
 

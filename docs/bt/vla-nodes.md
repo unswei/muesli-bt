@@ -24,6 +24,12 @@ Do not send model output directly to actuators. The host must validate proposals
 
 `vla-request` creates a job and stores its id in the blackboard. `vla-wait` polls that id and writes a valid action to the blackboard. `vla-cancel` cancels and clears the idempotent job key.
 
+`vla-request` also creates an invocation record. Existing trees use the
+`deadline_only` acceptance policy by default. Set `:acceptance_policy
+invocation_scoped` and provide `:context_key` when a result must remain bound to
+the current BT authority, request generation and world context. See
+[invocation-scoped authority](invocation-scoped-authority.md).
+
 The usual pattern is:
 
 ```lisp
@@ -60,6 +66,8 @@ The fallback branch is part of the safety contract.
 | `:model_version` | string or symbol | `stub-1` | Model version for records. |
 | `:frame_id` | string or symbol | `base` | Observation frame id. |
 | `:deadline_ms` | integer > 0 | `20` | Async job deadline. Alias: `:budget_ms`. |
+| `:acceptance_policy` | string or symbol | `deadline_only` | Use `invocation_scoped` to require current generation, active authority and matching context at commit. |
+| `:context_key` | string or symbol | unset | Context ID key. Required by `invocation_scoped`; the value must be a non-empty string or integer. |
 | `:dims` | integer >= 0 | state dimension | Action dimensions. |
 | `:bound_lo`, `:bound_hi` | number | `-1.0`, `1.0` | Continuous action bounds. |
 | `:max_abs`, `:max_delta` | number | `1.0`, `1.0` | Validation clamps. |
@@ -70,7 +78,7 @@ Return status:
 
 - `running` after submit;
 - `running` when the job key already holds an in-flight id;
-- `failure` for missing state, missing instruction, invalid media handles, invalid bounds, invalid deadline, or missing service.
+- `failure` for missing state, missing instruction, invalid media handles, invalid bounds, invalid deadline, invalid or missing required context, or missing service.
 
 ### `vla-wait`
 
@@ -136,6 +144,8 @@ Return status:
 ## gotchas
 
 - Use the same `:name` or `:job_key` across request, wait, and cancel nodes.
+- Use `invocation_scoped` when object identity or BT branch authority can change
+  while the job is running.
 - Keep a fallback branch after VLA work.
 - Treat model output as a proposal until the host validates it.
 - Prefer media handles such as `frame://camera1/latest` for remote calls instead of embedding image bytes in Lisp.
@@ -143,6 +153,7 @@ Return status:
 ## see also
 
 - [VLA integration](vla-integration.md)
+- [invocation-scoped authority](invocation-scoped-authority.md)
 - [VLA request/response](vla-request-response.md)
 - [VLA logging](../observability/vla-logging.md)
 - [generated guarded recovery](../tutorials/generated-guarded-recovery.md)

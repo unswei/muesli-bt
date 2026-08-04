@@ -106,6 +106,7 @@ nav:
           - PlanAction Node: bt/plan-action-node.md
           - Planner Configuration: bt/planner-configuration.md
           - VLA Nodes: bt/vla-nodes.md
+          - Invocation-Scoped Authority: bt/invocation-scoped-authority.md
           - VLA Request/Response: bt/vla-request-response.md
           - Host Integration: bt/robot-integration.md
       - Planning:

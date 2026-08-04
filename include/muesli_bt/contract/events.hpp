@@ -38,6 +38,7 @@ inline constexpr std::string_view kEventCancelLate = "cancel_late";
 inline constexpr std::string_view kEventAsyncCancelRequested = "async_cancel_requested";
 inline constexpr std::string_view kEventAsyncCancelAcknowledged = "async_cancel_acknowledged";
 inline constexpr std::string_view kEventAsyncCompletionDropped = "async_completion_dropped";
+inline constexpr std::string_view kEventAsyncAuthorityRevoked = "async_authority_revoked";
 inline constexpr std::string_view kEventDslFragmentGenerated = "dsl_fragment_generated";
 inline constexpr std::string_view kEventDslFragmentNormalised = "dsl_fragment_normalised";
 inline constexpr std::string_view kEventDslFragmentValidationOk = "dsl_fragment_validation_ok";

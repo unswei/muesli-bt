@@ -193,18 +193,23 @@ Uses per-node retry counter.
 - validates request inputs from configured keys/options
 - submits async job through [host](../terminology.md#host) VLA service
 - writes `job_id` to blackboard
+- records the job id, generation, requesting node, job key, captured context,
+  monotonic deadline and authority state
 - returns `running`
 
 ## `vla-wait`
 
 - polls `job_id` through [host](../terminology.md#host) VLA service
+- adopts invocation authority before polling an invocation-scoped request
 - while queued/running/streaming: returns `running`
-- on valid terminal action: writes action to blackboard and returns `success`
+- on valid terminal action: applies the configured authority commit gate, then
+  writes the action to blackboard and returns `success`
 - on timeout/error/cancel/invalid: returns `failure` (and clears `job_id` unless configured otherwise)
 
 ## `vla-cancel`
 
 - cancels job id at configured key when present
+- revokes the invocation before requesting best-effort backend cancellation
 - clears `job_id` key
 - returns `success` for idempotent control flow
 

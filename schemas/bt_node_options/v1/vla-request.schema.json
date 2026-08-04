@@ -19,6 +19,12 @@
     ":model_version": { "type": "string", "default": "stub-1" },
     ":frame_id": { "type": "string", "default": "base" },
     ":deadline_ms": { "type": "integer", "minimum": 1, "default": 20, "x-muesli-aliases": [":budget_ms"] },
+    ":acceptance_policy": {
+      "type": "string",
+      "enum": ["deadline_only", "invocation_scoped"],
+      "default": "deadline_only"
+    },
+    ":context_key": { "type": "string" },
     ":dims": { "type": "integer", "minimum": 0, "default": 0 },
     ":bound_lo": { "type": "number", "default": -1.0 },
     ":bound_hi": { "type": "number", "default": 1.0 },

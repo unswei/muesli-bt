@@ -54,7 +54,7 @@
 - `host_action_invalid`, `fallback_used`, `fallback_failed`
 - `late_result_dropped`, `cancel_acknowledged`, `cancel_late`
 - `vla_submit`, `vla_poll`, `vla_cancel`, `vla_result`
-- `async_cancel_requested`, `async_cancel_acknowledged`, `async_completion_dropped`
+- `async_cancel_requested`, `async_cancel_acknowledged`, `async_completion_dropped`, `async_authority_revoked`
 - `dsl_fragment_generated`, `dsl_fragment_normalised`, `dsl_fragment_validation_ok`, `dsl_fragment_validation_failed`
 - `dsl_fragment_compiled`, `subtree_install_requested`, `subtree_installed`, `subtree_install_rejected`, `subtree_replay_loaded`
 - `subtree_rollback_requested`, `subtree_rolled_back`, `subtree_rollback_rejected`
