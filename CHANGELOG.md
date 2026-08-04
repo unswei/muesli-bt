@@ -31,6 +31,10 @@ muesli-bt
   and records host acceptance or rejection with a stable reason.
 - Added a deterministic humanoid VLA evidence fixture covering an accepted and
   dispatched result, a moved-ball rejection and higher-priority pre-emption.
+- Added eight gate-controlled humanoid VLA runtime scenarios covering normal
+  acceptance, moved-ball rejection, supersession, late and duplicate
+  completion, branch halt, re-entry and emergency interruption. Each scenario
+  is exposed as a separately named CTest.
 - Added the first experimental agent-proposed task-logic path, including `agent_proposal.v1` fixtures, `guarded-recovery.v1` contract checks, manifest export, validation result objects, semantic diffs, dry-run reports, rollback handles, proposal rejection fixtures, and an agent-facing integration page.
 - Added transparent `slot` BT DSL metadata for patchable subtree boundaries, with compile, tick, and `bt.to-dsl` round-trip coverage.
 - Added the first experimental live C++ tick-boundary subtree install path for `slot` nodes, including install and rollback request APIs, rollback snapshots, non-destructive rejection gates, replaced-subtree cleanup, and unit coverage for install, rejection, rollback, and halt cleanup.
@@ -47,6 +51,9 @@ muesli-bt
 - Added the first deterministic generated guarded recovery subtree evidence slice, including a blocked-path generator, accepted and rejected generated-fragment fixtures, canonical DSL hashes, lifecycle events, replay report, tutorial, evidence page, and CTest coverage.
 
 ### Changed
+- Hardened VLA service teardown so a logically terminal job's scheduler
+  callback finishes recording before the service and canonical event sink are
+  destroyed.
 - Additively extended `mbt.evt.v1` with `async_authority_revoked` and optional
   invocation fields on VLA lifecycle payloads. This does not change the schema
   name or runtime contract version; consumers should continue ignoring unknown

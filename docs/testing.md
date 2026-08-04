@@ -6,6 +6,8 @@ Core test binaries:
 
 - `tests/test_main.cpp` (`muslisp_tests`)
 - `tests/conformance/test_conformance_main.cpp` (`muesli_bt_conformance_tests`, L0)
+- `tests/test_humanoid_vla_scenarios.cpp`
+  (`muesli_bt_humanoid_vla_scenario_tests`)
 
 Coverage includes:
 
@@ -24,6 +26,32 @@ Coverage includes:
 - `env.run-loop` multi-episode semantics for reset-capable and reset-less backends
 - generic `env.*` backend contract checks for PyBullet and ROS2 adapters
 - runtime-contract L0 conformance checks (tick ordering, budget/deadline hooks, async lifecycle, determinism)
+
+## deterministic humanoid VLA scenarios
+
+The humanoid scenario binary uses a gate-controlled VLA backend and fixed
+canonical event timestamps. A gate decides exactly when each backend invocation
+starts and completes. Wall-clock sleeps only bound a failed test; they do not
+decide the scenario ordering.
+
+CTest exposes one test for each required authority transition:
+
+- `normal_acceptance`: accept and dispatch the current generation;
+- `moved_ball`: reject context A after context B becomes current;
+- `supersession`: revoke generation one and accept generation two;
+- `late_completion`: drop successful output that arrives after cancellation;
+- `duplicate_completion`: reject a second terminal poll without another write;
+- `branch_halt`: revoke authority and clear invocation-owned keys;
+- `re_entry`: create a fresh generation and capture the new context;
+- `emergency_interruption`: switch to the safety branch, then reject the old
+  target without calling the walking controller.
+
+Run the whole matrix or one named scenario:
+
+```bash
+./build/dev/muesli_bt_humanoid_vla_scenario_tests
+./build/dev/muesli_bt_humanoid_vla_scenario_tests moved_ball
+```
 
 ## canonical event fixture suite
 
@@ -64,6 +92,7 @@ or:
 ```bash
 ./build/dev/muslisp_tests
 ./build/dev/muesli_bt_conformance_tests
+./build/dev/muesli_bt_humanoid_vla_scenario_tests
 ```
 
 Validate and verify fixtures:

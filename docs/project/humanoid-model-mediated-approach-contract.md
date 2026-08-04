@@ -279,6 +279,12 @@ host. Booster-specific state acquisition, observation-age and operating-area
 policy, and the actual walking-controller adapter remain experiment integration
 work.
 
+The deterministic runtime suite covers normal acceptance, moved-ball context
+change, supersession, late completion, duplicate completion, direct branch
+halt, re-entry and emergency interruption. Each scenario has a separately
+named CTest entry. The tests use explicit backend gates, fixed event timestamps
+and no physical robot dependency.
+
 Existing canonical event types should be extended where their meaning already
 fits. Any new event type must be added to the v1 schema and documented in the
 same implementation change.

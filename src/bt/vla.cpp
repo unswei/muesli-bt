@@ -438,7 +438,10 @@ vla_service::~vla_service() {
         scheduler_jobs.reserve(jobs_.size());
         for (auto& [_, state] : jobs_) {
             state->cancel_requested.store(true);
-            if (!is_terminal(state->status) && state->scheduler_job_id != 0) {
+            // A VLA state becomes terminal before its scheduler callback appends
+            // the final record. Wait for every submitted callback so it cannot
+            // outlive this service or a runtime host's event sink.
+            if (state->scheduler_job_id != 0) {
                 scheduler_jobs.push_back(state->scheduler_job_id);
             }
         }

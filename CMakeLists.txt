@@ -412,6 +412,21 @@ endif ()
 
 add_test(NAME muslisp_tests COMMAND muslisp_tests)
 
+add_executable(muesli_bt_humanoid_vla_scenario_tests tests/test_humanoid_vla_scenarios.cpp)
+if (TARGET muesli_bt_integration_model_service)
+  target_link_libraries(muesli_bt_humanoid_vla_scenario_tests PRIVATE muesli_bt_integration_model_service)
+else ()
+  target_link_libraries(muesli_bt_humanoid_vla_scenario_tests PRIVATE muesli_bt_core)
+endif ()
+
+foreach (scenario IN ITEMS normal_acceptance moved_ball supersession late_completion
+                           duplicate_completion branch_halt re_entry emergency_interruption)
+  add_test(
+    NAME muesli_bt_humanoid_vla_${scenario}
+    COMMAND muesli_bt_humanoid_vla_scenario_tests ${scenario}
+  )
+endforeach ()
+
 if (TARGET muesli_bt_integration_model_service)
   add_executable(muesli_bt_model_service_bridge_tests tests/test_model_service_bridge.cpp)
   target_link_libraries(muesli_bt_model_service_bridge_tests PRIVATE muesli_bt_integration_model_service)
