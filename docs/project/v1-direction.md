@@ -55,7 +55,10 @@ The `v1.0.0` release should not be led by:
 - several equal flagship scenarios competing for release priority
 - broad ROS2 surface expansion beyond the transport-plus-capability boundary
 
-Supporting lanes such as Isaac Sim, H1, and future manipulation work can remain documented, but they should not displace the wheeled flagship sequence.
+Supporting lanes such as the
+[humanoid model-mediated approach experiment](humanoid-model-mediated-approach-contract.md),
+Isaac Sim, H1, and future manipulation work can remain documented, but they
+should not displace the wheeled flagship sequence.
 
 ## fallback posture
 
