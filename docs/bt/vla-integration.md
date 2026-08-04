@@ -14,6 +14,8 @@ Implemented now:
 - cancellation and timeout behaviour in runtime lifecycle
 - opt-in invocation-scoped authority with generation, context and branch
   pre-emption checks
+- an explicit host commit-validation callback before VLA BT actions reach the
+  blackboard
 - canonical `mbt.evt.v1` logging for VLA events
 - optional `muesli-model-service` VLA session adapter for `cap.vla.action_chunk.v1`
 - validation gates for malformed, stale, unsafe, late, or policy-violating action chunks
@@ -32,7 +34,14 @@ Key principles:
 - jobs are submitted, polled, and cancelled through scheduler-owned state
 - responses are validated before actions are written to blackboard
 - invocation-scoped results are committed only while their captured authority,
-  generation, context and deadline remain current
+  generation, context and deadline remain current and the host commit validator
+  accepts the proposal
+
+Hosts register robot-specific policy with
+`runtime_host::set_vla_commit_validator`. Invocation-scoped commits fail closed
+when no validator is registered. The generic runtime still validates action
+shape and finite values before calling host policy. See
+[invocation-scoped authority](invocation-scoped-authority.md#host-validation).
 
 ## Capability Boundary
 

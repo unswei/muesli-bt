@@ -5,9 +5,10 @@
     Status: contract-only.
 
     This page defines the intended experiment and evidence contract. The
-    The runtime provides experimental invocation-scoped authority for VLA BT
-    nodes. The repository does not yet provide a Booster K1 host integration or
-    the complete experiment harness and overlay.
+    runtime provides experimental invocation-scoped authority and an explicit
+    host commit-validation hook for VLA BT nodes. The repository does not yet
+    provide the Booster K1 validator, host integration, complete experiment
+    harness or overlay.
 
 ## what this is
 
@@ -264,6 +265,10 @@ Before the full experiment is implemented, `mbt.evt.v1` must represent:
 - acceptance or rejection, including the current and captured context IDs;
 - blackboard changes used by the overlay; and
 - host walking-target validation and dispatch.
+
+The generic commit gate and host-validation outcome are now observable.
+Booster-specific pose validation and walking-target dispatch remain experiment
+integration work.
 
 Existing canonical event types should be extended where their meaning already
 fits. Any new event type must be added to the v1 schema and documented in the

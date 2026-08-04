@@ -972,23 +972,34 @@ std::optional<blob_handle_ref> blob_from_blackboard(const bb_value& value) {
     return std::nullopt;
 }
 
-bool action_is_finite(const vla_action& action) {
+std::optional<std::string> validate_vla_action_shape(const vla_action& action, std::int64_t expected_dims) {
     if (action.type == vla_action_type::continuous) {
-        for (double u : action.u) {
-            if (!std::isfinite(u)) {
-                return false;
+        if (action.u.empty() ||
+            (expected_dims > 0 && action.u.size() != static_cast<std::size_t>(expected_dims))) {
+            return "invalid_schema";
+        }
+        for (double value : action.u) {
+            if (!std::isfinite(value)) {
+                return "invalid_pose";
             }
         }
-        return true;
+        return std::nullopt;
     }
-    if (action.type == vla_action_type::sequence) {
-        for (const vla_action& step : action.steps) {
-            if (!action_is_finite(step)) {
-                return false;
-            }
+    if (expected_dims > 0) {
+        return "invalid_schema";
+    }
+    if (action.type == vla_action_type::discrete) {
+        return action.discrete_id.empty() ? std::optional<std::string>{"invalid_schema"} : std::nullopt;
+    }
+    if (action.steps.empty()) {
+        return "invalid_schema";
+    }
+    for (const vla_action& step : action.steps) {
+        if (std::optional<std::string> invalid = validate_vla_action_shape(step, 0); invalid.has_value()) {
+            return invalid;
         }
     }
-    return true;
+    return std::nullopt;
 }
 
 bb_value action_to_blackboard(const vla_action& action) {
@@ -1135,53 +1146,153 @@ void revoke_vla_invocation(tick_context& ctx,
                        reason);
 }
 
-struct vla_authority_check {
+struct vla_commit_check {
     bool accepted = true;
     std::string reason;
     std::string current_context_id;
+    std::string host_validation = "not_run";
+    std::string host_validation_reason;
+    std::string host_validation_source = "none";
 };
 
-vla_authority_check check_vla_authority(tick_context& ctx, vla_invocation& invocation) {
-    vla_authority_check result;
+bool is_stable_host_validation_reason(std::string_view reason) {
+    return reason == "invalid_schema" || reason == "invalid_frame" || reason == "invalid_pose" ||
+           reason == "ball_stale" || reason == "robot_unstable" || reason == "host_policy_rejected";
+}
 
-    if (tick_now(ctx) > invocation.deadline) {
-        result.accepted = false;
-        result.reason = "deadline_expired";
-        return result;
-    }
-    if (!invocation.context_key.empty()) {
-        const std::optional<std::string> current = context_id_from_blackboard(ctx.bb_get(invocation.context_key));
+std::string normalise_host_validation_reason(std::string_view reason) {
+    return is_stable_host_validation_reason(reason) ? std::string(reason) : "host_policy_rejected";
+}
+
+void emit_vla_host_action_invalid(tick_context& ctx,
+                                  node_id node,
+                                  std::uint64_t job_id,
+                                  std::string_view reason) {
+    const std::string job = std::to_string(job_id);
+    emit_outcome_event(ctx,
+                       muesli_bt::contract::kEventHostActionInvalid,
+                       "vla_commit_gate",
+                       node,
+                       job,
+                       reason);
+}
+
+vla_commit_check check_vla_commit_gate(tick_context& ctx,
+                                       vla_invocation* invocation,
+                                       node_id wait_node,
+                                       std::uint64_t job_id,
+                                       const vla_action& action,
+                                       bool early_result) {
+    vla_commit_check result;
+
+    if (invocation && !invocation->context_key.empty()) {
+        const std::optional<std::string> current = context_id_from_blackboard(ctx.bb_get(invocation->context_key));
         if (current.has_value()) {
             result.current_context_id = *current;
         }
     }
-    if (invocation.acceptance_policy == vla_acceptance_policy::deadline_only) {
+
+    if (invocation && invocation->acceptance_policy == vla_acceptance_policy::invocation_scoped) {
+        const auto generation = ctx.inst.vla_generations.find(invocation->job_key);
+        if (generation == ctx.inst.vla_generations.end() || generation->second != invocation->generation) {
+            result.accepted = false;
+            result.reason = "superseded";
+            return result;
+        }
+
+        if (invocation->authority_state == vla_authority_state::revoked) {
+            result.accepted = false;
+            result.reason = invocation->authority_reason.empty() ? "branch_revoked" : invocation->authority_reason;
+            return result;
+        }
+
+        if (result.current_context_id.empty() || result.current_context_id != invocation->captured_context_id) {
+            result.accepted = false;
+            result.reason = "context_changed";
+            return result;
+        }
+
+        if (tick_now(ctx) > invocation->deadline) {
+            result.accepted = false;
+            result.reason = "deadline_expired";
+            return result;
+        }
+
+        if (invocation->authority_state == vla_authority_state::accepted ||
+            invocation->authority_state == vla_authority_state::rejected) {
+            result.accepted = false;
+            result.reason = "duplicate_terminal_result";
+            return result;
+        }
+
+        if (invocation->authority_state != vla_authority_state::active) {
+            result.accepted = false;
+            result.reason = "branch_revoked";
+            return result;
+        }
+    } else if (invocation && tick_now(ctx) > invocation->deadline) {
+        result.accepted = false;
+        result.reason = "deadline_expired";
         return result;
     }
 
-    if (invocation.authority_state == vla_authority_state::revoked) {
+    const std::int64_t expected_dims = invocation ? invocation->action_dims : 0;
+    if (const std::optional<std::string> invalid = validate_vla_action_shape(action, expected_dims);
+        invalid.has_value()) {
         result.accepted = false;
-        result.reason = invocation.authority_reason.empty() ? "branch_revoked" : invocation.authority_reason;
-        return result;
-    }
-    if (invocation.authority_state == vla_authority_state::accepted ||
-        invocation.authority_state == vla_authority_state::rejected) {
-        result.accepted = false;
-        result.reason = "duplicate_terminal_result";
-        return result;
-    }
-
-    const auto generation = ctx.inst.vla_generations.find(invocation.job_key);
-    if (generation == ctx.inst.vla_generations.end() || generation->second != invocation.generation) {
-        result.accepted = false;
-        result.reason = "superseded";
+        result.reason = *invalid;
+        result.host_validation = "rejected";
+        result.host_validation_reason = *invalid;
+        result.host_validation_source = "runtime_structural";
+        emit_vla_host_action_invalid(ctx, wait_node, job_id, *invalid);
         return result;
     }
 
-    if (result.current_context_id.empty() || result.current_context_id != invocation.captured_context_id) {
+    if (!ctx.svc.vla_commit && invocation &&
+        invocation->acceptance_policy == vla_acceptance_policy::invocation_scoped) {
         result.accepted = false;
-        result.reason = "context_changed";
+        result.reason = "host_policy_rejected";
+        result.host_validation = "rejected";
+        result.host_validation_reason = result.reason;
+        result.host_validation_source = "unavailable";
+        emit_vla_host_action_invalid(ctx, wait_node, job_id, result.reason);
+        return result;
     }
+
+    result.host_validation_source = ctx.svc.vla_commit ? "host_callback" : "runtime_structural";
+    if (ctx.svc.vla_commit) {
+        vla_commit_context validation_context;
+        validation_context.job_id = job_id;
+        validation_context.generation = invocation ? invocation->generation : 0;
+        validation_context.requesting_node = invocation ? invocation->requesting_node : 0;
+        validation_context.authority_node = invocation ? invocation->authority_node : wait_node;
+        validation_context.job_key = invocation ? invocation->job_key : std::string{};
+        validation_context.captured_context_id = invocation ? invocation->captured_context_id : std::string{};
+        validation_context.current_context_id = result.current_context_id;
+        validation_context.early_result = early_result;
+
+        vla_commit_validation validation;
+        try {
+            validation = ctx.svc.vla_commit->validate(validation_context, action);
+        } catch (const std::exception& e) {
+            emit_log(ctx, log_level::error, "vla", "vla commit validator threw: " + std::string(e.what()));
+            validation = vla_commit_validation{.accepted = false, .reason = "host_policy_rejected"};
+        } catch (...) {
+            emit_log(ctx, log_level::error, "vla", "vla commit validator threw");
+            validation = vla_commit_validation{.accepted = false, .reason = "host_policy_rejected"};
+        }
+
+        if (!validation.accepted) {
+            result.accepted = false;
+            result.reason = normalise_host_validation_reason(validation.reason);
+            result.host_validation = "rejected";
+            result.host_validation_reason = result.reason;
+            emit_vla_host_action_invalid(ctx, wait_node, job_id, result.reason);
+            return result;
+        }
+    }
+
+    result.host_validation = "accepted";
     return result;
 }
 
@@ -1193,7 +1304,10 @@ void emit_vla_result_decision(tick_context& ctx,
                               std::string_view digest,
                               std::string_view decision,
                               std::string_view reason,
-                              std::string_view current_context_id) {
+                              std::string_view current_context_id,
+                              std::string_view host_validation = "not_run",
+                              std::string_view host_validation_reason = "",
+                              std::string_view host_validation_source = "none") {
     event_log* events = resolve_event_log(ctx);
     if (!events) {
         return;
@@ -1208,7 +1322,10 @@ void emit_vla_result_decision(tick_context& ctx,
     data << ",\"node_id\":" << wait_node << ",\"status\":\"" << event_log::json_escape(status)
          << "\",\"decision\":\"" << event_log::json_escape(decision) << "\",\"reason\":\""
          << event_log::json_escape(reason) << "\",\"current_context_id\":\""
-         << event_log::json_escape(current_context_id) << "\",\"digest\":\""
+         << event_log::json_escape(current_context_id) << "\",\"host_validation\":\""
+         << event_log::json_escape(host_validation) << "\",\"host_validation_reason\":\""
+         << event_log::json_escape(host_validation_reason) << "\",\"host_validation_source\":\""
+         << event_log::json_escape(host_validation_source) << "\",\"digest\":\""
          << event_log::json_escape(digest) << "\"}";
     (void)events->emit("vla_result", ctx.tick_index, data.str());
 }
@@ -2192,6 +2309,7 @@ status execute_vla_request(const node& n, tick_context& ctx, const std::vector<m
     invocation.job_key = opts.job_key;
     invocation.context_key = opts.context_key;
     invocation.captured_context_id = std::move(captured_context_id);
+    invocation.action_dims = dims;
     invocation.submitted_at = submitted_at;
     invocation.deadline = submitted_at + std::chrono::milliseconds(opts.deadline_ms);
     invocation.acceptance_policy = opts.acceptance_policy;
@@ -2268,16 +2386,14 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
     if ((poll.status == vla_job_status::queued || poll.status == vla_job_status::running ||
          poll.status == vla_job_status::streaming) &&
         opts.early_commit && poll.partial.has_value() && poll.partial->action_candidate.has_value() &&
-        clamp_confidence(poll.partial->confidence) >= opts.early_confidence && action_is_finite(*poll.partial->action_candidate)) {
-        vla_authority_check authority;
-        if (invocation) {
-            authority = check_vla_authority(ctx, *invocation);
-        }
+        clamp_confidence(poll.partial->confidence) >= opts.early_confidence) {
+        const vla_commit_check commit =
+            check_vla_commit_gate(ctx, invocation, n.id, id, *poll.partial->action_candidate, true);
         const std::string digest = event_log::hash64_hex(vla_action_to_json(*poll.partial->action_candidate));
-        if (!authority.accepted) {
+        if (!commit.accepted) {
             if (invocation && invocation->authority_state == vla_authority_state::active) {
                 invocation->authority_state = vla_authority_state::rejected;
-                invocation->authority_reason = authority.reason;
+                invocation->authority_reason = commit.reason;
             }
             emit_vla_result_decision(ctx,
                                      invocation,
@@ -2286,15 +2402,18 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
                                      "streaming",
                                      digest,
                                      "rejected",
-                                     authority.reason,
-                                     authority.current_context_id);
+                                     commit.reason,
+                                     commit.current_context_id,
+                                     commit.host_validation,
+                                     commit.host_validation_reason,
+                                     commit.host_validation_source);
             if (opts.clear_job) {
                 clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
             }
             if (invocation) {
                 erase_active_vla_job(ctx.inst, *invocation);
             }
-            emit_log(ctx, log_level::warn, "vla", "vla-wait: rejected partial action: " + authority.reason);
+            emit_log(ctx, log_level::warn, "vla", "vla-wait: rejected partial action: " + commit.reason);
             return status::failure;
         }
 
@@ -2335,7 +2454,10 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
                                  digest,
                                  "accepted",
                                  "",
-                                 authority.current_context_id);
+                                 commit.current_context_id,
+                                 commit.host_validation,
+                                 commit.host_validation_reason,
+                                 commit.host_validation_source);
         emit_log(ctx,
                  log_level::info,
                  "vla",
@@ -2347,17 +2469,13 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
         return status::running;
     }
 
-    if (poll.status == vla_job_status::done && poll.final.has_value() && poll.final->status == vla_status::ok &&
-        action_is_finite(poll.final->action)) {
-        vla_authority_check authority;
-        if (invocation) {
-            authority = check_vla_authority(ctx, *invocation);
-        }
+    if (poll.status == vla_job_status::done && poll.final.has_value() && poll.final->status == vla_status::ok) {
+        const vla_commit_check commit = check_vla_commit_gate(ctx, invocation, n.id, id, poll.final->action, false);
         const std::string digest = event_log::hash64_hex(vla_action_to_json(poll.final->action));
-        if (!authority.accepted) {
+        if (!commit.accepted) {
             if (invocation && invocation->authority_state == vla_authority_state::active) {
                 invocation->authority_state = vla_authority_state::rejected;
-                invocation->authority_reason = authority.reason;
+                invocation->authority_reason = commit.reason;
             }
             emit_vla_result_decision(ctx,
                                      invocation,
@@ -2366,15 +2484,18 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
                                      "ok",
                                      digest,
                                      "rejected",
-                                     authority.reason,
-                                     authority.current_context_id);
+                                     commit.reason,
+                                     commit.current_context_id,
+                                     commit.host_validation,
+                                     commit.host_validation_reason,
+                                     commit.host_validation_source);
             if (opts.clear_job) {
                 clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
             }
             if (invocation) {
                 erase_active_vla_job(ctx.inst, *invocation);
             }
-            emit_log(ctx, log_level::warn, "vla", "vla-wait: rejected final action: " + authority.reason);
+            emit_log(ctx, log_level::warn, "vla", "vla-wait: rejected final action: " + commit.reason);
             return status::failure;
         }
 
@@ -2388,8 +2509,18 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
             clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
         }
         emit_log(ctx, log_level::info, "vla", "vla-wait: committed final action");
-        emit_vla_result_decision(
-            ctx, invocation, n.id, id, "ok", digest, "accepted", "", authority.current_context_id);
+        emit_vla_result_decision(ctx,
+                                 invocation,
+                                 n.id,
+                                 id,
+                                 "ok",
+                                 digest,
+                                 "accepted",
+                                 "",
+                                 commit.current_context_id,
+                                 commit.host_validation,
+                                 commit.host_validation_reason,
+                                 commit.host_validation_source);
         return status::success;
     }
 
@@ -2415,16 +2546,23 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
     if (opts.clear_job) {
         clear_job_key_if_present(ctx, opts.job_key, opts.node_name);
     }
+    const bool service_rejected_action = poll.final.has_value() && poll.final->status == vla_status::invalid;
+    std::string service_validation_reason = "invalid_pose";
+    if (service_rejected_action && poll.final->explanation.find("dimensions") != std::string::npos) {
+        service_validation_reason = "invalid_schema";
+    }
     if (invocation) {
         const bool timed_out = poll.status == vla_job_status::timeout ||
                                (poll.final.has_value() && poll.final->status == vla_status::timeout);
-        const bool invalid_action = poll.status == vla_job_status::done && poll.final.has_value() &&
-                                    poll.final->status == vla_status::ok && !action_is_finite(poll.final->action);
-        const std::string terminal_reason =
-            timed_out ? "deadline_expired" : (invalid_action ? "invalid_action" : "backend_terminal_failure");
+        const std::string terminal_reason = timed_out                 ? "deadline_expired"
+                                            : service_rejected_action ? service_validation_reason
+                                                                      : "backend_terminal_failure";
         if (invocation->authority_state == vla_authority_state::active) {
             invocation->authority_state = vla_authority_state::rejected;
             invocation->authority_reason = terminal_reason;
+            if (service_rejected_action) {
+                emit_vla_host_action_invalid(ctx, n.id, id, terminal_reason);
+            }
         }
         erase_active_vla_job(ctx.inst, *invocation);
     }
@@ -2459,7 +2597,10 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
                                  "",
                                  "rejected",
                                  decision_reason,
-                                 current_context_id);
+                                 current_context_id,
+                                 service_rejected_action ? "rejected" : "not_run",
+                                 service_rejected_action ? decision_reason : "",
+                                 service_rejected_action ? "vla_service" : "none");
     }
     emit_log(ctx, log_level::warn, "vla", failure_reason);
     return status::failure;

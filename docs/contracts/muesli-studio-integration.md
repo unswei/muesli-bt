@@ -125,6 +125,10 @@ Required event families:
   `async_cancel_requested`, `async_cancel_acknowledged`,
   `async_completion_dropped`
 
+For commit decisions, Studio may display the optional `vla_result` fields
+`host_validation`, `host_validation_reason` and `host_validation_source`.
+Consumers must tolerate those fields being absent in older logs.
+
 ### requirement 9: deterministic mode for fixtures
 
 `muesli-bt` must provide deterministic fixture generation for compatibility checks.

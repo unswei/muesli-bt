@@ -20,9 +20,18 @@ runtime invocation record is available:
 - `acceptance_policy`; and
 - `authority_state`.
 
-BT-node `vla_result` events add `decision` (`accepted` or `rejected`) and a
-stable `reason`. `async_authority_revoked` records logical revocation before
-best-effort cancellation is requested.
+BT-node `vla_result` events add `decision` (`accepted` or `rejected`), a stable
+`reason`, and:
+
+- `host_validation`: `not_run`, `accepted` or `rejected`;
+- `host_validation_reason`; and
+- `host_validation_source`: `none`, `runtime_structural`, `vla_service`,
+  `host_callback` or `unavailable`.
+
+Authority failures short-circuit before host policy and use `not_run`.
+Structural or host-policy rejection also emits the existing
+`host_action_invalid` runtime outcome. `async_authority_revoked` records logical
+revocation before best-effort cancellation is requested.
 
 Use the canonical event APIs:
 

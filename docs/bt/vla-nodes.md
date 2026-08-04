@@ -27,7 +27,8 @@ Do not send model output directly to actuators. The host must validate proposals
 `vla-request` also creates an invocation record. Existing trees use the
 `deadline_only` acceptance policy by default. Set `:acceptance_policy
 invocation_scoped` and provide `:context_key` when a result must remain bound to
-the current BT authority, request generation and world context. See
+the current BT authority, request generation and world context. The host must
+also register a `vla_commit_validator`; full mode fails closed without one. See
 [invocation-scoped authority](invocation-scoped-authority.md).
 
 The usual pattern is:
@@ -146,6 +147,7 @@ Return status:
 - Use the same `:name` or `:job_key` across request, wait, and cancel nodes.
 - Use `invocation_scoped` when object identity or BT branch authority can change
   while the job is running.
+- Register a host commit validator before ticking an invocation-scoped tree.
 - Keep a fallback branch after VLA work.
 - Treat model output as a proposal until the host validates it.
 - Prefer media handles such as `frame://camera1/latest` for remote calls instead of embedding image bytes in Lisp.

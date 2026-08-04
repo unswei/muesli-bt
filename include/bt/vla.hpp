@@ -176,6 +176,30 @@ struct vla_poll {
     std::unordered_map<std::string, double> stats{};
 };
 
+struct vla_commit_context {
+    std::uint64_t job_id = 0;
+    std::uint64_t generation = 0;
+    std::uint64_t requesting_node = 0;
+    std::uint64_t authority_node = 0;
+    std::string job_key;
+    std::string captured_context_id;
+    std::string current_context_id;
+    bool early_result = false;
+};
+
+struct vla_commit_validation {
+    bool accepted = false;
+    std::string reason = "host_policy_rejected";
+};
+
+class vla_commit_validator {
+public:
+    virtual ~vla_commit_validator() = default;
+
+    virtual vla_commit_validation validate(const vla_commit_context& context,
+                                           const vla_action& action) = 0;
+};
+
 struct vla_record {
     std::int64_t ts_ms = 0;
     std::string run_id;

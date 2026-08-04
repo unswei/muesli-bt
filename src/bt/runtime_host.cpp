@@ -1011,6 +1011,7 @@ status runtime_host::tick_instance(std::int64_t handle) {
     svc.robot = robot_;
     svc.planner = &planner_;
     svc.vla = &vla_;
+    svc.vla_commit = vla_commit_validator_;
 
     return tick(*inst, registry_, svc);
 }
@@ -1053,6 +1054,18 @@ vla_service& runtime_host::vla_ref() {
 
 const vla_service& runtime_host::vla_ref() const {
     return vla_;
+}
+
+void runtime_host::set_vla_commit_validator(vla_commit_validator* validator) noexcept {
+    vla_commit_validator_ = validator;
+}
+
+vla_commit_validator* runtime_host::vla_commit_validator_ptr() noexcept {
+    return vla_commit_validator_;
+}
+
+const vla_commit_validator* runtime_host::vla_commit_validator_ptr() const noexcept {
+    return vla_commit_validator_;
 }
 
 void runtime_host::set_model_service_client(model_service_config config, std::unique_ptr<model_service_client> client) {

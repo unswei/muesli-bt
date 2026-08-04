@@ -88,6 +88,7 @@ void expect_lisp_error_message(const std::string& source,
 void reset_bt_runtime_host() {
     bt::runtime_host& host = bt::default_runtime_host();
     host.clear_all();
+    host.set_vla_commit_validator(nullptr);
     bt::install_demo_callbacks(host);
 }
 
@@ -120,6 +121,26 @@ public:
 
 private:
     std::shared_ptr<std::atomic<bool>> release_;
+};
+
+class controlled_vla_commit_validator final : public bt::vla_commit_validator {
+public:
+    explicit controlled_vla_commit_validator(bt::vla_commit_validation result) : result_(std::move(result)) {}
+
+    bt::vla_commit_validation validate(const bt::vla_commit_context& context,
+                                       const bt::vla_action& action) override {
+        ++calls;
+        last_context = context;
+        last_action = action;
+        return result_;
+    }
+
+    std::size_t calls = 0;
+    bt::vla_commit_context last_context;
+    bt::vla_action last_action;
+
+private:
+    bt::vla_commit_validation result_;
 };
 
 class manual_test_clock final : public bt::clock_interface {
@@ -3852,6 +3873,8 @@ void test_vla_invocation_scoped_authority_accepts_current_result() {
     reset_bt_runtime_host();
     env_ptr env = create_global_env();
     bt::runtime_host& host = bt::default_runtime_host();
+    controlled_vla_commit_validator validator(bt::vla_commit_validation{.accepted = true, .reason = ""});
+    host.set_vla_commit_validator(&validator);
     auto release = std::make_shared<std::atomic<bool>>(false);
     host.vla_ref().register_backend("authority-accept-test", std::make_shared<controlled_vla_backend>(release));
 
@@ -3915,6 +3938,7 @@ void test_vla_invocation_scoped_authority_accepts_current_result() {
           "duplicate result should fail its wait branch and leave the request branch running");
     check(inst->bb.get("authority-action")->last_write_tick == accepted_write_tick,
           "duplicate terminal result must not write the accepted action again");
+    check(validator.calls == 1, "accepted invocation should run host validation exactly once");
 
     bool saw_rich_submit = false;
     bool saw_accepted_result = false;
@@ -3928,15 +3952,202 @@ void test_vla_invocation_scoped_authority_accepts_current_result() {
         saw_accepted_result = saw_accepted_result ||
                               (line.find("\"type\":\"vla_result\"") != std::string::npos &&
                                line.find("\"decision\":\"accepted\"") != std::string::npos &&
-                               line.find("\"authority_state\":\"accepted\"") != std::string::npos);
+                               line.find("\"authority_state\":\"accepted\"") != std::string::npos &&
+                               line.find("\"host_validation\":\"accepted\"") != std::string::npos);
         saw_duplicate_rejection = saw_duplicate_rejection ||
                                   (line.find("\"type\":\"vla_result\"") != std::string::npos &&
                                    line.find("\"decision\":\"rejected\"") != std::string::npos &&
                                    line.find("\"reason\":\"duplicate_terminal_result\"") != std::string::npos);
     }
     check(saw_rich_submit, "vla_submit should record invocation identity and captured context");
-    check(saw_accepted_result, "vla_result should record the accepted authority decision");
+    check(saw_accepted_result, "vla_result should record authority and host validation acceptance");
     check(saw_duplicate_rejection, "accepted invocation should reject a duplicate terminal result");
+    host.set_vla_commit_validator(nullptr);
+}
+
+void test_vla_commit_gate_rejects_superseded_generation() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    bt::runtime_host& host = bt::default_runtime_host();
+    auto release = std::make_shared<std::atomic<bool>>(false);
+    host.vla_ref().register_backend("commit-generation-test", std::make_shared<controlled_vla_backend>(release));
+
+    (void)eval_text(
+        "(define commit-generation-tree "
+        "  (bt.compile "
+        "    '(reactive-sel "
+        "       (seq (vla-wait :name \"commit-generation\" :job_key generation-job "
+        "                      :action_key generation-action) "
+        "            (succeed)) "
+        "       (seq (cond bb-truthy submit-enabled) "
+        "            (vla-request :name \"commit-generation\" :job_key generation-job :instruction \"approach\" "
+        "                         :state_key state :model_name \"commit-generation-test\" :deadline_ms 1000 :dims 1 "
+        "                         :acceptance_policy invocation_scoped :context_key ball-context)))))",
+        env);
+    (void)eval_text("(define commit-generation-inst (bt.new-instance commit-generation-tree))", env);
+
+    (void)eval_text(
+        "(bt.tick commit-generation-inst '((state 0.0) (ball-context \"ball-A\") (submit-enabled #t)))", env);
+    bt::instance* inst = host.find_instance(bt_handle(eval_text("commit-generation-inst", env)));
+    check(inst != nullptr && inst->vla_invocations.size() == 1, "generation gate test should submit one invocation");
+    const std::uint64_t job_id = inst->vla_invocations.begin()->first;
+
+    (void)eval_text(
+        "(bt.tick commit-generation-inst '((state 0.0) (ball-context \"ball-A\") (submit-enabled #f)))", env);
+    inst->vla_generations["generation-job"] = 2;
+    release->store(true);
+
+    bool rejected = false;
+    for (int i = 0; i < 100; ++i) {
+        (void)eval_text(
+            "(bt.tick commit-generation-inst '((state 0.0) (ball-context \"ball-A\") (submit-enabled #f)))", env);
+        if (inst->vla_invocations.at(job_id).authority_state == bt::vla_authority_state::rejected) {
+            rejected = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    check(rejected, "commit gate should reject a result from a superseded generation");
+    check(inst->vla_invocations.at(job_id).authority_reason == "superseded",
+          "generation mismatch should use the stable superseded reason");
+    check(inst->bb.get("generation-action") == nullptr,
+          "superseded result must not update the action blackboard key");
+}
+
+void test_vla_commit_gate_requires_host_validation_and_runs_it_once() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    bt::runtime_host& host = bt::default_runtime_host();
+    controlled_vla_commit_validator validator(
+        bt::vla_commit_validation{.accepted = false, .reason = "robot_unstable"});
+    host.set_vla_commit_validator(&validator);
+    check(host.vla_commit_validator_ptr() == &validator, "runtime host should expose the configured commit validator");
+    auto release = std::make_shared<std::atomic<bool>>(false);
+    host.vla_ref().register_backend("commit-host-test", std::make_shared<controlled_vla_backend>(release));
+
+    (void)eval_text(
+        "(define commit-host-tree "
+        "  (bt.compile "
+        "    '(reactive-sel "
+        "       (seq (vla-wait :name \"commit-host\" :job_key host-job :action_key host-action :clear_job #f) "
+        "            (succeed)) "
+        "       (seq (cond bb-truthy submit-enabled) "
+        "            (vla-request :name \"commit-host\" :job_key host-job :instruction \"approach\" "
+        "                         :state_key state :model_name \"commit-host-test\" :deadline_ms 1000 :dims 1 "
+        "                         :acceptance_policy invocation_scoped :context_key ball-context)))))",
+        env);
+    (void)eval_text("(define commit-host-inst (bt.new-instance commit-host-tree))", env);
+
+    (void)eval_text("(bt.tick commit-host-inst "
+                    "'((state 0.0) (ball-context \"ball-A\") (submit-enabled #t)))",
+                    env);
+    bt::instance* inst = host.find_instance(bt_handle(eval_text("commit-host-inst", env)));
+    check(inst != nullptr && inst->vla_invocations.size() == 1, "host gate test should submit one invocation");
+    const std::uint64_t job_id = inst->vla_invocations.begin()->first;
+    (void)eval_text("(bt.tick commit-host-inst "
+                    "'((state 0.0) (ball-context \"ball-A\") (submit-enabled #f)))",
+                    env);
+
+    release->store(true);
+    bool rejected = false;
+    for (int i = 0; i < 100; ++i) {
+        (void)eval_text("(bt.tick commit-host-inst "
+                        "'((state 0.0) (ball-context \"ball-A\") (submit-enabled #f)))",
+                        env);
+        if (inst->vla_invocations.at(job_id).authority_state == bt::vla_authority_state::rejected) {
+            rejected = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    check(rejected, "host policy should reject the otherwise current result");
+    check(inst->vla_invocations.at(job_id).authority_reason == "robot_unstable",
+          "host rejection should preserve its stable reason");
+    check(inst->bb.get("host-action") == nullptr, "host-rejected result must not update the action key");
+    check(validator.calls == 1, "host validator should run once for the terminal proposal");
+    check(validator.last_context.job_id == job_id, "host validator should receive the backend job id");
+    check(validator.last_context.generation == 1, "host validator should receive the invocation generation");
+    check(validator.last_context.job_key == "host-job", "host validator should receive the job key");
+    check(validator.last_context.captured_context_id == "ball-A" &&
+              validator.last_context.current_context_id == "ball-A",
+          "host validator should receive captured and current context identity");
+    check(!validator.last_context.early_result, "final result should be identified as final to the host validator");
+    check(validator.last_action.u.size() == 1, "host validator should receive the proposed action");
+
+    (void)eval_text("(bt.tick commit-host-inst "
+                    "'((state 0.0) (ball-context \"ball-A\") (submit-enabled #f)))",
+                    env);
+    check(validator.calls == 1, "exactly-once gate must not repeat host validation after terminal rejection");
+    check(inst->bb.get("host-action") == nullptr, "duplicate rejected result must remain unable to write an action");
+
+    bool saw_host_invalid = false;
+    bool saw_host_rejection = false;
+    bool saw_duplicate_rejection = false;
+    for (const std::string& line : host.events().snapshot()) {
+        saw_host_invalid = saw_host_invalid ||
+                           (line.find("\"type\":\"host_action_invalid\"") != std::string::npos &&
+                            line.find("\"reason\":\"robot_unstable\"") != std::string::npos);
+        saw_host_rejection = saw_host_rejection ||
+                             (line.find("\"type\":\"vla_result\"") != std::string::npos &&
+                              line.find("\"decision\":\"rejected\"") != std::string::npos &&
+                              line.find("\"reason\":\"robot_unstable\"") != std::string::npos &&
+                              line.find("\"host_validation\":\"rejected\"") != std::string::npos &&
+                              line.find("\"host_validation_source\":\"host_callback\"") != std::string::npos);
+        saw_duplicate_rejection = saw_duplicate_rejection ||
+                                  (line.find("\"type\":\"vla_result\"") != std::string::npos &&
+                                   line.find("\"reason\":\"duplicate_terminal_result\"") != std::string::npos &&
+                                   line.find("\"host_validation\":\"not_run\"") != std::string::npos);
+    }
+    check(saw_host_invalid, "host rejection should emit canonical host_action_invalid evidence");
+    check(saw_host_rejection, "vla_result should record the host rejection and validation source");
+    check(saw_duplicate_rejection, "duplicate result should be rejected before host validation runs again");
+
+    host.set_vla_commit_validator(nullptr);
+    inst->bb.put("host-job",
+                 bt::bb_value{std::monostate{}},
+                 inst->tick_index,
+                 std::chrono::steady_clock::now(),
+                 0,
+                 "commit-gate-test");
+    (void)eval_text("(bt.tick commit-host-inst "
+                    "'((state 0.0) (ball-context \"ball-A\") (submit-enabled #t)))",
+                    env);
+    check(inst->vla_invocations.size() == 1, "new generation should replace the earlier host-rejected invocation");
+    const std::uint64_t unvalidated_job_id = inst->vla_invocations.begin()->first;
+    check(unvalidated_job_id != job_id, "new generation should have a distinct backend job id");
+
+    bool rejected_without_validator = false;
+    for (int i = 0; i < 100; ++i) {
+        (void)eval_text("(bt.tick commit-host-inst "
+                        "'((state 0.0) (ball-context \"ball-A\") (submit-enabled #f)))",
+                        env);
+        if (inst->vla_invocations.at(unvalidated_job_id).authority_state == bt::vla_authority_state::rejected) {
+            rejected_without_validator = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    check(rejected_without_validator, "invocation-scoped commit should fail closed without a host validator");
+    check(inst->vla_invocations.at(unvalidated_job_id).authority_reason == "host_policy_rejected",
+          "missing host validator should use host_policy_rejected");
+    check(inst->bb.get("host-action") == nullptr, "unvalidated result must not update the action key");
+
+    bool saw_unavailable_rejection = false;
+    for (const std::string& line : host.events().snapshot()) {
+        if (line.find("\"type\":\"vla_result\"") != std::string::npos &&
+            line.find("\"job_id\":\"" + std::to_string(unvalidated_job_id) + "\"") != std::string::npos &&
+            line.find("\"reason\":\"host_policy_rejected\"") != std::string::npos &&
+            line.find("\"host_validation_source\":\"unavailable\"") != std::string::npos) {
+            saw_unavailable_rejection = true;
+        }
+    }
+    check(saw_unavailable_rejection, "vla_result should explain fail-closed missing host validation");
 }
 
 void test_vla_invocation_scoped_authority_rejects_expired_deadline() {
@@ -7144,6 +7355,9 @@ int main() {
         {"phase6 sample wrappers tree", test_phase6_sample_wrappers_tree},
         {"phase6 custom robot interface", test_phase6_custom_robot_interface},
         {"vla invocation authority accepts current result", test_vla_invocation_scoped_authority_accepts_current_result},
+        {"vla commit gate rejects superseded generation", test_vla_commit_gate_rejects_superseded_generation},
+        {"vla commit gate requires host validation and runs it once",
+         test_vla_commit_gate_requires_host_validation_and_runs_it_once},
         {"vla invocation authority rejects expired deadline",
          test_vla_invocation_scoped_authority_rejects_expired_deadline},
         {"vla invocation authority rejects changed context and increments generation",

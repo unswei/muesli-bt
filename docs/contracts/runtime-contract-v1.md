@@ -146,6 +146,11 @@ Safety rules:
 - one active job per async node instance unless explicitly extended
 - late completion after cancellation does not commit actions
 - late completion drop is observable
+- invocation-scoped VLA results pass generation, branch authority, context,
+  monotonic deadline, exactly-once, structural and host-policy checks before a
+  blackboard action write
+- invocation-scoped VLA commits fail closed when the host commit validator is
+  unavailable
 
 Canonical async events:
 
@@ -163,6 +168,9 @@ Code anchors:
 - active async tracking: `include/bt/instance.hpp`
   (`instance::active_vla_jobs`, `instance::vla_invocations`, and
   `instance::vla_generations`)
+- host commit-validation API: `include/bt/vla.hpp`
+  (`vla_commit_context`, `vla_commit_validation`, and
+  `vla_commit_validator`)
 
 ### deterministic logging and replay
 

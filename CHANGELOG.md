@@ -12,6 +12,11 @@ muesli-bt
   evidence, and deterministic unit coverage. Existing trees retain
   `deadline_only`; opt in with `:acceptance_policy invocation_scoped` and
   `:context_key`.
+- Added an explicit VLA commit-validation interface for host policy. The atomic
+  commit gate now checks current generation, branch authority, context,
+  monotonic deadline, exactly-once state, action structure and host policy
+  before writing an action. Invocation-scoped mode fails closed when the host
+  validator is unavailable.
 - Added the first experimental agent-proposed task-logic path, including `agent_proposal.v1` fixtures, `guarded-recovery.v1` contract checks, manifest export, validation result objects, semantic diffs, dry-run reports, rollback handles, proposal rejection fixtures, and an agent-facing integration page.
 - Added transparent `slot` BT DSL metadata for patchable subtree boundaries, with compile, tick, and `bt.to-dsl` round-trip coverage.
 - Added the first experimental live C++ tick-boundary subtree install path for `slot` nodes, including install and rollback request APIs, rollback snapshots, non-destructive rejection gates, replaced-subtree cleanup, and unit coverage for install, rejection, rollback, and halt cleanup.
@@ -32,6 +37,9 @@ muesli-bt
   invocation fields on VLA lifecycle payloads. This does not change the schema
   name or runtime contract version; consumers should continue ignoring unknown
   event types and optional payload fields.
+- Extended VLA result payloads with optional host-validation status, reason and
+  source fields. Host-policy and structural rejections reuse the canonical
+  `host_action_invalid` event.
 - Extended the canonical event schema and event-log docs with generated-fragment, subtree-install, and subtree-rollback lifecycle event names for the experimental generated-subtree evidence path.
 
 ## [0.8.0] - 2026-05-10

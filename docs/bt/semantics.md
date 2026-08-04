@@ -204,6 +204,9 @@ Uses per-node retry counter.
 - while queued/running/streaming: returns `running`
 - on valid terminal action: applies the configured authority commit gate, then
   writes the action to blackboard and returns `success`
+- the commit gate checks structural validity and calls the registered host
+  commit validator immediately before the write
+- invocation-scoped commits fail closed when no host validator is registered
 - on timeout/error/cancel/invalid: returns `failure` (and clears `job_id` unless configured otherwise)
 
 ## `vla-cancel`

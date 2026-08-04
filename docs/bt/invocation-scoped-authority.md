@@ -74,6 +74,9 @@ authority state is active
 and the stored generation is current for the job key
 and monotonic time is not after the stored deadline
 and the current context ID equals the captured context ID
+and the invocation has no terminal decision
+and the action shape is valid
+and the host commit validator accepts the proposal
 ```
 
 The action blackboard key is written only after this gate passes. Acceptance
@@ -88,8 +91,34 @@ Stable rejection reasons include:
 - `deadline_expired`;
 - `duplicate_terminal_result`;
 - `superseded`;
-- `invalid_action`; and
+- `invalid_schema`;
+- `invalid_frame`;
+- `invalid_pose`;
+- `ball_stale`;
+- `robot_unstable`;
+- `host_policy_rejected`; and
 - `backend_terminal_failure`.
+
+### host validation
+
+The runtime checks that a BT VLA proposal is a finite continuous action with
+the dimensions captured at submission. The host can then apply robot-specific
+policy through `vla_commit_validator`.
+
+For `invocation_scoped`, a missing host validator fails closed with
+`host_policy_rejected`. The validator runs only after generation, authority,
+context, deadline, exactly-once and structural checks pass. A terminal
+invocation never calls the validator again.
+
+The validator receives `vla_commit_context`, which contains the job ID,
+generation, requesting and authority-owner nodes, job key, captured and current
+context IDs, and whether the proposal is an early result. It also receives the
+untrusted `vla_action` proposal.
+
+A Booster adapter should use this hook to validate the approach frame, pose
+bounds, observation age, operating area and current robot stability. Returning
+an undocumented reason is normalised to `host_policy_rejected`. Validator
+exceptions are also rejected with that reason.
 
 ### branch pre-emption
 
@@ -136,6 +165,31 @@ New request options:
 
 `vla-wait` and `vla-cancel` use the invocation associated with their configured
 `:job_key`. They require no new options.
+
+Register a host validator before ticking an invocation-scoped tree:
+
+```cpp
+class booster_commit_validator final : public bt::vla_commit_validator {
+public:
+    bt::vla_commit_validation validate(
+        const bt::vla_commit_context& context,
+        const bt::vla_action& action) override {
+        if (!robot_is_stable()) {
+            return {.accepted = false, .reason = "robot_unstable"};
+        }
+        if (!approach_pose_is_safe(context, action)) {
+            return {.accepted = false, .reason = "invalid_pose"};
+        }
+        return {.accepted = true, .reason = ""};
+    }
+};
+
+booster_commit_validator validator;
+host.set_vla_commit_validator(&validator);
+```
+
+The host retains ownership of the validator. The validator must outlive every
+tick that can use it. Passing `nullptr` removes the callback.
 
 Authority states are:
 
@@ -190,6 +244,8 @@ commit gate rejects its result with `context_changed` when it arrives.
 - Use the same `:job_key` on request, wait and cancel nodes.
 - A request node and an authority-owner node are not always the same node.
 - Cancellation is resource management. Revocation is the acceptance rule.
+- `invocation_scoped` fails closed when the host has not registered a commit
+  validator.
 - `vla.submit` and `vla.poll` Lisp built-ins do not create BT invocation
   authority records. This feature belongs to the BT VLA nodes.
 - Result acceptance does not replace host-side action validation.

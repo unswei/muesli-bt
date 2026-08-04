@@ -24,6 +24,7 @@ namespace bt {
 struct tick_context;
 class planner_service;
 class vla_service;
+class vla_commit_validator;
 
 struct node_memory {
     std::int64_t i0 = 0;
@@ -52,6 +53,7 @@ struct vla_invocation {
     std::string job_key;
     std::string context_key;
     std::string captured_context_id;
+    std::int64_t action_dims = 0;
     std::chrono::steady_clock::time_point submitted_at{};
     std::chrono::steady_clock::time_point deadline{};
     vla_acceptance_policy acceptance_policy = vla_acceptance_policy::deadline_only;
@@ -91,6 +93,7 @@ struct services {
     robot_interface* robot = nullptr;
     planner_service* planner = nullptr;
     vla_service* vla = nullptr;
+    vla_commit_validator* vla_commit = nullptr;
 };
 
 struct subtree_install_request {
