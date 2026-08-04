@@ -49,6 +49,7 @@ public:
         bt::vla_response out;
         out.model = request.model;
         out.action.type = bt::vla_action_type::continuous;
+        out.action.frame_id = request.action_space.frame_id;
         out.action.u = {behaviour_.action_value};
         out.confidence = 0.8;
         out.explanation = "scripted backend";

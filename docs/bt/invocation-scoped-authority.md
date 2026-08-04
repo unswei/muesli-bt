@@ -112,13 +112,19 @@ invocation never calls the validator again.
 
 The validator receives `vla_commit_context`, which contains the job ID,
 generation, requesting and authority-owner nodes, job key, captured and current
-context IDs, and whether the proposal is an early result. It also receives the
-untrusted `vla_action` proposal.
+context IDs, expected action frame, and whether the proposal is an early
+result. It also receives the untrusted `vla_action` proposal, including any
+frame reported by the backend.
 
-A Booster adapter should use this hook to validate the approach frame, pose
-bounds, observation age, operating area and current robot stability. Returning
-an undocumented reason is normalised to `host_policy_rejected`. Validator
-exceptions are also rejected with that reason.
+The SDK-independent `approach_pose_validator` implements the common humanoid
+checks for a three-component `[x_m, y_m, yaw_rad]` result: requested and reported
+frame, pose bounds, current ball context and robot stability. A Booster adapter
+still supplies the live state snapshot and applies any observation-age,
+operating-area and walking-dispatch policy. See
+[approach pose host validation](approach-pose-validation.md).
+
+Returning an undocumented reason is normalised to `host_policy_rejected`.
+Validator exceptions are also rejected with that reason.
 
 ### branch pre-emption
 
@@ -163,6 +169,8 @@ Enable invocation-scoped authority on `vla-request`:
   :job_key approach-job
   :instruction "choose an approach pose"
   :state_key ball-state
+  :dims 3
+  :action_frame ball_context
   :deadline_ms 3500
   :acceptance_policy invocation_scoped
   :context_key ball-context-id)
@@ -174,29 +182,30 @@ New request options:
 | --- | --- | --- | --- |
 | `:acceptance_policy` | string or symbol | `deadline_only` | `deadline_only` or `invocation_scoped`. |
 | `:context_key` | string or symbol | unset | Blackboard key holding a non-empty string or integer context ID. Required for `invocation_scoped`. |
+| `:action_frame` | string or symbol | unset | Expected output action frame captured with the invocation. |
 
 `vla-wait` and `vla-cancel` use the invocation associated with their configured
 `:job_key`. They require no new options.
 
-Register a host validator before ticking an invocation-scoped tree:
+Register a host validator before ticking an invocation-scoped tree. For a
+humanoid approach pose, use the concrete validator:
 
 ```cpp
-class booster_commit_validator final : public bt::vla_commit_validator {
-public:
-    bt::vla_commit_validation validate(
-        const bt::vla_commit_context& context,
-        const bt::vla_action& action) override {
-        if (!robot_is_stable()) {
-            return {.accepted = false, .reason = "robot_unstable"};
-        }
-        if (!approach_pose_is_safe(context, action)) {
-            return {.accepted = false, .reason = "invalid_pose"};
-        }
-        return {.accepted = true, .reason = ""};
-    }
-};
-
-booster_commit_validator validator;
+bt::approach_pose_validator validator(
+    bt::approach_pose_validator_config{
+        .frame_id = "ball_context",
+        .bounds = {
+            .min_x_m = -1.0,
+            .max_x_m = 0.0,
+            .min_y_m = -0.5,
+            .max_y_m = 0.5,
+            .min_yaw_rad = -3.141593,
+            .max_yaw_rad = 3.141593,
+        },
+    },
+    [&robot_state] {
+        return robot_state.approach_pose_host_state();
+    });
 host.set_vla_commit_validator(&validator);
 ```
 
@@ -235,6 +244,8 @@ invocation, and submits only when no current result can be consumed:
       :job_key approach-job
       :instruction "choose an approach pose"
       :state_key ball-state
+      :dims 3
+      :action_frame ball_context
       :deadline_ms 3500
       :acceptance_policy invocation_scoped
       :context_key ball-context-id)))
@@ -270,6 +281,7 @@ commit gate rejects its result with `context_changed` when it arrives.
 
 - [VLA BT nodes](vla-nodes.md)
 - [VLA integration](vla-integration.md)
+- [approach pose host validation](approach-pose-validation.md)
 - [VLA logging](../observability/vla-logging.md)
 - [humanoid model-mediated approach experiment](../project/humanoid-model-mediated-approach-contract.md)
 - [terminology](../terminology.md)

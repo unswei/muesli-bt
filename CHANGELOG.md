@@ -21,6 +21,10 @@ muesli-bt
   logically revoked, cancelled and removed from active tracking before the
   matching job, action and metadata keys are cleared. Runtime host reset and
   clear-all paths use this cleanup before discarding instance state.
+- Added an SDK-independent three-component approach-pose commit validator. It
+  checks configured bounds, requested and reported frames, the current ball
+  context and robot stability before an invocation-scoped result can reach the
+  blackboard.
 - Added the first experimental agent-proposed task-logic path, including `agent_proposal.v1` fixtures, `guarded-recovery.v1` contract checks, manifest export, validation result objects, semantic diffs, dry-run reports, rollback handles, proposal rejection fixtures, and an agent-facing integration page.
 - Added transparent `slot` BT DSL metadata for patchable subtree boundaries, with compile, tick, and `bt.to-dsl` round-trip coverage.
 - Added the first experimental live C++ tick-boundary subtree install path for `slot` nodes, including install and rollback request APIs, rollback snapshots, non-destructive rejection gates, replaced-subtree cleanup, and unit coverage for install, rejection, rollback, and halt cleanup.
@@ -44,6 +48,9 @@ muesli-bt
 - Extended VLA result payloads with optional host-validation status, reason and
   source fields. Host-policy and structural rejections reuse the canonical
   `host_action_invalid` event.
+- Extended VLA action spaces, action results, commit contexts and invocation
+  events with optional action-frame metadata. Existing requests leave the
+  field unset and retain their previous request hashes and behaviour.
 - Extended the canonical event schema and event-log docs with generated-fragment, subtree-install, and subtree-rollback lifecycle event names for the experimental generated-subtree evidence path.
 
 ## [0.8.0] - 2026-05-10

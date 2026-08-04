@@ -107,6 +107,7 @@ nav:
           - Planner Configuration: bt/planner-configuration.md
           - VLA Nodes: bt/vla-nodes.md
           - Invocation-Scoped Authority: bt/invocation-scoped-authority.md
+          - Approach Pose Host Validation: bt/approach-pose-validation.md
           - VLA Request/Response: bt/vla-request-response.md
           - Host Integration: bt/robot-integration.md
       - Planning:

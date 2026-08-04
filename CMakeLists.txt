@@ -24,6 +24,7 @@ option(MUESLI_BT_BENCH_WITH_BTCPP "Build the optional BehaviorTree.CPP benchmark
 
 add_library(
   muesli_bt_core
+  src/bt/approach_pose_validator.cpp
   src/bt/blackboard.cpp
   src/bt/compiler.cpp
   src/bt/event_payload.cpp

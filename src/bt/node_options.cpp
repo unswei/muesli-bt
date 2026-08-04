@@ -58,7 +58,7 @@ constexpr std::array<node_option_spec, 5> kPlanActionConstraintOptions{{
     {":goal_tolerance", option_value_kind::number, ""},
 }};
 
-constexpr std::array<node_option_spec, 25> kVlaRequestOptions{{
+constexpr std::array<node_option_spec, 26> kVlaRequestOptions{{
     {":name", option_value_kind::text, ""},
     {":job_key", option_value_kind::text, "<name>.job_id"},
     {":instruction", option_value_kind::text, ""},
@@ -72,6 +72,7 @@ constexpr std::array<node_option_spec, 25> kVlaRequestOptions{{
     {":model_name", option_value_kind::text, "rt2-stub"},
     {":model_version", option_value_kind::text, "stub-1"},
     {":frame_id", option_value_kind::text, "base"},
+    {":action_frame", option_value_kind::text, ""},
     {":deadline_ms", option_value_kind::integer, "20", false, kDeadlineAliases},
     {":acceptance_policy", option_value_kind::text, "deadline_only", false, {}, kVlaAcceptancePolicyValues},
     {":context_key", option_value_kind::text, ""},

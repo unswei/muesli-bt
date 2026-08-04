@@ -16,6 +16,7 @@ Submits an async VLA job and returns a `job_id`.
 - missing required fields raise runtime errors
 - invalid bounds/dims/schema types raise runtime errors
 - unknown handles in observation raise runtime errors
+- `action_space.frame_id` optionally declares the requested output frame
 
 ## Examples
 
@@ -81,6 +82,8 @@ Submits an async VLA job and returns a `job_id`.
 ## Notes
 
 - Use `vla.poll` to observe status and result.
+- Backends can return `action.frame_id`; robot-specific commit validation may
+  require it to match `action_space.frame_id`.
 
 ## See Also
 

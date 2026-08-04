@@ -1300,6 +1300,9 @@ value vla_action_to_lisp(const bt::vla_action& action) {
     gc_root_scope roots(default_gc());
     roots.add(&out);
     map_set_symbol(out, "type", keyword_symbol(bt::vla_action_type_name(action.type)));
+    if (!action.frame_id.empty()) {
+        map_set_symbol(out, "frame_id", make_string(action.frame_id));
+    }
     if (action.type == bt::vla_action_type::continuous) {
         value u = numeric_vector_to_lisp_list(action.u);
         roots.add(&u);
@@ -1845,6 +1848,8 @@ bt::vla_request parse_vla_request_map(value request_map) {
         }
         const value space_map = require_map_arg(*space_v, "vla.submit action_space");
         req.action_space.type = map_lookup_text_or(space_map, "type", req.action_space.type, "vla.submit action_space.type");
+        req.action_space.frame_id =
+            map_lookup_text_or(space_map, "frame_id", req.action_space.frame_id, "vla.submit action_space.frame_id");
         req.action_space.dims = map_lookup_int_or(space_map, "dims", req.action_space.dims, "vla.submit action_space.dims");
         if (req.action_space.dims <= 0) {
             throw lisp_error("vla.submit: action_space.dims must be > 0");

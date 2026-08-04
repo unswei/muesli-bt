@@ -17,6 +17,7 @@ runtime invocation record is available:
 - `job_key`;
 - `action_key` and `meta_key` when a wait node has adopted the invocation;
 - `context_key`, `captured_context_id` and the current context on decisions;
+- `action_frame` when the request declares an expected output frame;
 - `submitted_at_ns` and `deadline_at_ns`;
 - `acceptance_policy`; and
 - `authority_state`.

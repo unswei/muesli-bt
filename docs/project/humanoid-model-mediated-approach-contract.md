@@ -2,12 +2,13 @@
 
 !!! note "status"
 
-    Status: contract-only.
+    Status: contract plus core runtime safety primitives.
 
     This page defines the intended experiment and evidence contract. The
     runtime provides experimental invocation-scoped authority, pre-emption and
-    reset cleanup, and an explicit host commit-validation hook for VLA BT nodes.
-    The repository does not yet provide the Booster K1 validator, host
+    reset cleanup, an explicit host commit-validation hook, and an
+    SDK-independent three-component approach-pose validator for VLA BT nodes.
+    The repository does not yet provide the Booster K1 state adapter, walking
     integration, complete experiment harness or overlay.
 
 ## what this is
@@ -266,9 +267,11 @@ Before the full experiment is implemented, `mbt.evt.v1` must represent:
 - blackboard changes used by the overlay; and
 - host walking-target validation and dispatch.
 
-The generic commit gate and host-validation outcome are now observable.
-Booster-specific pose validation and walking-target dispatch remain experiment
-integration work.
+The generic commit gate, host-validation outcome and SDK-independent local pose
+policy are now implemented and observable. The local policy checks the action
+frame, configured pose bounds, current ball context and robot stability.
+Booster-specific state acquisition, observation-age and operating-area policy,
+and walking-target dispatch remain experiment integration work.
 
 Existing canonical event types should be extended where their meaning already
 fits. Any new event type must be added to the v1 schema and documented in the
@@ -315,6 +318,11 @@ The Booster host retains final authority over all motion. It must reject a pose
 that is non-finite, outside the allowed frame, outside configured distance or
 yaw bounds, outside the permitted operating area, or unsafe for the current
 stability state.
+
+The core `approach_pose_validator` implements the finite-value, frame, local
+bounds, ball-context and stability checks without a Booster SDK dependency. The
+Booster adapter must supply the current context and stability snapshot, then
+apply observation-age, operating-area and walking-controller policy.
 
 Start with the software-controlled instability flag. Use a physical push only
 after the software trial is reliable and after the relevant robot safety review.
@@ -431,12 +439,15 @@ deadline. That difference is the experimental contrast.
 - The deadline-only policy is an experimental baseline, not a production mode.
 - Isaac H1 integration does not imply Booster K1 support. The Booster adapter,
   walking target interface and stability flag require their own integration.
+- The core approach-pose validator is not a Booster SDK adapter and does not
+  dispatch motion.
 
 ## see also
 
 - [flagship task and evidence contract](flagship-task-contract.md)
 - [v1.0 direction](v1-direction.md)
 - [VLA request/response contract](../bt/vla-request-response.md)
+- [approach pose host validation](../bt/approach-pose-validation.md)
 - [VLA logging](../observability/vla-logging.md)
 - [canonical event log](../observability/event-log.md)
 - [terminology](../terminology.md)

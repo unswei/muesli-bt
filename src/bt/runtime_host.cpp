@@ -461,8 +461,11 @@ std::string vla_request_to_model_service_input_json(const vla_request& request) 
         out << ",\"images\":{\"camera1\":{\"ref\":\"" << json_escape_string_fragment(request.observation.frame_id)
             << "\"}}";
     }
-    out << "},\"action_space\":{\"type\":\"" << json_escape_string_fragment(request.action_space.type)
-        << "\",\"dims\":" << request.action_space.dims << ",\"bounds\":" << bounds_to_json_array(request.action_space.bounds)
+    out << "},\"action_space\":{\"type\":\"" << json_escape_string_fragment(request.action_space.type) << "\"";
+    if (!request.action_space.frame_id.empty()) {
+        out << ",\"frame_id\":\"" << json_escape_string_fragment(request.action_space.frame_id) << "\"";
+    }
+    out << ",\"dims\":" << request.action_space.dims << ",\"bounds\":" << bounds_to_json_array(request.action_space.bounds)
         << "},\"constraints\":{\"max_abs_value\":" << request.constraints.max_abs_value
         << ",\"max_delta\":" << request.constraints.max_delta
         << ",\"forbidden_ranges\":" << bounds_to_json_array(request.constraints.forbidden_ranges) << "}}";
@@ -521,6 +524,52 @@ std::optional<std::vector<double>> extract_first_action_values(std::string_view 
         return std::nullopt;
     }
     return values;
+}
+
+std::optional<std::string> extract_first_action_frame_id(std::string_view output_json) {
+    const std::size_t actions_pos = output_json.find("\"actions\"");
+    if (actions_pos == std::string_view::npos) {
+        return std::nullopt;
+    }
+    const std::size_t object_end = output_json.find('}', actions_pos);
+    const std::size_t frame_pos = output_json.find("\"frame_id\"", actions_pos);
+    if (frame_pos == std::string_view::npos || object_end == std::string_view::npos || frame_pos > object_end) {
+        return std::nullopt;
+    }
+    std::size_t pos = output_json.find(':', frame_pos);
+    if (pos == std::string_view::npos || pos > object_end) {
+        return std::nullopt;
+    }
+    ++pos;
+    while (pos < object_end && std::isspace(static_cast<unsigned char>(output_json[pos]))) {
+        ++pos;
+    }
+    if (pos >= object_end || output_json[pos] != '"') {
+        return std::nullopt;
+    }
+    ++pos;
+
+    std::string frame_id;
+    while (pos < object_end) {
+        const char ch = output_json[pos++];
+        if (ch == '"') {
+            return frame_id;
+        }
+        if (ch != '\\') {
+            frame_id.push_back(ch);
+            continue;
+        }
+        if (pos >= object_end) {
+            return std::nullopt;
+        }
+        const char escaped = output_json[pos++];
+        if (escaped == '"' || escaped == '\\' || escaped == '/') {
+            frame_id.push_back(escaped);
+        } else {
+            return std::nullopt;
+        }
+    }
+    return std::nullopt;
 }
 
 struct model_service_vla_trace {
@@ -607,6 +656,7 @@ vla_response action_chunk_to_vla_response(const vla_request& request,
     out.status = vla_status::ok;
     out.model = request.model;
     out.action.type = vla_action_type::continuous;
+    out.action.frame_id = extract_first_action_frame_id(response.output_json).value_or("");
     out.action.u = *values;
     out.confidence = 1.0;
     out.explanation = "model-service action chunk";

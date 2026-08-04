@@ -175,6 +175,8 @@ Code anchors:
 - host commit-validation API: `include/bt/vla.hpp`
   (`vla_commit_context`, `vla_commit_validation`, and
   `vla_commit_validator`)
+- approach-pose host policy: `include/bt/approach_pose_validator.hpp`
+  (`approach_pose_validator` and its host-state provider)
 
 ### deterministic logging and replay
 

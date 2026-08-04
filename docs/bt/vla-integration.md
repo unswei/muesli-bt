@@ -18,6 +18,8 @@ Implemented now:
   blackboard outputs
 - an explicit host commit-validation callback before VLA BT actions reach the
   blackboard
+- an SDK-independent three-component approach-pose validator for frame, bounds,
+  current ball context and robot stability
 - canonical `mbt.evt.v1` logging for VLA events
 - optional `muesli-model-service` VLA session adapter for `cap.vla.action_chunk.v1`
 - validation gates for malformed, stale, unsafe, late, or policy-violating action chunks
@@ -46,6 +48,8 @@ Hosts register robot-specific policy with
 when no validator is registered. The generic runtime still validates action
 shape and finite values before calling host policy. See
 [invocation-scoped authority](invocation-scoped-authority.md#host-validation).
+The concrete humanoid policy is documented under
+[approach pose host validation](approach-pose-validation.md).
 
 ## Capability Boundary
 
@@ -94,6 +98,7 @@ The selector lets `vla-wait` complete when ready, while fallback logic continues
 
 - [VLA BT Nodes](vla-nodes.md)
 - [Invocation-Scoped Authority](invocation-scoped-authority.md)
+- [Approach Pose Host Validation](approach-pose-validation.md)
 - [VLA Request/Response Schema](vla-request-response.md)
 - [VLA Logging Schema](../observability/vla-logging.md)
 - [muesli-model-service Bridge](../integration/model-service-bridge.md)

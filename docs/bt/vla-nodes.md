@@ -70,6 +70,7 @@ The fallback branch is part of the safety contract.
 | `:model_name` | string or symbol | `rt2-stub` | Model name for records. |
 | `:model_version` | string or symbol | `stub-1` | Model version for records. |
 | `:frame_id` | string or symbol | `base` | Observation frame id. |
+| `:action_frame` | string or symbol | unset | Expected output action frame. The backend result reports its frame separately. |
 | `:deadline_ms` | integer > 0 | `20` | Async job deadline. Alias: `:budget_ms`. |
 | `:acceptance_policy` | string or symbol | `deadline_only` | Use `invocation_scoped` to require current generation, active authority and matching context at commit. |
 | `:context_key` | string or symbol | unset | Context ID key. Required by `invocation_scoped`; the value must be a non-empty string or integer. |

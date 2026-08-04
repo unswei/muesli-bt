@@ -39,6 +39,7 @@ public:
             std::exit(1);
         }
         ops.push_back(bt::model_service_operation_name(request.op));
+        inputs_json.push_back(request.input_json);
         refs_seen += request.refs_json.size();
         refs_json.insert(refs_json.end(), request.refs_json.begin(), request.refs_json.end());
         bt::model_service_response response;
@@ -73,6 +74,7 @@ public:
     }
 
     std::vector<std::string> ops;
+    std::vector<std::string> inputs_json;
     std::vector<std::string> refs_json;
     std::size_t refs_seen = 0;
     std::atomic<int> step_calls{0};
@@ -218,6 +220,31 @@ int main() {
     check(!poll.final->frame_refs.empty(), "model-service VLA final should include frame refs");
     check(poll.final->frame_refs[0] == "frame://camera1/123456789",
           "model-service VLA final should preserve frame ref");
+
+    {
+        bt::runtime_host framed_host;
+        auto framed_fake = std::make_unique<fake_vla_model_service_client>(
+            "{\"actions\":[{\"type\":\"approach_pose\",\"frame_id\":\"ball_context\","
+            "\"values\":[-0.45,0.08,0.0],\"dt_ms\":200}]}");
+        fake_vla_model_service_client* framed_fake_ptr = framed_fake.get();
+        framed_host.set_model_service_client(fake_cfg, std::move(framed_fake));
+        bt::vla_request framed_request = make_model_service_vla_request();
+        framed_request.action_space.frame_id = "ball_context";
+        framed_request.action_space.dims = 3;
+        framed_request.action_space.bounds = {{-1.0, 0.0}, {-0.5, 0.5}, {-3.141593, 3.141593}};
+        const bt::vla_poll framed_poll =
+            wait_for_terminal_vla(framed_host, framed_host.vla_ref().submit(framed_request));
+        check(framed_poll.status == bt::vla_job_status::done && framed_poll.final.has_value(),
+              "frame-tagged model-service VLA result should complete");
+        check(framed_poll.final->action.frame_id == "ball_context",
+              "model-service bridge should preserve the reported action frame");
+        bool sent_action_frame = false;
+        for (const std::string& input : framed_fake_ptr->inputs_json) {
+            sent_action_frame = sent_action_frame ||
+                                input.find("\"frame_id\":\"ball_context\"") != std::string::npos;
+        }
+        check(sent_action_frame, "model-service request should declare the requested action frame");
+    }
 
     const std::filesystem::path replay_dir =
         std::filesystem::temp_directory_path() /

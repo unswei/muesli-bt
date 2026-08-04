@@ -33,6 +33,7 @@ Observation fields:
 Action space fields:
 
 - `type` (`:continuous` or string)
+- `frame_id` (optional string identifying the requested output frame)
 - `dims` (int)
 - `bounds` (list of `(lo hi)`)
 - `units` (optional list)
@@ -79,9 +80,13 @@ Top-level fields:
 
 Action map forms:
 
-- `{:type :continuous, :u (...)}`
-- `{:type :discrete, :id "..."}`
-- `{:type :sequence, :steps (...)}`
+- `{:type :continuous, :frame_id "...", :u (...)}`
+- `{:type :discrete, :frame_id "...", :id "..."}`
+- `{:type :sequence, :frame_id "...", :steps (...)}`
+
+`frame_id` is optional in the generic action schema. A robot-specific commit
+validator can require it. The approach-pose validator requires the reported
+action frame and requested action-space frame to match its configured frame.
 
 ## Validation Rules
 
@@ -89,9 +94,12 @@ Action map forms:
 - non-finite action values are rejected
 - unsupported/missing required fields return error status
 - cancelled/timeout/error states do not auto-commit actions in `vla-wait`
+- robot-specific validators may require action frame metadata and tighter
+  semantic bounds
 
 ## See Also
 
 - [VLA Integration In BTs](vla-integration.md)
 - [VLA BT Nodes Reference](vla-nodes.md)
+- [Approach Pose Host Validation](approach-pose-validation.md)
 - [Language Reference Index](../language/reference/index.md)

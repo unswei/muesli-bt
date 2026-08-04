@@ -55,6 +55,7 @@ struct vla_invocation {
     std::string meta_key;
     std::string context_key;
     std::string captured_context_id;
+    std::string action_frame;
     std::int64_t action_dims = 0;
     std::chrono::steady_clock::time_point submitted_at{};
     std::chrono::steady_clock::time_point deadline{};

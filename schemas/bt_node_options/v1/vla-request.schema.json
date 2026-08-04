@@ -18,6 +18,7 @@
     ":model_name": { "type": "string", "default": "rt2-stub" },
     ":model_version": { "type": "string", "default": "stub-1" },
     ":frame_id": { "type": "string", "default": "base" },
+    ":action_frame": { "type": "string" },
     ":deadline_ms": { "type": "integer", "minimum": 1, "default": 20, "x-muesli-aliases": [":budget_ms"] },
     ":acceptance_policy": {
       "type": "string",

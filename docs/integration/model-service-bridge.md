@@ -231,6 +231,12 @@ After `start` returns a `session_id`, a VLA `step` response uses `status: "actio
 
 The bridge validates those proposals before any downstream host capability or robot action can observe them as executable commands. Malformed, stale, unsafe, late, or policy-violating chunks are rejected with `host_reached=false`.
 
+An action can additionally report `frame_id`. The bridge preserves that value
+in the generic VLA action. A request can declare the expected frame as
+`action_space.frame_id`; robot-specific commit policy decides whether the
+reported and requested frames are acceptable. The approach-pose validator
+requires both to match its configured frame.
+
 To route the existing VLA API through the model service, configure the bridge and use the public model-service capability with the `model-service` backend name:
 
 ```lisp

@@ -876,6 +876,9 @@ std::string json_escape(std::string_view text) {
 std::string vla_action_to_json(const vla_action& action) {
     std::ostringstream out;
     out << "{\"type\":\"" << vla_action_type_name(action.type) << "\"";
+    if (!action.frame_id.empty()) {
+        out << ",\"frame_id\":\"" << json_escape(action.frame_id) << "\"";
+    }
     if (action.type == vla_action_type::continuous) {
         out << ",\"u\":[";
         for (std::size_t i = 0; i < action.u.size(); ++i) {
@@ -1084,8 +1087,11 @@ void append_vla_invocation_fields(std::ostringstream& data, const vla_invocation
          << "\"action_key\":\"" << event_log::json_escape(invocation.action_key) << "\","
          << "\"meta_key\":\"" << event_log::json_escape(invocation.meta_key) << "\","
          << "\"captured_context_id\":\"" << event_log::json_escape(invocation.captured_context_id) << "\","
-         << "\"context_key\":\"" << event_log::json_escape(invocation.context_key) << "\","
-         << "\"submitted_at_ns\":" << ns_since_epoch(invocation.submitted_at) << ','
+         << "\"context_key\":\"" << event_log::json_escape(invocation.context_key) << "\",";
+    if (!invocation.action_frame.empty()) {
+        data << "\"action_frame\":\"" << event_log::json_escape(invocation.action_frame) << "\",";
+    }
+    data << "\"submitted_at_ns\":" << ns_since_epoch(invocation.submitted_at) << ','
          << "\"deadline_at_ns\":" << ns_since_epoch(invocation.deadline) << ','
          << "\"acceptance_policy\":\"" << vla_acceptance_policy_name(invocation.acceptance_policy) << "\","
          << "\"authority_state\":\"" << vla_authority_state_name(invocation.authority_state) << '"';
@@ -1159,7 +1165,8 @@ struct vla_commit_check {
 
 bool is_stable_host_validation_reason(std::string_view reason) {
     return reason == "invalid_schema" || reason == "invalid_frame" || reason == "invalid_pose" ||
-           reason == "ball_stale" || reason == "robot_unstable" || reason == "host_policy_rejected";
+           reason == "ball_stale" || reason == "context_changed" || reason == "robot_unstable" ||
+           reason == "host_policy_rejected";
 }
 
 std::string normalise_host_validation_reason(std::string_view reason) {
@@ -1271,6 +1278,7 @@ vla_commit_check check_vla_commit_gate(tick_context& ctx,
         validation_context.job_key = invocation ? invocation->job_key : std::string{};
         validation_context.captured_context_id = invocation ? invocation->captured_context_id : std::string{};
         validation_context.current_context_id = result.current_context_id;
+        validation_context.expected_action_frame = invocation ? invocation->action_frame : std::string{};
         validation_context.early_result = early_result;
 
         vla_commit_validation validation;
@@ -1346,6 +1354,7 @@ struct vla_request_options {
     std::string model_name = "rt2-stub";
     std::string model_version = "stub-1";
     std::string frame_id = "base";
+    std::string action_frame;
     std::int64_t deadline_ms = 20;
     vla_acceptance_policy acceptance_policy = vla_acceptance_policy::deadline_only;
     std::string context_key;
@@ -1412,6 +1421,8 @@ vla_request_options parse_vla_request_options(const node& n, const std::vector<m
             opts.model_version = arg_as_text(value, "vla-request :model_version");
         } else if (key == "frame_id") {
             opts.frame_id = arg_as_text(value, "vla-request :frame_id");
+        } else if (key == "action_frame") {
+            opts.action_frame = arg_as_text(value, "vla-request :action_frame");
         } else if (key == "deadline_ms" || key == "budget_ms") {
             opts.deadline_ms = arg_as_int(value, "vla-request :deadline_ms");
         } else if (key == "acceptance_policy") {
@@ -2231,6 +2242,7 @@ status execute_vla_request(const node& n, tick_context& ctx, const std::vector<m
     request.run_id = "inst-" + std::to_string(ctx.inst.instance_handle);
     request.tick_index = ctx.tick_index;
     request.action_space.type = "continuous";
+    request.action_space.frame_id = opts.action_frame;
     request.action_space.dims = dims;
     request.action_space.bounds.assign(static_cast<std::size_t>(dims), {opts.bound_lo, opts.bound_hi});
     request.constraints.max_abs_value = std::max(0.0, opts.max_abs);
@@ -2338,6 +2350,7 @@ status execute_vla_request(const node& n, tick_context& ctx, const std::vector<m
     invocation.meta_key = std::move(prior_meta_key);
     invocation.context_key = opts.context_key;
     invocation.captured_context_id = std::move(captured_context_id);
+    invocation.action_frame = opts.action_frame;
     invocation.action_dims = dims;
     invocation.submitted_at = submitted_at;
     invocation.deadline = submitted_at + std::chrono::milliseconds(opts.deadline_ms);

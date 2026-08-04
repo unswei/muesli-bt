@@ -79,6 +79,9 @@ std::string json_escape(std::string_view input) {
 std::string action_to_json(const vla_action& action) {
     std::ostringstream out;
     out << "{\"type\":\"" << vla_action_type_name(action.type) << "\"";
+    if (!action.frame_id.empty()) {
+        out << ",\"frame_id\":\"" << json_escape(action.frame_id) << "\"";
+    }
     if (action.type == vla_action_type::continuous) {
         out << ",\"u\":[";
         for (std::size_t i = 0; i < action.u.size(); ++i) {
@@ -239,9 +242,10 @@ bool validate_and_clamp_action(const vla_request& request, vla_action& action, s
     return true;
 }
 
-vla_action make_continuous_action(const std::vector<double>& u) {
+vla_action make_continuous_action(const std::vector<double>& u, std::string_view frame_id = {}) {
     vla_action action;
     action.type = vla_action_type::continuous;
+    action.frame_id = frame_id;
     action.u = u;
     return action;
 }
@@ -261,7 +265,7 @@ public:
             part.sequence = seq;
             part.text_chunk = std::move(text);
             part.confidence = confidence;
-            part.action_candidate = make_continuous_action(proposal);
+            part.action_candidate = make_continuous_action(proposal, request.action_space.frame_id);
             if (!on_partial(part)) {
                 cancel_flag.store(true);
             }
@@ -309,7 +313,7 @@ public:
                 vla_response timeout;
                 timeout.status = vla_status::timeout;
                 timeout.model = request.model;
-                timeout.action = make_continuous_action(proposal);
+                timeout.action = make_continuous_action(proposal, request.action_space.frame_id);
                 timeout.confidence = 0.0;
                 timeout.explanation = "deadline exceeded";
                 timeout.stats["latency_ms"] = elapsed;
@@ -321,7 +325,7 @@ public:
         vla_response out;
         out.status = vla_status::ok;
         out.model = request.model;
-        out.action = make_continuous_action(proposal);
+        out.action = make_continuous_action(proposal, request.action_space.frame_id);
         out.confidence = 0.75;
         out.explanation = "rt2-style stub output";
         out.stats["latency_ms"] = elapsed_ms(started, std::chrono::steady_clock::now());
@@ -1042,7 +1046,11 @@ std::uint64_t vla_service::hash_request(const vla_request& request) {
     for (double v : request.observation.state) {
         out << v << ',';
     }
-    out << '\n' << "dims:" << request.action_space.dims << '\n';
+    out << '\n';
+    if (!request.action_space.frame_id.empty()) {
+        out << "action_frame:" << request.action_space.frame_id << '\n';
+    }
+    out << "dims:" << request.action_space.dims << '\n';
     for (const auto& [lo, hi] : request.action_space.bounds) {
         out << lo << ':' << hi << ';';
     }

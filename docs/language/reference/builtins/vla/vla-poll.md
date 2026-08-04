@@ -86,6 +86,7 @@ Polls async VLA job state and returns structured partial/final payloads.
 ## Notes
 
 - `status` values: `:queued`, `:running`, `:streaming`, `:done`, `:error`, `:timeout`, `:cancelled`.
+- An action map includes `frame_id` when the backend reports an action frame.
 
 ## See Also
 

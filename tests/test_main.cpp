@@ -1,6 +1,6 @@
-#include <cmath>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -16,6 +16,7 @@
 #include <variant>
 #include <vector>
 
+#include "bt/approach_pose_validator.hpp"
 #include "bt/instance.hpp"
 #include "bt/event_log.hpp"
 #include "bt/event_payload.hpp"
@@ -115,6 +116,7 @@ public:
         response.model = request.model;
         response.confidence = 1.0;
         response.action.type = bt::vla_action_type::continuous;
+        response.action.frame_id = request.action_space.frame_id;
         response.action.u.assign(static_cast<std::size_t>(request.action_space.dims), 0.25);
         return response;
     }
@@ -3692,6 +3694,7 @@ void test_vla_builtins_submit_poll_cancel_and_caps() {
         "  (map.set! req 'observation obs))"
         "(let ((space (map.make)))"
         "  (map.set! space 'type ':continuous)"
+        "  (map.set! space 'frame_id \"ball_context\")"
         "  (map.set! space 'dims 1)"
         "  (map.set! space 'bounds (list (list -1.0 1.0)))"
         "  (map.set! req 'action_space space))"
@@ -3735,6 +3738,12 @@ void test_vla_builtins_submit_poll_cancel_and_caps() {
     const std::vector<value> action_items = vector_from_list(final_action);
     check(action_items.size() == 1 && is_float(action_items[0]), "vla final action should be one float");
     check(float_value(action_items[0]) >= -1.0 && float_value(action_items[0]) <= 1.0, "vla final action out of bounds");
+    value final_action_frame = eval_text(
+        "(map.get (map.get (map.get (vla.poll " + std::to_string(job_id) +
+            ") 'final (map.make)) 'action (map.make)) 'frame_id \"\")",
+        env);
+    check(is_string(final_action_frame) && string_value(final_action_frame) == "ball_context",
+          "vla action frame should round-trip through submit and poll");
 
     value job2 = eval_text("(vla.submit req)", env);
     check(is_integer(job2) && integer_value(job2) > 0, "second vla.submit should return positive job id");
@@ -3865,6 +3874,137 @@ void test_vla_bt_nodes_flow_and_cancel() {
         }
     }
     check(saw_cancel_acknowledged, "VLA cancel should emit compact cancel_acknowledged outcome");
+}
+
+void test_approach_pose_validator_checks_bounds_frame_context_and_stability() {
+    bt::approach_pose_host_state host_state{.ball_context_id = "ball-A", .robot_stable = true};
+    bt::approach_pose_validator validator(
+        bt::approach_pose_validator_config{
+            .frame_id = "ball_context",
+            .bounds = {.min_x_m = -1.0,
+                       .max_x_m = 0.0,
+                       .min_y_m = -0.5,
+                       .max_y_m = 0.5,
+                       .min_yaw_rad = -3.141593,
+                       .max_yaw_rad = 3.141593}},
+        [&host_state] { return host_state; });
+
+    bt::vla_commit_context context;
+    context.captured_context_id = "ball-A";
+    context.current_context_id = "ball-A";
+    context.expected_action_frame = "ball_context";
+    bt::vla_action action;
+    action.type = bt::vla_action_type::continuous;
+    action.frame_id = "ball_context";
+    action.u = {-0.45, 0.08, 0.0};
+
+    check(validator.validate(context, action).accepted,
+          "current, stable, in-bounds approach pose should pass host validation");
+
+    action.u = {-0.45, 0.08};
+    check(validator.validate(context, action).reason == "invalid_schema",
+          "approach pose must have exactly three components");
+    action.u = {-0.45, 0.08, 0.0};
+
+    action.frame_id = "field";
+    check(validator.validate(context, action).reason == "invalid_frame",
+          "approach pose in the wrong result frame should be rejected");
+    action.frame_id = "ball_context";
+
+    context.expected_action_frame = "field";
+    check(validator.validate(context, action).reason == "invalid_frame",
+          "approach pose request in the wrong frame should be rejected");
+    context.expected_action_frame = "ball_context";
+
+    action.u[0] = 0.1;
+    check(validator.validate(context, action).reason == "invalid_pose",
+          "out-of-bounds approach pose should be rejected");
+    action.u[0] = -0.45;
+
+    host_state.ball_context_id = "ball-B";
+    check(validator.validate(context, action).reason == "context_changed",
+          "host ball context change should reject the old approach pose");
+    host_state.ball_context_id.clear();
+    check(validator.validate(context, action).reason == "ball_stale",
+          "missing current ball context should reject the approach pose as stale");
+
+    host_state.ball_context_id = "ball-A";
+    host_state.robot_stable = false;
+    check(validator.validate(context, action).reason == "robot_unstable",
+          "unstable robot state should reject the approach pose");
+}
+
+void test_approach_pose_validator_registers_with_commit_gate() {
+    using namespace muslisp;
+
+    reset_bt_runtime_host();
+    env_ptr env = create_global_env();
+    bt::runtime_host& host = bt::default_runtime_host();
+    bt::approach_pose_host_state host_state{.ball_context_id = "ball-A", .robot_stable = true};
+    bt::approach_pose_validator validator(
+        bt::approach_pose_validator_config{
+            .frame_id = "ball_context",
+            .bounds = {.min_x_m = -1.0,
+                       .max_x_m = 1.0,
+                       .min_y_m = -1.0,
+                       .max_y_m = 1.0,
+                       .min_yaw_rad = -3.141593,
+                       .max_yaw_rad = 3.141593}},
+        [&host_state] { return host_state; });
+    host.set_vla_commit_validator(&validator);
+    auto release = std::make_shared<std::atomic<bool>>(false);
+    host.vla_ref().register_backend("approach-pose-test", std::make_shared<controlled_vla_backend>(release));
+
+    (void)eval_text(
+        "(define approach-pose-tree "
+        "  (bt.compile "
+        "    '(reactive-sel "
+        "       (seq (vla-wait :name \"approach-pose\" :job_key approach-job :action_key approach-action) "
+        "            (succeed)) "
+        "       (vla-request :name \"approach-pose\" :job_key approach-job :instruction \"approach\" "
+        "                    :state_key state :model_name \"approach-pose-test\" :deadline_ms 1000 :dims 3 "
+        "                    :action_frame ball_context :acceptance_policy invocation_scoped "
+        "                    :context_key ball-context))))",
+        env);
+    (void)eval_text("(define approach-pose-inst (bt.new-instance approach-pose-tree))", env);
+
+    (void)eval_text(
+        "(bt.tick approach-pose-inst '((state (0.0 0.0 0.0)) (ball-context \"ball-A\")))", env);
+    bt::instance* inst = host.find_instance(bt_handle(eval_text("approach-pose-inst", env)));
+    check(inst != nullptr && inst->vla_invocations.size() == 1,
+          "approach pose request should create one invocation");
+    const std::uint64_t job_id = inst->vla_invocations.begin()->first;
+    check(inst->vla_invocations.at(job_id).action_frame == "ball_context",
+          "invocation should capture the requested action frame");
+
+    (void)eval_text(
+        "(bt.tick approach-pose-inst '((state (0.0 0.0 0.0)) (ball-context \"ball-A\")))", env);
+    release->store(true);
+
+    bool succeeded = false;
+    for (int i = 0; i < 100; ++i) {
+        value result = eval_text(
+            "(bt.tick approach-pose-inst '((state (0.0 0.0 0.0)) (ball-context \"ball-A\")))", env);
+        if (is_symbol(result) && symbol_name(result) == "success") {
+            succeeded = true;
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    check(succeeded, "registered approach pose validator should accept a valid current pose");
+    const bt::bb_entry* accepted = inst->bb.get("approach-action");
+    check(accepted != nullptr && std::holds_alternative<std::vector<double>>(accepted->value) &&
+              std::get<std::vector<double>>(accepted->value).size() == 3,
+          "accepted approach pose should write a three-component action");
+
+    bool saw_action_frame = false;
+    for (const std::string& line : host.events().snapshot()) {
+        saw_action_frame = saw_action_frame ||
+                           (line.find("\"type\":\"vla_submit\"") != std::string::npos &&
+                            line.find("\"action_frame\":\"ball_context\"") != std::string::npos);
+    }
+    check(saw_action_frame, "VLA invocation events should record the requested action frame");
+    host.set_vla_commit_validator(nullptr);
 }
 
 void test_vla_invocation_scoped_authority_accepts_current_result() {
@@ -4522,6 +4662,8 @@ void test_bt_node_option_metadata() {
           "vla-request :acceptance_policy default should preserve deadline-only behaviour");
     check(bt::find_node_option_spec(*request, ":context_key") != nullptr,
           "vla-request should expose :context_key option");
+    check(bt::find_node_option_spec(*request, ":action_frame") != nullptr,
+          "vla-request should expose :action_frame option");
 
     const bt::node_option_schema* wait = bt::find_node_option_schema("vla-wait");
     check(wait != nullptr, "vla-wait option schema should be registered");
@@ -7477,6 +7619,10 @@ int main() {
         {"phase5 ring buffer bounds", test_phase5_ring_buffer_bounds},
         {"phase6 sample wrappers tree", test_phase6_sample_wrappers_tree},
         {"phase6 custom robot interface", test_phase6_custom_robot_interface},
+        {"approach pose validator checks bounds, frame, context and stability",
+         test_approach_pose_validator_checks_bounds_frame_context_and_stability},
+        {"approach pose validator registers with commit gate",
+         test_approach_pose_validator_registers_with_commit_gate},
         {"vla invocation authority accepts current result", test_vla_invocation_scoped_authority_accepts_current_result},
         {"vla commit gate rejects superseded generation", test_vla_commit_gate_rejects_superseded_generation},
         {"vla commit gate requires host validation and runs it once",

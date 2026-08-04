@@ -83,6 +83,7 @@ enum class vla_action_type {
 
 struct vla_action {
     vla_action_type type = vla_action_type::continuous;
+    std::string frame_id{};
     std::vector<double> u{};
     std::string discrete_id{};
     std::vector<vla_action> steps{};
@@ -121,6 +122,7 @@ struct vla_observation {
 
 struct vla_action_space {
     std::string type = "continuous";
+    std::string frame_id{};
     std::int64_t dims = 0;
     std::vector<std::pair<double, double>> bounds{};
     std::vector<std::string> units{};
@@ -184,6 +186,7 @@ struct vla_commit_context {
     std::string job_key;
     std::string captured_context_id;
     std::string current_context_id;
+    std::string expected_action_frame;
     bool early_result = false;
 };
 
