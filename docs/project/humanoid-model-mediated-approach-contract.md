@@ -2,15 +2,17 @@
 
 !!! note "status"
 
-    Status: contract plus core runtime safety primitives.
+    Status: experimental software experiment harness plus core runtime safety
+    primitives.
 
     This page defines the intended experiment and evidence contract. The
     runtime provides experimental invocation-scoped authority, pre-emption and
     reset cleanup, an explicit host commit-validation hook, and an
     SDK-independent three-component approach-pose validator for VLA BT nodes.
-    It also provides an exactly-once walking-target host callback and canonical
-    dispatch evidence. The repository does not yet provide the Booster K1 state
-    or walking-controller adapters, complete experiment harness or overlay.
+    It also provides matched baseline/full BTs, a delayed deterministic service,
+    a four-trial runner, evidence manifests, an exactly-once walking-target host
+    callback and canonical dispatch evidence. The repository does not yet
+    provide the Booster K1 state or walking-controller adapters or video overlay.
 
 ## what this is
 
@@ -238,7 +240,7 @@ Use these stable values:
 | Field | Values |
 | --- | --- |
 | Active branch | `safe_stand`, `stabilise`, `search`, `model_wait`, `model_execute`, `fallback` |
-| Request state | `idle`, `queued`, `running`, `done`, `error`, `timeout`, `cancelled`, `revoked` |
+| Request state | `idle`, `queued`, `running`, `done`, `error`, `timeout`, `cancelled`, `revoked`, `rejected_safe_wait` |
 | Result decision | `none`, `accepted`, `rejected` |
 | Target state | `none`, `current`, `obsolete` |
 
@@ -261,7 +263,7 @@ Rejection reasons are stable machine-readable codes:
 | `walking_controller_rejected` | The walking-controller boundary refused the target. |
 | `host_policy_rejected` | Another documented host safety check rejects the pose. |
 
-Before the full experiment is implemented, `mbt.evt.v1` must represent:
+The implemented software experiment records these behaviours in `mbt.evt.v1`:
 
 - request submission, polling and terminal backend status;
 - captured request ID, generation, context ID and deadline;
@@ -285,6 +287,16 @@ halt, re-entry and emergency interruption. Each scenario has a separately
 named CTest entry. The tests use explicit backend gates, fixed event timestamps
 and no physical robot dependency.
 
+The runnable harness is under
+`examples/humanoid_model_mediated_approach/`. It includes matched
+deadline-only and invocation-scoped BTs, the 2.5-second fake service, the four
+frozen trial configurations and per-trial evidence protocols. The matrix runner
+creates canonical event logs, trial summaries, validation reports and
+provenance-rich run manifests. Each evidence protocol contains named predicates
+that the runner evaluates against the event stream. Raw video, overlay video,
+recorded-result replay
+and Booster adapters remain explicit pending artefacts.
+
 Existing canonical event types should be extended where their meaning already
 fits. Any new event type must be added to the v1 schema and documented in the
 same implementation change.
@@ -294,9 +306,10 @@ same implementation change.
 Store one self-contained bundle per run:
 
 ```text
-runs/humanoid-model-mediated-approach/<run_id>/
+examples/humanoid_model_mediated_approach/runs/<run_id>/
 ├── manifest.json
 ├── events.jsonl
+├── event-validation.json
 ├── trial-summary.json
 ├── raw-video.mp4
 ├── overlay-video.mp4
@@ -305,6 +318,10 @@ runs/humanoid-model-mediated-approach/<run_id>/
 
 `events.jsonl` is the only event log. The other JSON files are summaries or
 configuration artefacts, not competing logs.
+
+The SDK-independent harness records a `null` observation-age limit and a
+`not_simulated_by_sdk_independent_stub` policy. Such a run is not paper-eligible.
+A Booster run must replace that policy with an enforced finite age limit.
 
 The manifest must record:
 

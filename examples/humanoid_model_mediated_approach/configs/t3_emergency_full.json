@@ -1,0 +1,19 @@
+{
+  "schema_version": "humanoid.video_trial.v1",
+  "trial_id": "T3",
+  "name": "emergency-full",
+  "acceptance_policy": "invocation_scoped",
+  "bt": "lisp/bt_invocation_scoped.lisp",
+  "intervention": "emergency",
+  "evidence_manifest": "evidence/manifests/t3_emergency_full.json",
+  "expected": {
+    "terminal_decision": "rejected",
+    "reason": "branch_revoked",
+    "accepted_dispatches": 0,
+    "rejected_dispatches": 0,
+    "authority_revocations": 1,
+    "completion_drops": 1,
+    "recording_dispatch_calls": 0,
+    "active_branch": "safe_stand"
+  }
+}

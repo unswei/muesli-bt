@@ -359,6 +359,9 @@ void event_log::emit_bt_def(const definition& def) {
 }
 
 std::uint64_t event_log::emit(std::string_view type, std::optional<std::uint64_t> tick, std::string_view data_json) {
+    // Sequence allocation and every externally visible sink append must remain
+    // one ordered operation when worker completions race with BT ticks.
+    bool drain_listener = false;
     bool file_enabled = false;
     bool flush_on_tick_end = true;
     bool flush_each_message = false;
@@ -369,68 +372,150 @@ std::uint64_t event_log::emit(std::string_view type, std::optional<std::uint64_t
     std::int64_t unix_ms = 0;
     line_listener listener{};
     {
-        std::lock_guard<std::mutex> lock(mutex_);
-        seq = ++seq_;
-        if (!enabled_) {
-            return seq;
+        std::lock_guard<std::recursive_mutex> emission_lock(emission_mutex_);
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            seq = ++seq_;
+            if (!enabled_) {
+                return seq;
+            }
+            file_enabled = file_enabled_;
+            flush_on_tick_end = flush_on_tick_end_;
+            flush_each_message = flush_each_message_;
+            capture_stats_enabled = capture_stats_enabled_;
+            run_id = run_id_;
+            if (deterministic_time_enabled_) {
+                unix_ms = deterministic_unix_ms_;
+                deterministic_unix_ms_ += deterministic_step_ms_;
+            } else {
+                unix_ms = unix_ms_now();
+            }
+            listener = line_listener_;
+            needs_serialised_line = file_enabled || ring_capacity_ != 0u || static_cast<bool>(listener);
         }
-        file_enabled = file_enabled_;
-        flush_on_tick_end = flush_on_tick_end_;
-        flush_each_message = flush_each_message_;
-        capture_stats_enabled = capture_stats_enabled_;
-        run_id = run_id_;
-        if (deterministic_time_enabled_) {
-            unix_ms = deterministic_unix_ms_;
-            deterministic_unix_ms_ += deterministic_step_ms_;
-        } else {
-            unix_ms = unix_ms_now();
+        event_log_allocation_scope allocation_scope(this);
+        std::string line;
+        std::size_t serialised_size = 0u;
+        if (needs_serialised_line) {
+            line = serialise_event_line(type, run_id, unix_ms, seq, tick, data_json);
+            serialised_size = line.size();
+        } else if (capture_stats_enabled) {
+            serialised_size = serialise_event_line_size(type, run_id, unix_ms, seq, tick, data_json);
         }
-        listener = line_listener_;
-        needs_serialised_line = file_enabled || ring_capacity_ != 0u || static_cast<bool>(listener);
-    }
 
-    event_log_allocation_scope allocation_scope(this);
-    std::string line;
-    std::size_t serialised_size = 0u;
-    if (needs_serialised_line) {
-        line = serialise_event_line(type, run_id, unix_ms, seq, tick, data_json);
-        serialised_size = line.size();
-    } else if (capture_stats_enabled) {
-        serialised_size = serialise_event_line_size(type, run_id, unix_ms, seq, tick, data_json);
-    }
+        if (capture_stats_enabled) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            ++captured_event_count_;
+            captured_byte_count_ += static_cast<std::uint64_t>(serialised_size);
+        }
 
-    if (capture_stats_enabled) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        ++captured_event_count_;
-        captured_byte_count_ += static_cast<std::uint64_t>(serialised_size);
-    }
-
-    if (needs_serialised_line) {
-        append_ring_line(line);
-        if (file_enabled) {
-            const bool flush_now = flush_each_message || !flush_on_tick_end || type == "tick_end";
-            append_file_line(line, flush_now);
+        if (needs_serialised_line) {
+            append_ring_line(line);
+            if (file_enabled) {
+                const bool flush_now = flush_each_message || !flush_on_tick_end || type == "tick_end";
+                append_file_line(line, flush_now);
+            }
+        }
+        if (listener) {
+            if (listener_queue_.size() >= listener_queue_capacity_) {
+                ++listener_dropped_count_;
+            } else {
+                listener_queue_.push_back(pending_listener_line{std::move(listener), std::move(line)});
+                if (!listener_draining_) {
+                    listener_draining_ = true;
+                    drain_listener = true;
+                }
+            }
         }
     }
-    if (listener) {
-        listener(line);
+    if (drain_listener) {
+        drain_listener_queue();
     }
     return seq;
 }
 
+void event_log::drain_listener_queue() {
+    while (true) {
+        pending_listener_line pending;
+        {
+            std::lock_guard<std::recursive_mutex> emission_lock(emission_mutex_);
+            if (listener_queue_.empty()) {
+                listener_callback_active_ = false;
+                listener_draining_ = false;
+                listener_drainer_thread_ = {};
+                listener_condition_.notify_all();
+                break;
+            }
+            pending = std::move(listener_queue_.front());
+            listener_queue_.pop_front();
+            listener_callback_active_ = true;
+            listener_drainer_thread_ = std::this_thread::get_id();
+        }
+        try {
+            pending.listener(pending.line);
+        } catch (...) {
+            // Listener failures must not escape through an unrelated emitter.
+            // Streaming transports are responsible for their own error state.
+        }
+        {
+            std::lock_guard<std::recursive_mutex> emission_lock(emission_mutex_);
+            listener_callback_active_ = false;
+            listener_condition_.notify_all();
+        }
+    }
+}
+
 void event_log::set_line_listener(line_listener listener) {
+    clear_line_listener();
     std::lock_guard<std::mutex> lock(mutex_);
     line_listener_ = std::move(listener);
 }
 
 void event_log::clear_line_listener() noexcept {
-    std::lock_guard<std::mutex> lock(mutex_);
-    line_listener_ = {};
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        line_listener_ = {};
+    }
+    std::unique_lock<std::recursive_mutex> emission_lock(emission_mutex_);
+    listener_queue_.clear();
+    if (listener_drainer_thread_ == std::this_thread::get_id()) {
+        return;
+    }
+    listener_condition_.wait(emission_lock, [this]() {
+        return !listener_draining_ && !listener_callback_active_;
+    });
 }
 
 bool event_log::has_line_listener() const noexcept {
     std::lock_guard<std::mutex> lock(mutex_);
     return static_cast<bool>(line_listener_);
+}
+
+void event_log::set_line_listener_queue_capacity(std::size_t capacity) {
+    if (capacity == 0u) {
+        throw std::invalid_argument("event listener queue capacity must be greater than zero");
+    }
+    std::lock_guard<std::recursive_mutex> emission_lock(emission_mutex_);
+    listener_queue_capacity_ = capacity;
+    while (listener_queue_.size() > listener_queue_capacity_) {
+        listener_queue_.pop_back();
+        ++listener_dropped_count_;
+    }
+}
+
+std::size_t event_log::line_listener_queue_capacity() const noexcept {
+    std::lock_guard<std::recursive_mutex> emission_lock(emission_mutex_);
+    return listener_queue_capacity_;
+}
+
+std::uint64_t event_log::line_listener_dropped_count() const noexcept {
+    std::lock_guard<std::recursive_mutex> emission_lock(emission_mutex_);
+    return listener_dropped_count_;
+}
+
+void event_log::clear_line_listener_dropped_count() noexcept {
+    std::lock_guard<std::recursive_mutex> emission_lock(emission_mutex_);
+    listener_dropped_count_ = 0;
 }
 
 void event_log::set_deterministic_time(std::int64_t start_unix_ms, std::int64_t step_ms) noexcept {

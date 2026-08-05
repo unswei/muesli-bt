@@ -173,6 +173,7 @@ nav:
       - Planning BT (PTZ): examples/planner-bt-ptz.md
       - VLA Stub BT: examples/vla-stub-bt.md
       - Hybrid VLA + Planner: examples/hybrid-vla-mcts.md
+      - Humanoid Model-mediated Approach: examples/humanoid-model-mediated-approach.md
       - C++ Nodes: examples/cpp-nodes.md
       - Full Source Walkthroughs:
           - Webots e-puck Obstacle Source: examples/webots-epuck-obstacle-wall-following-source.md

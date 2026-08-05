@@ -35,6 +35,10 @@ muesli-bt
   acceptance, moved-ball rejection, supersession, late and duplicate
   completion, branch halt, re-entry and emergency interruption. Each scenario
   is exposed as a separately named CTest.
+- Added an executable humanoid video experiment with matched deadline-only and
+  invocation-scoped BTs, a fixed-delay fake approach service, four frozen trial
+  configurations, per-trial evidence protocols, canonical run bundles and a
+  shortened CTest matrix.
 - Added the first experimental agent-proposed task-logic path, including `agent_proposal.v1` fixtures, `guarded-recovery.v1` contract checks, manifest export, validation result objects, semantic diffs, dry-run reports, rollback handles, proposal rejection fixtures, and an agent-facing integration page.
 - Added transparent `slot` BT DSL metadata for patchable subtree boundaries, with compile, tick, and `bt.to-dsl` round-trip coverage.
 - Added the first experimental live C++ tick-boundary subtree install path for `slot` nodes, including install and rollback request APIs, rollback snapshots, non-destructive rejection gates, replaced-subtree cleanup, and unit coverage for install, rejection, rollback, and halt cleanup.
@@ -51,6 +55,12 @@ muesli-bt
 - Added the first deterministic generated guarded recovery subtree evidence slice, including a blocked-path generator, accepted and rejected generated-fragment fixtures, canonical DSL hashes, lifecycle events, replay report, tutorial, evidence page, and CTest coverage.
 
 ### Changed
+- Serialised concurrent canonical event emission so asynchronous completions
+  and BT ticks cannot append `mbt.evt.v1` records out of sequence order.
+  Listener callbacks now drain from an ordered queue outside the emission lock,
+  so they cannot deadlock another emitting thread. The listener queue is
+  bounded, drops the newest delivery on overflow and exposes drop accounting;
+  canonical ring and file records remain unaffected.
 - Hardened VLA service teardown so a logically terminal job's scheduler
   callback finishes recording before the service and canonical event sink are
   destroyed.

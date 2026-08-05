@@ -64,6 +64,7 @@ Most examples follow the same pattern:
 
 ## Advanced Integrations
 
+- [humanoid model-mediated approach video experiment](humanoid-model-mediated-approach.md) - advanced asynchronous-authority experiment
 - [H1 locomotion demo](isaac-h1-ros2-demo.md) - advanced integration
 - [TurtleBot3 ROS2 demo](isaac-wheeled-ros2-showcase.md) - advanced integration
 - [ROS2 tutorial](../integration/ros2-tutorial.md) - advanced integration

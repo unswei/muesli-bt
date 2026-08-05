@@ -2,12 +2,15 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <condition_variable>
+#include <deque>
 #include <fstream>
 #include <functional>
 #include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "bt/ast.hpp"
@@ -66,6 +69,10 @@ public:
     void set_line_listener(line_listener listener);
     void clear_line_listener() noexcept;
     [[nodiscard]] bool has_line_listener() const noexcept;
+    void set_line_listener_queue_capacity(std::size_t capacity);
+    [[nodiscard]] std::size_t line_listener_queue_capacity() const noexcept;
+    [[nodiscard]] std::uint64_t line_listener_dropped_count() const noexcept;
+    void clear_line_listener_dropped_count() noexcept;
 
     void set_deterministic_time(std::int64_t start_unix_ms, std::int64_t step_ms = 1) noexcept;
     void clear_deterministic_time() noexcept;
@@ -103,12 +110,26 @@ public:
     [[nodiscard]] static std::string hash64_hex(std::string_view text);
 
 private:
+    struct pending_listener_line {
+        line_listener listener;
+        std::string line;
+    };
+
     void append_ring_line(const std::string& line);
     void append_file_line(const std::string& line, bool flush_now);
+    void drain_listener_queue();
     [[nodiscard]] static std::string node_kind_name(node_kind kind);
 
+    mutable std::recursive_mutex emission_mutex_;
+    std::condition_variable_any listener_condition_;
     mutable std::mutex mutex_;
     mutable std::mutex file_mutex_;
+    std::deque<pending_listener_line> listener_queue_;
+    std::size_t listener_queue_capacity_ = 1024;
+    std::uint64_t listener_dropped_count_ = 0;
+    bool listener_draining_ = false;
+    bool listener_callback_active_ = false;
+    std::thread::id listener_drainer_thread_{};
 
     bool enabled_ = true;
     bool file_enabled_ = false;

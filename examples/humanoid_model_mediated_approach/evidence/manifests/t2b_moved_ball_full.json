@@ -1,0 +1,46 @@
+{
+  "schema_version": "humanoid.video_evidence_protocol.v1",
+  "trial_id": "T2b",
+  "capture_status": "pending",
+  "configuration": "configs/t2b_moved_ball_full.json",
+  "required_event_evidence": [
+    {
+      "check": "context_changed_after_submit",
+      "description": "ball-context-id changes from ball-0001 to ball-0002 after vla_submit"
+    },
+    {
+      "check": "intervention_before_backend_completion",
+      "description": "the ball context changes before the delayed backend result is recorded"
+    },
+    {
+      "check": "full_rejects_changed_context",
+      "description": "vla_result rejects generation 1 with context_changed"
+    },
+    {
+      "check": "correlated_rejected_candidate",
+      "description": "candidate-walking-target records the correlated rejected pose"
+    },
+    {
+      "check": "rejected_safe_wait",
+      "description": "request-state enters rejected_safe_wait"
+    },
+    {
+      "check": "overlay_obsolete_candidate",
+      "description": "walking-target-state marks the rejected candidate obsolete"
+    },
+    {
+      "check": "no_walking_dispatch",
+      "description": "no walking_target_dispatch event is accepted or attempted"
+    }
+  ],
+  "required_video_action": "Repeat the baseline movement and show the rejected target in red without walking.",
+  "required_artefacts": [
+    "manifest.json",
+    "events.jsonl",
+    "event-validation.json",
+    "trial-summary.json",
+    "raw-video.mp4",
+    "overlay-video.mp4",
+    "replay-report.json"
+  ]
+}

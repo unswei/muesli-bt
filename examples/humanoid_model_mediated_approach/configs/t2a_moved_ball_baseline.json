@@ -1,0 +1,20 @@
+{
+  "schema_version": "humanoid.video_trial.v1",
+  "trial_id": "T2a",
+  "name": "moved-ball-baseline",
+  "acceptance_policy": "deadline_only",
+  "bt": "lisp/bt_deadline_only.lisp",
+  "intervention": "moved_ball",
+  "evidence_manifest": "evidence/manifests/t2a_moved_ball_baseline.json",
+  "expected": {
+    "terminal_decision": "accepted",
+    "reason": "",
+    "accepted_dispatches": 0,
+    "rejected_dispatches": 1,
+    "dispatch_reason": "context_changed",
+    "authority_revocations": 0,
+    "completion_drops": 0,
+    "recording_dispatch_calls": 0,
+    "active_branch": "fallback"
+  }
+}

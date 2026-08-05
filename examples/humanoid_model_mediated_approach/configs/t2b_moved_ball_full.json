@@ -1,0 +1,19 @@
+{
+  "schema_version": "humanoid.video_trial.v1",
+  "trial_id": "T2b",
+  "name": "moved-ball-full",
+  "acceptance_policy": "invocation_scoped",
+  "bt": "lisp/bt_invocation_scoped.lisp",
+  "intervention": "moved_ball",
+  "evidence_manifest": "evidence/manifests/t2b_moved_ball_full.json",
+  "expected": {
+    "terminal_decision": "rejected",
+    "reason": "context_changed",
+    "accepted_dispatches": 0,
+    "rejected_dispatches": 0,
+    "authority_revocations": 0,
+    "completion_drops": 0,
+    "recording_dispatch_calls": 0,
+    "active_branch": "fallback"
+  }
+}

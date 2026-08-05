@@ -1,0 +1,34 @@
+{
+  "schema_version": "humanoid.video_evidence_protocol.v1",
+  "trial_id": "T1",
+  "capture_status": "pending",
+  "configuration": "configs/t1_normal_full.json",
+  "required_event_evidence": [
+    {
+      "check": "submission_initial_context",
+      "description": "vla_submit captures generation 1 and ball-0001"
+    },
+    {
+      "check": "accepted_current_result",
+      "description": "vla_result accepts generation 1 for ball-0001 exactly once"
+    },
+    {
+      "check": "accepted_dispatch_once",
+      "description": "walking_target_dispatch accepts the correlated target exactly once"
+    },
+    {
+      "check": "overlay_current_target",
+      "description": "walking-target-state is current and current-walking-target holds the accepted pose"
+    }
+  ],
+  "required_video_action": "Leave the ball stationary until the accepted target is shown in green.",
+  "required_artefacts": [
+    "manifest.json",
+    "events.jsonl",
+    "event-validation.json",
+    "trial-summary.json",
+    "raw-video.mp4",
+    "overlay-video.mp4",
+    "replay-report.json"
+  ]
+}

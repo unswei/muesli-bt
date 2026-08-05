@@ -1,12 +1,14 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -5672,6 +5674,279 @@ void test_event_log_file_sink_reuses_stream_and_reopens_on_path_change() {
     std::filesystem::remove(second_path, ec);
 }
 
+void test_event_log_concurrent_emission_preserves_sequence_order() {
+    constexpr std::size_t thread_count = 8;
+    constexpr std::size_t events_per_thread = 200;
+    constexpr std::size_t expected_count = thread_count * events_per_thread;
+
+    bt::event_log events(expected_count);
+    events.set_run_id("concurrent-order");
+    events.set_deterministic_time(1735689604000, 1);
+    events.set_line_listener_queue_capacity(expected_count);
+    std::vector<std::string> callback_lines;
+    callback_lines.reserve(expected_count);
+    events.set_line_listener(
+        [&callback_lines](const std::string& line) { callback_lines.push_back(line); });
+
+    std::atomic<bool> start{false};
+    std::vector<std::thread> workers;
+    workers.reserve(thread_count);
+    for (std::size_t thread_index = 0; thread_index < thread_count; ++thread_index) {
+        workers.emplace_back([&events, &start, thread_index]() {
+            while (!start.load()) {
+                std::this_thread::yield();
+            }
+            for (std::size_t event_index = 0; event_index < events_per_thread; ++event_index) {
+                const std::string payload = "{\"thread\":" + std::to_string(thread_index) +
+                                            ",\"event\":" + std::to_string(event_index) + "}";
+                (void)events.emit("bb_write", std::nullopt, payload);
+            }
+        });
+    }
+    start.store(true);
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+
+    const std::vector<std::string> lines = events.snapshot();
+    check(lines.size() == expected_count, "concurrent event emission should retain every line");
+    check(callback_lines.size() == expected_count,
+          "concurrent listener delivery should retain every line");
+    for (std::size_t index = 0; index < lines.size(); ++index) {
+        const std::string expected_sequence = "\"seq\":" + std::to_string(index + 1) + ',';
+        check(lines[index].find(expected_sequence) != std::string::npos,
+              "concurrent event emission should append in sequence order at index " + std::to_string(index));
+        check(callback_lines[index] == lines[index],
+              "concurrent listener delivery should match ring order at index " + std::to_string(index));
+    }
+}
+
+void test_event_log_listener_does_not_block_concurrent_emitters() {
+    bt::event_log events(4);
+    events.set_run_id("listener-concurrency");
+    events.set_deterministic_time(1735689605000, 1);
+
+    std::mutex coordination_mutex;
+    std::condition_variable coordination;
+    bool first_listener_started = false;
+    bool second_emit_returned = false;
+    bool listener_observed_second_return = false;
+    std::vector<std::string> callback_lines;
+    events.set_line_listener([&](const std::string& line) {
+        if (line.find("\"seq\":1,") != std::string::npos) {
+            std::unique_lock<std::mutex> lock(coordination_mutex);
+            first_listener_started = true;
+            coordination.notify_all();
+            listener_observed_second_return = coordination.wait_for(
+                lock, std::chrono::seconds(2), [&]() { return second_emit_returned; });
+        }
+        callback_lines.push_back(line);
+    });
+
+    std::thread first([&]() { (void)events.emit("bb_write", std::nullopt, "{\"source\":1}"); });
+    bool listener_started = false;
+    {
+        std::unique_lock<std::mutex> lock(coordination_mutex);
+        listener_started = coordination.wait_for(
+            lock, std::chrono::seconds(2), [&]() { return first_listener_started; });
+    }
+
+    std::thread second;
+    if (listener_started) {
+        second = std::thread([&]() {
+            (void)events.emit("bb_write", std::nullopt, "{\"source\":2}");
+            {
+                std::lock_guard<std::mutex> lock(coordination_mutex);
+                second_emit_returned = true;
+            }
+            coordination.notify_all();
+        });
+    } else {
+        std::lock_guard<std::mutex> lock(coordination_mutex);
+        second_emit_returned = true;
+        coordination.notify_all();
+    }
+
+    first.join();
+    if (second.joinable()) {
+        second.join();
+    }
+
+    check(listener_started, "first listener callback should start");
+    check(listener_observed_second_return,
+          "a listener callback must not prevent another emitter from returning");
+    check(callback_lines.size() == 2, "listener queue should deliver both concurrent lines");
+    check(callback_lines[0].find("\"seq\":1,") != std::string::npos &&
+              callback_lines[1].find("\"seq\":2,") != std::string::npos,
+          "listener queue should preserve canonical sequence order");
+}
+
+void test_event_log_clear_listener_waits_and_discards_queued_callbacks() {
+    bt::event_log events(8);
+    events.set_run_id("listener-clear");
+
+    std::mutex coordination_mutex;
+    std::condition_variable coordination;
+    bool callback_started = false;
+    bool release_callback = false;
+    bool clear_returned = false;
+    bool callback_finished = false;
+    bool clear_observed_callback_finished = false;
+    std::vector<std::string> callback_lines;
+    events.set_line_listener([&](const std::string& line) {
+        callback_lines.push_back(line);
+        std::unique_lock<std::mutex> lock(coordination_mutex);
+        callback_started = true;
+        coordination.notify_all();
+        coordination.wait(lock, [&]() { return release_callback; });
+        callback_finished = true;
+        coordination.notify_all();
+    });
+
+    std::thread first([&]() { (void)events.emit("bb_write", std::nullopt, "{\"source\":1}"); });
+    bool callback_did_start = false;
+    {
+        std::unique_lock<std::mutex> lock(coordination_mutex);
+        callback_did_start = coordination.wait_for(
+            lock, std::chrono::seconds(2), [&]() { return callback_started; });
+        if (!callback_did_start) {
+            release_callback = true;
+        }
+    }
+    coordination.notify_all();
+    if (!callback_did_start) {
+        first.join();
+        check(false, "listener callback should start before clear synchronisation test");
+    }
+
+    std::thread second([&]() { (void)events.emit("bb_write", std::nullopt, "{\"source\":2}"); });
+    second.join();
+    std::thread clearer([&]() {
+        events.clear_line_listener();
+        {
+            std::lock_guard<std::mutex> lock(coordination_mutex);
+            clear_observed_callback_finished = callback_finished;
+            clear_returned = true;
+        }
+        coordination.notify_all();
+    });
+
+    const auto clear_start_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (events.has_line_listener() && std::chrono::steady_clock::now() < clear_start_deadline) {
+        std::this_thread::yield();
+    }
+    const bool clear_began_while_callback_active = !events.has_line_listener();
+    {
+        std::lock_guard<std::mutex> lock(coordination_mutex);
+        release_callback = true;
+    }
+    coordination.notify_all();
+    first.join();
+    clearer.join();
+
+    check(clear_began_while_callback_active,
+          "clear_line_listener should begin while the callback remains active");
+    check(clear_observed_callback_finished,
+          "clear_line_listener should not return before the in-flight callback finishes");
+    check(clear_returned, "clear_line_listener should return after the callback finishes");
+    check(callback_lines.size() == 1,
+          "clear_line_listener should discard queued callback snapshots");
+    (void)events.emit("bb_write", std::nullopt, "{\"source\":3}");
+    check(callback_lines.size() == 1, "cleared listener should not receive later events");
+
+    events.set_line_listener([](const std::string&) { throw std::runtime_error("transport failed"); });
+    (void)events.emit("bb_write", std::nullopt, "{\"source\":4}");
+    events.clear_line_listener();
+    check(events.snapshot().size() == 4,
+          "listener exceptions should not prevent canonical ring delivery");
+}
+
+void test_event_log_listener_queue_is_bounded_and_reports_drops() {
+    bt::event_log events(8);
+    events.set_run_id("listener-overflow");
+    events.set_line_listener_queue_capacity(3);
+    check(events.line_listener_queue_capacity() == 3,
+          "listener queue should expose its configured capacity");
+
+    bool rejected_zero_capacity = false;
+    try {
+        events.set_line_listener_queue_capacity(0);
+    } catch (const std::invalid_argument&) {
+        rejected_zero_capacity = true;
+    }
+    check(rejected_zero_capacity, "listener queue should reject a zero capacity");
+
+    std::mutex coordination_mutex;
+    std::condition_variable coordination;
+    bool first_callback_started = false;
+    bool release_first_callback = false;
+    std::vector<std::string> callback_lines;
+    events.set_line_listener([&](const std::string& line) {
+        {
+            std::lock_guard<std::mutex> lock(coordination_mutex);
+            callback_lines.push_back(line);
+        }
+        if (line.find("\"seq\":1,") != std::string::npos) {
+            std::unique_lock<std::mutex> lock(coordination_mutex);
+            first_callback_started = true;
+            coordination.notify_all();
+            coordination.wait(lock, [&]() { return release_first_callback; });
+        }
+    });
+
+    std::thread first([&]() { (void)events.emit("bb_write", std::nullopt, "{\"source\":1}"); });
+    bool callback_did_start = false;
+    {
+        std::unique_lock<std::mutex> lock(coordination_mutex);
+        callback_did_start = coordination.wait_for(
+            lock, std::chrono::seconds(2), [&]() { return first_callback_started; });
+        if (!callback_did_start) {
+            release_first_callback = true;
+        }
+    }
+    coordination.notify_all();
+    if (!callback_did_start) {
+        first.join();
+        check(false, "listener callback should start before overflow test");
+    }
+
+    (void)events.emit("bb_write", std::nullopt, "{\"source\":2}");
+    (void)events.emit("bb_write", std::nullopt, "{\"source\":3}");
+    (void)events.emit("bb_write", std::nullopt, "{\"source\":4}");
+    (void)events.emit("bb_write", std::nullopt, "{\"source\":5}");
+    const std::uint64_t dropped_count_after_overflow = events.line_listener_dropped_count();
+    events.set_line_listener_queue_capacity(1);
+    const std::uint64_t dropped_count_after_shrink = events.line_listener_dropped_count();
+
+    {
+        std::lock_guard<std::mutex> lock(coordination_mutex);
+        release_first_callback = true;
+    }
+    coordination.notify_all();
+    first.join();
+    (void)events.emit("bb_write", std::nullopt, "{\"source\":6}");
+    events.clear_line_listener();
+
+    check(dropped_count_after_overflow == 1,
+          "a full listener queue should report one dropped newest delivery");
+    check(events.line_listener_queue_capacity() == 1,
+          "listener queue should expose a reduced capacity");
+    check(dropped_count_after_shrink == 3,
+          "shrinking a populated listener queue should count discarded excess deliveries");
+    const std::vector<std::string> ring_lines = events.snapshot();
+    check(ring_lines.size() == 6,
+          "listener overflow should not remove canonical ring records");
+    check(callback_lines.size() == 3,
+          "listener overflow and shrink should retain only the active, oldest queued and later delivery");
+    check(callback_lines[0].find("\"seq\":1,") != std::string::npos &&
+              callback_lines[1].find("\"seq\":2,") != std::string::npos &&
+              callback_lines[2].find("\"seq\":6,") != std::string::npos,
+          "listener shrink should remove newest queued lines and later delivery should resume in order");
+    events.clear_line_listener_dropped_count();
+    check(events.line_listener_dropped_count() == 0,
+          "listener drop accounting should be explicitly resettable");
+}
+
 void test_runtime_host_deterministic_test_mode() {
     bt::runtime_host host;
     host.enable_deterministic_test_mode(4242, "deterministic-host", 1735689601000, 7);
@@ -7677,6 +7952,10 @@ int main() {
         {"event log capture stats without serialised sink", test_event_log_capture_stats_without_serialised_sink},
         {"event payload builders", test_event_payload_builders},
         {"event log file sink reuses stream and reopens on path change", test_event_log_file_sink_reuses_stream_and_reopens_on_path_change},
+        {"event log concurrent emission preserves sequence order", test_event_log_concurrent_emission_preserves_sequence_order},
+        {"event log listener does not block concurrent emitters", test_event_log_listener_does_not_block_concurrent_emitters},
+        {"event log clear listener waits and discards queued callbacks", test_event_log_clear_listener_waits_and_discards_queued_callbacks},
+        {"event log listener queue is bounded and reports drops", test_event_log_listener_queue_is_bounded_and_reports_drops},
         {"runtime host deterministic test mode", test_runtime_host_deterministic_test_mode},
         {"pybullet backend absent in core env", test_pybullet_backend_absent_in_core_env},
         {"ros2 backend absent in core env", test_ros2_backend_absent_in_core_env},

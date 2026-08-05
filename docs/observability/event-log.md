@@ -114,6 +114,11 @@ These events are identity and evidence records. They do not make generated fragm
 ## c++ integration hooks
 
 - `bt::event_log::set_line_listener(...)`: consume canonical pre-serialised JSON lines for streaming transports.
+- `bt::event_log::set_line_listener_queue_capacity(...)`: bound queued listener
+  deliveries. The default capacity is 1024 lines.
+- `bt::event_log::line_listener_dropped_count()`: inspect listener deliveries
+  dropped because the queue was full or its capacity was reduced. Use
+  `clear_line_listener_dropped_count()` to reset the counter.
 - `bt::event_log::serialise_event_line(...)`: canonical serialiser for `mbt.evt.v1` envelopes.
 - `bt::event_log::set_deterministic_time(...)`: fixed timestamp progression for deterministic fixture/test runs.
 - `bt::event_log::set_allocation_whitelist_hooks(...)`: benchmark-only hook pair for marking canonical logging allocation paths during strict allocation tests.
@@ -123,6 +128,32 @@ These events are identity and evidence records. They do not make generated fragm
 
 - Blackboard `bb_write.preview` is size-limited (4KB JSON).
 - `seq` is the authoritative ordering key for replay/monitoring.
+- Concurrent emitters, including asynchronous model completions and BT ticks,
+  are serialised through sequence allocation and every configured sink. Ring
+  and file consumers therefore observe every record in the same `seq` order.
+- Listener delivery drains an ordered queue after releasing the emission lock.
+  A listener may therefore enqueue another event or wait for another emitting
+  thread without blocking that thread behind the callback.
+- The listener queue holds at most 1024 lines by default. When the queue is full,
+  the newest listener delivery is dropped and
+  `line_listener_dropped_count()` increases. Older delivered listener lines
+  remain in `seq` order, but a slow listener may observe explicit sequence gaps.
+  Ring and file records are unaffected. Streaming transports should hand work
+  off without blocking and monitor the drop counter.
+- Reducing the configured listener capacity discards the newest excess queued
+  deliveries and includes them in the drop counter. A capacity of zero is
+  invalid.
+- The thread that starts a drain invokes the callbacks. A concurrent or
+  re-entrant emitter can return after enqueueing its line but before that line's
+  callback runs. Use `seq` for ordering; do not treat `emit()` return as a
+  transport acknowledgement.
+- `clear_line_listener()` discards queued deliveries and waits for an in-flight
+  callback before returning. It is therefore the lifetime barrier to call
+  before destroying state referenced by a listener. A callback may clear itself;
+  that re-entrant call discards later queued deliveries without waiting on itself.
+- Listener exceptions are contained. They do not escape through an unrelated
+  emitter or remove the canonical ring/file record. Streaming transports must
+  expose and handle their own delivery errors.
 - Existing planner/vla metadata is wrapped in canonical events (for example `planner_v1`).
 - Compact outcome events use `schema_version: "runtime_outcome.v1"`. They summarise evaluation outcomes such as `tick_ok`, `tick_deadline_missed`, `planner_timeout`, `vla_timeout`, `late_result_dropped`, `cancel_acknowledged`, and `cancel_late` while the detailed lifecycle events remain the source of inspection detail.
 - `gc_begin` and `gc_end` are emitted when the Lisp heap collector runs through the default runtime host. Payloads use `schema_version: "gc.lifecycle.v1"`.

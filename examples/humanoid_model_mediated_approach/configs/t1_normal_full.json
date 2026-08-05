@@ -1,0 +1,19 @@
+{
+  "schema_version": "humanoid.video_trial.v1",
+  "trial_id": "T1",
+  "name": "normal-full",
+  "acceptance_policy": "invocation_scoped",
+  "bt": "lisp/bt_invocation_scoped.lisp",
+  "intervention": "none",
+  "evidence_manifest": "evidence/manifests/t1_normal_full.json",
+  "expected": {
+    "terminal_decision": "accepted",
+    "reason": "",
+    "accepted_dispatches": 1,
+    "rejected_dispatches": 0,
+    "authority_revocations": 0,
+    "completion_drops": 0,
+    "recording_dispatch_calls": 1,
+    "active_branch": "model_execute"
+  }
+}

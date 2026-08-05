@@ -1,0 +1,38 @@
+{
+  "schema_version": "humanoid.video_evidence_protocol.v1",
+  "trial_id": "T2a",
+  "capture_status": "pending",
+  "configuration": "configs/t2a_moved_ball_baseline.json",
+  "required_event_evidence": [
+    {
+      "check": "context_changed_after_submit",
+      "description": "ball-context-id changes from ball-0001 to ball-0002 after vla_submit"
+    },
+    {
+      "check": "intervention_before_backend_completion",
+      "description": "the ball context changes before the delayed backend result is recorded"
+    },
+    {
+      "check": "baseline_accepts_stale_result",
+      "description": "the deadline-only vla_result accepts the stale ball-0001 proposal"
+    },
+    {
+      "check": "host_rejects_stale_dispatch",
+      "description": "the independent host envelope rejects dispatch with context_changed"
+    },
+    {
+      "check": "overlay_obsolete_candidate",
+      "description": "the blocked pose is overlay-only and walking-target-state is obsolete"
+    }
+  ],
+  "required_video_action": "Move the ball after the request cue and show the stale accepted target in red.",
+  "required_artefacts": [
+    "manifest.json",
+    "events.jsonl",
+    "event-validation.json",
+    "trial-summary.json",
+    "raw-video.mp4",
+    "overlay-video.mp4",
+    "replay-report.json"
+  ]
+}

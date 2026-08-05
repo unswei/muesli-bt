@@ -254,6 +254,17 @@ if (UNIX)
   target_compile_definitions(muslisp PRIVATE MUESLI_BT_HAVE_LINENOISE=1)
 endif ()
 
+add_executable(
+  humanoid_model_mediated_trial
+  examples/humanoid_model_mediated_approach/src/delayed_fake_service.cpp
+  examples/humanoid_model_mediated_approach/src/experiment_runner.cpp
+)
+target_include_directories(
+  humanoid_model_mediated_trial
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/examples/humanoid_model_mediated_approach/src
+)
+target_link_libraries(humanoid_model_mediated_trial PRIVATE muesli_bt_core)
+
 if (TARGET muesli_bt_integration_ros2)
   add_executable(muslisp_ros2 tools/muslisp_ros2_main.cpp)
   target_link_libraries(muslisp_ros2 PRIVATE muesli_bt_integration_ros2)
@@ -511,6 +522,24 @@ if (Python3_Interpreter_FOUND)
     NAME muesli_bt_humanoid_vla_evidence
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_humanoid_vla_evidence.py"
   )
+  execute_process(
+    COMMAND "${Python3_EXECUTABLE}" -c "import jsonschema"
+    RESULT_VARIABLE MUESLI_BT_JSONSCHEMA_IMPORT_RESULT
+    OUTPUT_QUIET
+    ERROR_QUIET
+  )
+  if (MUESLI_BT_JSONSCHEMA_IMPORT_RESULT EQUAL 0)
+    add_test(
+      NAME muesli_bt_humanoid_video_experiment
+      COMMAND
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/examples/humanoid_model_mediated_approach/run_trials.py"
+        --runner "$<TARGET_FILE:humanoid_model_mediated_trial>" --check
+    )
+    set_tests_properties(muesli_bt_humanoid_video_experiment PROPERTIES TIMEOUT 30)
+  else ()
+    message(STATUS "jsonschema not found; humanoid video experiment CTest is not registered")
+  endif ()
   add_test(
     NAME muesli_bt_wheeled_flagship_nav_capability_evidence
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_wheeled_flagship_nav_capability_evidence.py"

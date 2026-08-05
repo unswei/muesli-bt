@@ -1,0 +1,74 @@
+{
+  "schema_version": "humanoid.video_experiment_common.v1",
+  "experiment": "humanoid-model-mediated-approach",
+  "proposer": {
+    "kind": "deterministic",
+    "backend": "humanoid-delayed-fake",
+    "model": "deterministic-v1",
+    "seed": 424242,
+    "artificial_delay_ms": 2500,
+    "completes_after_cancel": true,
+    "instruction": "choose a bounded approach pose relative to the observed ball",
+    "request_action_space": {
+      "dims": 3,
+      "bound_lo": -1.0,
+      "bound_hi": 1.0,
+      "max_delta": 10.0
+    },
+    "approach_pose": {
+      "frame_id": "ball_context",
+      "x_m": -0.45,
+      "y_m": 0.08,
+      "yaw_rad": 0.0
+    }
+  },
+  "timing": {
+    "deadline_ms": 3500,
+    "tick_hz": 20.0,
+    "intervention_after_submit_ms": 1000
+  },
+  "host": {
+    "identity": "booster-k1-sdk-independent-host-stub",
+    "platform": "sdk-independent",
+    "walking_adapter": "recording-stub",
+    "stability_source": "software-flag",
+    "physical_motion_enabled": false
+  },
+  "frames": {
+    "ball_position_frame": "field",
+    "approach_pose_frame": "ball_context"
+  },
+  "pose_bounds": {
+    "min_x_m": -1.0,
+    "max_x_m": 1.0,
+    "min_y_m": -1.0,
+    "max_y_m": 1.0,
+    "min_yaw_rad": -3.141593,
+    "max_yaw_rad": 3.141593
+  },
+  "perception": {
+    "ball_context_change_threshold_m": 0.15,
+    "ball_observation_max_age_ms": null,
+    "context_change_policy": "euclidean_distance_gt_threshold",
+    "observation_age_policy": "not_simulated_by_sdk_independent_stub",
+    "initial_context_id": "ball-0001",
+    "moved_context_id": "ball-0002",
+    "initial_ball_position_m": {
+      "x_m": 1.2,
+      "y_m": -0.35,
+      "z_m": 0.0
+    },
+    "moved_ball_position_m": {
+      "x_m": 0.75,
+      "y_m": 0.4,
+      "z_m": 0.0
+    }
+  },
+  "video": {
+    "request_cue": "REQUEST_SUBMITTED",
+    "event_clock": "unix_ms",
+    "video_clock_alignment": "record the request cue and align it to vla_submit",
+    "accepted_target_colour": "green",
+    "obsolete_target_colour": "red"
+  }
+}

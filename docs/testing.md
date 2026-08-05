@@ -53,6 +53,30 @@ Run the whole matrix or one named scenario:
 ./build/dev/muesli_bt_humanoid_vla_scenario_tests moved_ball
 ```
 
+## humanoid video experiment smoke test
+
+The executable video experiment has a shortened CTest matrix. It builds the
+deadline-only and invocation-scoped BTs, runs the delayed fake service, applies
+the configured moved-ball and emergency interventions, and checks the generated
+canonical evidence and run manifests. It also rejects a drifted action-space
+contract and evaluates the structured overlay and evidence predicates.
+
+```bash
+ctest --test-dir build/dev --output-on-failure \
+  -R muesli_bt_humanoid_video_experiment
+```
+
+The smoke test scales the 2.5-second delay and writes to a temporary directory.
+It also exercises the guarded run-directory replacement policy. JSON Schema
+validation is fail-closed and requires the Python `jsonschema` package. The
+smoke test is not paper evidence. Run the example without `--check` for the
+frozen real-time protocol.
+
+CMake registers this CTest only when its selected Python interpreter can import
+`jsonschema`. The Linux GCC and Clang CI jobs install that dependency and run
+the matrix. The standalone runner always fails closed when validation cannot
+run.
+
 ## canonical event fixture suite
 
 Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:
