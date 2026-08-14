@@ -522,6 +522,13 @@ if (Python3_Interpreter_FOUND)
     NAME muesli_bt_humanoid_vla_evidence
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_humanoid_vla_evidence.py"
   )
+  add_test(
+    NAME muesli_bt_booster_studio_adapter
+    COMMAND
+      "${Python3_EXECUTABLE}" -m unittest discover
+      -s "${CMAKE_CURRENT_SOURCE_DIR}/examples/humanoid_model_mediated_approach/booster_studio/tests"
+      -p "test_*.py" -v
+  )
   execute_process(
     COMMAND "${Python3_EXECUTABLE}" -c "import jsonschema"
     RESULT_VARIABLE MUESLI_BT_JSONSCHEMA_IMPORT_RESULT

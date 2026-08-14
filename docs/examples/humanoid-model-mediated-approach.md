@@ -2,8 +2,9 @@
 
 !!! note "status"
 
-    Status: experimental software experiment harness.
-    The Booster K1 adapters and physical video capture remain integration work.
+    Status: experimental software experiment harness with an offline-tested
+    Booster Studio host-adapter scaffold. Live C++ bridge wiring, simulator
+    execution and physical video capture remain integration work.
 
 ## what this is
 
@@ -26,6 +27,11 @@ Use this example to:
 
 Do not use the included recording dispatcher for physical motion. The native
 helper rejects physical-motion mode until a Booster host adapter exists.
+
+The Booster Studio subproject implements the platform-owned context, safety,
+dispatch and bounded velocity policy. Motion is disabled by default. The muesli
+C++ bridge client that supplies live state and receives the synchronous host
+decision remains pending.
 
 ## how it works
 
@@ -94,6 +100,14 @@ PASS T3: ...
 humanoid video experiment matrix passed (4 trial(s))
 ```
 
+Run the Booster host policy tests without BoosterOS or ROS 2:
+
+```bash
+python3 -m unittest discover \
+  -s examples/humanoid_model_mediated_approach/booster_studio/tests \
+  -p 'test_*.py' -v
+```
+
 Run a real-time clip for the full moved-ball trial:
 
 ```bash
@@ -127,6 +141,8 @@ pending artefacts before treating the run as paper evidence.
   generation are recorded in adjacent canonical blackboard writes.
 - A completed runtime bundle is still missing raw video, overlay video and
   replay comparison until the manifest says otherwise.
+- The Booster adapter socket is not yet called by the native muesli runner. A
+  passing offline adapter test is not an end-to-end K1 result.
 - A forced rerun is staged and validated before it replaces an existing marked
   evidence bundle. A selected matrix is fully validated before publication
   starts.
@@ -140,3 +156,4 @@ pending artefacts before treating the run as paper evidence.
 - [approach pose validation](../bt/approach-pose-validation.md)
 - [VLA logging](../observability/vla-logging.md)
 - [testing and verification](../testing.md)
+- [Booster Studio adapter README](https://github.com/unswei/muesli-bt/blob/main/examples/humanoid_model_mediated_approach/booster_studio/README.md)

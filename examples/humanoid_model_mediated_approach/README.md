@@ -1,7 +1,8 @@
 # humanoid model-mediated approach video experiment
 
-Status: experimental software experiment harness. The Booster K1 perception,
-stability and walking-controller adapters are not included.
+Status: experimental software experiment harness with an offline-tested Booster
+Studio host-adapter scaffold. The live C++ bridge client, Studio package build,
+virtual K1 run and physical video capture remain integration work.
 
 ## what this is
 
@@ -17,6 +18,7 @@ recording walking adapter and refuses to enable physical motion.
 
 ```text
 humanoid_model_mediated_approach/
+├── booster_studio/           fail-closed Booster K1 host adapter scaffold
 ├── configs/                  frozen common and per-trial configuration
 ├── evidence/manifests/       required evidence and video actions
 ├── lisp/                     deadline-only and invocation-scoped BTs
@@ -129,13 +131,16 @@ must supply and enforce observation timestamps before a physical trial.
 
 ## booster integration boundary
 
-Before enabling a robot trial, replace only the host-side adapters:
+The `booster_studio/` project implements ball context tracking, observation age,
+stability/emergency state, operating-area validation and a bounded pose
+follower. Motion is disabled by default. Before enabling a robot trial:
 
-1. feed Booster perception contexts and ball positions into the state sync;
-2. feed the software stability flag into `robot_stable` and `emergency`;
-3. replace the recording dispatcher with the existing Booster walking-target
-   adapter; and
-4. retain the runtime commit gate and dispatch-time safety checks.
+1. implement the C++ client for the adapter's snapshot and synchronous dispatch
+   socket operations;
+2. feed each snapshot into the existing muesli state sync and use the dispatch
+   response as the walking-target callback result;
+3. build and package the C++ runtime for the Booster agent environment; and
+4. retain the runtime commit gate and both dispatch-time safety checks.
 
 The fake runner rejects `--physical-motion-enabled true`. Do not bypass that
 guard. A physical push is outside this example and should follow a successful

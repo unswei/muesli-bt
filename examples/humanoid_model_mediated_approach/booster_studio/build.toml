@@ -1,0 +1,8 @@
+[python]
+obfuscation = false
+
+[python.dependencies]
+common = []
+
+[platform]
+supports = ["sim_x86_64", "sim_aarch64", "real_jetson"]

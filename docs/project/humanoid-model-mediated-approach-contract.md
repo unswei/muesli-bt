@@ -273,13 +273,14 @@ The implemented software experiment records these behaviours in `mbt.evt.v1`:
 - host walking-target validation and dispatch.
 
 The generic commit gate, host-validation outcome, SDK-independent local pose
-policy and canonical walking-target dispatch boundary are now implemented and
+policy and canonical walking-target dispatch boundary are implemented and
 observable. The local policy checks the action frame, configured pose bounds,
 current ball context and robot stability. Dispatch rechecks the invocation,
 context, frame, exact accepted target and exactly-once state before calling the
-host. Booster-specific state acquisition, observation-age and operating-area
-policy, and the actual walking-controller adapter remain experiment integration
-work.
+host. The Booster Studio scaffold now implements state acquisition,
+observation-age and operating-area policy, a synchronous host-side dispatch
+gate and a bounded pose follower. Its live C++ client, Booster package build and
+virtual-robot execution remain experiment integration work.
 
 The deterministic runtime suite covers normal acceptance, moved-ball context
 change, supersession, late completion, duplicate completion, direct branch
@@ -294,8 +295,8 @@ frozen trial configurations and per-trial evidence protocols. The matrix runner
 creates canonical event logs, trial summaries, validation reports and
 provenance-rich run manifests. Each evidence protocol contains named predicates
 that the runner evaluates against the event stream. Raw video, overlay video,
-recorded-result replay
-and Booster adapters remain explicit pending artefacts.
+recorded-result replay, live muesli-to-Booster bridge wiring and Booster
+simulation evidence remain explicit pending artefacts.
 
 Existing canonical event types should be extended where their meaning already
 fits. Any new event type must be added to the v1 schema and documented in the

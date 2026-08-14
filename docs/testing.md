@@ -72,6 +72,16 @@ validation is fail-closed and requires the Python `jsonschema` package. The
 smoke test is not paper evidence. Run the example without `--check` for the
 frozen real-time protocol.
 
+The Booster Studio host policy has a separate SDK-independent test. It covers
+ball context movement and reacquisition, observation age, synchronous dispatch,
+exactly-once admission, emergency rejection, velocity bounds, target revocation
+and the Unix-socket request/reply boundary:
+
+```bash
+ctest --test-dir build/dev --output-on-failure \
+  -R muesli_bt_booster_studio_adapter
+```
+
 CMake registers this CTest only when its selected Python interpreter can import
 `jsonschema`. The Linux GCC and Clang CI jobs install that dependency and run
 the matrix. The standalone runner always fails closed when validation cannot
