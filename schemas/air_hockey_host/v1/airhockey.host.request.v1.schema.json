@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.org/schemas/air_hockey_host/v1/airhockey.host.request.v1.schema.json",
+  "title": "Air-hockey host request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "op", "payload"],
+  "properties": {
+    "schema_version": {"const": "airhockey.host.request.v1"},
+    "request_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+    "op": {
+      "enum": ["info", "configure", "reset", "observe", "act", "step", "close"]
+    },
+    "payload": {"type": "object"}
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "op": {"const": "info"},
+        "payload": {"$ref": "#/$defs/emptyPayload"}
+      }
+    },
+    {
+      "properties": {
+        "op": {"const": "configure"},
+        "payload": {"$ref": "#/$defs/configurePayload"}
+      }
+    },
+    {
+      "properties": {
+        "op": {"const": "reset"},
+        "payload": {"$ref": "#/$defs/resetPayload"}
+      }
+    },
+    {
+      "properties": {
+        "op": {"const": "observe"},
+        "payload": {"$ref": "#/$defs/emptyPayload"}
+      }
+    },
+    {
+      "properties": {
+        "op": {"const": "act"},
+        "payload": {"$ref": "#/$defs/actPayload"}
+      }
+    },
+    {
+      "properties": {
+        "op": {"const": "step"},
+        "payload": {"$ref": "#/$defs/emptyPayload"}
+      }
+    },
+    {
+      "properties": {
+        "op": {"const": "close"},
+        "payload": {"$ref": "#/$defs/emptyPayload"}
+      }
+    }
+  ],
+  "$defs": {
+    "emptyPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "maxProperties": 0
+    },
+    "configurePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "blackout_start_step": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "blackout_length_steps": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "timeout_steps": {"type": "integer", "minimum": 1, "maximum": 1000000},
+        "action_lock_steps": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "replace_track_steps": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {"type": "integer", "minimum": 1, "maximum": 1000000}
+        },
+        "terminate_at_step": {
+          "oneOf": [
+            {"type": "integer", "minimum": 1, "maximum": 1000000},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "resetPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seed": {"type": "integer", "minimum": 0, "maximum": 4294967295}
+      }
+    },
+    "actPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": {
+        "action": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {"type": "number", "minimum": -1.0, "maximum": 1.0}
+        }
+      }
+    }
+  }
+}

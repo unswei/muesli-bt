@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.org/schemas/air_hockey_host/v1/airhockey.host.response.v1.schema.json",
+  "title": "Air-hockey host response v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "request_id", "op", "ok"],
+  "properties": {
+    "schema_version": {"const": "airhockey.host.response.v1"},
+    "request_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+    "op": {
+      "enum": ["info", "configure", "reset", "observe", "act", "step", "close", "error"]
+    },
+    "ok": {"type": "boolean"},
+    "result": {},
+    "error": {"$ref": "#/$defs/error"}
+  },
+  "oneOf": [
+    {
+      "required": ["result"],
+      "not": {"required": ["error"]},
+      "properties": {
+        "ok": {"const": true},
+        "op": {"const": "info"},
+        "result": {"$ref": "#/$defs/infoResult"}
+      }
+    },
+    {
+      "required": ["result"],
+      "not": {"required": ["error"]},
+      "properties": {
+        "ok": {"const": true},
+        "op": {"const": "configure"},
+        "result": {"$ref": "#/$defs/configureResult"}
+      }
+    },
+    {
+      "required": ["result"],
+      "not": {"required": ["error"]},
+      "properties": {
+        "ok": {"const": true},
+        "op": {"const": "reset"},
+        "result": {"$ref": "#/$defs/stateResult"}
+      }
+    },
+    {
+      "required": ["result"],
+      "not": {"required": ["error"]},
+      "properties": {
+        "ok": {"const": true},
+        "op": {"const": "observe"},
+        "result": {"$ref": "#/$defs/stateResult"}
+      }
+    },
+    {
+      "required": ["result"],
+      "not": {"required": ["error"]},
+      "properties": {
+        "ok": {"const": true},
+        "op": {"const": "act"},
+        "result": {"$ref": "#/$defs/actResult"}
+      }
+    },
+    {
+      "required": ["result"],
+      "not": {"required": ["error"]},
+      "properties": {
+        "ok": {"const": true},
+        "op": {"const": "step"},
+        "result": {"$ref": "#/$defs/stepResult"}
+      }
+    },
+    {
+      "required": ["result"],
+      "not": {"required": ["error"]},
+      "properties": {
+        "ok": {"const": true},
+        "op": {"const": "close"},
+        "result": {"$ref": "#/$defs/closeResult"}
+      }
+    },
+    {
+      "required": ["error"],
+      "not": {"required": ["result"]},
+      "properties": {
+        "ok": {"const": false},
+        "error": {"$ref": "#/$defs/error"}
+      }
+    }
+  ],
+  "$defs": {
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blackout_start_step",
+        "blackout_length_steps",
+        "timeout_steps",
+        "action_lock_steps",
+        "replace_track_steps",
+        "terminate_at_step"
+      ],
+      "properties": {
+        "blackout_start_step": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "blackout_length_steps": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "timeout_steps": {"type": "integer", "minimum": 1, "maximum": 1000000},
+        "action_lock_steps": {"type": "integer", "minimum": 0, "maximum": 1000000},
+        "replace_track_steps": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {"type": "integer", "minimum": 1, "maximum": 1000000}
+        },
+        "terminate_at_step": {
+          "oneOf": [
+            {"type": "integer", "minimum": 1, "maximum": 1000000},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "publicState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_schema",
+        "observation",
+        "observation_step",
+        "puck_visible",
+        "action_locked",
+        "episode_active",
+        "terminated",
+        "truncated",
+        "defence_context_id",
+        "episode_id"
+      ],
+      "properties": {
+        "observation_schema": {"const": "airhockey.public_observation.v1"},
+        "observation": {
+          "type": "array",
+          "minItems": 19,
+          "maxItems": 19,
+          "items": {"type": "number", "minimum": -1.0, "maximum": 1.0}
+        },
+        "observation_step": {"type": "integer", "minimum": 0},
+        "puck_visible": {"type": "boolean"},
+        "action_locked": {"type": "boolean"},
+        "episode_active": {"type": "boolean"},
+        "terminated": {"type": "boolean"},
+        "truncated": {"type": "boolean"},
+        "defence_context_id": {"type": "string", "pattern": "^episode-[0-9]{6,}/track-[0-9]{4,}$"},
+        "episode_id": {"type": "string", "pattern": "^episode-[0-9]{6,}$"}
+      }
+    },
+    "infoResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "backend",
+        "operations",
+        "observation",
+        "action",
+        "control_period_ms",
+        "max_deadline_ms",
+        "privileged_fields_available"
+      ],
+      "properties": {
+        "protocol_version": {"const": "airhockey.host.v1"},
+        "backend": {"enum": ["fake_direct_launch", "acra_direct_launch"]},
+        "operations": {
+          "const": ["info", "configure", "reset", "observe", "act", "step", "close"]
+        },
+        "observation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema", "dimension"],
+          "properties": {
+            "schema": {"const": "airhockey.public_observation.v1"},
+            "dimension": {"const": 19}
+          }
+        },
+        "action": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema", "dimension", "minimum", "maximum"],
+          "properties": {
+            "schema": {"const": "airhockey.normalised_mallet_target.v1"},
+            "dimension": {"const": 2},
+            "minimum": {"const": -1.0},
+            "maximum": {"const": 1.0}
+          }
+        },
+        "control_period_ms": {"const": 20},
+        "max_deadline_ms": {"const": 120},
+        "privileged_fields_available": {"const": false}
+      }
+    },
+    "configureResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["configuration"],
+      "properties": {"configuration": {"$ref": "#/$defs/configuration"}}
+    },
+    "stateResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {"state": {"$ref": "#/$defs/publicState"}}
+    },
+    "actResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["accepted", "requested_action", "action_locked"],
+      "properties": {
+        "accepted": {"const": true},
+        "requested_action": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {"type": "number", "minimum": -1.0, "maximum": 1.0}
+        },
+        "action_locked": {"type": "boolean"}
+      }
+    },
+    "stepResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "reward"],
+      "properties": {
+        "state": {"$ref": "#/$defs/publicState"},
+        "reward": {"type": "number"}
+      }
+    },
+    "closeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["closed"],
+      "properties": {"closed": {"const": true}}
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "enum": [
+            "invalid_json",
+            "request_too_large",
+            "invalid_schema",
+            "invalid_configuration",
+            "episode_not_started",
+            "action_required",
+            "episode_complete",
+            "episode_active",
+            "host_closed",
+            "internal_error"
+          ]
+        },
+        "message": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    }
+  }
+}

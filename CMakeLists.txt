@@ -537,6 +537,13 @@ if (Python3_Interpreter_FOUND)
   )
   if (MUESLI_BT_JSONSCHEMA_IMPORT_RESULT EQUAL 0)
     add_test(
+      NAME muesli_bt_air_hockey_host
+      COMMAND
+        "${Python3_EXECUTABLE}" -m unittest discover
+        -s "${CMAKE_CURRENT_SOURCE_DIR}/examples/air_hockey_model_mediated_defence/host/tests"
+        -p "test_*.py" -v
+    )
+    add_test(
       NAME muesli_bt_humanoid_video_experiment
       COMMAND
         "${Python3_EXECUTABLE}"
@@ -545,7 +552,10 @@ if (Python3_Interpreter_FOUND)
     )
     set_tests_properties(muesli_bt_humanoid_video_experiment PROPERTIES TIMEOUT 30)
   else ()
-    message(STATUS "jsonschema not found; humanoid video experiment CTest is not registered")
+    message(
+      STATUS
+      "jsonschema not found; air-hockey host and humanoid video experiment CTests are not registered"
+    )
   endif ()
   add_test(
     NAME muesli_bt_wheeled_flagship_nav_capability_evidence
