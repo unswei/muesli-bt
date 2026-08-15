@@ -14,6 +14,7 @@ sys.path.insert(0, str(EXAMPLE_ROOT))
 from analysis.evidence import (
     EvidenceError,
     RecordedProviderReplay,
+    _validate_events,
     campaign_summary,
     clopper_pearson,
     file_sha256,
@@ -67,6 +68,22 @@ class AirHockeyWp3Tests(unittest.TestCase):
             write_json(manifest_path, manifest)
             with self.assertRaisesRegex(EvidenceError, "privileged scoring data"):
                 validate_raw_bundle(run_dir)
+
+    def test_canonical_runtime_outcome_is_not_a_task_outcome_leak(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            run_dir = generate_run(
+                Path(directory) / "runs", 0, "invocation_scoped", force=False
+            )
+            event_path = run_dir / "events.jsonl"
+            rows = read_jsonl(event_path)
+            runtime_row = rows[2]
+            runtime_row["type"] = "tick_ok"
+            runtime_row["data"] = {
+                "schema_version": "runtime_outcome.v1",
+                "outcome": "tick_ok",
+                "source": "bt.tick",
+            }
+            _validate_events(rows, event_path)
 
     def test_recorded_provider_requires_exact_request(self) -> None:
         action = {

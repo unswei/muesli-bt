@@ -235,8 +235,20 @@ def _validate_events(
         raise EvidenceError(
             f"{path}: event stream requires run_start and run_end delimiters"
         )
-    if PROHIBITED_CONTROL_KEYS & _all_keys(rows):
-        raise EvidenceError(f"{path}: privileged scoring data crossed into events")
+    for row in rows:
+        prohibited = PROHIBITED_CONTROL_KEYS & _all_keys(row)
+        data = row.get("data")
+        if (
+            "outcome" in prohibited
+            and isinstance(data, dict)
+            and data.get("schema_version") == "runtime_outcome.v1"
+            and data.get("outcome") == row.get("type")
+        ):
+            prohibited.remove("outcome")
+        if prohibited:
+            raise EvidenceError(
+                f"{path}: privileged scoring data crossed into events"
+            )
 
 
 def _validate_recorded_provider(

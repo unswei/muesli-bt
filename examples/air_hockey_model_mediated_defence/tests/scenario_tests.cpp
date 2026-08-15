@@ -429,6 +429,18 @@ public:
         return backend_->last_state();
     }
 
+    void finish_events() {
+        if (events_finished_) {
+            return;
+        }
+        std::ostringstream data;
+        data << "{\"status\":\"success\",\"scenario\":\""
+             << bt::event_log::json_escape(scenario_) << "\",\"observation_step\":"
+             << backend_->last_state().observation_step << '}';
+        (void)host_.events().emit("run_end", instance_->tick_index, data.str());
+        events_finished_ = true;
+    }
+
     [[nodiscard]] bool provider_replay_mode() const noexcept {
         return provider_->replay_mode();
     }
@@ -557,6 +569,7 @@ private:
     bool hold_after_dispatch_ = false;
     std::function<void(bt::tick_context&)> before_dispatch_;
     std::optional<air_hockey_demo::action_dispatch_result> last_dispatch_;
+    bool events_finished_ = false;
     std::int64_t instance_handle_ = 0;
     bt::instance* instance_ = nullptr;
 };
@@ -614,6 +627,7 @@ void test_h1(const scenario_options& options) {
               "H1 must dispatch one current action and no obsolete action");
     check(rig.step_control().state.observation_step == 1,
           "H1 current action was not consumed by one simulator/control step");
+    rig.finish_events();
 }
 
 void advance_through_reacquisition(scenario_rig& rig) {
@@ -645,6 +659,7 @@ void test_h2a(const scenario_options& options) {
               "H2a must record one bounded obsolete baseline dispatch");
     check(rig.step_control().state.observation_step == 3,
           "H2a obsolete action was not consumed inside the bounded host");
+    rig.finish_events();
 }
 
 void test_h2b(const scenario_options& options) {
@@ -669,6 +684,7 @@ void test_h2b(const scenario_options& options) {
               "H2b must dispatch no obsolete action");
     check(rig.step_control().state.observation_step == 3,
           "H2b fallback was not consumed after stale-result rejection");
+    rig.finish_events();
 }
 
 void test_g5_fixed_shot(const scenario_options& options) {
@@ -710,6 +726,7 @@ void test_g5_fixed_shot(const scenario_options& options) {
     predicate("g5_fixed_shot_current_dispatch_once",
               rig.accepted_dispatches() == 1 && rig.obsolete_dispatches() == 0,
               "G5 fixed shot must consume exactly one authorised proposal");
+    rig.finish_events();
 }
 
 void test_h3(const scenario_options& options) {
