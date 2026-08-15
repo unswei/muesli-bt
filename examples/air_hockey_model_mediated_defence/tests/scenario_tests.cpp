@@ -171,6 +171,7 @@ public:
     bt::vla_response infer(const bt::vla_request& request,
                            std::function<bool(const bt::vla_partial&)>,
                            std::atomic<bool>& cancel_flag) override {
+        const auto started_at = std::chrono::steady_clock::now();
         const std::size_t index = next_gate_.fetch_add(1);
         if (index >= gates_.size()) {
             throw std::runtime_error("air-hockey provider received an unexpected invocation");
@@ -192,11 +193,13 @@ public:
             response.status = bt::vla_status::cancelled;
             response.explanation = "cancelled before deterministic completion";
             store_completed_response(response);
+            store_wall_duration(started_at);
             gate->mark_finished();
             return response;
         }
         response.status = bt::vla_status::ok;
         store_completed_response(response);
+        store_wall_duration(started_at);
         gate->mark_finished();
         return response;
     }
@@ -217,16 +220,29 @@ public:
         return *completed_response_;
     }
 
+    [[nodiscard]] std::vector<std::int64_t> wall_durations_ns() const {
+        std::lock_guard<std::mutex> lock(response_mutex_);
+        return wall_durations_ns_;
+    }
+
 private:
     void store_completed_response(const bt::vla_response& response) {
         std::lock_guard<std::mutex> lock(response_mutex_);
         completed_response_ = response;
     }
 
+    void store_wall_duration(std::chrono::steady_clock::time_point started_at) {
+        const auto elapsed = std::chrono::steady_clock::now() - started_at;
+        std::lock_guard<std::mutex> lock(response_mutex_);
+        wall_durations_ns_.push_back(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count());
+    }
+
     std::vector<std::shared_ptr<completion_gate>> gates_;
     std::optional<bt::vla_response> replay_response_;
     mutable std::mutex response_mutex_;
     std::optional<bt::vla_response> completed_response_;
+    std::vector<std::int64_t> wall_durations_ns_;
     std::atomic<std::size_t> next_gate_{0};
 };
 
@@ -352,7 +368,12 @@ public:
     scenario_rig& operator=(const scenario_rig&) = delete;
 
     bt::status tick() {
+        const auto started_at = std::chrono::steady_clock::now();
         const bt::status result = host_.tick_instance(instance_handle_);
+        tick_durations_ns_.push_back(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - started_at)
+                .count());
         for (const auto& [job_id, invocation] : instance_->vla_invocations) {
             if (!validator_.source_step(job_id).has_value()) {
                 validator_.record_source_step(job_id, backend_->last_state().observation_step);
@@ -438,6 +459,24 @@ public:
              << bt::event_log::json_escape(scenario_) << "\",\"observation_step\":"
              << backend_->last_state().observation_step << '}';
         (void)host_.events().emit("run_end", instance_->tick_index, data.str());
+        std::cout << "TIMING {\"schema_version\":\"airhockey.wp6.timing.v1\",\"scenario\":\""
+                  << bt::event_log::json_escape(scenario_) << "\",\"tick_duration_ns\":[";
+        for (std::size_t index = 0; index < tick_durations_ns_.size(); ++index) {
+            if (index != 0) {
+                std::cout << ',';
+            }
+            std::cout << tick_durations_ns_[index];
+        }
+        std::cout << "],\"provider_wall_duration_ns\":[";
+        const std::vector<std::int64_t> provider_durations =
+            provider_->wall_durations_ns();
+        for (std::size_t index = 0; index < provider_durations.size(); ++index) {
+            if (index != 0) {
+                std::cout << ',';
+            }
+            std::cout << provider_durations[index];
+        }
+        std::cout << "]}\n";
         events_finished_ = true;
     }
 
@@ -570,6 +609,7 @@ private:
     std::function<void(bt::tick_context&)> before_dispatch_;
     std::optional<air_hockey_demo::action_dispatch_result> last_dispatch_;
     bool events_finished_ = false;
+    std::vector<std::int64_t> tick_durations_ns_;
     std::int64_t instance_handle_ = 0;
     bt::instance* instance_ = nullptr;
 };
@@ -687,6 +727,63 @@ void test_h2b(const scenario_options& options) {
     rig.finish_events();
 }
 
+void run_g6_current_delay(const scenario_options& options,
+                          std::string scenario,
+                          std::chrono::milliseconds delay,
+                          std::string_view predicate_name) {
+    auto completion = std::make_shared<completion_gate>();
+    scenario_rig rig(options.socket_path, options.tree_path, std::move(scenario),
+                     bt::vla_acceptance_policy::invocation_scoped, {completion}, true,
+                     options.event_path);
+    check(rig.tick() == bt::status::running,
+          "G6 delay calibration did not submit its current request");
+    const std::uint64_t job = rig.only_job_id();
+    adopt_running_invocation(rig, job);
+    completion->wait_for_start();
+    rig.advance_clock(delay);
+    completion->release();
+    wait_for_authority(rig, job, bt::vla_authority_state::accepted);
+    predicate(predicate_name,
+              rig.accepted_dispatches() == 1 && rig.obsolete_dispatches() == 0,
+              "G6 current completion did not remain authorised at its calibrated delay");
+    check(rig.step_control().state.observation_step == 1,
+          "G6 calibrated current action was not consumed by the simulator");
+    rig.finish_events();
+}
+
+void test_g6_delay_timely(const scenario_options& options) {
+    run_g6_current_delay(options, "G6-delay-timely", 20ms,
+                         "g6_timely_completion_accepted");
+}
+
+void test_g6_delay_boundary(const scenario_options& options) {
+    run_g6_current_delay(options, "G6-delay-boundary", 119ms,
+                         "g6_boundary_completion_accepted");
+}
+
+void test_g6_delay_stale(const scenario_options& options) {
+    auto completion = std::make_shared<completion_gate>();
+    scenario_rig rig(options.socket_path, options.tree_path, "G6-delay-stale",
+                     bt::vla_acceptance_policy::invocation_scoped, {completion}, true,
+                     options.event_path);
+    check(rig.tick() == bt::status::running,
+          "G6 stale calibration did not submit its request");
+    const std::uint64_t job = rig.only_job_id();
+    adopt_running_invocation(rig, job);
+    completion->wait_for_start();
+    advance_through_reacquisition(rig);
+    rig.advance_clock(20ms);
+    completion->release();
+    wait_for_authority(rig, job, bt::vla_authority_state::rejected);
+    predicate("g6_stale_unexpired_completion_rejected",
+              rig.invocation(job).authority_reason == "context_changed" &&
+                  rig.accepted_dispatches() == 0 && rig.obsolete_dispatches() == 0,
+              "G6 stale unexpired result was not rejected by context identity");
+    check(rig.step_control().state.observation_step == 3,
+          "G6 stale-result fallback was not consumed by the simulator");
+    rig.finish_events();
+}
+
 void test_g5_fixed_shot(const scenario_options& options) {
     auto completion = std::make_shared<completion_gate>();
     completion->action = {0.0, 0.0};
@@ -763,6 +860,9 @@ void test_h3(const scenario_options& options) {
                   event_has(rig.host().events(), "vla_result",
                             {"\"generation\":2", "\"decision\":\"accepted\""}),
               "H3 must allow the replacement generation to dispatch");
+    check(rig.step_control().state.observation_step == 1,
+          "H3 current replacement action was not consumed by the simulator");
+    rig.finish_events();
 }
 
 void test_h4(const scenario_options& options) {
@@ -788,6 +888,7 @@ void test_h4(const scenario_options& options) {
                   event_count(rig.host().events(), "cap_call_start") == 0 &&
                   event_count(rig.host().events(), "cap_call_end") == 0,
               "H4 dispatch gate must reject before any host capability call");
+    rig.finish_events();
 }
 
 void test_h5(const scenario_options& options) {
@@ -816,6 +917,9 @@ void test_h5(const scenario_options& options) {
               rig.accepted_dispatches() == 0 &&
                   event_has(rig.host().events(), "async_completion_dropped"),
               "H5 late completion must not dispatch");
+    check(rig.step_control().state.observation_step == 1,
+          "H5 authored branch-exit fallback was not consumed by the simulator");
+    rig.finish_events();
 }
 
 bool run_h6_policy(const scenario_options& options,
@@ -835,10 +939,17 @@ bool run_h6_policy(const scenario_options& options,
     rig.advance_clock(121ms);
     completion->release();
     wait_for_authority(rig, job, bt::vla_authority_state::rejected);
-    return rig.invocation(job).authority_reason == "deadline_expired" &&
-           rig.accepted_dispatches() == 0 &&
-           event_has(rig.host().events(), "vla_result",
-                     {"\"reason\":\"deadline_expired\""});
+    const auto before = rig.state().observation;
+    const air_hockey_demo::host_step_result applied = rig.step_control();
+    const bool fallback_held =
+        before[14] == applied.state.observation[14] &&
+        before[15] == applied.state.observation[15];
+    const bool passed = rig.invocation(job).authority_reason == "deadline_expired" &&
+                        rig.accepted_dispatches() == 0 && fallback_held &&
+                        event_has(rig.host().events(), "vla_result",
+                                  {"\"reason\":\"deadline_expired\""});
+    rig.finish_events();
+    return passed;
 }
 
 void test_h6(const scenario_options& options) {
@@ -884,6 +995,9 @@ void test_h7(const scenario_options& options) {
                   event_count(rig.host().events(), "cap_call_end",
                               {"\"status\":\"accepted\""}) == 1,
               "H7 must reject a duplicate dispatch");
+    check(rig.step_control().state.observation_step == 1,
+          "H7 exactly-once action was not consumed by the simulator");
+    rig.finish_events();
 }
 
 std::vector<std::string> replay_projection(const bt::event_log& events) {
@@ -925,13 +1039,15 @@ replay_half_result run_replay_half(const scenario_options& options,
     check(rig.accepted_dispatches() == 1 && rig.obsolete_dispatches() == 0,
           "H8 recorded schedule did not dispatch its current result");
     const air_hockey_demo::host_step_result applied = rig.step_control();
-    return {
+    replay_half_result result{
         .projection = replay_projection(rig.host().events()),
         .response = rig.completed_provider_response(),
         .applied_mallet_target = {applied.state.observation[14],
                                   applied.state.observation[15]},
         .replay_mode = rig.provider_replay_mode(),
     };
+    rig.finish_events();
+    return result;
 }
 
 void test_h8(const scenario_options& options) {
@@ -955,6 +1071,9 @@ const std::vector<std::pair<std::string_view, scenario_fn>> kScenarios{
     {"H1", test_h1},   {"H2a", test_h2a}, {"H2b", test_h2b}, {"H3", test_h3},
     {"H4", test_h4},   {"H5", test_h5},   {"H6", test_h6},   {"H7", test_h7},
     {"H8", test_h8},   {"G5-fixed", test_g5_fixed_shot},
+    {"G6-delay-timely", test_g6_delay_timely},
+    {"G6-delay-boundary", test_g6_delay_boundary},
+    {"G6-delay-stale", test_g6_delay_stale},
 };
 
 }  // namespace

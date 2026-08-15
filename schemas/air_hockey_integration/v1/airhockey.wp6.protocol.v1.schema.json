@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.org/schemas/air_hockey_integration/v1/airhockey.wp6.protocol.v1.schema.json",
+  "title": "Air-hockey WP6 frozen engineering protocol v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "control_period_ms",
+    "deadline_ms",
+    "engineering_split",
+    "delay_calibration",
+    "deterministic_matrix",
+    "learned_provider",
+    "timing",
+    "fallback",
+    "paper_split"
+  ],
+  "properties": {
+    "schema_version": {"const": "airhockey.wp6.protocol.v1"},
+    "status": {"const": "frozen_before_paper_split"},
+    "control_period_ms": {"const": 20},
+    "deadline_ms": {"const": 120},
+    "engineering_split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distribution_config",
+        "distribution_config_sha256",
+        "name",
+        "seed",
+        "expected_shots",
+        "manifest_sha256"
+      ],
+      "properties": {
+        "distribution_config": {"const": "configs/direct_launch_muesli_v1.yaml"},
+        "distribution_config_sha256": {"$ref": "#/$defs/sha256"},
+        "name": {"const": "engineering"},
+        "seed": {"const": 6302},
+        "expected_shots": {"const": 26},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "delay_calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timely_ms",
+        "boundary_ms",
+        "context_change_ms",
+        "stale_unexpired_ms",
+        "timeout_ms"
+      ],
+      "properties": {
+        "timely_ms": {"type": "integer", "minimum": 0, "maximum": 119},
+        "boundary_ms": {"type": "integer", "minimum": 0, "maximum": 119},
+        "context_change_ms": {"type": "integer", "minimum": 1, "maximum": 119},
+        "stale_unexpired_ms": {"type": "integer", "minimum": 1, "maximum": 119},
+        "timeout_ms": {"type": "integer", "minimum": 121}
+      }
+    },
+    "deterministic_matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenarios",
+        "minimum_current_progress_rate",
+        "maximum_invocation_scoped_obsolete_dispatches",
+        "required_deadline_only_obsolete_dispatches"
+      ],
+      "properties": {
+        "scenarios": {
+          "const": ["H1", "H2a", "H2b", "H3", "H4", "H5", "H6", "H7", "H8"]
+        },
+        "minimum_current_progress_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "maximum_invocation_scoped_obsolete_dispatches": {"const": 0},
+        "required_deadline_only_obsolete_dispatches": {"const": 26}
+      }
+    },
+    "learned_provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "family_id",
+        "training_seed",
+        "training_stage",
+        "checkpoint_sha256",
+        "blackout_start_step",
+        "blackout_length_steps",
+        "timeout_steps",
+        "save_outcomes",
+        "minimum_save_rate",
+        "maximum_p95_inference_ms",
+        "maximum_inference_ms"
+      ],
+      "properties": {
+        "kind": {"const": "acra_frozen"},
+        "family_id": {"const": "structured_k2"},
+        "training_seed": {"const": 14303},
+        "training_stage": {"const": "final"},
+        "checkpoint_sha256": {"$ref": "#/$defs/sha256"},
+        "blackout_start_step": {"const": 5},
+        "blackout_length_steps": {"const": 5},
+        "timeout_steps": {"const": 125},
+        "save_outcomes": {"const": ["returned", "arrested", "safe_deflection"]},
+        "minimum_save_rate": {"type": "number", "minimum": 0, "maximum": 1},
+        "maximum_p95_inference_ms": {"type": "number", "exclusiveMinimum": 0},
+        "maximum_inference_ms": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tick_budget_ms",
+        "maximum_tick_p99_ms",
+        "maximum_tick_budget_miss_rate"
+      ],
+      "properties": {
+        "tick_budget_ms": {"const": 20},
+        "maximum_tick_p99_ms": {"type": "number", "exclusiveMinimum": 0},
+        "maximum_tick_budget_miss_rate": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "fallback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "normalised_tolerance"],
+      "properties": {
+        "kind": {"const": "hold_current_normalised_mallet_target"},
+        "normalised_tolerance": {"type": "number", "minimum": 0}
+      }
+    },
+    "paper_split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "manifest_sha256", "must_remain_unopened"],
+      "properties": {
+        "name": {"const": "muesli_test"},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "must_remain_unopened": {"const": true}
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

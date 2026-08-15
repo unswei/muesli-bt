@@ -1,0 +1,55 @@
+{
+  "schema_version": "airhockey.wp6.protocol.v1",
+  "status": "frozen_before_paper_split",
+  "control_period_ms": 20,
+  "deadline_ms": 120,
+  "engineering_split": {
+    "distribution_config": "configs/direct_launch_muesli_v1.yaml",
+    "distribution_config_sha256": "7d2819356dad664ede5d879845082b52bedcb69f0a2ae68ec27f389ea69603a5",
+    "name": "engineering",
+    "seed": 6302,
+    "expected_shots": 26,
+    "manifest_sha256": "41b5a8217f2d5d3b4066d133917c3770909bb0d5033a65963c78b438391e011e"
+  },
+  "delay_calibration": {
+    "timely_ms": 20,
+    "boundary_ms": 119,
+    "context_change_ms": 40,
+    "stale_unexpired_ms": 60,
+    "timeout_ms": 121
+  },
+  "deterministic_matrix": {
+    "scenarios": ["H1", "H2a", "H2b", "H3", "H4", "H5", "H6", "H7", "H8"],
+    "minimum_current_progress_rate": 0.95,
+    "maximum_invocation_scoped_obsolete_dispatches": 0,
+    "required_deadline_only_obsolete_dispatches": 26
+  },
+  "learned_provider": {
+    "kind": "acra_frozen",
+    "family_id": "structured_k2",
+    "training_seed": 14303,
+    "training_stage": "final",
+    "checkpoint_sha256": "6f653f2708c829945653558e6eb1aa3fe35cda9f452b781c0608cca8f3a5154e",
+    "blackout_start_step": 5,
+    "blackout_length_steps": 5,
+    "timeout_steps": 125,
+    "save_outcomes": ["returned", "arrested", "safe_deflection"],
+    "minimum_save_rate": 0.25,
+    "maximum_p95_inference_ms": 20.0,
+    "maximum_inference_ms": 120.0
+  },
+  "timing": {
+    "tick_budget_ms": 20,
+    "maximum_tick_p99_ms": 20.0,
+    "maximum_tick_budget_miss_rate": 0.01
+  },
+  "fallback": {
+    "kind": "hold_current_normalised_mallet_target",
+    "normalised_tolerance": 1e-09
+  },
+  "paper_split": {
+    "name": "muesli_test",
+    "manifest_sha256": "59527e9f55537d127fc401ee3ab5fbbfedbc36dc22cbca0322935eb99ea1d665",
+    "must_remain_unopened": true
+  }
+}
