@@ -35,6 +35,11 @@ class GateG6PureTest(unittest.TestCase):
             protocol["deterministic_matrix"]["scenarios"],
             ["H1", "H2a", "H2b", "H3", "H4", "H5", "H6", "H7", "H8"],
         )
+        self.assertEqual(protocol["learned_provider"]["action_lock_steps"], 5)
+        self.assertEqual(
+            protocol["learned_provider"]["source_protocol_sha256"],
+            "1f8ececf4492f68517938ccd2fd1e05bb459e0fdd7275851536f71d782bed448",
+        )
 
     def test_delay_order_and_percentiles_are_deterministic(self) -> None:
         delays = load_protocol()["delay_calibration"]

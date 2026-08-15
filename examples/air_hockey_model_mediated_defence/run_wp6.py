@@ -554,6 +554,11 @@ def _run_learned_pilot(
         raise GateG6Error("learned checkpoint training seed changed")
     if provider.metadata.get("training_stage") != definition["training_stage"]:
         raise GateG6Error("learned checkpoint is not a frozen final-stage export")
+    if (
+        provider.metadata.get("protocol_sha256")
+        != definition["source_protocol_sha256"]
+    ):
+        raise GateG6Error("learned checkpoint source protocol hash changed")
 
     response_schema = _read_json(PROVIDER_RESPONSE_SCHEMA)
     Draft202012Validator.check_schema(response_schema)
@@ -565,6 +570,7 @@ def _run_learned_pilot(
             length_steps=definition["blackout_length_steps"],
         ),
         timeout_steps=definition["timeout_steps"],
+        action_lock_steps=definition["action_lock_steps"],
     )
     inference_ns: list[int] = []
     episodes: list[dict[str, Any]] = []
@@ -634,6 +640,25 @@ def _run_learned_pilot(
     save_count = sum(outcomes[value] for value in definition["save_outcomes"])
     save_rate = save_count / len(episodes)
     timing = _timing_summary(inference_ns)
+    measured = {
+        "family_id": definition["family_id"],
+        "training_seed": definition["training_seed"],
+        "source_protocol_sha256": definition["source_protocol_sha256"],
+        "checkpoint_sha256": definition["checkpoint_sha256"],
+        "episodes": len(episodes),
+        "action_lock_steps": definition["action_lock_steps"],
+        "blackout_start_step": definition["blackout_start_step"],
+        "blackout_length_steps": definition["blackout_length_steps"],
+        "save_count": save_count,
+        "save_rate": save_rate,
+        "outcome_counts": dict(sorted(outcomes.items())),
+        "inference_timing": timing,
+        "deadline_misses": deadline_misses,
+        "fallback_steps": fallback_steps,
+        "status": "measured",
+    }
+    _write_json(output / "learned-episodes.json", {"episodes": episodes})
+    _write_json(output / "learned-provider-measured.json", measured)
     if save_rate < definition["minimum_save_rate"]:
         raise GateG6Error("learned-provider save rate fell below the engineering floor")
     if timing["p95_ms"] > definition["maximum_p95_inference_ms"]:
@@ -643,22 +668,7 @@ def _run_learned_pilot(
     if deadline_misses != 0 or fallback_steps != 0:
         raise GateG6Error("learned-provider pilot required an unexpected deadline fallback")
 
-    result = {
-        "family_id": definition["family_id"],
-        "training_seed": definition["training_seed"],
-        "checkpoint_sha256": definition["checkpoint_sha256"],
-        "episodes": len(episodes),
-        "blackout_start_step": definition["blackout_start_step"],
-        "blackout_length_steps": definition["blackout_length_steps"],
-        "save_count": save_count,
-        "save_rate": save_rate,
-        "outcome_counts": dict(sorted(outcomes.items())),
-        "inference_timing": timing,
-        "deadline_misses": deadline_misses,
-        "fallback_steps": fallback_steps,
-        "status": "passed",
-    }
-    _write_json(output / "learned-episodes.json", {"episodes": episodes})
+    result = {**measured, "status": "passed"}
     _write_json(output / "learned-provider-report.json", result)
     return result
 
