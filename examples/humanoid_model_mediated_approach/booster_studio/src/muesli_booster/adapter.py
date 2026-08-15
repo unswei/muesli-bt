@@ -164,6 +164,10 @@ class BallContextTracker:
     def context_id(self) -> str:
         return self._context_id
 
+    @property
+    def current_observation(self) -> BallObservation | None:
+        return self._ball
+
     def observe(self, observation: BallObservation) -> str:
         if not _finite(
             observation.x_m, observation.y_m, observation.z_m, observation.observed_at
@@ -320,7 +324,7 @@ class AdapterState:
             self._unsafe_simulation_context_anchor = None
             if self._unsafe_simulation_stale_dispatch:
                 context_id = self._tracker.context_id
-                context_anchor = self._tracker.context_anchor(context_id)
+                context_anchor = self._tracker.current_observation
                 if context_id and context_anchor is not None:
                     self._unsafe_simulation_context_id = context_id
                     self._unsafe_simulation_context_anchor = context_anchor
