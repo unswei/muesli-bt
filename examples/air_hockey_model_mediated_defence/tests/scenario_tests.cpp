@@ -450,6 +450,15 @@ public:
         return backend_->last_state();
     }
 
+    [[nodiscard]] std::size_t fallback_requests() const noexcept {
+        return fallback_requests_;
+    }
+
+    [[nodiscard]] const std::optional<std::array<double, air_hockey_demo::kActionDimension>>&
+    last_fallback_target() const noexcept {
+        return last_fallback_target_;
+    }
+
     void finish_events() {
         if (events_finished_) {
             return;
@@ -552,7 +561,11 @@ private:
             [this](bt::tick_context&, bt::node_id, bt::node_memory&,
                    std::span<const muslisp::value>) {
                 const auto& state = backend_->last_state();
-                backend_->act_target({state.observation[14], state.observation[15]});
+                const std::array<double, air_hockey_demo::kActionDimension> target{
+                    state.observation[14], state.observation[15]};
+                backend_->act_target(target);
+                last_fallback_target_ = target;
+                ++fallback_requests_;
                 return bt::status::success;
             });
         callbacks.register_action(
@@ -608,6 +621,9 @@ private:
     bool hold_after_dispatch_ = false;
     std::function<void(bt::tick_context&)> before_dispatch_;
     std::optional<air_hockey_demo::action_dispatch_result> last_dispatch_;
+    std::optional<std::array<double, air_hockey_demo::kActionDimension>>
+        last_fallback_target_;
+    std::size_t fallback_requests_ = 0;
     bool events_finished_ = false;
     std::vector<std::int64_t> tick_durations_ns_;
     std::int64_t instance_handle_ = 0;
@@ -940,12 +956,13 @@ bool run_h6_policy(const scenario_options& options,
     completion->release();
     wait_for_authority(rig, job, bt::vla_authority_state::rejected);
     const auto before = rig.state().observation;
-    const air_hockey_demo::host_step_result applied = rig.step_control();
-    const bool fallback_held =
-        before[14] == applied.state.observation[14] &&
-        before[15] == applied.state.observation[15];
+    const bool fallback_requested =
+        rig.fallback_requests() > 0 && rig.last_fallback_target().has_value() &&
+        *rig.last_fallback_target() ==
+            std::array<double, air_hockey_demo::kActionDimension>{before[14], before[15]};
+    (void)rig.step_control();
     const bool passed = rig.invocation(job).authority_reason == "deadline_expired" &&
-                        rig.accepted_dispatches() == 0 && fallback_held &&
+                        rig.accepted_dispatches() == 0 && fallback_requested &&
                         event_has(rig.host().events(), "vla_result",
                                   {"\"reason\":\"deadline_expired\""});
     rig.finish_events();
