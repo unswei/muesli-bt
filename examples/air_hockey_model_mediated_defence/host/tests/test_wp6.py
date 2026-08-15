@@ -12,6 +12,7 @@ sys.path.insert(0, str(EXAMPLE_ROOT))
 
 from run_wp6 import (
     _event_counts,
+    _normalise_event_streams,
     _percentile,
     _timing_records,
     _timing_summary,
@@ -82,6 +83,47 @@ class GateG6PureTest(unittest.TestCase):
                 "accepted_obsolete_dispatches": 1,
             },
         )
+
+    def test_multi_rig_event_file_is_split_into_canonical_streams(self) -> None:
+        import tempfile
+
+        def stream(run_id: str) -> list[dict[str, object]]:
+            return [
+                {
+                    "schema": "mbt.evt.v1",
+                    "contract_version": "1.0.0",
+                    "type": "run_start",
+                    "run_id": run_id,
+                    "unix_ms": 1,
+                    "seq": 1,
+                    "data": {
+                        "git_sha": "fixture",
+                        "host": {"name": "test", "version": "v1", "platform": "local"},
+                        "contract_version": "1.0.0",
+                        "contract_id": "runtime-contract-v1.0.0",
+                        "tick_hz": 50,
+                        "tree_hash": "fnv1a64:0000000000000000",
+                        "capabilities": {},
+                    },
+                },
+                {
+                    "schema": "mbt.evt.v1",
+                    "contract_version": "1.0.0",
+                    "type": "run_end",
+                    "run_id": run_id,
+                    "unix_ms": 2,
+                    "seq": 2,
+                    "data": {"status": "success"},
+                },
+            ]
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "events.jsonl"
+            streams = _normalise_event_streams(
+                stream("fixture-wp6-a") + stream("fixture-wp6-b"), path
+            )
+            self.assertEqual(len(streams), 2)
+            self.assertTrue((path.parent / "events-2.jsonl").is_file())
 
 
 if __name__ == "__main__":

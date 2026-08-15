@@ -216,6 +216,40 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def _normalise_event_streams(
+    rows: list[dict[str, Any]], path: Path
+) -> list[list[dict[str, Any]]]:
+    """Split multi-rig scenarios into independently canonical event streams."""
+
+    streams: list[list[dict[str, Any]]] = []
+    current: list[dict[str, Any]] = []
+    for row in rows:
+        if row.get("type") == "run_start":
+            if current:
+                if current[-1].get("type") != "run_end":
+                    raise GateG6Error("a new runtime run started before the prior run ended")
+                streams.append(current)
+            current = [row]
+        else:
+            if not current:
+                raise GateG6Error("event evidence appeared before run_start")
+            current.append(row)
+    if not current or current[-1].get("type") != "run_end":
+        raise GateG6Error("event evidence ended without run_end")
+    streams.append(current)
+
+    for stream in streams:
+        try:
+            _validate_events(stream, path)
+        except Exception as error:
+            raise GateG6Error(f"invalid canonical event stream {path}: {error}") from error
+    if len(streams) > 1:
+        _write_jsonl(path, streams[0])
+        for index, stream in enumerate(streams[1:], start=2):
+            _write_jsonl(path.with_name(f"events-{index}.jsonl"), stream)
+    return streams
+
+
 def _validate_public_boundary(records: list[dict[str, Any]]) -> None:
     if not records:
         raise GateG6Error("MuJoCo scenario produced no control steps")
@@ -310,13 +344,17 @@ def _run_scenario(
     backend.shutdown()
     _write_jsonl(output / "evaluation-records.jsonl", records)
     _write_json(output / "direct-replay.json", replay)
-    events = _read_jsonl(events_path)
-    _validate_events(events, events_path)
+    event_streams = _normalise_event_streams(_read_jsonl(events_path), events_path)
+    events = [row for stream in event_streams for row in stream]
     result = {
         "scenario": scenario,
         "shot_id": generated.shot.shot_id,
         "predicates": sorted(observed),
         "events": len(events),
+        "event_streams": [
+            "events.jsonl",
+            *(f"events-{index}.jsonl" for index in range(2, len(event_streams) + 1)),
+        ],
         "control_steps": len(records),
         "event_counts": _event_counts(events),
         "timing": _timing_records(completed.stdout),
