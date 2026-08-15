@@ -120,6 +120,10 @@ uv run --with 'jsonschema>=4.20,<5' \
 
 Do not run the printed command while the ACRA experiments are active.
 
+Running the joint image without overriding its command executes the H1 fake-host
+scenario through the complete G2 harness. This is a CPU-only packaging check;
+it is not MuJoCo task evidence.
+
 ## run the contract tests
 
 From the repository root:

@@ -37,4 +37,4 @@ RUN python3 /opt/muesli-bt/examples/air_hockey_model_mediated_defence/run_wp4.py
       container-check
 
 WORKDIR /opt/muesli-bt
-CMD ["/opt/muesli-bt/build/air-hockey-wp4/muesli_bt_air_hockey_scenario_tests", "--scenario", "h1_current"]
+CMD ["python3", "/opt/muesli-bt/examples/air_hockey_model_mediated_defence/run_g2.py", "--runner", "/opt/muesli-bt/build/air-hockey-wp4/muesli_bt_air_hockey_scenario_tests", "--scenario", "H1"]

@@ -119,6 +119,13 @@ def validate_definition(lock: dict[str, Any]) -> None:
         "g++=4:13.2.0-7ubuntu1",
         "make=4.3-4.1build2",
         "container-check",
+        (
+            'CMD ["python3", '
+            '"/opt/muesli-bt/examples/air_hockey_model_mediated_defence/run_g2.py", '
+            '"--runner", '
+            '"/opt/muesli-bt/build/air-hockey-wp4/'
+            'muesli_bt_air_hockey_scenario_tests", "--scenario", "H1"]'
+        ),
     )
     for fragment in required_fragments:
         if fragment not in dockerfile:
