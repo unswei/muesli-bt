@@ -94,7 +94,6 @@ def shot() -> dict:
         "output": {"width": 1920, "height": 1080, "fps": 30},
         "fixed_camera_pixel_calibration": {
             "robot_start": [800, 700],
-            "ball_a": [1060, 730],
             "current_target": [960, 720],
         },
     }
@@ -124,7 +123,7 @@ class T1PrototypeTests(unittest.TestCase):
             "ball_body_id": 141,
             "robot_start_position_m": [-0.6, 0.0, 0.545],
             "robot_start_quaternion_wxyz": [1.0, 0.0, 0.0, 0.0],
-            "ball_a_position_m": [0.5, 0.0, 0.11],
+            "ball_position_m": [0.5, 0.0, 0.11],
             "reset_wait_seconds": 8.0,
         }
 
@@ -159,6 +158,8 @@ class T1PrototypeTests(unittest.TestCase):
         self.assertIn("MODEL REQUEST PENDING", overlay)
         self.assertIn("CURRENT RESULT ACCEPTED", overlay)
         self.assertIn("WALKING TARGET DISPATCHED EXACTLY ONCE", overlay)
+        self.assertNotIn("BALL A", overlay)
+        self.assertNotIn("CONTEXT A", overlay)
         self.assertIn(r"\pos(960,720)", overlay)
 
     def test_timeline_rejects_a_changed_context(self) -> None:

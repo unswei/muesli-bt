@@ -245,7 +245,6 @@ def generate_ass(timeline: Timeline, shot: dict[str, Any]) -> str:
     width = int(_positive_number(output.get("width"), "output width"))
     height = int(_positive_number(output.get("height"), "output height"))
     robot_x, robot_y = _calibrated_point(shot, "robot_start")
-    ball_x, ball_y = _calibrated_point(shot, "ball_a")
     target_x, target_y = _calibrated_point(shot, "current_target")
     end = timeline.duration_seconds
     submit = timeline.submit_seconds
@@ -268,7 +267,6 @@ Style: Badge,DejaVu Sans,25,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HB0182028,-1,0,0,0
 Style: Note,DejaVu Sans,27,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HC0182028,-1,0,0,0,100,100,0,0,3,1,0,1,68,68,54,1
 Style: Marker,DejaVu Sans,88,&H006BE62E,&H006BE62E,&H00101A12,&H00000000,-1,0,0,0,100,100,0,0,1,5,0,5,0,0,0,1
 Style: MarkerLabel,DejaVu Sans,27,&H006BE62E,&H006BE62E,&H00101A12,&HB0101812,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
-Style: BallLabel,DejaVu Sans,25,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HB0182028,-1,0,0,0,100,100,0,0,3,1,0,2,0,0,0,1
 Style: Success,DejaVu Sans,34,&H006BE62E,&H006BE62E,&H00131A20,&HC0182028,-1,0,0,0,100,100,0,0,3,2,0,3,64,64,58,1
 Style: Vector,Arial,20,&H806BE62E,&H806BE62E,&H806BE62E,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 
@@ -284,12 +282,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         ),
         _dialogue(
             0.0,
-            end,
-            "BallLabel",
-            rf"{{\an2\pos({ball_x},{ball_y - 42})}}BALL A  ·  CONTEXT A",
-        ),
-        _dialogue(
-            0.0,
             submit,
             "Header",
             r"{\c&H00FFFFFF&}T1  ·  NORMAL RESULT",
@@ -298,7 +290,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             0.0,
             submit,
             "Body",
-            rf"BALL STATIONARY AT A\NCURRENT CONTEXT A  ·  {context}",
+            rf"BALL STATIONARY\NCURRENT CONTEXT  ·  {context}",
         ),
         _dialogue(
             submit,
@@ -313,7 +305,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             (
                 f"JOB {_ass_escape(timeline.job_id)}  ·  "
                 f"GENERATION {timeline.generation}\\N"
-                f"CAPTURED CONTEXT A  ·  {context}"
+                f"CAPTURED CONTEXT  ·  {context}"
             ),
         ),
         _dialogue(
@@ -333,7 +325,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             end,
             "Body",
             (
-                f"CAPTURED A = CURRENT A  ·  {context}\\N"
+                f"CAPTURED CONTEXT = CURRENT CONTEXT  ·  {context}\\N"
                 "WALKING TARGET DISPATCHED EXACTLY ONCE"
             ),
         ),

@@ -258,13 +258,15 @@ def build_trial_timeline(
         if (
             dispatch_data.get("decision") != "accepted"
             or str(dispatch_data.get("reason", ""))
+            or dispatch_data.get("context_match_required") is not False
             or str(dispatch_data.get("job_id")) != job_id
             or dispatch_data.get("generation") != generation
             or dispatch_data.get("captured_context_id") != captured_context
             or dispatch_data.get("current_context_id") != current_context
         ):
             raise ComparisonError(
-                "T2a simulation baseline must dispatch the correlated stale target"
+                "T2a simulation baseline must explicitly bypass the context match "
+                "and dispatch the correlated stale target"
             )
         target_relative = _target_from_dispatch(dispatch)
         dispatch_decision: str | None = "accepted"

@@ -442,7 +442,7 @@ paper results and record them in every run manifest.
 The moved-ball full-system trial has the following expected timeline:
 
 ```text
-t = 0.00 s  ball A becomes current as ball-0001
+t = 0.00 s  the ball becomes current as ball-0001
 t = 0.10 s  req-0042 generation 7 is submitted for ball-0001
 t = 1.00 s  operator moves the ball beyond the context threshold
 t = 1.05 s  perception publishes ball-0002

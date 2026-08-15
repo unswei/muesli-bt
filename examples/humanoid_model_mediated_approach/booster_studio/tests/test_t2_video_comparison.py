@@ -90,6 +90,7 @@ def t2_events(role: str) -> list[dict]:
                     "current_context_id": "ball-0002",
                     "decision": "accepted",
                     "reason": "",
+                    "context_match_required": False,
                     "target": {
                         "frame_id": "ball_context",
                         "x_m": -0.45,
@@ -286,6 +287,22 @@ class T2ComparisonTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             comparison.ComparisonError, "T2a must contain 1 backend dispatch calls"
+        ):
+            comparison.build_trial_timeline(
+                events, capture(), shot(), role="baseline"
+            )
+
+    def test_baseline_requires_explicit_context_match_bypass(self) -> None:
+        events = copy.deepcopy(t2_events("baseline"))
+        dispatch = next(
+            event
+            for event in events
+            if event["type"] == "walking_target_dispatch"
+        )
+        dispatch["data"]["context_match_required"] = True
+
+        with self.assertRaisesRegex(
+            comparison.ComparisonError, "explicitly bypass the context match"
         ):
             comparison.build_trial_timeline(
                 events, capture(), shot(), role="baseline"

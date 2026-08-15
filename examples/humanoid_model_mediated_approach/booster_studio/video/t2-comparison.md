@@ -60,7 +60,8 @@ dispatches target B.
 these claims:
 
 - T2a uses `deadline_only` and accepts the stale result;
-- T2a records one accepted `walking_target_dispatch` and one backend call;
+- T2a records one accepted `walking_target_dispatch` with
+  `context_match_required=false` and one backend call;
 - the T2a live manifest declares `unsafe_simulation_baseline`;
 - T2b uses `invocation_scoped`, rejects with reason `context_changed` and
   records no stale walking-target dispatch;

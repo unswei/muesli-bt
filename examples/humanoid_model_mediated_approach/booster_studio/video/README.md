@@ -26,13 +26,13 @@ they do not replace `mbt.evt.v1`.
 `t1_prototype.json` freezes:
 
 - an 11-second shot with three seconds before request submission;
-- the K1 and ball A simulation poses;
+- the K1 and ball simulation poses;
 - a 16:9 crop and 1080p output;
 - fixed-camera pixel calibration for the robot, ball and current target; and
 - the clean capture framing.
 
 `stage_t1_scene.py` resets robot motion control before positioning robot1 and
-ball A. `capture_clean_simulator.py` temporarily hides the HTML scoreboard and
+the ball. `capture_clean_simulator.py` temporarily hides the HTML scoreboard and
 referee feed through Chromium's DevTools Protocol. It does not modify physics
 or the simulator package, and it restores the UI after capture.
 
