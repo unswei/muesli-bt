@@ -5,7 +5,8 @@ offline-tested Booster Studio host bridge, native supervisor and overlay path.
 The signed Linux package and all four live trials ran on a virtual K1 at source
 commit `e88bdaa`. Polished, canonical-event-validated T1 and matched T2
 simulation prototypes are reproducible from clean Booster Studio captures.
-Physical video capture remains integration work.
+The T2 comparison includes fresh current-context recovery requests and visible
+walking towards ball B. Physical video capture remains integration work.
 
 ## what this is
 

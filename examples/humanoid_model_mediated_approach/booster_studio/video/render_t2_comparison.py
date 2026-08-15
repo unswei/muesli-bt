@@ -42,6 +42,23 @@ class TrialTimeline:
     obsolete_target_field_position_m: tuple[float, float, float]
 
 
+@dataclasses.dataclass(frozen=True)
+class RecoveryTimeline:
+    run_id: str
+    trial_id: str
+    acceptance_policy: str
+    job_id: str
+    generation: int
+    context_id: str
+    submit_seconds: float
+    accept_seconds: float
+    dispatch_seconds: float
+    recording_dispatch_calls: int
+    ball_b_field_position_m: tuple[float, float, float]
+    target_ball_relative: tuple[float, float, float]
+    current_target_field_position_m: tuple[float, float, float]
+
+
 def _read_json(path: pathlib.Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -125,10 +142,10 @@ def _positive_number(value: object, field: str) -> float:
 def _target_from_dispatch(dispatch: dict[str, Any]) -> tuple[float, float, float]:
     target = dispatch["data"].get("target")
     if not isinstance(target, dict) or target.get("frame_id") != "ball_context":
-        raise ComparisonError("T2 baseline target must use the ball_context frame")
+        raise ComparisonError("walking target must use the ball_context frame")
     return _triple(
         [target.get("x_m"), target.get("y_m"), target.get("yaw_rad")],
-        "baseline walking target",
+        "walking target",
     )
 
 
@@ -313,8 +330,137 @@ def build_trial_timeline(
     )
 
 
+def build_recovery_timeline(
+    events: list[dict[str, Any]],
+    capture: dict[str, Any],
+    previous: TrialTimeline,
+) -> RecoveryTimeline:
+    if capture.get("schema_version") != "humanoid.clean_simulator_capture.v1":
+        raise ComparisonError("recovery timing is not a clean simulator capture")
+    first_frame_epoch = _positive_number(
+        capture.get("first_frame_epoch"), "first frame epoch"
+    )
+    submission = _single(
+        _events_of_type(events, "vla_submit"), "recovery VLA submission"
+    )
+    decisions = [
+        event
+        for event in _events_of_type(events, "vla_result")
+        if "decision" in event["data"]
+    ]
+    decision = _single(decisions, "recovery authoritative VLA decision")
+    dispatch = _single(
+        _events_of_type(events, "walking_target_dispatch"),
+        "recovery walking-target dispatch",
+    )
+    run_end = _single(_events_of_type(events, "run_end"), "recovery run end")
+
+    submission_data = submission["data"]
+    decision_data = decision["data"]
+    dispatch_data = dispatch["data"]
+    job_id = str(submission_data.get("job_id", ""))
+    generation = submission_data.get("generation")
+    context_id = str(submission_data.get("captured_context_id", ""))
+    if not job_id or not isinstance(generation, int) or not context_id:
+        raise ComparisonError("recovery submission identity is incomplete")
+    if context_id != previous.current_context_id:
+        raise ComparisonError("recovery request did not capture current ball B context")
+    for event_data in (decision_data, dispatch_data):
+        if (
+            str(event_data.get("job_id")) != job_id
+            or event_data.get("generation") != generation
+            or event_data.get("captured_context_id") != context_id
+            or event_data.get("current_context_id") != context_id
+        ):
+            raise ComparisonError("recovery result is not current and invocation-correlated")
+    if (
+        submission_data.get("acceptance_policy") != "invocation_scoped"
+        or decision_data.get("acceptance_policy") != "invocation_scoped"
+        or decision_data.get("decision") != "accepted"
+        or dispatch_data.get("decision") != "accepted"
+    ):
+        raise ComparisonError("recovery must accept and dispatch one current B result")
+
+    ball_writes = [
+        event
+        for event in _events_of_type(events, "bb_write")
+        if event["data"].get("key") == "ball-state"
+    ]
+    if not ball_writes:
+        raise ComparisonError("recovery event stream has no ball B state")
+    ball_b = _triple(ball_writes[0]["data"].get("preview"), "recovery ball B state")
+    if any(
+        abs(left - right) > 1e-9
+        for left, right in zip(
+            ball_b, previous.ball_b_field_position_m, strict=True
+        )
+    ):
+        raise ComparisonError("recovery ball state does not match moved ball B")
+    target_relative = _target_from_dispatch(dispatch)
+    if any(
+        abs(left - right) > 1e-9
+        for left, right in zip(
+            target_relative, previous.target_ball_relative, strict=True
+        )
+    ):
+        raise ComparisonError("recovery changed the model candidate pose")
+
+    if run_end["data"].get("trial_id") != "T1":
+        raise ComparisonError("recovery evidence is not a normal-result trial")
+    recording_dispatch_calls = run_end["data"].get("recording_dispatch_calls")
+    if recording_dispatch_calls != 1:
+        raise ComparisonError("recovery must contain exactly one walking backend call")
+
+    submit_seconds = (
+        submission["unix_ms"] / 1000.0
+        - first_frame_epoch
+        - previous.clip_start_seconds
+    )
+    accept_seconds = (
+        decision["unix_ms"] / 1000.0
+        - first_frame_epoch
+        - previous.clip_start_seconds
+    )
+    dispatch_seconds = (
+        dispatch["unix_ms"] / 1000.0
+        - first_frame_epoch
+        - previous.clip_start_seconds
+    )
+    if not (
+        previous.decision_seconds
+        < submit_seconds
+        < accept_seconds
+        <= dispatch_seconds
+        < previous.duration_seconds
+    ):
+        raise ComparisonError("recovery timing is not ordered within the T2 capture")
+    current_target = (
+        ball_b[0] + target_relative[0],
+        ball_b[1] + target_relative[1],
+        target_relative[2],
+    )
+    return RecoveryTimeline(
+        run_id=str(events[0].get("run_id", "")),
+        trial_id="T1",
+        acceptance_policy="invocation_scoped",
+        job_id=job_id,
+        generation=generation,
+        context_id=context_id,
+        submit_seconds=submit_seconds,
+        accept_seconds=accept_seconds,
+        dispatch_seconds=dispatch_seconds,
+        recording_dispatch_calls=recording_dispatch_calls,
+        ball_b_field_position_m=ball_b,
+        target_ball_relative=target_relative,
+        current_target_field_position_m=current_target,
+    )
+
+
 def validate_matched_trials(
-    baseline: TrialTimeline, full: TrialTimeline
+    baseline: TrialTimeline,
+    full: TrialTimeline,
+    baseline_recovery: RecoveryTimeline | None = None,
+    full_recovery: RecoveryTimeline | None = None,
 ) -> None:
     if baseline.duration_seconds != full.duration_seconds:
         raise ComparisonError("T2 trials have different rendered durations")
@@ -327,6 +473,14 @@ def validate_matched_trials(
         right = getattr(full, field)
         if any(abs(a - b) > 1e-9 for a, b in zip(left, right, strict=True)):
             raise ComparisonError(f"T2 trials are not matched on {field}")
+    if (baseline_recovery is None) != (full_recovery is None):
+        raise ComparisonError("T2 comparison has only one recovery invocation")
+    if baseline_recovery is not None and full_recovery is not None:
+        for field in ("ball_b_field_position_m", "target_ball_relative"):
+            left = getattr(baseline_recovery, field)
+            right = getattr(full_recovery, field)
+            if any(abs(a - b) > 1e-9 for a, b in zip(left, right, strict=True)):
+                raise ComparisonError(f"T2 recoveries are not matched on {field}")
 
 
 def _ass_time(seconds: float) -> str:
@@ -361,6 +515,7 @@ def _panel_point(shot: dict[str, Any], name: str, offset: int) -> tuple[int, int
 
 def _panel_rows(
     timeline: TrialTimeline,
+    recovery: RecoveryTimeline,
     shot: dict[str, Any],
     *,
     offset: int,
@@ -375,6 +530,9 @@ def _panel_rows(
     ball_a_x, ball_a_y = _panel_point(shot, "ball_a", offset)
     ball_b_x, ball_b_y = _panel_point(shot, "ball_b", offset)
     target_x, target_y = _panel_point(shot, "obsolete_target", offset)
+    current_target_x, current_target_y = _panel_point(
+        shot, "current_target_b", offset
+    )
     captured = _ass_escape(timeline.captured_context_id)
     current = _ass_escape(timeline.current_context_id)
     title = "T2a  ·  TIMEOUT-ONLY BASELINE" if role == "baseline" else (
@@ -442,14 +600,14 @@ def _panel_rows(
         ),
         _dialogue(
             move,
-            end,
+            recovery.accept_seconds,
             "GhostRed",
             rf"{{\an5\pos({ball_a_x},{ball_a_y})}}○",
             2,
         ),
         _dialogue(
             move,
-            end,
+            recovery.accept_seconds,
             "RedLabel",
             rf"{{\an2\pos({ball_a_x},{ball_a_y - 45})}}A  ·  OBSOLETE",
             3,
@@ -470,7 +628,7 @@ def _panel_rows(
         ),
         _dialogue(
             decision,
-            end,
+            recovery.accept_seconds,
             "VectorRed",
             (
                 rf"{{\p1\c&H503B4CFF&}}m {ball_a_x} {ball_a_y - 6} "
@@ -481,14 +639,14 @@ def _panel_rows(
         ),
         _dialogue(
             decision,
-            end,
+            recovery.accept_seconds,
             "TargetRed",
             rf"{{\an5\pos({target_x},{target_y})\fad(100,0)}}⊗",
             3,
         ),
         _dialogue(
             decision,
-            end,
+            recovery.accept_seconds,
             "RedLabel",
             rf"{{\an6\pos({target_x - 43},{target_y - 52})}}OLD TARGET FOR A",
             3,
@@ -499,21 +657,21 @@ def _panel_rows(
             [
                 _dialogue(
                     decision,
-                    end,
+                    recovery.submit_seconds,
                     "StatusRed",
                     rf"{{\an7\pos({left},147)}}STALE RESULT ACCEPTED BY RUNTIME",
                     3,
                 ),
                 _dialogue(
                     decision,
-                    end,
+                    recovery.submit_seconds,
                     "Detail",
                     rf"{{\an7\pos({left},194)}}HOST BLOCKED DISPATCH  ·  context_changed",
                     3,
                 ),
                 _dialogue(
                     decision,
-                    end,
+                    recovery.submit_seconds,
                     "PipelineRed",
                     rf"{{\an2\pos({centre},1014)}}RUNTIME ACCEPTED  →  HOST BLOCKED",
                     4,
@@ -525,21 +683,21 @@ def _panel_rows(
             [
                 _dialogue(
                     decision,
-                    end,
+                    recovery.submit_seconds,
                     "StatusGreen",
                     rf"{{\an7\pos({left},147)}}STALE RESULT REJECTED",
                     3,
                 ),
                 _dialogue(
                     decision,
-                    end,
+                    recovery.submit_seconds,
                     "Detail",
                     rf"{{\an7\pos({left},194)}}INVOCATION GATE  ·  context_changed",
                     3,
                 ),
                 _dialogue(
                     decision,
-                    end,
+                    recovery.submit_seconds,
                     "PipelineGreen",
                     rf"{{\an2\pos({centre},1014)}}RUNTIME REJECTED  →  NO DISPATCH",
                     4,
@@ -548,18 +706,111 @@ def _panel_rows(
         )
     rows.append(
         _dialogue(
-            decision + 0.45,
-            end,
+            decision + 0.25,
+            recovery.submit_seconds,
             "NoCommand",
-            rf"{{\an2\pos({centre},1060)}}0 WALK COMMANDS  ✓",
+            rf"{{\an2\pos({centre},1060)}}0 COMMANDS TO OLD TARGET  ✓",
             4,
         )
+    )
+    recovery_context = _ass_escape(recovery.context_id)
+    rows.extend(
+        [
+            _dialogue(
+                recovery.submit_seconds,
+                recovery.accept_seconds,
+                "StatusAmber",
+                rf"{{\an7\pos({left},147)}}NEW REQUEST FOR CURRENT BALL B",
+                3,
+            ),
+            _dialogue(
+                recovery.submit_seconds,
+                recovery.accept_seconds,
+                "Detail",
+                (
+                    rf"{{\an7\pos({left},194)}}CAPTURED B = CURRENT B  ·  "
+                    rf"{recovery_context}"
+                ),
+                3,
+            ),
+            _dialogue(
+                recovery.submit_seconds,
+                recovery.accept_seconds,
+                "PipelineGreen",
+                rf"{{\an2\pos({centre},1036)}}FRESH REQUEST CAPTURES B",
+                4,
+            ),
+            _dialogue(
+                recovery.accept_seconds,
+                end,
+                "StatusGreen",
+                rf"{{\an7\pos({left},147)}}CURRENT B RESULT ACCEPTED",
+                3,
+            ),
+            _dialogue(
+                recovery.accept_seconds,
+                end,
+                "Detail",
+                rf"{{\an7\pos({left},194)}}CURRENT CONTEXT VERIFIED  ·  DISPATCHED ONCE",
+                3,
+            ),
+            _dialogue(
+                recovery.accept_seconds,
+                end,
+                "VectorGreen",
+                (
+                    rf"{{\p1\c&H506BE62E&}}m {ball_b_x} {ball_b_y - 6} "
+                    rf"l {current_target_x} {current_target_y - 6} "
+                    rf"l {current_target_x} {current_target_y + 6} "
+                    rf"l {ball_b_x} {ball_b_y + 6}{{\p0}}"
+                ),
+                1,
+            ),
+            _dialogue(
+                recovery.accept_seconds,
+                end,
+                "TargetGreen",
+                (
+                    rf"{{\an5\pos({current_target_x},{current_target_y})"
+                    r"\fad(100,0)}⊕"
+                ),
+                3,
+            ),
+            _dialogue(
+                recovery.accept_seconds,
+                end,
+                "GreenLabel",
+                (
+                    rf"{{\an6\pos({current_target_x - 43},"
+                    rf"{current_target_y - 52})}}CURRENT TARGET FOR B"
+                ),
+                3,
+            ),
+            _dialogue(
+                recovery.accept_seconds,
+                end,
+                "PipelineGreen",
+                rf"{{\an2\pos({centre},1014)}}CURRENT B ACCEPTED  →  WALKING",
+                4,
+            ),
+            _dialogue(
+                recovery.accept_seconds + 0.5,
+                end,
+                "NoCommand",
+                rf"{{\an2\pos({centre},1060)}}ROBOT WALKS TO CURRENT TARGET B  ✓",
+                4,
+            ),
+        ]
     )
     return rows
 
 
 def generate_ass(
-    baseline: TrialTimeline, full: TrialTimeline, shot: dict[str, Any]
+    baseline: TrialTimeline,
+    full: TrialTimeline,
+    baseline_recovery: RecoveryTimeline,
+    full_recovery: RecoveryTimeline,
+    shot: dict[str, Any],
 ) -> str:
     output = shot.get("output")
     if not isinstance(output, dict):
@@ -592,7 +843,9 @@ Style: CurrentGreen,DejaVu Sans,70,&H406BE62E,&H406BE62E,&H30131A20,&H00000000,-
 Style: RedLabel,DejaVu Sans,21,&H003B4CFF,&H003B4CFF,&H00131A20,&HBC182028,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
 Style: GreenLabel,DejaVu Sans,21,&H006BE62E,&H006BE62E,&H00131A20,&HBC182028,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
 Style: TargetRed,DejaVu Sans,78,&H003B4CFF,&H003B4CFF,&H00131A20,&H00000000,-1,0,0,0,100,100,0,0,1,5,0,5,0,0,0,1
+Style: TargetGreen,DejaVu Sans,78,&H006BE62E,&H006BE62E,&H00131A20,&H00000000,-1,0,0,0,100,100,0,0,1,5,0,5,0,0,0,1
 Style: VectorRed,Arial,20,&H503B4CFF,&H503B4CFF,&H503B4CFF,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
+Style: VectorGreen,Arial,20,&H506BE62E,&H506BE62E,&H506BE62E,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 Style: PipelineRed,DejaVu Sans,28,&H003B4CFF,&H003B4CFF,&H00131A20,&HDC182028,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
 Style: PipelineGreen,DejaVu Sans,28,&H006BE62E,&H006BE62E,&H00131A20,&HDC182028,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
 Style: NoCommand,DejaVu Sans,23,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HD0182028,-1,0,0,0,100,100,0,0,3,1,0,2,0,0,0,1
@@ -617,8 +870,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             5,
         ),
     ]
-    rows.extend(_panel_rows(baseline, shot, offset=0, role="baseline"))
-    rows.extend(_panel_rows(full, shot, offset=panel_width, role="full"))
+    rows.extend(
+        _panel_rows(
+            baseline, baseline_recovery, shot, offset=0, role="baseline"
+        )
+    )
+    rows.extend(
+        _panel_rows(
+            full, full_recovery, shot, offset=panel_width, role="full"
+        )
+    )
     return header + "\n".join(rows) + "\n"
 
 
@@ -632,9 +893,11 @@ def _sha256(path: pathlib.Path) -> str:
 
 def render(
     baseline_events_path: pathlib.Path,
+    baseline_recovery_events_path: pathlib.Path,
     baseline_capture_path: pathlib.Path,
     baseline_video_path: pathlib.Path,
     full_events_path: pathlib.Path,
+    full_recovery_events_path: pathlib.Path,
     full_capture_path: pathlib.Path,
     full_video_path: pathlib.Path,
     shot_path: pathlib.Path,
@@ -644,9 +907,11 @@ def render(
 ) -> pathlib.Path:
     paths = [
         baseline_events_path,
+        baseline_recovery_events_path,
         baseline_capture_path,
         baseline_video_path,
         full_events_path,
+        full_recovery_events_path,
         full_capture_path,
         full_video_path,
         shot_path,
@@ -654,9 +919,11 @@ def render(
     paths = [path.resolve() for path in paths]
     (
         baseline_events_path,
+        baseline_recovery_events_path,
         baseline_capture_path,
         baseline_video_path,
         full_events_path,
+        full_recovery_events_path,
         full_capture_path,
         full_video_path,
         shot_path,
@@ -681,10 +948,27 @@ def render(
         shot,
         role="full",
     )
-    validate_matched_trials(baseline, full)
+    baseline_recovery = build_recovery_timeline(
+        _load_events(baseline_recovery_events_path),
+        _read_json(baseline_capture_path),
+        baseline,
+    )
+    full_recovery = build_recovery_timeline(
+        _load_events(full_recovery_events_path),
+        _read_json(full_capture_path),
+        full,
+    )
+    validate_matched_trials(
+        baseline, full, baseline_recovery, full_recovery
+    )
 
     overlay_path = output_dir / "t2-comparison.ass"
-    overlay_path.write_text(generate_ass(baseline, full, shot), encoding="utf-8")
+    overlay_path.write_text(
+        generate_ass(
+            baseline, full, baseline_recovery, full_recovery, shot
+        ),
+        encoding="utf-8",
+    )
     crop = shot.get("source_crop")
     output = shot.get("output")
     if not isinstance(crop, dict) or not isinstance(output, dict):
@@ -756,20 +1040,29 @@ def render(
         "shot_id": shot.get("shot_id"),
         "comparison": {
             "baseline": dataclasses.asdict(baseline),
+            "baseline_recovery": dataclasses.asdict(baseline_recovery),
             "full": dataclasses.asdict(full),
+            "full_recovery": dataclasses.asdict(full_recovery),
         },
         "paper_claim": {
             "ball_moved_during_request": True,
             "baseline_runtime_accepted": True,
             "baseline_host_blocked": True,
             "full_runtime_rejected": True,
-            "walking_backend_dispatch_calls": 0,
+            "obsolete_target_backend_dispatch_calls": 0,
+            "current_b_backend_dispatch_calls": 2,
         },
         "inputs": {
             "baseline_events_sha256": _sha256(baseline_events_path),
+            "baseline_recovery_events_sha256": _sha256(
+                baseline_recovery_events_path
+            ),
             "baseline_capture_timing_sha256": _sha256(baseline_capture_path),
             "baseline_raw_video_sha256": _sha256(baseline_video_path),
             "full_events_sha256": _sha256(full_events_path),
+            "full_recovery_events_sha256": _sha256(
+                full_recovery_events_path
+            ),
             "full_capture_timing_sha256": _sha256(full_capture_path),
             "full_raw_video_sha256": _sha256(full_video_path),
             "shot_sha256": _sha256(shot_path),
@@ -791,9 +1084,13 @@ def render(
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline-events", required=True, type=pathlib.Path)
+    parser.add_argument(
+        "--baseline-recovery-events", required=True, type=pathlib.Path
+    )
     parser.add_argument("--baseline-capture-timing", required=True, type=pathlib.Path)
     parser.add_argument("--baseline-raw-video", required=True, type=pathlib.Path)
     parser.add_argument("--full-events", required=True, type=pathlib.Path)
+    parser.add_argument("--full-recovery-events", required=True, type=pathlib.Path)
     parser.add_argument("--full-capture-timing", required=True, type=pathlib.Path)
     parser.add_argument("--full-raw-video", required=True, type=pathlib.Path)
     parser.add_argument(
@@ -811,9 +1108,11 @@ def main() -> int:
     try:
         video = render(
             args.baseline_events,
+            args.baseline_recovery_events,
             args.baseline_capture_timing,
             args.baseline_raw_video,
             args.full_events,
+            args.full_recovery_events,
             args.full_capture_timing,
             args.full_raw_video,
             args.shot,

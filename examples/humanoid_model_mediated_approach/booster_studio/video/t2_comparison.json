@@ -1,7 +1,7 @@
 {
   "schema_version": "humanoid.paper_video_comparison.v1",
   "shot_id": "t2-moved-ball-comparison",
-  "duration_seconds": 11.0,
+  "duration_seconds": 20.0,
   "request_lead_seconds": 3.0,
   "output": {
     "width": 1920,
@@ -29,6 +29,7 @@
     "robot_start": [365, 706],
     "ball_a": [584, 728],
     "ball_b": [792, 709],
-    "obsolete_target": [483, 720]
+    "obsolete_target": [483, 720],
+    "current_target_b": [691, 701]
   }
 }

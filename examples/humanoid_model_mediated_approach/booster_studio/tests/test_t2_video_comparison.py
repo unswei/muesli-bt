@@ -130,6 +130,68 @@ def capture() -> dict:
     }
 
 
+def recovery_events(context_id: str = "ball-0002") -> list[dict]:
+    return [
+        event(1, 1_006_800, "run_start", {}),
+        event(
+            2,
+            1_006_900,
+            "bb_write",
+            {"key": "ball-state", "preview": [1.1, 0.65, 0.0]},
+        ),
+        event(
+            3,
+            1_007_000,
+            "vla_submit",
+            {
+                "acceptance_policy": "invocation_scoped",
+                "job_id": "1",
+                "generation": 1,
+                "captured_context_id": context_id,
+            },
+        ),
+        event(
+            4,
+            1_009_500,
+            "vla_result",
+            {
+                "acceptance_policy": "invocation_scoped",
+                "job_id": "1",
+                "generation": 1,
+                "captured_context_id": context_id,
+                "current_context_id": context_id,
+                "decision": "accepted",
+                "reason": "",
+            },
+        ),
+        event(
+            5,
+            1_009_502,
+            "walking_target_dispatch",
+            {
+                "job_id": "1",
+                "generation": 1,
+                "captured_context_id": context_id,
+                "current_context_id": context_id,
+                "decision": "accepted",
+                "reason": "",
+                "target": {
+                    "frame_id": "ball_context",
+                    "x_m": -0.45,
+                    "y_m": 0.08,
+                    "yaw_rad": 0.0,
+                },
+            },
+        ),
+        event(
+            6,
+            1_009_600,
+            "run_end",
+            {"trial_id": "T1", "recording_dispatch_calls": 1},
+        ),
+    ]
+
+
 def shot() -> dict:
     return {
         "duration_seconds": 11.0,
@@ -145,6 +207,7 @@ def shot() -> dict:
             "ball_a": [584, 728],
             "ball_b": [792, 709],
             "obsolete_target": [483, 720],
+            "current_target_b": [691, 701],
         },
     }
 
@@ -157,7 +220,15 @@ class T2ComparisonTests(unittest.TestCase):
         full = comparison.build_trial_timeline(
             t2_events("full"), capture(), shot(), role="full"
         )
-        comparison.validate_matched_trials(baseline, full)
+        baseline_recovery = comparison.build_recovery_timeline(
+            recovery_events(), capture(), baseline
+        )
+        full_recovery = comparison.build_recovery_timeline(
+            recovery_events(), capture(), full
+        )
+        comparison.validate_matched_trials(
+            baseline, full, baseline_recovery, full_recovery
+        )
 
         self.assertAlmostEqual(baseline.submit_seconds, 3.0)
         self.assertAlmostEqual(baseline.move_seconds, 4.1)
@@ -168,6 +239,10 @@ class T2ComparisonTests(unittest.TestCase):
         self.assertIsNone(full.dispatch_decision)
         self.assertEqual(full.runtime_reason, "context_changed")
         self.assertEqual(baseline.recording_dispatch_calls, 0)
+        self.assertEqual(baseline_recovery.recording_dispatch_calls, 1)
+        self.assertEqual(baseline_recovery.context_id, "ball-0002")
+        self.assertAlmostEqual(baseline_recovery.submit_seconds, 6.0)
+        self.assertAlmostEqual(baseline_recovery.accept_seconds, 8.5)
         for observed, expected in zip(
             baseline.obsolete_target_field_position_m,
             (0.05, 0.08, 0.0),
@@ -175,10 +250,14 @@ class T2ComparisonTests(unittest.TestCase):
         ):
             self.assertAlmostEqual(observed, expected)
 
-        overlay = comparison.generate_ass(baseline, full, shot())
+        overlay = comparison.generate_ass(
+            baseline, full, baseline_recovery, full_recovery, shot()
+        )
         self.assertIn("RUNTIME ACCEPTED  →  HOST BLOCKED", overlay)
         self.assertIn("RUNTIME REJECTED  →  NO DISPATCH", overlay)
-        self.assertEqual(overlay.count("0 WALK COMMANDS"), 2)
+        self.assertEqual(overlay.count("0 COMMANDS TO OLD TARGET"), 2)
+        self.assertEqual(overlay.count("ROBOT WALKS TO CURRENT TARGET B"), 2)
+        self.assertIn("CURRENT B ACCEPTED  →  WALKING", overlay)
         self.assertIn(r"\pos(483,720)", overlay)
         self.assertIn(r"\pos(1443,720)", overlay)
 
@@ -215,6 +294,18 @@ class T2ComparisonTests(unittest.TestCase):
         ):
             comparison.build_trial_timeline(
                 events, capture(), shot(), role="baseline"
+            )
+
+    def test_recovery_refuses_a_request_for_the_old_context(self) -> None:
+        baseline = comparison.build_trial_timeline(
+            t2_events("baseline"), capture(), shot(), role="baseline"
+        )
+
+        with self.assertRaisesRegex(
+            comparison.ComparisonError, "current ball B context"
+        ):
+            comparison.build_recovery_timeline(
+                recovery_events("ball-0001"), capture(), baseline
             )
 
 

@@ -8,8 +8,8 @@ T2b and T3 rehearsals completed in Booster Studio with canonical evidence.
 T1 also produced visible robot translation towards its accepted target.
 The matched T2a/T2b simulation captures also produced an event-validated,
 polished split-screen comparison of stale acceptance and invocation-scoped
-rejection. Motion remains disabled by default. Physical capture remains
-pending.
+rejection, followed by fresh current-B requests and visible recovery walking.
+Motion remains disabled by default. Physical capture remains pending.
 
 ## what this is
 
