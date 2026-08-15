@@ -1,0 +1,101 @@
+{
+  "schema_version": "airhockey.wp7.protocol.v1",
+  "status": "frozen_before_muesli_test_open",
+  "parent_wp6_protocol_sha256": "a3964c4b07b1769930972053414f08427fc63cee42898b22b635915db0e4c111",
+  "control_period_ms": 20,
+  "deadline_ms": 120,
+  "repositories": {
+    "acra_revision": "1b6bbbbf19743b0042f01eabf0628eba5621cacf",
+    "base_image_digest": "de846e25961d2408db73a6b5cfe2afc7ecf0e14e0e8ac837f97212a180e51d5f"
+  },
+  "paper_split": {
+    "distribution_config": "configs/direct_launch_muesli_v1.yaml",
+    "distribution_config_sha256": "7d2819356dad664ede5d879845082b52bedcb69f0a2ae68ec27f389ea69603a5",
+    "name": "muesli_test",
+    "seed": 6303,
+    "expected_shots": 72,
+    "manifest_sha256": "59527e9f55537d127fc401ee3ab5fbbfedbc36dc22cbca0322935eb99ea1d665"
+  },
+  "paired_trial": {
+    "blackout_start_step": 1,
+    "blackout_length_steps": 1,
+    "timeout_steps": 125,
+    "context_change_step": 2,
+    "fault": "blackout_reacquisition",
+    "source_age_limit_steps": 6,
+    "policies": ["deadline_only", "invocation_scoped"],
+    "expected": {
+      "deadline_only": {
+        "terminal_decision": "accepted",
+        "reason": "",
+        "obsolete_dispatches": 1
+      },
+      "invocation_scoped": {
+        "terminal_decision": "rejected",
+        "reason": "context_changed",
+        "obsolete_dispatches": 0
+      }
+    }
+  },
+  "behaviour_trees": {
+    "deadline_only": {
+      "path": "lisp/bt_deadline_only.lisp",
+      "sha256": "20f31248eb9cb1b93f5f8d4530bdb1d1f883cebf2658f623d89e1f2820fdddae"
+    },
+    "invocation_scoped": {
+      "path": "lisp/bt_invocation_scoped.lisp",
+      "sha256": "c7b6fb13b7a1c38e4fa2409dad43e354ce5f568a9ca919011f3ab1dade4e10f1"
+    }
+  },
+  "deterministic_provider": {
+    "identity": "public_puck_target_v1",
+    "action_rule": "clip_public_observation_indices_16_17",
+    "action_lock_steps": 0,
+    "delay_schedule": [
+      {"seed": 7311, "delay_ms": 50},
+      {"seed": 7312, "delay_ms": 80},
+      {"seed": 7313, "delay_ms": 110}
+    ]
+  },
+  "learned_provider": {
+    "kind": "acra_frozen",
+    "family_id": "structured_k2",
+    "training_seed": 14303,
+    "training_stage": "final",
+    "source_protocol_sha256": "1f8ececf4492f68517938ccd2fd1e05bb459e0fdd7275851536f71d782bed448",
+    "checkpoint_sha256": "6f653f2708c829945653558e6eb1aa3fe35cda9f452b781c0608cca8f3a5154e",
+    "action_lock_steps": 5,
+    "subset_selection": "sha256_shot_id_order_first",
+    "subset_shots": 12,
+    "delay_seed": 7391,
+    "delay_ms": 80,
+    "maximum_p95_inference_ms": 20.0,
+    "maximum_inference_ms": 120.0
+  },
+  "campaign": {
+    "deterministic_pairs": 216,
+    "learned_pairs": 12,
+    "total_pairs": 228,
+    "total_runs": 456,
+    "confidence": 0.95,
+    "bootstrap_samples": 10000,
+    "bootstrap_seed": 6303,
+    "representative_pair_selection": "lexicographically_smallest_deterministic_pair_id",
+    "video_fps": 25
+  },
+  "gate": {
+    "required_baseline_obsolete_dispatch_pairs": 228,
+    "maximum_full_obsolete_dispatch_pairs": 0,
+    "maximum_missing_terminal_invocations": 0,
+    "maximum_replay_mismatches": 0,
+    "maximum_trace_failures": 0,
+    "maximum_tick_p99_ms": 20.0,
+    "maximum_learned_p95_inference_ms": 20.0
+  },
+  "freeze": {
+    "file_mode": "0444",
+    "directory_mode": "0555",
+    "backup_copies": 1,
+    "checksum_algorithm": "sha256"
+  }
+}

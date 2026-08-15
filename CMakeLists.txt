@@ -628,6 +628,14 @@ if (Python3_Interpreter_FOUND)
         )
         set_tests_properties(muesli_bt_air_hockey_${scenario_name} PROPERTIES TIMEOUT 30)
       endforeach ()
+      add_test(
+        NAME muesli_bt_air_hockey_wp7_native
+        COMMAND
+          "${Python3_EXECUTABLE}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/examples/air_hockey_model_mediated_defence/run_wp7.py"
+          check-native --runner "$<TARGET_FILE:muesli_bt_air_hockey_scenario_tests>"
+      )
+      set_tests_properties(muesli_bt_air_hockey_wp7_native PROPERTIES TIMEOUT 30)
     endif ()
   else ()
     message(

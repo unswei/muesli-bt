@@ -297,7 +297,8 @@ public:
                  std::optional<std::filesystem::path> event_path = std::nullopt,
                  std::optional<bt::vla_response> replay_response = std::nullopt,
                  std::optional<air_hockey_demo::host_configuration> remote_configuration =
-                     std::nullopt)
+                     std::nullopt,
+                 std::optional<std::string> runtime_run_id = std::nullopt)
         : policy_(policy),
           scenario_(std::move(scenario)),
           backend_(std::make_shared<air_hockey_demo::air_hockey_env_backend>(std::move(socket_path))),
@@ -331,7 +332,8 @@ public:
         }
         (void)backend_->reset_host(6302);
 
-        host_.enable_deterministic_test_mode(6302, "air-hockey-" + scenario_, 1735689610000, 1);
+        host_.enable_deterministic_test_mode(
+            6302, runtime_run_id.value_or("air-hockey-" + scenario_), 1735689610000, 1);
         host_.set_clock_interface(&clock_);
         host_.set_vla_commit_validator(&validator_);
         host_.vla_ref().set_cache_ttl_ms(0);
@@ -396,6 +398,12 @@ public:
         air_hockey_demo::host_step_result result = backend_->step_host();
         clock_.advance(20ms);
         return result;
+    }
+
+    air_hockey_demo::host_step_result step_control_to(
+        const std::array<double, air_hockey_demo::kActionDimension>& target) {
+        backend_->act_target(target);
+        return step_control();
     }
 
     void force_context_change(bt::tick_context* context = nullptr) {
@@ -687,10 +695,22 @@ void wait_for_completion_drop(scenario_rig& rig) {
         "air-hockey late completion was not recorded as dropped");
 }
 
+struct paper_scenario_options {
+    std::string run_id;
+    std::array<double, air_hockey_demo::kActionDimension> provider_action;
+    int blackout_start_step = 1;
+    int blackout_length_steps = 1;
+    int timeout_steps = 125;
+    int action_lock_steps = 0;
+    int completion_delay_ms = 60;
+    bool replay = false;
+};
+
 struct scenario_options {
     std::filesystem::path socket_path;
     std::filesystem::path tree_path;
     std::optional<std::filesystem::path> event_path;
+    std::optional<paper_scenario_options> paper;
 };
 
 void test_h1(const scenario_options& options) {
@@ -771,6 +791,116 @@ void test_h2b(const scenario_options& options) {
     check(rig.step_control().state.observation_step == 3,
           "H2b fallback was not consumed after stale-result rejection");
     rig.finish_events();
+}
+
+bt::vla_response paper_replay_response(
+    const std::array<double, air_hockey_demo::kActionDimension>& action) {
+    bt::vla_response response;
+    response.status = bt::vla_status::ok;
+    response.model.name = "airhockey-delayed-fake";
+    response.model.version = "wp7-v1";
+    response.action.type = bt::vla_action_type::continuous;
+    response.action.frame_id = "airhockey.normalised_mallet_target.v1";
+    response.action.u.assign(action.begin(), action.end());
+    response.confidence = 1.0;
+    response.explanation = "recorded WP7 air-hockey proposal";
+    return response;
+}
+
+void run_p7_pair_half(const scenario_options& options,
+                      bt::vla_acceptance_policy policy,
+                      std::string scenario) {
+    check(options.paper.has_value(), "WP7 scenario options were not supplied");
+    const paper_scenario_options& paper = *options.paper;
+    check(paper.completion_delay_ms >= 0 && paper.completion_delay_ms < 120,
+          "WP7 completion delay must remain inside the frozen deadline");
+    auto completion = std::make_shared<completion_gate>();
+    completion->action.assign(paper.provider_action.begin(), paper.provider_action.end());
+    const std::optional<bt::vla_response> replay =
+        paper.replay ? std::optional<bt::vla_response>{
+                           paper_replay_response(paper.provider_action)}
+                     : std::nullopt;
+    scenario_rig rig(
+        options.socket_path, options.tree_path, std::move(scenario), policy,
+        {completion}, true, options.event_path, replay,
+        air_hockey_demo::host_configuration{
+            .blackout_start_step = paper.blackout_start_step,
+            .blackout_length_steps = paper.blackout_length_steps,
+            .timeout_steps = paper.timeout_steps,
+            .action_lock_steps = paper.action_lock_steps,
+            .replace_track_steps = {},
+            .terminate_at_step = std::nullopt,
+        },
+        paper.run_id);
+    check(rig.tick() == bt::status::running,
+          "WP7 paired trial did not submit its request");
+    const std::uint64_t job = rig.only_job_id();
+    const std::string captured_context = rig.invocation(job).captured_context_id;
+    adopt_running_invocation(rig, job);
+    completion->wait_for_start();
+
+    int control_steps = 0;
+    while (rig.state().episode_active &&
+           rig.state().defence_context_id == captured_context) {
+        (void)rig.step_control();
+        ++control_steps;
+        if (rig.state().episode_active &&
+            rig.state().defence_context_id == captured_context) {
+            (void)rig.tick();
+        }
+    }
+    check(rig.state().episode_active &&
+              rig.state().defence_context_id != captured_context,
+          "WP7 trial did not produce the predeclared context reacquisition");
+    const int elapsed_control_ms = control_steps * 20;
+    check(paper.completion_delay_ms >= elapsed_control_ms,
+          "WP7 completion delay precedes the context change");
+    rig.advance_clock(std::chrono::milliseconds{
+        paper.completion_delay_ms - elapsed_control_ms});
+    completion->release();
+
+    const bool baseline = policy == bt::vla_acceptance_policy::deadline_only;
+    wait_for_authority(rig, job, baseline ? bt::vla_authority_state::accepted
+                                          : bt::vla_authority_state::rejected);
+    if (baseline) {
+        predicate("p7_deadline_only_obsolete_dispatch",
+                  rig.accepted_dispatches() == 1 && rig.obsolete_dispatches() == 1 &&
+                      rig.last_dispatch().has_value() && rig.last_dispatch()->obsolete,
+                  "WP7 deadline-only trial did not expose one obsolete dispatch");
+    } else {
+        predicate("p7_invocation_scoped_context_rejection",
+                  rig.accepted_dispatches() == 0 && rig.obsolete_dispatches() == 0 &&
+                      rig.invocation(job).authority_reason == "context_changed",
+                  "WP7 invocation-scoped trial did not reject the stale result");
+    }
+    predicate("p7_provider_mode_matches",
+              rig.provider_replay_mode() == paper.replay,
+              "WP7 live/replay provider mode did not match its declaration");
+
+    (void)rig.step_control();
+    std::array<double, air_hockey_demo::kActionDimension> continuation_target =
+        paper.provider_action;
+    if (!baseline) {
+        continuation_target = {rig.state().observation[14],
+                               rig.state().observation[15]};
+    }
+    while (rig.state().episode_active) {
+        (void)rig.step_control_to(continuation_target);
+    }
+    predicate("p7_task_episode_completed",
+              rig.state().terminated || rig.state().truncated,
+              "WP7 paired trial did not reach a task terminal state");
+    rig.finish_events();
+}
+
+void test_p7_deadline_only(const scenario_options& options) {
+    run_p7_pair_half(options, bt::vla_acceptance_policy::deadline_only,
+                     "P7-deadline-only");
+}
+
+void test_p7_invocation_scoped(const scenario_options& options) {
+    run_p7_pair_half(options, bt::vla_acceptance_policy::invocation_scoped,
+                     "P7-invocation-scoped");
 }
 
 void run_g6_current_delay(const scenario_options& options,
@@ -1121,21 +1251,54 @@ const std::vector<std::pair<std::string_view, scenario_fn>> kScenarios{
     {"G6-delay-timely", test_g6_delay_timely},
     {"G6-delay-boundary", test_g6_delay_boundary},
     {"G6-delay-stale", test_g6_delay_stale},
+    {"P7-deadline-only", test_p7_deadline_only},
+    {"P7-invocation-scoped", test_p7_invocation_scoped},
 };
 
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 4 || argc > 5) {
-        std::cerr << "usage: muesli_bt_air_hockey_scenario_tests SCENARIO SOCKET TREE [EVENTS]\n";
+    if (argc < 2) {
+        std::cerr << "usage: muesli_bt_air_hockey_scenario_tests SCENARIO ...\n";
         return 2;
     }
     const std::string_view requested = argv[1];
-    const scenario_options options{
+    const bool paper_requested =
+        requested == "P7-deadline-only" || requested == "P7-invocation-scoped";
+    if ((!paper_requested && (argc < 4 || argc > 5)) ||
+        (paper_requested && argc != 14)) {
+        std::cerr
+            << "usage: muesli_bt_air_hockey_scenario_tests SCENARIO SOCKET TREE [EVENTS]\n"
+            << "paper usage: ... P7-* SOCKET TREE EVENTS RUN_ID ACTION_X ACTION_Y "
+               "BLACKOUT_START BLACKOUT_LENGTH TIMEOUT ACTION_LOCK DELAY_MS live|replay\n";
+        return 2;
+    }
+    scenario_options options{
         .socket_path = argv[2],
         .tree_path = argv[3],
-        .event_path = argc == 5 ? std::optional<std::filesystem::path>{argv[4]} : std::nullopt,
+        .event_path = argc >= 5 ? std::optional<std::filesystem::path>{argv[4]}
+                                : std::nullopt,
     };
+    try {
+        if (paper_requested) {
+            const std::string mode = argv[13];
+            check(mode == "live" || mode == "replay",
+                  "WP7 provider mode must be live or replay");
+            options.paper = paper_scenario_options{
+                .run_id = argv[5],
+                .provider_action = {std::stod(argv[6]), std::stod(argv[7])},
+                .blackout_start_step = std::stoi(argv[8]),
+                .blackout_length_steps = std::stoi(argv[9]),
+                .timeout_steps = std::stoi(argv[10]),
+                .action_lock_steps = std::stoi(argv[11]),
+                .completion_delay_ms = std::stoi(argv[12]),
+                .replay = mode == "replay",
+            };
+        }
+    } catch (const std::exception& error) {
+        std::cerr << "invalid air-hockey scenario arguments: " << error.what() << '\n';
+        return 2;
+    }
     for (const auto& [name, scenario] : kScenarios) {
         if (name != requested) {
             continue;

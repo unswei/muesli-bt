@@ -42,6 +42,9 @@ class _InjectedEnvironment:
         self.step_number = 0
         self.mallet = [0.0, 0.0]
         self.closed = False
+        self.outcome_tracker = type(
+            "OutcomeTracker", (), {"first_contact_step": 2}
+        )()
 
     def reset(self, *, shot: object, seed: int) -> tuple[list[float], dict[str, Any]]:
         del shot, seed
@@ -155,6 +158,7 @@ class MujocoBackendContractTest(unittest.TestCase):
                 "blackout_start_step": 1,
                 "blackout_length_steps": 1,
                 "timeout_steps": 3,
+                "action_lock_steps": 1,
             },
         )
         reset = self.exchange("reset", "reset", {"seed": 6302})
@@ -179,6 +183,11 @@ class MujocoBackendContractTest(unittest.TestCase):
         records = self.backend.evaluation_records()
         self.assertEqual(len(records), 3)
         self.assertIn("privileged", records[0])
+        self.assertEqual(records[0]["requested_action"], [0.25, -0.4])
+        self.assertEqual(records[0]["applied_action"], [0.0, 0.0])
+        self.assertEqual(records[1]["applied_action"], [0.0, 0.0])
+        self.assertFalse(records[0]["privileged"]["contact"])
+        self.assertTrue(records[1]["privileged"]["contact"])
         self.assertEqual(records[-1]["privileged"]["outcome"], "timeout")
         replay = self.backend.direct_replay_report()
         self.assertTrue(replay["passed"])

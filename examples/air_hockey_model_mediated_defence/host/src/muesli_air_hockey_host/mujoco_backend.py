@@ -126,6 +126,11 @@ class MujocoDirectLaunchHostBackend(FakeDirectLaunchBackend):
             raise RuntimeError("MuJoCo environment is unavailable after reset")
 
         requested_action = list(self._pending_action)
+        applied_action = (
+            list(self._observation[14:16])
+            if bool(self._environment_info.get("action_locked", False))
+            else list(requested_action)
+        )
         started_ns = time.monotonic_ns()
         observation, reward, terminated, truncated, info = self._environment.step(
             requested_action
@@ -162,6 +167,7 @@ class MujocoDirectLaunchHostBackend(FakeDirectLaunchBackend):
                 "finished_monotonic_ns": finished_ns,
                 "step_duration_ns": finished_ns - started_ns,
                 "requested_action": requested_action,
+                "applied_action": applied_action,
                 "reward": float(reward),
                 "public_state": copy.deepcopy(state),
                 "environment_info": self._evaluation_info(),
@@ -289,6 +295,8 @@ class MujocoDirectLaunchHostBackend(FakeDirectLaunchBackend):
         if self._environment is None:
             raise RuntimeError("MuJoCo environment is unavailable")
         state = self._environment.privileged_state()
+        outcome_tracker = getattr(self._environment, "outcome_tracker", None)
+        contact_step = getattr(outcome_tracker, "first_contact_step", None)
         return {
             "puck_position_table_xy": _float_list(
                 state.puck_position_table_xy,
@@ -300,6 +308,7 @@ class MujocoDirectLaunchHostBackend(FakeDirectLaunchBackend):
                 size=2,
                 where="privileged puck velocity",
             ),
+            "contact": contact_step is not None and int(contact_step) <= self._step,
             "outcome": self._environment_info.get("outcome", "pending"),
         }
 

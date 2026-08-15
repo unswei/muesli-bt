@@ -174,7 +174,11 @@
         "task-trajectory.jsonl": {"$ref": "#/$defs/artefact"},
         "recorded-provider.jsonl": {"$ref": "#/$defs/artefact"},
         "replay-events.jsonl": {"$ref": "#/$defs/artefact"},
-        "replay-task-trajectory.jsonl": {"$ref": "#/$defs/artefact"}
+        "replay-task-trajectory.jsonl": {"$ref": "#/$defs/artefact"},
+        "direct-replay.json": {"$ref": "#/$defs/artefact"},
+        "replay-direct-replay.json": {"$ref": "#/$defs/artefact"},
+        "runner.stdout": {"$ref": "#/$defs/artefact"},
+        "replay-runner.stdout": {"$ref": "#/$defs/artefact"}
       }
     },
     "derived_artefacts": {

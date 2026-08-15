@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.org/schemas/air_hockey_integration/v1/airhockey.wp7.protocol.v1.schema.json",
+  "title": "Air-hockey WP7 frozen paper protocol v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "parent_wp6_protocol_sha256",
+    "control_period_ms",
+    "deadline_ms",
+    "repositories",
+    "paper_split",
+    "paired_trial",
+    "behaviour_trees",
+    "deterministic_provider",
+    "learned_provider",
+    "campaign",
+    "gate",
+    "freeze"
+  ],
+  "properties": {
+    "schema_version": {"const": "airhockey.wp7.protocol.v1"},
+    "status": {"const": "frozen_before_muesli_test_open"},
+    "parent_wp6_protocol_sha256": {"$ref": "#/$defs/sha256"},
+    "control_period_ms": {"const": 20},
+    "deadline_ms": {"const": 120},
+    "repositories": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["acra_revision", "base_image_digest"],
+      "properties": {
+        "acra_revision": {"const": "1b6bbbbf19743b0042f01eabf0628eba5621cacf"},
+        "base_image_digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "paper_split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "distribution_config",
+        "distribution_config_sha256",
+        "name",
+        "seed",
+        "expected_shots",
+        "manifest_sha256"
+      ],
+      "properties": {
+        "distribution_config": {"const": "configs/direct_launch_muesli_v1.yaml"},
+        "distribution_config_sha256": {"$ref": "#/$defs/sha256"},
+        "name": {"const": "muesli_test"},
+        "seed": {"const": 6303},
+        "expected_shots": {"const": 72},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "paired_trial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blackout_start_step",
+        "blackout_length_steps",
+        "timeout_steps",
+        "context_change_step",
+        "fault",
+        "source_age_limit_steps",
+        "policies",
+        "expected"
+      ],
+      "properties": {
+        "blackout_start_step": {"const": 1},
+        "blackout_length_steps": {"const": 1},
+        "timeout_steps": {"const": 125},
+        "context_change_step": {"const": 2},
+        "fault": {"const": "blackout_reacquisition"},
+        "source_age_limit_steps": {"const": 6},
+        "policies": {"const": ["deadline_only", "invocation_scoped"]},
+        "expected": {
+          "const": {
+            "deadline_only": {
+              "terminal_decision": "accepted",
+              "reason": "",
+              "obsolete_dispatches": 1
+            },
+            "invocation_scoped": {
+              "terminal_decision": "rejected",
+              "reason": "context_changed",
+              "obsolete_dispatches": 0
+            }
+          }
+        }
+      }
+    },
+    "behaviour_trees": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deadline_only", "invocation_scoped"],
+      "properties": {
+        "deadline_only": {"$ref": "#/$defs/tree"},
+        "invocation_scoped": {"$ref": "#/$defs/tree"}
+      }
+    },
+    "deterministic_provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "action_rule", "action_lock_steps", "delay_schedule"],
+      "properties": {
+        "identity": {"const": "public_puck_target_v1"},
+        "action_rule": {"const": "clip_public_observation_indices_16_17"},
+        "action_lock_steps": {"const": 0},
+        "delay_schedule": {
+          "const": [
+            {"seed": 7311, "delay_ms": 50},
+            {"seed": 7312, "delay_ms": 80},
+            {"seed": 7313, "delay_ms": 110}
+          ]
+        }
+      }
+    },
+    "learned_provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "family_id",
+        "training_seed",
+        "training_stage",
+        "source_protocol_sha256",
+        "checkpoint_sha256",
+        "action_lock_steps",
+        "subset_selection",
+        "subset_shots",
+        "delay_seed",
+        "delay_ms",
+        "maximum_p95_inference_ms",
+        "maximum_inference_ms"
+      ],
+      "properties": {
+        "kind": {"const": "acra_frozen"},
+        "family_id": {"const": "structured_k2"},
+        "training_seed": {"const": 14303},
+        "training_stage": {"const": "final"},
+        "source_protocol_sha256": {"$ref": "#/$defs/sha256"},
+        "checkpoint_sha256": {"$ref": "#/$defs/sha256"},
+        "action_lock_steps": {"const": 5},
+        "subset_selection": {"const": "sha256_shot_id_order_first"},
+        "subset_shots": {"const": 12},
+        "delay_seed": {"const": 7391},
+        "delay_ms": {"const": 80},
+        "maximum_p95_inference_ms": {"const": 20.0},
+        "maximum_inference_ms": {"const": 120.0}
+      }
+    },
+    "campaign": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deterministic_pairs",
+        "learned_pairs",
+        "total_pairs",
+        "total_runs",
+        "confidence",
+        "bootstrap_samples",
+        "bootstrap_seed",
+        "representative_pair_selection",
+        "video_fps"
+      ],
+      "properties": {
+        "deterministic_pairs": {"const": 216},
+        "learned_pairs": {"const": 12},
+        "total_pairs": {"const": 228},
+        "total_runs": {"const": 456},
+        "confidence": {"const": 0.95},
+        "bootstrap_samples": {"const": 10000},
+        "bootstrap_seed": {"const": 6303},
+        "representative_pair_selection": {
+          "const": "lexicographically_smallest_deterministic_pair_id"
+        },
+        "video_fps": {"const": 25}
+      }
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_baseline_obsolete_dispatch_pairs",
+        "maximum_full_obsolete_dispatch_pairs",
+        "maximum_missing_terminal_invocations",
+        "maximum_replay_mismatches",
+        "maximum_trace_failures",
+        "maximum_tick_p99_ms",
+        "maximum_learned_p95_inference_ms"
+      ],
+      "properties": {
+        "required_baseline_obsolete_dispatch_pairs": {"const": 228},
+        "maximum_full_obsolete_dispatch_pairs": {"const": 0},
+        "maximum_missing_terminal_invocations": {"const": 0},
+        "maximum_replay_mismatches": {"const": 0},
+        "maximum_trace_failures": {"const": 0},
+        "maximum_tick_p99_ms": {"const": 20.0},
+        "maximum_learned_p95_inference_ms": {"const": 20.0}
+      }
+    },
+    "freeze": {
+      "const": {
+        "file_mode": "0444",
+        "directory_mode": "0555",
+        "backup_copies": 1,
+        "checksum_algorithm": "sha256"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "tree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}
