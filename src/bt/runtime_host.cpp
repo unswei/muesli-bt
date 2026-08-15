@@ -1138,7 +1138,8 @@ const walking_target_dispatcher* runtime_host::walking_target_dispatcher_ptr() c
 walking_target_dispatch_result runtime_host::dispatch_walking_target(std::int64_t instance_handle,
                                                                      std::uint64_t job_id,
                                                                      node_id dispatching_node,
-                                                                     const walking_target& target) {
+                                                                     const walking_target& target,
+                                                                     walking_target_dispatch_options options) {
     instance* inst = find_instance(instance_handle);
     if (!inst) {
         throw std::invalid_argument("dispatch_walking_target: unknown instance handle");
@@ -1199,6 +1200,8 @@ walking_target_dispatch_result runtime_host::dispatch_walking_target(std::int64_
              << (result.accepted ? "accepted" : "rejected") << "\",\"reason\":\""
              << event_log::json_escape(result.reason) << "\",\"dispatch_source\":\""
              << event_log::json_escape(source) << "\",\"target\":" << target_serialised
+             << ",\"context_match_required\":"
+             << (options.require_context_match ? "true" : "false")
              << ",\"target_digest\":\"" << event_log::hash64_hex(target_serialised) << "\"}";
         (void)events_.emit(muesli_bt::contract::kEventWalkingTargetDispatch, inst->tick_index, data.str());
     };
@@ -1219,7 +1222,7 @@ walking_target_dispatch_result runtime_host::dispatch_walking_target(std::int64_
     if (invocation.captured_context_id.empty() || current_context_id.empty()) {
         return reject("ball_stale", "runtime_structural");
     }
-    if (current_context_id != invocation.captured_context_id) {
+    if (options.require_context_match && current_context_id != invocation.captured_context_id) {
         return reject("context_changed", "runtime_structural");
     }
     if (target.frame_id.empty() || target.frame_id != invocation.action_frame) {

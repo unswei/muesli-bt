@@ -99,8 +99,7 @@ Dispatch request:
 The response uses `humanoid.booster_dispatch_response.v1` and returns
 `accepted`, `reason` and the transformed field target. Known rejection reasons
 include `motion_disabled`, `robot_unstable`, `ball_stale`, `context_changed`,
-`unsafe_baseline_context_unavailable`, `duplicate_dispatch`, `invalid_frame`,
-`invalid_pose` and
+`duplicate_dispatch`, `invalid_frame`, `invalid_pose` and
 `outside_operating_area`.
 
 Runtime settings:

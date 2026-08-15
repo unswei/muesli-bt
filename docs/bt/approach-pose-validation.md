@@ -57,6 +57,12 @@ the target exactly matches the accepted three-component action, and no target
 has already been dispatched for that invocation. The method then calls the
 registered `walking_target_dispatcher`.
 
+`walking_target_dispatch_options::require_context_match` defaults to `true`.
+Keep that default in operational code. The option exists so an experiment can
+make a stale-target baseline physically observable in simulation. The
+humanoid example accepts the override only for its explicitly unsafe T2a
+Booster Studio simulation profile. It never enables the override for hardware.
+
 Every dispatch attempt emits `walking_target_dispatch` in `mbt.evt.v1`. An
 accepted event means the host callback reported that the target reached its
 walking-controller boundary. A rejected event records the stable reason and
@@ -79,6 +85,7 @@ class approach_pose_validator final : public vla_commit_validator;
 class walking_target_dispatcher;
 struct walking_target;
 struct walking_target_dispatch_context;
+struct walking_target_dispatch_options;
 struct walking_target_dispatch_result;
 ```
 

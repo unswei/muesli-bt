@@ -31,6 +31,10 @@ struct walking_target_dispatch_result {
     std::string reason = "walking_controller_rejected";
 };
 
+struct walking_target_dispatch_options {
+    bool require_context_match = true;
+};
+
 class walking_target_dispatcher {
 public:
     virtual ~walking_target_dispatcher() = default;

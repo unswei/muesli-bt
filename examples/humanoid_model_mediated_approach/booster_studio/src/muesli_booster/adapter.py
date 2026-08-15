@@ -406,7 +406,7 @@ class AdapterState:
             if captured_context_id == self._unsafe_simulation_context_id:
                 reference_ball = self._unsafe_simulation_context_anchor
             if reference_ball is None:
-                return DispatchOutcome(False, "unsafe_baseline_context_unavailable")
+                return DispatchOutcome(False, "context_changed")
         if snapshot.robot_pose is None:
             return DispatchOutcome(False, "robot_pose_stale")
         frame_id = target_value.get("frame_id")

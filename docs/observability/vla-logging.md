@@ -53,12 +53,16 @@ contains:
 - target digest;
 - authority state;
 - `decision` (`accepted` or `rejected`) and stable `reason`; and
+- `context_match_required`, which is normally `true`; and
 - `dispatch_source` (`runtime_structural`, `host_callback` or `unavailable`).
 
 An accepted dispatch event is emitted only after the registered host callback
 reports that the walking-controller boundary accepted the target. Rejected or
 revoked VLA results do not produce accepted dispatch events. A second dispatch
 for the same invocation is rejected with `duplicate_dispatch`.
+`context_match_required=false` is evidence of an explicit host dispatch option.
+The core default remains `true`. The humanoid example permits the false value
+only for its deliberately unsafe T2a simulation profile.
 
 Use the canonical event APIs:
 

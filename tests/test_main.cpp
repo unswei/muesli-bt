@@ -4035,13 +4035,23 @@ void test_approach_pose_validator_registers_with_commit_gate() {
     check(dispatcher.calls == 1, "a rejected controller hand-off should call the dispatcher once");
 
     dispatcher.set_result(bt::walking_target_dispatch_result{.accepted = true, .reason = {}});
-    const bt::walking_target_dispatch_result dispatch =
+    inst->bb.put("ball-context", bt::bb_value{std::string("ball-B")}, inst->tick_index,
+                 std::chrono::steady_clock::now(), 0, "simulation-test");
+    const bt::walking_target_dispatch_result stale_default =
         host.dispatch_walking_target(instance_handle, job_id, 99, target);
-    check(dispatch.accepted, "accepted invocation should reach the registered walking-target dispatcher");
+    check(!stale_default.accepted && stale_default.reason == "context_changed" &&
+              dispatcher.calls == 1,
+          "walking dispatch should require a matching context by default");
+    const bt::walking_target_dispatch_result dispatch =
+        host.dispatch_walking_target(instance_handle, job_id, 99, target,
+                                     bt::walking_target_dispatch_options{
+                                         .require_context_match = false});
+    check(dispatch.accepted,
+          "an explicit context override should reach the registered walking-target dispatcher");
     check(dispatcher.calls == 2, "walking target should be accepted by the dispatcher exactly once");
     check(dispatcher.last_context.job_id == job_id && dispatcher.last_context.generation == 1 &&
               dispatcher.last_context.captured_context_id == "ball-A" &&
-              dispatcher.last_context.current_context_id == "ball-A",
+              dispatcher.last_context.current_context_id == "ball-B",
           "walking-target dispatcher should receive invocation generation and context");
     check(dispatcher.last_target.frame_id == "ball_context" && dispatcher.last_target.x_m == 0.25,
           "walking-target dispatcher should receive the validated target");
@@ -4071,6 +4081,7 @@ void test_approach_pose_validator_registers_with_commit_gate() {
                                 (line.find("\"type\":\"walking_target_dispatch\"") != std::string::npos &&
                                  line.find("\"generation\":1") != std::string::npos &&
                                  line.find("\"decision\":\"accepted\"") != std::string::npos &&
+                                 line.find("\"context_match_required\":false") != std::string::npos &&
                                  line.find("\"frame_id\":\"ball_context\"") != std::string::npos &&
                                  line.find("\"x_m\":0.25") != std::string::npos);
         saw_controller_rejection_evidence =

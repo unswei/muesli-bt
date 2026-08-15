@@ -67,6 +67,7 @@ def build_trial_command(
     event_path: pathlib.Path,
     bridge_socket: str,
     motion_enabled: bool,
+    unsafe_simulation_stale_dispatch: bool = False,
 ) -> list[str]:
     trial_file = TRIAL_FILES.get(trial_id)
     if trial_file is None:
@@ -162,6 +163,8 @@ def build_trial_command(
         "booster-studio-sim_x86_64",
         "--physical-motion-enabled",
         _bool_text(motion_enabled),
+        "--unsafe-simulation-stale-dispatch",
+        _bool_text(unsafe_simulation_stale_dispatch),
         "--backend-name",
         _value(proposer, "backend"),
         "--model-version",
@@ -266,6 +269,9 @@ class NativeTrialSupervisor:
             self._evidence_root.resolve().mkdir(parents=True, exist_ok=True)
             run_dir.mkdir()
             event_path = run_dir / "events.jsonl"
+            unsafe_simulation_baseline = (
+                self._unsafe_simulation_baseline_enabled and trial_id == "T2a"
+            )
             command = build_trial_command(
                 payload,
                 trial_id=trial_id,
@@ -273,9 +279,7 @@ class NativeTrialSupervisor:
                 event_path=event_path,
                 bridge_socket=self._bridge_socket,
                 motion_enabled=self._state.motion_enabled,
-            )
-            unsafe_simulation_baseline = (
-                self._unsafe_simulation_baseline_enabled and trial_id == "T2a"
+                unsafe_simulation_stale_dispatch=unsafe_simulation_baseline,
             )
             self._state.prepare_trial(
                 unsafe_simulation_stale_dispatch=unsafe_simulation_baseline

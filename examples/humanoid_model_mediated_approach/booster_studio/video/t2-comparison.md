@@ -45,8 +45,10 @@ run the full system with the host context gate enabled.
 The trial controller moves the ball one second after `REQUEST_SUBMITTED`. On
 the left, `MUESLI_BOOSTER_UNSAFE_SIM_BASELINE=true` permits only T2a to resolve
 the stale ball-relative pose against its retained original context anchor. The
-baseline therefore dispatches target A. The override defaults to false, is
-cleared when the trial ends and is revoked on explicit ball loss.
+runner passes an explicit `require_context_match=false` option through the
+otherwise fail-closed C++ structural dispatch gate. The baseline therefore
+dispatches target A. The override defaults to false, is cleared when the trial
+ends and is revoked on explicit ball loss.
 
 On the right, the ordinary host envelope remains enabled. T2b rejects the stale
 result before dispatch. The controller then submits a normal-result trial

@@ -115,6 +115,12 @@ class NativeTrialSupervisorTests(unittest.TestCase):
                 "/tmp/test-bridge.sock",
             )
             self.assertEqual(command[command.index("--delay-ms") + 1], "2500")
+            self.assertEqual(
+                command[
+                    command.index("--unsafe-simulation-stale-dispatch") + 1
+                ],
+                "false",
+            )
 
     def test_success_writes_bound_evidence_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -211,6 +217,13 @@ class NativeTrialSupervisorTests(unittest.TestCase):
                 outcome: dict[str, object] = {}
 
                 def factory(command: list[str], **_: object) -> FinishedProcess:
+                    self.assertEqual(
+                        command[
+                            command.index("--unsafe-simulation-stale-dispatch")
+                            + 1
+                        ],
+                        "true" if trial_id == "T2a" else "false",
+                    )
                     event_path = pathlib.Path(command[command.index("--events") + 1])
                     event_path.write_text(
                         '{"schema":"mbt.evt.v1","type":"run_start","seq":1,'

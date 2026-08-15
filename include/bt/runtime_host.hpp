@@ -50,7 +50,8 @@ public:
     walking_target_dispatch_result dispatch_walking_target(std::int64_t instance_handle,
                                                            std::uint64_t job_id,
                                                            node_id dispatching_node,
-                                                           const walking_target& target);
+                                                           const walking_target& target,
+                                                           walking_target_dispatch_options options = {});
     void set_model_service_client(model_service_config config, std::unique_ptr<model_service_client> client);
     void clear_model_service_client() noexcept;
     [[nodiscard]] bool model_service_configured() const noexcept;

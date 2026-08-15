@@ -77,6 +77,7 @@ struct options
   std::vector<double> moved_ball_position_m{0.75, 0.40, 0.0};
   double context_change_threshold_m = 0.15;
   bool physical_motion_enabled = false;
+  bool unsafe_simulation_stale_dispatch = false;
   std::string booster_bridge_socket;
   std::int64_t booster_bridge_timeout_ms = 100;
 };
@@ -329,6 +330,11 @@ options parse_options(int argc, char** argv)
     {
       out.physical_motion_enabled = parse_bool(require_value(argc, argv, i, arg), arg);
     }
+    else if (arg == "--unsafe-simulation-stale-dispatch")
+    {
+      out.unsafe_simulation_stale_dispatch =
+          parse_bool(require_value(argc, argv, i, arg), arg);
+    }
     else if (arg == "--booster-bridge-socket")
     {
       out.booster_bridge_socket = require_value(argc, argv, i, arg);
@@ -341,7 +347,8 @@ options parse_options(int argc, char** argv)
     {
       std::cout << "usage: humanoid_model_mediated_trial --tree FILE --events FILE --run-id ID "
                    "--trial-id ID --acceptance-policy deadline_only|invocation_scoped "
-                   "--intervention none|moved_ball|emergency [options]\n";
+                   "--intervention none|moved_ball|emergency "
+                   "[--unsafe-simulation-stale-dispatch true|false] [options]\n";
       std::exit(0);
     }
     else
@@ -362,6 +369,13 @@ options parse_options(int argc, char** argv)
       out.intervention != "emergency")
   {
     fail("--intervention must be none, moved_ball or emergency");
+  }
+  if (out.unsafe_simulation_stale_dispatch &&
+      (out.trial_id != "T2a" || out.acceptance_policy != "deadline_only" ||
+       out.intervention != "moved_ball" || out.platform != "booster-studio-sim_x86_64" ||
+       out.booster_bridge_socket.empty() || !out.physical_motion_enabled))
+  {
+    fail("unsafe stale dispatch is restricted to motion-enabled T2a in Booster Studio simulation");
   }
   if (out.delay_ms <= 0 || out.deadline_ms <= 0 || out.intervention_ms < 0 ||
       out.booster_bridge_timeout_ms <= 0 ||
@@ -873,7 +887,9 @@ void register_experiment_callbacks(bt::runtime_host& host, experiment_host_state
                                         .y_m = (*action)[1],
                                         .yaw_rad = (*action)[2]};
         const bt::walking_target_dispatch_result result = host.dispatch_walking_target(
-            context.inst.instance_handle, invocation->job_id, node, target);
+            context.inst.instance_handle, invocation->job_id, node, target,
+            bt::walking_target_dispatch_options{
+                .require_context_match = !opts.unsafe_simulation_stale_dispatch});
 
         put_if_changed(context, "result-decision", std::string("accepted"), "experiment-overlay");
         put_if_changed(context, "result-reason", std::string{}, "experiment-overlay");
