@@ -221,6 +221,11 @@ This requires `ffmpeg`. The finaliser retains the raw clip, writes
 `overlay-video.mp4`, and records hashes and the cue alignment in
 `live-manifest.json`.
 
+Use the [T1 paper-video prototype](video/README.md) as the visual-quality gate
+before recording the complete paper sequence. Its clean capture and editorial
+renderer remain bound to the canonical event stream while making the accepted
+target and robot motion legible at video scale.
+
 For the paper video, keep the hardware shot to one K1 and one ball. Simulation
 can carry the richer comparison: use a fixed camera, park irrelevant robots,
 show T2a and T2b side by side, and add field markers for the old target and the

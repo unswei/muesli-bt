@@ -5,8 +5,8 @@
     Status: experimental software experiment harness with an offline-tested
     Booster Studio host bridge, verified native-runner supervisor and
     canonical-event overlay path. The four-trial virtual K1 matrix and a
-    motion-enabled T1 video have passed. Physical video capture remains
-    integration work.
+    polished 11-second, motion-enabled T1 prototype have passed. Physical
+    video capture remains integration work.
 
 ## what this is
 
