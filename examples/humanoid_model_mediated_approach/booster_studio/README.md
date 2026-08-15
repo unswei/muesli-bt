@@ -2,10 +2,11 @@
 
 Status: the Studio package source, native-runner supervisor and video-overlay
 path are locally integrated and offline tested. The signed Agent installs and
-starts on a virtual K1 with the pinned Linux payload. At source commit
-`e88bdaa`, motion-enabled T1, T2a, T2b and T3 rehearsals completed in Booster
-Studio with canonical evidence. Motion remains disabled by default. Physical
-capture remains pending.
+starts on a virtual K1 with the pinned Linux payload. With native payload
+commit `9b3385c` and Agent adapter commit `b153e9f`, motion-enabled T1, T2a,
+T2b and T3 rehearsals completed in Booster Studio with canonical evidence.
+T1 also produced visible robot translation towards its accepted target.
+Motion remains disabled by default. Physical capture remains pending.
 
 ## what this is
 
@@ -40,9 +41,10 @@ simulation ground truth:
 - `/team1/robot1/soccer/sim/ground_truth/robot_pose`; and
 - `/muesli/emergency` for the controlled interruption.
 
-The robot backend uses `BoosterRobot`, the `soccer` gait, `walk` mode,
-`get_fall_down_state()` and `set_velocity()`. No robot object is created while
-motion is disabled.
+The robot backend uses `BoosterRobot`, a configured gait, `walk` mode,
+`get_fall_down_state()` and `set_velocity()`. The gait defaults to `default`
+because it produces translation in the tested virtual K1. No robot object is
+created while motion is disabled.
 
 The platform-independent adapter serves one JSON request per Unix-domain socket
 connection. The C++ `bridge_walking_target_dispatcher` uses the response as its
@@ -251,9 +253,9 @@ passes. The project metadata selects `football3v3` and `soccer-match`.
   context, observation, stability or emergency failure. Agent shutdown also
   clears it.
 - The C++ and Python bridge, supervisor, payload verifier and overlay generator
-  have passed local tests. The full live matrix passed on a virtual K1 at
-  source commit `e88bdaa`; re-run the matrix and retain fresh evidence after a
-  behavioural change.
+  have passed local tests. The full live matrix passed on a virtual K1 with
+  native payload commit `9b3385c` and Agent adapter commit `b153e9f`; re-run
+  the matrix and retain fresh evidence after a behavioural change.
 - An Apple Silicon build of the C++ runner is Mach-O/ARM and is deliberately
   rejected. Use the pinned container build for `sim_x86_64`.
 - The `football3v3` scene includes other robots and referee state. Freeze or

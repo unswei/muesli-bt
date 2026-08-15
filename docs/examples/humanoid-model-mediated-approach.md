@@ -4,8 +4,9 @@
 
     Status: experimental software experiment harness with an offline-tested
     Booster Studio host bridge, verified native-runner supervisor and
-    canonical-event overlay path. Simulator execution and physical video
-    capture remain integration work.
+    canonical-event overlay path. The four-trial virtual K1 matrix and a
+    motion-enabled T1 video have passed. Physical video capture remains
+    integration work.
 
 ## what this is
 
@@ -172,9 +173,10 @@ pending artefacts before treating the run as paper evidence.
   generation are recorded in adjacent canonical blackboard writes.
 - A completed runtime bundle is still missing raw video, overlay video and
   replay comparison until the manifest says otherwise.
-- The native runner and adapter pass a local socket round trip. A signed Agent
-  also installs and starts fail-closed in the virtual K1 simulator. Neither
-  result is a motion-enabled end-to-end trial.
+- The native runner and adapter pass a local socket round trip. Signed Agent
+  `0.2.5` also completed the four-trial virtual K1 matrix. The motion-enabled
+  T1 run accepted one current target and the simulated robot walked towards
+  it. This result does not replace device validation or physical video.
 - The Booster host defaults to the standard `default` walking gait. Override
   `MUESLI_BOOSTER_GAIT` only after confirming that the selected simulator or
   device gait translates bounded velocity commands as expected.
