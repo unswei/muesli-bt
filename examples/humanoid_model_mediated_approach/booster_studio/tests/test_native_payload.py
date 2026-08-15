@@ -85,7 +85,7 @@ class NativePayloadTests(unittest.TestCase):
             with self.assertRaisesRegex(payload.PayloadError, "wrong runner path"):
                 payload.verify_payload(staged)
 
-    def test_publish_preserves_tracked_readme(self) -> None:
+    def test_publish_preserves_tracked_readme_and_staging(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             runner = root / "runner"
@@ -100,6 +100,10 @@ class NativePayloadTests(unittest.TestCase):
 
             self.assertEqual(
                 (destination / "README.md").read_text(encoding="utf-8"), "keep me\n"
+            )
+            self.assertTrue((staged / "manifest.json").is_file())
+            self.assertTrue(
+                (staged / "sim_x86_64/bin/humanoid_model_mediated_trial").is_file()
             )
             payload.verify_payload(destination)
 

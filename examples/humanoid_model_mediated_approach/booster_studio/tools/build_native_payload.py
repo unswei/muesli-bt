@@ -191,14 +191,25 @@ def verify_payload(root: pathlib.Path) -> dict[str, Any]:
 
 def publish_payload(staged: pathlib.Path, destination: pathlib.Path) -> None:
     destination.mkdir(parents=True, exist_ok=True)
-    for name in ("common", PLATFORM, "manifest.json"):
-        target = destination / name
-        if target.is_dir() and not target.is_symlink():
-            shutil.rmtree(target)
-        elif target.exists() or target.is_symlink():
-            target.unlink()
-    for source in staged.iterdir():
-        source.replace(destination / source.name)
+    try:
+        # ``staged`` may live on a different filesystem (for example, /tmp is
+        # commonly a tmpfs). Copy it beside the destination before using
+        # same-filesystem renames to publish each managed payload entry.
+        with tempfile.TemporaryDirectory(
+            prefix=f".{destination.name}.publish-", dir=destination.parent
+        ) as temporary:
+            adjacent = pathlib.Path(temporary) / "staged"
+            shutil.copytree(staged, adjacent)
+            for name in ("common", PLATFORM, "manifest.json"):
+                target = destination / name
+                if target.is_dir() and not target.is_symlink():
+                    shutil.rmtree(target)
+                elif target.exists() or target.is_symlink():
+                    target.unlink()
+            for source in adjacent.iterdir():
+                source.replace(destination / source.name)
+    except OSError as exc:
+        raise PayloadError(f"could not publish native payload: {exc}") from exc
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:

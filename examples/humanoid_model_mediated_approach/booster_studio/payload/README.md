@@ -35,3 +35,7 @@ the same ELF64 x86-64 and digest checks still apply.
 The default release build refuses relevant source-tree changes. Use
 `--allow-dirty` only for a development package; the manifest records the dirty
 state and a digest of the Git status.
+
+Temporary build output may be on a different filesystem from the repository.
+Publication copies that output into a temporary sibling of this directory
+before replacing the managed payload entries.

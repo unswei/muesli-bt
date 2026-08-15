@@ -1,8 +1,9 @@
 # Booster Studio host adapter
 
 Status: the Studio package source, native-runner supervisor and video-overlay
-path are locally integrated and offline tested. Motion is disabled by default.
-A Linux payload build and virtual K1 trial remain pending.
+path are locally integrated and offline tested. The pinned Linux payload builds
+and verifies on x86-64. Motion is disabled by default. A virtual K1 trial
+remains pending.
 
 ## what this is
 
@@ -139,6 +140,10 @@ python3 examples/humanoid_model_mediated_approach/booster_studio/tools/build_nat
 The build uses a digest-pinned Ubuntu 22.04 image and links the GNU C++ runtime
 libraries into the runner. `build.toml` advertises only `sim_x86_64` until
 separate ARM and device payloads are built and tested.
+
+The publisher first copies temporary build output beside `payload/`, then uses
+same-filesystem renames for the managed entries. The build therefore works when
+the system temporary directory and repository are on different filesystems.
 
 For a virtual K1 trial, set motion and one trial explicitly in the Studio agent
 environment:
