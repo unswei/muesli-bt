@@ -85,6 +85,8 @@ synthetic outcomes exercise analysis code only and are never paper evidence.
 `1b6bbbbf19743b0042f01eabf0628eba5621cacf` and the audited base-image digest.
 The learned-provider checkpoint remains explicitly unresolved until the ACRA
 freeze. The joint Dockerfile consumes Git archives, not mutable working trees.
+It also installs the exact Ubuntu CMake, C++ and Make package versions required
+to build the muesli runner because the simulator base image has no compiler.
 
 Run every non-MuJoCo startup, schema and provider check locally:
 

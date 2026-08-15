@@ -115,6 +115,9 @@ def validate_definition(lock: dict[str, Any]) -> None:
         f'test "${{ACRA_REVISION}}" = "{lock["acra"]["revision"]}"',
         ".air-hockey-source-revision",
         ".muesli-bt-source-revision",
+        "cmake=3.28.3-1build7",
+        "g++=4:13.2.0-7ubuntu1",
+        "make=4.3-4.1build2",
         "container-check",
     )
     for fragment in required_fragments:

@@ -18,6 +18,13 @@ RUN test "${ACRA_REVISION}" = "1b6bbbbf19743b0042f01eabf0628eba5621cacf" && \
     test -n "${MUESLI_BT_REVISION}" && \
     test "$(cat /opt/muesli-bt/.muesli-bt-source-revision)" = "${MUESLI_BT_REVISION}"
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      cmake=3.28.3-1build7 \
+      g++=4:13.2.0-7ubuntu1 \
+      make=4.3-4.1build2 && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN python3 -m pip install --no-cache-dir \
       -r /opt/muesli-bt/examples/air_hockey_model_mediated_defence/container/requirements-wp4.txt && \
     python3 -m pip install --no-build-isolation --no-deps /opt/airhockey-distillation
