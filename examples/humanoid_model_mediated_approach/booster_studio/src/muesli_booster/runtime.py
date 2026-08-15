@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import math
 import os
+import pathlib
 import threading
 import time
 from typing import Any
 
 from .adapter import AdapterConfig, AdapterState, BallObservation, RobotPose
 from .bridge_server import BridgeServer
+from .trial_runner import TRIAL_FILES, NativeTrialSupervisor, TrialError
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -67,9 +69,39 @@ class BoosterRuntime:
         )
         self._bridge = BridgeServer(socket_path, self._state)
         self._motion_enabled = motion_enabled
+        project_root = pathlib.Path(__file__).resolve().parents[2]
+        payload_root = pathlib.Path(
+            os.environ.get(
+                "MUESLI_BOOSTER_NATIVE_PAYLOAD_ROOT", str(project_root / "payload")
+            )
+        )
+        evidence_root = pathlib.Path(
+            os.environ.get("MUESLI_BOOSTER_EVIDENCE_ROOT", "/tmp/muesli-humanoid-runs")
+        )
+        self._trial_supervisor = NativeTrialSupervisor(
+            payload_root=payload_root,
+            evidence_root=evidence_root,
+            bridge_socket=socket_path,
+            motion_enabled=motion_enabled,
+            state=self._state,
+            logger=logger,
+        )
+        self._autostart_trial = os.environ.get(
+            "MUESLI_BOOSTER_AUTOSTART_TRIAL", ""
+        ).strip()
+        if self._autostart_trial and self._autostart_trial not in TRIAL_FILES:
+            raise ValueError(
+                "MUESLI_BOOSTER_AUTOSTART_TRIAL must be T1, T2a, T2b or T3"
+            )
+        self._trial_startup_timeout_s = _env_float(
+            "MUESLI_BOOSTER_TRIAL_STARTUP_TIMEOUT_S", 30.0
+        )
+        if self._trial_startup_timeout_s <= 0.0:
+            raise ValueError("MUESLI_BOOSTER_TRIAL_STARTUP_TIMEOUT_S must be positive")
         self._stop = threading.Event()
         self._spin_thread: threading.Thread | None = None
         self._control_thread: threading.Thread | None = None
+        self._autostart_thread: threading.Thread | None = None
         self._robot: Any = None
         self._node: Any = None
         self._executor: Any = None
@@ -93,12 +125,12 @@ class BoosterRuntime:
         self._node = rclpy.create_node("muesli_booster_host", context=context)
         qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE)
         ball_topic = f"/team{self._team_id}/soccer/sim/ground_truth/ball"
-        robot_topic = (
-            f"/team{self._team_id}/{self._robot_name}/soccer/sim/ground_truth/robot_pose"
-        )
+        robot_topic = f"/team{self._team_id}/{self._robot_name}/soccer/sim/ground_truth/robot_pose"
         self._node.create_subscription(Pose2D, ball_topic, self._on_ball, qos)
         self._node.create_subscription(Pose2D, robot_topic, self._on_robot_pose, qos)
-        self._node.create_subscription(Bool, "/muesli/emergency", self._on_emergency, qos)
+        self._node.create_subscription(
+            Bool, "/muesli/emergency", self._on_emergency, qos
+        )
         self._executor = SingleThreadedExecutor(context=context)
         self._executor.add_node(self._node)
 
@@ -125,24 +157,33 @@ class BoosterRuntime:
         )
         self._spin_thread.start()
         self._control_thread.start()
+        if self._autostart_trial:
+            self._autostart_thread = threading.Thread(
+                target=self._start_trial_when_ready,
+                name="muesli_trial_autostart",
+                daemon=True,
+            )
+            self._autostart_thread.start()
         bridge_path = os.environ.get(
             "MUESLI_BOOSTER_BRIDGE_SOCKET", "/tmp/muesli-booster-bridge.sock"
         )
         self._logger.info(
-            "muesli Booster host started; motion_enabled=%s bridge=%s"
-            % (self._motion_enabled, bridge_path)
+            f"muesli Booster host started; motion_enabled={self._motion_enabled} "
+            f"bridge={bridge_path}"
         )
 
     def stop(self) -> None:
         self._stop.set()
+        self._trial_supervisor.stop()
         self._bridge.stop()
         if self._executor is not None:
             self._executor.shutdown()
-        for thread in (self._spin_thread, self._control_thread):
+        for thread in (self._spin_thread, self._control_thread, self._autostart_thread):
             if thread is not None and thread.is_alive():
                 thread.join(timeout=2.0)
         self._spin_thread = None
         self._control_thread = None
+        self._autostart_thread = None
         if self._robot is not None:
             try:
                 self._robot.set_velocity(vx=0.0, vy=0.0, vyaw=0.0)
@@ -159,10 +200,37 @@ class BoosterRuntime:
         self._executor = None
         self._state.set_robot_stable(False)
 
+    def start_trial(self, trial_id: str, run_id: str | None = None) -> pathlib.Path:
+        """Start one native trial after the live host has become ready."""
+        return self._trial_supervisor.start(trial_id, run_id)
+
+    def _start_trial_when_ready(self) -> None:
+        deadline = time.monotonic() + self._trial_startup_timeout_s
+        while not self._stop.is_set() and time.monotonic() < deadline:
+            snapshot = self._state.snapshot(time.monotonic())
+            if (
+                snapshot.ball_available
+                and snapshot.robot_pose is not None
+                and snapshot.robot_stable
+                and not snapshot.emergency
+            ):
+                try:
+                    run_dir = self.start_trial(self._autostart_trial)
+                    self._logger.info(f"muesli trial evidence directory: {run_dir}")
+                except TrialError as exc:
+                    self._state.latch_runtime_fault()
+                    self._logger.error(f"muesli native trial did not start: {exc}")
+                return
+            self._stop.wait(0.1)
+        if not self._stop.is_set():
+            self._logger.error(
+                "muesli native trial did not start before the host-readiness timeout"
+            )
+
     def _spin(self) -> None:
         try:
             self._executor.spin()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - environment-owned executor boundary
             if not self._stop.is_set():
                 self._logger.error(f"muesli ROS spin failed: {exc}")
                 self._state.set_robot_stable(False)
@@ -181,7 +249,7 @@ class BoosterRuntime:
                     self._robot.set_velocity(
                         vx=command.vx_mps, vy=command.vy_mps, vyaw=command.vyaw_rps
                     )
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 - Booster SDK boundary
                     self._state.set_robot_stable(False)
                     self._logger.error(f"Booster set_velocity failed: {exc}")
             self._stop.wait(max(0.0, period - (time.monotonic() - started)))
@@ -191,7 +259,7 @@ class BoosterRuntime:
             state = self._robot.get_fall_down_state()
             state_name = getattr(state, "state", None)
             self._state.set_robot_stable(state_name == "normal")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - Booster SDK boundary
             self._state.set_robot_stable(False)
             self._logger.error(f"Booster stability query failed: {exc}")
 
@@ -202,7 +270,12 @@ class BoosterRuntime:
 
     def _on_robot_pose(self, message: Any) -> None:
         self._state.observe_robot(
-            RobotPose(float(message.x), float(message.y), float(message.theta), time.monotonic())
+            RobotPose(
+                float(message.x),
+                float(message.y),
+                float(message.theta),
+                time.monotonic(),
+            )
         )
 
     def _on_emergency(self, message: Any) -> None:

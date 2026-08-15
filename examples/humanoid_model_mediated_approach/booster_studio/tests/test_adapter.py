@@ -8,19 +8,18 @@ import time
 import unittest
 from pathlib import Path
 
-
 PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT / "src"))
 
-from muesli_booster.adapter import (  # noqa: E402
+from muesli_booster.adapter import (
+    DISPATCH_REQUEST_SCHEMA,
     AdapterConfig,
     AdapterState,
     BallContextTracker,
     BallObservation,
-    DISPATCH_REQUEST_SCHEMA,
     RobotPose,
 )
-from muesli_booster.bridge_server import BridgeServer  # noqa: E402
+from muesli_booster.bridge_server import BridgeServer
 
 
 def request(context_id: str = "ball-0001", generation: int = 1) -> dict:
@@ -42,11 +41,19 @@ def request(context_id: str = "ball-0001", generation: int = 1) -> dict:
 class BallContextTrackerTests(unittest.TestCase):
     def test_movement_loss_and_reacquisition_advance_context(self) -> None:
         tracker = BallContextTracker(0.15, 0.5)
-        self.assertEqual(tracker.observe(BallObservation(1.0, 0.0, 0.0, 10.0)), "ball-0001")
-        self.assertEqual(tracker.observe(BallObservation(1.1, 0.0, 0.0, 10.1)), "ball-0001")
-        self.assertEqual(tracker.observe(BallObservation(1.3, 0.0, 0.0, 10.2)), "ball-0002")
+        self.assertEqual(
+            tracker.observe(BallObservation(1.0, 0.0, 0.0, 10.0)), "ball-0001"
+        )
+        self.assertEqual(
+            tracker.observe(BallObservation(1.1, 0.0, 0.0, 10.1)), "ball-0001"
+        )
+        self.assertEqual(
+            tracker.observe(BallObservation(1.3, 0.0, 0.0, 10.2)), "ball-0002"
+        )
         tracker.mark_lost()
-        self.assertEqual(tracker.observe(BallObservation(1.3, 0.0, 0.0, 10.3)), "ball-0003")
+        self.assertEqual(
+            tracker.observe(BallObservation(1.3, 0.0, 0.0, 10.3)), "ball-0003"
+        )
 
     def test_stale_ball_is_unavailable(self) -> None:
         tracker = BallContextTracker(0.15, 0.5)
@@ -59,9 +66,15 @@ class BallContextTrackerTests(unittest.TestCase):
 
     def test_small_steps_accumulate_against_context_anchor(self) -> None:
         tracker = BallContextTracker(0.15, 0.5)
-        self.assertEqual(tracker.observe(BallObservation(1.0, 0.0, 0.0, 10.0)), "ball-0001")
-        self.assertEqual(tracker.observe(BallObservation(1.1, 0.0, 0.0, 10.1)), "ball-0001")
-        self.assertEqual(tracker.observe(BallObservation(1.16, 0.0, 0.0, 10.2)), "ball-0002")
+        self.assertEqual(
+            tracker.observe(BallObservation(1.0, 0.0, 0.0, 10.0)), "ball-0001"
+        )
+        self.assertEqual(
+            tracker.observe(BallObservation(1.1, 0.0, 0.0, 10.1)), "ball-0001"
+        )
+        self.assertEqual(
+            tracker.observe(BallObservation(1.16, 0.0, 0.0, 10.2)), "ball-0002"
+        )
 
 
 class DispatchAndFollowerTests(unittest.TestCase):
@@ -81,6 +94,13 @@ class DispatchAndFollowerTests(unittest.TestCase):
         duplicate = state.dispatch(request(), 10.2)
         self.assertFalse(duplicate.accepted)
         self.assertEqual(duplicate.reason, "duplicate_dispatch")
+
+    def test_new_trial_clears_dispatch_identity_and_active_motion(self) -> None:
+        state = self.ready_state()
+        self.assertTrue(state.dispatch(request(), 10.1).accepted)
+        state.prepare_trial()
+        self.assertEqual(state.velocity_command(10.2).reason, "no_target")
+        self.assertTrue(state.dispatch(request(), 10.2).accepted)
 
     def test_context_change_and_emergency_reject(self) -> None:
         state = self.ready_state()
@@ -116,7 +136,9 @@ class DispatchAndFollowerTests(unittest.TestCase):
         self.assertEqual(command.reason, "walking")
         state.observe_ball(BallObservation(1.5, -0.35, 0.0, 10.3))
         stopped = state.velocity_command(10.3)
-        self.assertEqual((stopped.vx_mps, stopped.vy_mps, stopped.vyaw_rps), (0.0, 0.0, 0.0))
+        self.assertEqual(
+            (stopped.vx_mps, stopped.vy_mps, stopped.vyaw_rps), (0.0, 0.0, 0.0)
+        )
         self.assertEqual(stopped.reason, "context_changed")
 
 
@@ -163,7 +185,9 @@ class ManifestTests(unittest.TestCase):
         agent = (PROJECT / "agent.toml").read_text(encoding="utf-8")
         self.assertIn('entry = "src/main.py:MuesliHumanoidAgent"', agent)
         self.assertIn('models = [ "Booster K1" ]', agent)
-        runtime = (PROJECT / "src/muesli_booster/runtime.py").read_text(encoding="utf-8")
+        runtime = (PROJECT / "src/muesli_booster/runtime.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn('"MUESLI_BOOSTER_MOTION_ENABLED", False', runtime)
 
 

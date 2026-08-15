@@ -47,6 +47,12 @@ robot stability, operating bounds and exactly-once admission.
 The existing runtime emits the synchronous outcome as
 `walking_target_dispatch` in `mbt.evt.v1`. No bridge-specific log is created.
 
+The Studio agent also owns a fail-closed native-process supervisor. Before
+launch, it verifies a manifest-bound ELF64 x86-64 runner and all frozen BT,
+configuration and evidence files. It waits for fresh ball and robot pose data,
+normal stability and no emergency. A process fault removes the active target
+and latches the software emergency state.
+
 ## api / syntax
 
 Build and link the optional integration target:
@@ -99,6 +105,12 @@ The runner requires the CLI motion flag to match the adapter snapshot. This
 prevents an evidence manifest from claiming a different motion state from the
 host process.
 
+The generated payload and live-trial manifests use
+`humanoid.booster_native_payload.v1` and `humanoid.booster_live_trial.v1`.
+Their JSON Schemas are under `schemas/humanoid_booster/v1/`. The live manifest
+binds the payload digest, exact runner command, canonical event hash and derived
+overlay hash.
+
 ## example
 
 Run the complete local bridge checks without ROS 2, BoosterOS or a simulator:
@@ -131,6 +143,8 @@ canonical event. It never creates a Booster robot object or velocity publisher.
 - `MUESLI_BT_BUILD_INTEGRATION_BOOSTER=OFF` removes the integration target and
   live runner option. The SDK-independent experiment remains available.
 - Passing local tests is not evidence of a virtual K1 or physical K1 run.
+- The checked-in Studio target is `sim_x86_64` only. Real K1 targets need an
+  independently built and verified payload plus the physical safety review.
 
 ## see also
 

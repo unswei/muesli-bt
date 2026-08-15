@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.dev/schemas/humanoid_booster/v1/native-payload.schema.json",
+  "title": "Booster Studio native payload manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "platform",
+    "source_git_commit",
+    "source_git_dirty",
+    "source_status_sha256",
+    "build",
+    "runner",
+    "assets"
+  ],
+  "properties": {
+    "schema_version": { "const": "humanoid.booster_native_payload.v1" },
+    "platform": { "const": "sim_x86_64" },
+    "source_git_commit": { "type": "string", "minLength": 1 },
+    "source_git_dirty": { "type": "boolean" },
+    "source_status_sha256": { "$ref": "#/$defs/digest" },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["container_image", "configuration", "portable_gnu_runtime"],
+      "properties": {
+        "container_image": { "type": "string", "minLength": 1 },
+        "configuration": { "const": "Release" },
+        "portable_gnu_runtime": { "const": true }
+      }
+    },
+    "runner": { "$ref": "#/$defs/file" },
+    "assets": {
+      "type": "array",
+      "minItems": 11,
+      "maxItems": 11,
+      "items": { "$ref": "#/$defs/asset" }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "file": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes", "format"],
+      "properties": {
+        "path": { "const": "sim_x86_64/bin/humanoid_model_mediated_trial" },
+        "sha256": { "$ref": "#/$defs/digest" },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "format": { "const": "elf64-x86-64" }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes", "source"],
+      "properties": {
+        "path": { "type": "string", "pattern": "^common/" },
+        "sha256": { "$ref": "#/$defs/digest" },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

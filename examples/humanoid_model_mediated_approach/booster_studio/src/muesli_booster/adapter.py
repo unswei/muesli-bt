@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import math
 import threading
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping
-
+from typing import Any
 
 DISPATCH_REQUEST_SCHEMA = "humanoid.booster_dispatch_request.v1"
 DISPATCH_RESPONSE_SCHEMA = "humanoid.booster_dispatch_response.v1"
@@ -71,7 +71,9 @@ class AdapterConfig:
             self.max_angular_rps,
         )
         if not _finite(*positive) or any(value <= 0.0 for value in positive):
-            raise ValueError("adapter thresholds, gains and limits must be finite and positive")
+            raise ValueError(
+                "adapter thresholds, gains and limits must be finite and positive"
+            )
         ordered = (
             (self.min_offset_x_m, self.max_offset_x_m),
             (self.min_offset_y_m, self.max_offset_y_m),
@@ -143,7 +145,11 @@ class BallContextTracker:
     """Assign monotonic context IDs to a fresh ball track."""
 
     def __init__(self, threshold_m: float, max_age_s: float) -> None:
-        if not _finite(threshold_m, max_age_s) or threshold_m <= 0.0 or max_age_s <= 0.0:
+        if (
+            not _finite(threshold_m, max_age_s)
+            or threshold_m <= 0.0
+            or max_age_s <= 0.0
+        ):
             raise ValueError("ball context threshold and maximum age must be positive")
         self._threshold_m = threshold_m
         self._max_age_s = max_age_s
@@ -229,6 +235,7 @@ class AdapterState:
         self._robot_pose: RobotPose | None = None
         self._robot_stable = False
         self._emergency = False
+        self._runtime_fault = False
         self._accepted_keys: set[tuple[str, int]] = set()
         self._active_target: _ActiveTarget | None = None
 
@@ -245,7 +252,10 @@ class AdapterState:
         if not _finite(pose.x_m, pose.y_m, pose.yaw_rad, pose.observed_at):
             raise ValueError("robot pose must be finite")
         with self._lock:
-            if self._robot_pose is not None and pose.observed_at < self._robot_pose.observed_at:
+            if (
+                self._robot_pose is not None
+                and pose.observed_at < self._robot_pose.observed_at
+            ):
                 raise ValueError("robot pose timestamps must be monotonic")
             self._robot_pose = pose
 
@@ -261,6 +271,23 @@ class AdapterState:
             if emergency:
                 self._active_target = None
 
+    def latch_runtime_fault(self) -> None:
+        """Latch an internal supervisor fault until the agent is recreated."""
+        with self._lock:
+            self._runtime_fault = True
+            self._active_target = None
+
+    def prepare_trial(self) -> None:
+        """Clear per-process dispatch authority before starting a new trial."""
+        with self._lock:
+            self._accepted_keys.clear()
+            self._active_target = None
+
+    def cancel_motion(self) -> None:
+        """Remove the active walking target without changing observation state."""
+        with self._lock:
+            self._active_target = None
+
     def snapshot(self, now: float) -> BridgeSnapshot:
         with self._lock:
             pose = self._robot_pose
@@ -272,7 +299,7 @@ class AdapterState:
                 now=now,
                 robot_pose=pose,
                 robot_stable=self._robot_stable,
-                emergency=self._emergency,
+                emergency=self._emergency or self._runtime_fault,
             )
 
     def dispatch(self, request: Mapping[str, Any], now: float) -> DispatchOutcome:
@@ -365,7 +392,9 @@ class AdapterState:
         )
         if not (
             self.config.min_field_x_m <= field_target.x_m <= self.config.max_field_x_m
-            and self.config.min_field_y_m <= field_target.y_m <= self.config.max_field_y_m
+            and self.config.min_field_y_m
+            <= field_target.y_m
+            <= self.config.max_field_y_m
         ):
             return DispatchOutcome(False, "outside_operating_area")
         return DispatchOutcome(True, "", field_target)
@@ -386,8 +415,10 @@ class AdapterState:
                 self._active_target = None
                 return VelocityCommand(0.0, 0.0, 0.0, "context_changed")
             pose = snapshot.robot_pose
-            if pose is None or now - pose.observed_at < 0.0 or (
-                now - pose.observed_at > self.config.robot_pose_max_age_s
+            if (
+                pose is None
+                or now - pose.observed_at < 0.0
+                or (now - pose.observed_at > self.config.robot_pose_max_age_s)
             ):
                 self._active_target = None
                 return VelocityCommand(0.0, 0.0, 0.0, "robot_pose_stale")
@@ -451,9 +482,7 @@ class AdapterState:
             "schema_version": SNAPSHOT_RESPONSE_SCHEMA,
             "ball_context_id": snapshot.ball_context_id,
             "ball_available": snapshot.ball_available,
-            "ball_position_m": None
-            if ball is None
-            else [ball.x_m, ball.y_m, ball.z_m],
+            "ball_position_m": None if ball is None else [ball.x_m, ball.y_m, ball.z_m],
             "robot_pose": None
             if robot is None
             else {
@@ -467,7 +496,9 @@ class AdapterState:
             "motion_enabled": self.config.motion_enabled,
         }
 
-    def dispatch_payload(self, request: Mapping[str, Any], now: float) -> dict[str, Any]:
+    def dispatch_payload(
+        self, request: Mapping[str, Any], now: float
+    ) -> dict[str, Any]:
         outcome = self.dispatch(request, now)
         target = outcome.field_target
         return {

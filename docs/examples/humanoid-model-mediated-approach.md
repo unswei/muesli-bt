@@ -3,9 +3,9 @@
 !!! note "status"
 
     Status: experimental software experiment harness with an offline-tested
-    Booster Studio host bridge. Local C++/Python bridge wiring is complete and
-    offline tested. Simulator execution and physical video capture remain
-    integration work.
+    Booster Studio host bridge, verified native-runner supervisor and
+    canonical-event overlay path. Simulator execution and physical video
+    capture remain integration work.
 
 ## what this is
 
@@ -34,6 +34,12 @@ The Booster Studio subproject implements the platform-owned context, safety,
 dispatch and bounded velocity policy. Motion is disabled by default. The muesli
 C++ bridge client supplies live state and receives the synchronous host
 decision.
+
+The Studio agent can supervise one frozen trial after fresh ball, robot pose and
+stability data arrive. It verifies a digest-bound Linux x86-64 payload before
+launch and fails closed on missing files, changed files, wrong architecture or
+an unexpected runner exit. Each live run derives `overlay.ass` directly from
+`mbt.evt.v1`.
 
 ## how it works
 
@@ -117,6 +123,16 @@ ctest --test-dir build/dev --output-on-failure \
   -R '^muesli_bt_booster_(bridge|bridge_runner|studio_adapter)$'
 ```
 
+Build the virtual K1 native payload:
+
+```bash
+python3 examples/humanoid_model_mediated_approach/booster_studio/tools/build_native_payload.py
+```
+
+The command requires Docker Buildx. It uses a pinned Linux x86-64 container;
+local macOS binaries are rejected. The Booster adapter README contains the
+Studio activation and video-finalisation runbook.
+
 Run a real-time clip for the full moved-ball trial:
 
 ```bash
@@ -153,6 +169,8 @@ pending artefacts before treating the run as paper evidence.
 - The native runner and adapter pass a local socket round trip. This is not an
   end-to-end virtual K1 result because Booster Studio and the simulator are not
   involved in that test.
+- `build.toml` currently advertises only `sim_x86_64`. Do not add a device or
+  ARM target until its native payload has a separate build and test result.
 - A forced rerun is staged and validated before it replaces an existing marked
   evidence bundle. A selected matrix is fully validated before publication
   starts.

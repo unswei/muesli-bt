@@ -19,6 +19,8 @@ option(MUESLI_BT_BUILD_INTEGRATION_PYBULLET "Build the PyBullet integration libr
 option(MUESLI_BT_BUILD_INTEGRATION_WEBOTS "Build the Webots integration library" ON)
 option(MUESLI_BT_BUILD_INTEGRATION_ROS2 "Build the ROS2 integration library" OFF)
 option(MUESLI_BT_BUILD_INTEGRATION_BOOSTER "Build the SDK-independent Booster host bridge" ON)
+option(MUESLI_BT_BOOSTER_PORTABLE_RUNNER
+       "Link the humanoid Booster runner with portable GNU C++ runtime libraries" OFF)
 option(MUESLI_BT_BUILD_MODEL_SERVICE_BRIDGE "Build the optional muesli-model-service bridge target" OFF)
 option(MUESLI_BT_BUILD_BENCHMARKS "Build the optional benchmark harness" OFF)
 option(MUESLI_BT_BENCH_WITH_BTCPP "Build the optional BehaviorTree.CPP benchmark adapter" OFF)
@@ -279,10 +281,17 @@ target_include_directories(
   humanoid_model_mediated_trial
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/examples/humanoid_model_mediated_approach/src
 )
-target_link_libraries(humanoid_model_mediated_trial PRIVATE muesli_bt_core)
 if (TARGET muesli_bt_integration_booster)
   target_link_libraries(humanoid_model_mediated_trial PRIVATE muesli_bt_integration_booster)
   target_compile_definitions(humanoid_model_mediated_trial PRIVATE MUESLI_BT_HAVE_BOOSTER_BRIDGE=1)
+else ()
+  target_link_libraries(humanoid_model_mediated_trial PRIVATE muesli_bt_core)
+endif ()
+if (MUESLI_BT_BOOSTER_PORTABLE_RUNNER)
+  if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR NOT UNIX OR APPLE)
+    message(FATAL_ERROR "MUESLI_BT_BOOSTER_PORTABLE_RUNNER requires GNU C++ on Linux")
+  endif ()
+  target_link_options(humanoid_model_mediated_trial PRIVATE -static-libgcc -static-libstdc++)
 endif ()
 
 if (UNIX)
@@ -787,6 +796,11 @@ install(
 
 install(FILES schemas/event_log/v1/mbt.evt.v1.schema.json
         DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/schemas/event_log/v1
+)
+
+install(
+  DIRECTORY schemas/humanoid_booster/
+  DESTINATION ${MUESLI_BT_INSTALL_SHAREDIR}/schemas/humanoid_booster
 )
 
 install(

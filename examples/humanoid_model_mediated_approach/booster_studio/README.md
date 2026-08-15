@@ -1,7 +1,8 @@
 # Booster Studio host adapter
 
-Status: locally integrated and offline tested. Motion is disabled by default.
-The Studio package build and virtual K1 trial remain pending.
+Status: the Studio package source, native-runner supervisor and video-overlay
+path are locally integrated and offline tested. Motion is disabled by default.
+A Linux payload build and virtual K1 trial remain pending.
 
 ## what this is
 
@@ -11,8 +12,10 @@ experiment. It supplies the Booster-owned half of the host boundary:
 - fresh ball observations and monotonic ball context IDs;
 - robot pose, stability and software emergency state;
 - a synchronous local dispatch gate;
-- conversion from a ball-relative approach pose to a field target; and
-- a bounded field-target follower that emits body-frame velocity commands.
+- conversion from a ball-relative approach pose to a field target;
+- a bounded field-target follower that emits body-frame velocity commands;
+- a manifest-verified Linux C++ trial runner; and
+- canonical-event-derived video overlays and evidence manifests.
 
 The adapter does not implement invocation authority. The muesli C++ runtime
 retains generation, branch, deadline, context and exactly-once authority. The
@@ -42,6 +45,18 @@ The platform-independent adapter serves one JSON request per Unix-domain socket
 connection. The C++ `bridge_walking_target_dispatcher` uses the response as its
 synchronous host decision so the canonical `walking_target_dispatch` event
 records the actual Booster acceptance or rejection.
+
+The agent waits for a fresh ball, fresh robot pose and stable robot state before
+starting a requested native trial. It verifies the Linux executable and every
+frozen BT, configuration and evidence protocol against `payload/manifest.json`.
+A changed, missing, symlinked or wrong-architecture file prevents launch.
+
+The native process is supervised. Agent shutdown terminates the process and
+clears the walking target. An unexpected non-zero exit clears motion and
+latches the software emergency state. A successful run writes
+`events.jsonl`, `overlay.ass` and `live-manifest.json` under the evidence root.
+The ASS subtitle overlay is derived from `mbt.evt.v1`; it is not another event
+log.
 
 ## api / syntax
 
@@ -91,6 +106,10 @@ Runtime settings:
 | `MUESLI_BOOSTER_ROBOT_POSE_MAX_AGE_S` | `0.5` | Maximum robot pose age. |
 | `MUESLI_BOOSTER_MIN_FIELD_X_M` / `MAX_FIELD_X_M` | `-6.5` / `6.5` | Permitted field x range. |
 | `MUESLI_BOOSTER_MIN_FIELD_Y_M` / `MAX_FIELD_Y_M` | `-4.0` / `4.0` | Permitted field y range. |
+| `MUESLI_BOOSTER_NATIVE_PAYLOAD_ROOT` | project `payload/` | Verified native payload root. |
+| `MUESLI_BOOSTER_EVIDENCE_ROOT` | `/tmp/muesli-humanoid-runs` | Live trial evidence directory. |
+| `MUESLI_BOOSTER_AUTOSTART_TRIAL` | empty | Start `T1`, `T2a`, `T2b` or `T3` once the host is ready. |
+| `MUESLI_BOOSTER_TRIAL_STARTUP_TIMEOUT_S` | `30` | Maximum wait for fresh ball, pose and stability. |
 
 ## example
 
@@ -109,21 +128,75 @@ ctest --test-dir build/dev --output-on-failure \
   -R '^muesli_bt_booster_(bridge|bridge_runner|studio_adapter)$'
 ```
 
+Prepare the Linux x86-64 payload with a working Docker Buildx builder:
+
+```bash
+python3 examples/humanoid_model_mediated_approach/booster_studio/tools/build_native_payload.py
+python3 examples/humanoid_model_mediated_approach/booster_studio/tools/build_native_payload.py \
+  --check-only
+```
+
+The build uses a digest-pinned Ubuntu 22.04 image and links the GNU C++ runtime
+libraries into the runner. `build.toml` advertises only `sim_x86_64` until
+separate ARM and device payloads are built and tested.
+
+For a virtual K1 trial, set motion and one trial explicitly in the Studio agent
+environment:
+
+```text
+MUESLI_BOOSTER_MOTION_ENABLED=true
+MUESLI_BOOSTER_AUTOSTART_TRIAL=T2b
+```
+
+Start recording before activating the agent. Move the ball after the
+`REQUEST_SUBMITTED` cue for T2a or T2b. For T3, publish a controlled software
+emergency after the cue. Run one trial per activation and retain its evidence
+directory.
+
+```bash
+ros2 topic pub --once /muesli/emergency std_msgs/msg/Bool '{data: true}'
+```
+
+After recording, note the request cue time in the raw clip and render the
+aligned overlay:
+
+```bash
+python3 examples/humanoid_model_mediated_approach/booster_studio/tools/finalise_video_evidence.py \
+  --run-dir /tmp/muesli-humanoid-runs/<run-id> \
+  --raw-video /path/to/recording.mp4 \
+  --request-cue-seconds 4.20
+```
+
+This requires `ffmpeg`. The finaliser retains the raw clip, writes
+`overlay-video.mp4`, and records hashes and the cue alignment in
+`live-manifest.json`.
+
 Open `booster_studio/` as a Booster Studio project only after the offline test
 passes. The project metadata selects `football3v3` and `soccer-match`.
 
 ## gotchas
 
 - Motion defaults to disabled and a dispatch then returns `motion_disabled`.
+- Autostart is empty by default. Setting a trial ID does nothing until the ball,
+  pose and stability snapshot is fresh.
+- A live trial needs motion enabled even for T2a, because the experiment must
+  show that the host blocks the stale target for `context_changed`, not merely
+  because all motion was disabled.
 - The adapter creates no second event log. `events.jsonl` from muesli remains
   the sole external runtime evidence stream.
 - The ball context frame is field-aligned in the frozen experiment contract.
   Conversion therefore adds the ball translation and does not rotate offsets.
 - A context change, stale ball, stale robot pose, instability or emergency
   clears the active target and outputs zero velocity.
-- The C++ and Python bridge ends have passed a local end-to-end smoke test. Do
-  not claim a Booster simulation result until the Studio package runs in a
-  virtual K1 scene.
+- A successful T1 runner exit leaves its already-authorised target with the
+  bounded host follower. The follower stops at arrival or immediately on any
+  context, observation, stability or emergency failure. Agent shutdown also
+  clears it.
+- The C++ and Python bridge, supervisor, payload verifier and overlay generator
+  have passed local tests. Do not claim a Booster simulation result until the
+  Studio package runs in a virtual K1 scene.
+- An Apple Silicon build of the C++ runner is Mach-O/ARM and is deliberately
+  rejected. Use the pinned container build for `sim_x86_64`.
 - The `football3v3` scene includes other robots and referee state. Freeze or
   park irrelevant actors before recording the one-robot paper trial.
 

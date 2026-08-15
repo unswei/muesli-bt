@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.dev/schemas/humanoid_booster/v1/live-trial.schema.json",
+  "title": "Booster Studio live humanoid trial manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "status",
+    "trial_id",
+    "run_id",
+    "source_git_commit",
+    "source_git_dirty",
+    "payload_manifest_sha256",
+    "motion_enabled",
+    "runner_command",
+    "event_log"
+  ],
+  "properties": {
+    "schema_version": { "const": "humanoid.booster_live_trial.v1" },
+    "status": {
+      "enum": ["running", "completed", "failed", "stopped", "launch_failed"]
+    },
+    "trial_id": { "enum": ["T1", "T2a", "T2b", "T3"] },
+    "run_id": { "type": "string", "minLength": 1 },
+    "source_git_commit": { "type": "string", "minLength": 1 },
+    "source_git_dirty": { "type": "boolean" },
+    "payload_manifest_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "motion_enabled": { "type": "boolean" },
+    "runner_command": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" }
+    },
+    "return_code": { "type": "integer" },
+    "launch_error": { "type": "string" },
+    "event_log": { "$ref": "#/$defs/artefact" },
+    "overlay": { "$ref": "#/$defs/artefact" },
+    "raw_video": { "$ref": "#/$defs/artefact" },
+    "overlay_video": { "$ref": "#/$defs/artefact" },
+    "video_alignment": {
+      "type": "object",
+      "required": ["reference", "request_cue_seconds"],
+      "properties": {
+        "reference": { "const": "vla_submit_request_cue" },
+        "request_cue_seconds": { "type": "number", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "artefact": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "schema": { "type": "string" },
+        "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "alignment": { "type": "string" },
+        "status": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    }
+  }
+}

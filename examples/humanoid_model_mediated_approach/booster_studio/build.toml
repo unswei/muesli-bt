@@ -5,4 +5,4 @@ obfuscation = false
 common = []
 
 [platform]
-supports = ["sim_x86_64", "sim_aarch64", "real_jetson"]
+supports = ["sim_x86_64"]

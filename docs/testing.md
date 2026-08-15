@@ -76,13 +76,25 @@ frozen real-time protocol.
 
 The Booster Studio host policy has a separate SDK-independent test. It covers
 ball context movement and reacquisition, observation age, synchronous dispatch,
-exactly-once admission, emergency rejection, velocity bounds, target revocation
-and the Unix-socket request/reply boundary:
+exactly-once admission, emergency rejection, velocity bounds, target
+revocation, the Unix-socket boundary, native-payload tamper checks, process
+supervision, public manifest schemas and canonical-event overlay generation:
 
 ```bash
 ctest --test-dir build/dev --output-on-failure \
   -R muesli_bt_booster_studio_adapter
 ```
+
+The pinned Linux payload has a source-only check that does not require Docker:
+
+```bash
+python3 examples/humanoid_model_mediated_approach/booster_studio/tools/build_native_payload.py \
+  --source-check
+```
+
+A release payload build refuses a dirty relevant source tree. The generated
+runner must be ELF64 x86-64, and verification recomputes the digest and size of
+the executable and every frozen experiment asset.
 
 CMake registers this CTest only when its selected Python interpreter can import
 `jsonschema`. The Linux GCC and Clang CI jobs install that dependency and run

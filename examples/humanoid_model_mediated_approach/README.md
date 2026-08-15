@@ -1,8 +1,9 @@
 # humanoid model-mediated approach video experiment
 
 Status: experimental software experiment harness with a locally integrated,
-offline-tested Booster Studio host bridge. The Studio package build, virtual K1
-run and physical video capture remain integration work.
+offline-tested Booster Studio host bridge, native supervisor and overlay path.
+The Linux package build, virtual K1 run and physical video capture remain
+integration work.
 
 ## what this is
 
@@ -133,15 +134,20 @@ must supply and enforce observation timestamps before a physical trial.
 ## booster integration boundary
 
 The `booster_studio/` project implements ball context tracking, observation age,
-stability/emergency state, operating-area validation and a bounded pose
-follower. Motion is disabled by default. The native runner now polls adapter
-snapshots and uses the synchronous bridge response as the walking-target
-callback result. Before enabling a robot trial:
+stability/emergency state, operating-area validation, a bounded pose follower,
+a manifest-verified native runner supervisor and event-derived overlays. Motion
+is disabled by default. The native runner polls adapter snapshots and uses the
+synchronous bridge response as the walking-target callback result. Before
+enabling a robot trial:
 
-1. build and package the C++ runtime and Studio agent in the Booster environment;
+1. build the pinned `sim_x86_64` native payload and verify its manifest;
 2. run the snapshot/dispatch round trip with motion disabled;
 3. run the software-emergency trial in the virtual K1 scene; and
 4. retain the runtime commit gate and both dispatch-time safety checks.
+
+See `booster_studio/README.md` for the exact payload, trial and video finalising
+commands. The current Studio package advertises only `sim_x86_64`; device
+targets remain deliberately unavailable until separately built and tested.
 
 Physical motion requires an absolute `--booster-bridge-socket`, an explicit
 `--physical-motion-enabled true` and a host snapshot that also reports motion

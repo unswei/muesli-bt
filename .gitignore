@@ -61,6 +61,10 @@ examples/webots_epuck_*/controllers/muesli_epuck/muesli_epuck
 examples/webots_epuck_*/controllers/muesli_epuck/build/
 examples/_tools/__pycache__/
 
+# generated Booster Studio native payload
+examples/humanoid_model_mediated_approach/booster_studio/payload/*
+!examples/humanoid_model_mediated_approach/booster_studio/payload/README.md
+
 # generic example run artefacts
 examples/**/logs/*
 !examples/**/logs/.gitkeep

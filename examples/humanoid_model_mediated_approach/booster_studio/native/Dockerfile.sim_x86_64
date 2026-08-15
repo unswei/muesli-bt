@@ -1,0 +1,36 @@
+# syntax=docker/dockerfile:1.7
+
+# The digest pins the Ubuntu 22.04 multi-platform index. The constant platform
+# is intentional: Apple Silicon developers must still produce an x86-64 Studio
+# simulation payload rather than accidentally packaging a Mach-O or ARM binary.
+FROM --platform=linux/amd64 ubuntu:22.04@sha256:3b06811b2afd352be909dd088a004166d665dc76d38b13eada33522a9d915c6f AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends \
+       build-essential=12.9ubuntu3 \
+       ca-certificates \
+       cmake=3.22.1-1ubuntu1.22.04.2 \
+       ninja-build=1.10.1-1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY . .
+
+RUN cmake -S . -B build/booster-sim-x86_64 -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DMUESLI_BT_BOOSTER_PORTABLE_RUNNER=ON \
+      -DMUESLI_BT_BUILD_BENCHMARKS=OFF \
+      -DMUESLI_BT_BUILD_INTEGRATION_BOOSTER=ON \
+      -DMUESLI_BT_BUILD_INTEGRATION_PYBULLET=OFF \
+      -DMUESLI_BT_BUILD_INTEGRATION_ROS2=OFF \
+      -DMUESLI_BT_BUILD_INTEGRATION_WEBOTS=OFF \
+      -DMUESLI_BT_BUILD_MODEL_SERVICE_BRIDGE=OFF \
+      -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
+      -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF \
+    && cmake --build build/booster-sim-x86_64 \
+      --target humanoid_model_mediated_trial --parallel \
+    && strip build/booster-sim-x86_64/humanoid_model_mediated_trial
+
+FROM scratch AS export
+COPY --from=builder /src/build/booster-sim-x86_64/humanoid_model_mediated_trial /humanoid_model_mediated_trial

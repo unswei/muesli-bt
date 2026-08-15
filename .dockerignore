@@ -1,0 +1,17 @@
+.git
+.agents
+.codex
+.instructions
+.venv*
+bench/results
+build
+build-*
+cmake-build-*
+dist
+out
+site
+examples/**/runs
+examples/**/__pycache__
+examples/humanoid_model_mediated_approach/booster_studio/payload
+**/*.pyc
+**/.DS_Store
