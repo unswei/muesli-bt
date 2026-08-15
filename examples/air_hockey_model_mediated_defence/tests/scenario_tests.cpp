@@ -279,7 +279,9 @@ public:
                  std::vector<std::shared_ptr<completion_gate>> gates,
                  bool configure_remote = true,
                  std::optional<std::filesystem::path> event_path = std::nullopt,
-                 std::optional<bt::vla_response> replay_response = std::nullopt)
+                 std::optional<bt::vla_response> replay_response = std::nullopt,
+                 std::optional<air_hockey_demo::host_configuration> remote_configuration =
+                     std::nullopt)
         : policy_(policy),
           scenario_(std::move(scenario)),
           backend_(std::make_shared<air_hockey_demo::air_hockey_env_backend>(std::move(socket_path))),
@@ -301,14 +303,15 @@ public:
               "air-hockey env backend registration did not attach the socket adapter");
 
         if (configure_remote) {
-            backend_->configure_host(air_hockey_demo::host_configuration{
-                .blackout_start_step = 1,
-                .blackout_length_steps = 1,
-                .timeout_steps = 12,
-                .action_lock_steps = 0,
-                .replace_track_steps = {},
-                .terminate_at_step = std::nullopt,
-            });
+            backend_->configure_host(remote_configuration.value_or(
+                air_hockey_demo::host_configuration{
+                    .blackout_start_step = 1,
+                    .blackout_length_steps = 1,
+                    .timeout_steps = 12,
+                    .action_lock_steps = 0,
+                    .replace_track_steps = {},
+                    .terminate_at_step = std::nullopt,
+                }));
         }
         (void)backend_->reset_host(6302);
 
@@ -420,6 +423,10 @@ public:
 
     [[nodiscard]] const std::optional<air_hockey_demo::action_dispatch_result>& last_dispatch() const {
         return last_dispatch_;
+    }
+
+    [[nodiscard]] const air_hockey_demo::public_state& state() const {
+        return backend_->last_state();
     }
 
     [[nodiscard]] bool provider_replay_mode() const noexcept {
@@ -605,6 +612,8 @@ void test_h1(const scenario_options& options) {
     predicate("h1_current_dispatch_once",
               rig.accepted_dispatches() == 1 && rig.obsolete_dispatches() == 0,
               "H1 must dispatch one current action and no obsolete action");
+    check(rig.step_control().state.observation_step == 1,
+          "H1 current action was not consumed by one simulator/control step");
 }
 
 void advance_through_reacquisition(scenario_rig& rig) {
@@ -634,6 +643,8 @@ void test_h2a(const scenario_options& options) {
     predicate("h2a_obsolete_dispatch_observed",
               rig.accepted_dispatches() == 1 && rig.obsolete_dispatches() == 1,
               "H2a must record one bounded obsolete baseline dispatch");
+    check(rig.step_control().state.observation_step == 3,
+          "H2a obsolete action was not consumed inside the bounded host");
 }
 
 void test_h2b(const scenario_options& options) {
@@ -656,6 +667,49 @@ void test_h2b(const scenario_options& options) {
     predicate("h2b_zero_obsolete_dispatch",
               rig.accepted_dispatches() == 0 && rig.obsolete_dispatches() == 0,
               "H2b must dispatch no obsolete action");
+    check(rig.step_control().state.observation_step == 3,
+          "H2b fallback was not consumed after stale-result rejection");
+}
+
+void test_g5_fixed_shot(const scenario_options& options) {
+    auto completion = std::make_shared<completion_gate>();
+    completion->action = {0.0, 0.0};
+    scenario_rig rig(
+        options.socket_path, options.tree_path, "G5-fixed",
+        bt::vla_acceptance_policy::invocation_scoped, {completion}, true,
+        options.event_path, std::nullopt,
+        air_hockey_demo::host_configuration{
+            .blackout_start_step = 5,
+            .blackout_length_steps = 3,
+            .timeout_steps = 20,
+            .action_lock_steps = 0,
+            .replace_track_steps = {},
+            .terminate_at_step = std::nullopt,
+        });
+    check(rig.tick() == bt::status::running,
+          "G5 fixed shot did not submit its deterministic request");
+    const std::uint64_t job = rig.only_job_id();
+    adopt_running_invocation(rig, job);
+    completion->wait_for_start();
+    completion->release();
+    wait_for_authority(rig, job, bt::vla_authority_state::accepted);
+    check(rig.accepted_dispatches() == 1 && rig.obsolete_dispatches() == 0,
+          "G5 fixed shot did not dispatch one current target");
+
+    std::size_t steps = 0;
+    while (rig.state().episode_active) {
+        const air_hockey_demo::host_step_result step = rig.step_control();
+        ++steps;
+        if (step.state.episode_active) {
+            (void)rig.tick();
+        }
+    }
+    predicate("g5_fixed_shot_completed",
+              steps > 0 && (rig.state().terminated || rig.state().truncated),
+              "G5 fixed shot must reach a simulator terminal state");
+    predicate("g5_fixed_shot_current_dispatch_once",
+              rig.accepted_dispatches() == 1 && rig.obsolete_dispatches() == 0,
+              "G5 fixed shot must consume exactly one authorised proposal");
 }
 
 void test_h3(const scenario_options& options) {
@@ -883,7 +937,7 @@ using scenario_fn = void (*)(const scenario_options&);
 const std::vector<std::pair<std::string_view, scenario_fn>> kScenarios{
     {"H1", test_h1},   {"H2a", test_h2a}, {"H2b", test_h2b}, {"H3", test_h3},
     {"H4", test_h4},   {"H5", test_h5},   {"H6", test_h6},   {"H7", test_h7},
-    {"H8", test_h8},
+    {"H8", test_h8},   {"G5-fixed", test_g5_fixed_shot},
 };
 
 }  // namespace
