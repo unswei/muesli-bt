@@ -18,6 +18,29 @@ from .bridge_server import BridgeServer
 from .trial_runner import TRIAL_FILES, NativeTrialSupervisor, TrialError
 
 
+def _default_payload_root(
+    module_path: pathlib.Path | None = None,
+    working_directory: pathlib.Path | None = None,
+) -> pathlib.Path:
+    """Locate the Studio-packaged native payload or its source-tree location."""
+    module_path = (module_path or pathlib.Path(__file__)).resolve()
+    working_directory = (working_directory or pathlib.Path.cwd()).resolve()
+    candidates: list[pathlib.Path] = []
+    for anchor in (module_path.parent, working_directory):
+        for parent in (anchor, *anchor.parents):
+            candidate = parent / "res" / "native_payload"
+            if candidate not in candidates:
+                candidates.append(candidate)
+    for candidate in candidates:
+        if (candidate / "manifest.json").is_file():
+            return candidate
+
+    # ``runtime.py`` lives below ``src/muesli_booster`` in a source checkout.
+    # Returning this stable path gives payload verification a useful error when
+    # the generated resource has not been built yet.
+    return module_path.parents[2] / "res" / "native_payload"
+
+
 def _env_bool(name: str, default: bool = False) -> bool:
     value = os.environ.get(name)
     if value is None:
@@ -69,10 +92,9 @@ class BoosterRuntime:
         )
         self._bridge = BridgeServer(socket_path, self._state)
         self._motion_enabled = motion_enabled
-        project_root = pathlib.Path(__file__).resolve().parents[2]
         payload_root = pathlib.Path(
             os.environ.get(
-                "MUESLI_BOOSTER_NATIVE_PAYLOAD_ROOT", str(project_root / "payload")
+                "MUESLI_BOOSTER_NATIVE_PAYLOAD_ROOT", str(_default_payload_root())
             )
         )
         evidence_root = pathlib.Path(

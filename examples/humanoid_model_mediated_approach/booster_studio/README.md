@@ -49,7 +49,8 @@ records the actual Booster acceptance or rejection.
 
 The agent waits for a fresh ball, fresh robot pose and stable robot state before
 starting a requested native trial. It verifies the Linux executable and every
-frozen BT, configuration and evidence protocol against `payload/manifest.json`.
+frozen BT, configuration and evidence protocol against
+`res/native_payload/manifest.json`.
 A changed, missing, symlinked or wrong-architecture file prevents launch.
 
 The native process is supervised. Agent shutdown terminates the process and
@@ -107,7 +108,7 @@ Runtime settings:
 | `MUESLI_BOOSTER_ROBOT_POSE_MAX_AGE_S` | `0.5` | Maximum robot pose age. |
 | `MUESLI_BOOSTER_MIN_FIELD_X_M` / `MAX_FIELD_X_M` | `-6.5` / `6.5` | Permitted field x range. |
 | `MUESLI_BOOSTER_MIN_FIELD_Y_M` / `MAX_FIELD_Y_M` | `-4.0` / `4.0` | Permitted field y range. |
-| `MUESLI_BOOSTER_NATIVE_PAYLOAD_ROOT` | project `payload/` | Verified native payload root. |
+| `MUESLI_BOOSTER_NATIVE_PAYLOAD_ROOT` | packaged `res/native_payload/` | Verified native payload root. |
 | `MUESLI_BOOSTER_EVIDENCE_ROOT` | `/tmp/muesli-humanoid-runs` | Live trial evidence directory. |
 | `MUESLI_BOOSTER_AUTOSTART_TRIAL` | empty | Start `T1`, `T2a`, `T2b` or `T3` once the host is ready. |
 | `MUESLI_BOOSTER_TRIAL_STARTUP_TIMEOUT_S` | `30` | Maximum wait for fresh ball, pose and stability. |
@@ -141,9 +142,12 @@ The build uses a digest-pinned Ubuntu 22.04 image and links the GNU C++ runtime
 libraries into the runner. `build.toml` advertises only `sim_x86_64` until
 separate ARM and device payloads are built and tested.
 
-The publisher first copies temporary build output beside `payload/`, then uses
-same-filesystem renames for the managed entries. The build therefore works when
-the system temporary directory and repository are on different filesystems.
+The publisher first copies temporary build output beside
+`res/native_payload/`, then uses same-filesystem renames for the managed
+entries. The build therefore works when the system temporary directory and
+repository are on different filesystems. Booster Studio includes `res/` in the
+signed Agent, so the verifier can find the payload both in a checkout and after
+installation.
 
 For a virtual K1 trial, set motion and one trial explicitly in the Studio agent
 environment:

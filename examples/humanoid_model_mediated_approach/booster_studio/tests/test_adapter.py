@@ -20,6 +20,7 @@ from muesli_booster.adapter import (
     RobotPose,
 )
 from muesli_booster.bridge_server import BridgeServer
+from muesli_booster.runtime import _default_payload_root
 
 
 def request(context_id: str = "ball-0001", generation: int = 1) -> dict:
@@ -189,6 +190,23 @@ class ManifestTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('"MUESLI_BOOSTER_MOTION_ENABLED", False', runtime)
+
+    def test_default_payload_root_finds_packaged_resource(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            install_root = Path(directory)
+            module = (
+                install_root
+                / "agent/example/lib/python3.10/site-packages/example/muesli_booster/runtime.py"
+            )
+            module.parent.mkdir(parents=True)
+            module.touch()
+            payload = install_root / "res/native_payload"
+            payload.mkdir(parents=True)
+            (payload / "manifest.json").write_text("{}\n", encoding="utf-8")
+
+            resolved = _default_payload_root(module, install_root / "agent")
+
+            self.assertEqual(resolved, payload.resolve())
 
 
 if __name__ == "__main__":

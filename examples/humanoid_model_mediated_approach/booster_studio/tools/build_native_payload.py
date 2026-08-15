@@ -16,7 +16,7 @@ from typing import Any
 STUDIO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 EXPERIMENT_ROOT = STUDIO_ROOT.parent
 REPO_ROOT = EXPERIMENT_ROOT.parents[1]
-PAYLOAD_ROOT = STUDIO_ROOT / "payload"
+PAYLOAD_ROOT = STUDIO_ROOT / "res" / "native_payload"
 sys.path.insert(0, str(STUDIO_ROOT / "src"))
 
 from muesli_booster.native_payload import (

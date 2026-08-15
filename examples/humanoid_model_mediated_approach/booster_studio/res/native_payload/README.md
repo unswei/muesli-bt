@@ -4,10 +4,11 @@ This directory is populated by `tools/build_native_payload.py`. Generated
 binaries and copied experiment assets are ignored by Git. Run the preparation
 tool before asking Booster Studio to build the `.agent` package.
 
-The generated layout is:
+Booster Studio packages this directory as an Agent resource. The generated
+layout is:
 
 ```text
-payload/
+res/native_payload/
 ├── manifest.json
 ├── common/
 │   ├── configs/
