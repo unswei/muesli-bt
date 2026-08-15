@@ -31,6 +31,7 @@ from muesli_booster.adapter import (
 from muesli_booster.native_payload import verify_payload
 from muesli_booster.trial_runner import (
     NativeTrialSupervisor,
+    TrialError,
     build_trial_command,
 )
 
@@ -150,7 +151,6 @@ class NativeTrialSupervisorTests(unittest.TestCase):
                 payload_root=payload_root,
                 evidence_root=root / "evidence",
                 bridge_socket="/tmp/test-bridge.sock",
-                motion_enabled=True,
                 state=state,
                 logger=logger,
                 process_factory=factory,
@@ -189,7 +189,6 @@ class NativeTrialSupervisorTests(unittest.TestCase):
                 payload_root=self.stage_payload(root),
                 evidence_root=root / "evidence",
                 bridge_socket="/tmp/test-bridge.sock",
-                motion_enabled=True,
                 state=state,
                 logger=Logger(),
                 process_factory=lambda *args, **kwargs: FinishedProcess(9, "failed\n"),
@@ -201,6 +200,22 @@ class NativeTrialSupervisorTests(unittest.TestCase):
                 time.sleep(0.005)
             state.set_emergency(False)
             self.assertTrue(state.snapshot(time.monotonic()).emergency)
+
+    def test_disarmed_host_cannot_start_trial(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            state = ready_state()
+            state.set_motion_enabled(False)
+            supervisor = NativeTrialSupervisor(
+                payload_root=self.stage_payload(root),
+                evidence_root=root / "evidence",
+                bridge_socket="/tmp/test-bridge.sock",
+                state=state,
+                logger=Logger(),
+            )
+
+            with self.assertRaisesRegex(TrialError, "require armed motion"):
+                supervisor.start("T1", "disarmed")
 
 
 if __name__ == "__main__":

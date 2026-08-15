@@ -207,7 +207,6 @@ class NativeTrialSupervisor:
         payload_root: pathlib.Path,
         evidence_root: pathlib.Path,
         bridge_socket: str,
-        motion_enabled: bool,
         state: AdapterState,
         logger: Any,
         process_factory: Callable[..., subprocess.Popen[str]] = subprocess.Popen,
@@ -215,7 +214,6 @@ class NativeTrialSupervisor:
         self._payload_root = payload_root
         self._evidence_root = evidence_root
         self._bridge_socket = bridge_socket
-        self._motion_enabled = motion_enabled
         self._state = state
         self._logger = logger
         self._process_factory = process_factory
@@ -246,13 +244,15 @@ class NativeTrialSupervisor:
                 raise TrialError(str(exc)) from exc
             snapshot = self._state.snapshot(time.monotonic())
             if (
-                not snapshot.ball_available
+                not self._state.motion_enabled
+                or not snapshot.ball_available
                 or snapshot.robot_pose is None
                 or not snapshot.robot_stable
                 or snapshot.emergency
             ):
                 raise TrialError(
-                    "Booster host is not ready: require fresh ball, pose and stability"
+                    "Booster host is not ready: require armed motion, fresh ball, pose "
+                    "and stability"
                 )
             if run_id is None:
                 stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
@@ -268,7 +268,7 @@ class NativeTrialSupervisor:
                 run_id=run_id,
                 event_path=event_path,
                 bridge_socket=self._bridge_socket,
-                motion_enabled=self._motion_enabled,
+                motion_enabled=self._state.motion_enabled,
             )
             self._state.prepare_trial()
             manifest: dict[str, Any] = {
@@ -279,7 +279,7 @@ class NativeTrialSupervisor:
                 "source_git_commit": payload.source_git_commit,
                 "source_git_dirty": payload.source_git_dirty,
                 "payload_manifest_sha256": sha256_file(payload.root / "manifest.json"),
-                "motion_enabled": self._motion_enabled,
+                "motion_enabled": self._state.motion_enabled,
                 "runner_command": command,
                 "event_log": {"path": "events.jsonl", "schema": "mbt.evt.v1"},
             }

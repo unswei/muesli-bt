@@ -1,9 +1,9 @@
 # Booster Studio host adapter
 
 Status: the Studio package source, native-runner supervisor and video-overlay
-path are locally integrated and offline tested. The pinned Linux payload builds
-and verifies on x86-64. Motion is disabled by default. A virtual K1 trial
-remains pending.
+path are locally integrated and offline tested. The signed Agent installs and
+starts on a virtual K1 with the pinned Linux payload. Motion is disabled by
+default. A motion-enabled virtual K1 trial remains pending.
 
 ## what this is
 
@@ -113,6 +113,23 @@ Runtime settings:
 | `MUESLI_BOOSTER_AUTOSTART_TRIAL` | empty | Start `T1`, `T2a`, `T2b` or `T3` once the host is ready. |
 | `MUESLI_BOOSTER_TRIAL_STARTUP_TIMEOUT_S` | `30` | Maximum wait for fresh ball, pose and stability. |
 
+Studio exposes six operator actions after the Agent starts:
+
+| Action ID | Effect |
+| --- | --- |
+| `motion_arm` | Toggle the Booster walking backend. Disarming stops any trial and clears its walking target. |
+| `trial_t1` | Start the normal full-authority trial. |
+| `trial_t2a` | Start the moved-ball timeout-only baseline. |
+| `trial_t2b` | Start the moved-ball invocation-scoped trial. |
+| `trial_t3` | Start the higher-priority interruption trial. |
+| `software_emergency` | Toggle the controlled emergency used after the T3 request cue. |
+
+The Agent always starts fail-closed unless
+`MUESLI_BOOSTER_MOTION_ENABLED=true` is supplied by a controlled deployment.
+For interactive Studio work, use `motion_arm` so arming is a visible operator
+action. A trial action refuses to launch until motion is armed and the ball,
+robot pose and stability observations are fresh.
+
 ## example
 
 Run the adapter policy and socket tests without ROS, BoosterOS or a simulator:
@@ -149,18 +166,19 @@ repository are on different filesystems. Booster Studio includes `res/` in the
 signed Agent, so the verifier can find the payload both in a checkout and after
 installation.
 
-For a virtual K1 trial, set motion and one trial explicitly in the Studio agent
-environment:
+For an unattended virtual K1 trial, set motion and one trial explicitly in the
+Studio Agent environment:
 
 ```text
 MUESLI_BOOSTER_MOTION_ENABLED=true
 MUESLI_BOOSTER_AUTOSTART_TRIAL=T2b
 ```
 
-Start recording before activating the agent. Move the ball after the
-`REQUEST_SUBMITTED` cue for T2a or T2b. For T3, publish a controlled software
-emergency after the cue. Run one trial per activation and retain its evidence
-directory.
+For an interactive trial, start recording, activate the Agent, invoke
+`motion_arm`, then invoke one trial action. Move the ball after the
+`REQUEST_SUBMITTED` cue for T2a or T2b. For T3, invoke
+`software_emergency` after the cue. Run one trial at a time and retain its
+evidence directory.
 
 ```bash
 ros2 topic pub --once /muesli/emergency std_msgs/msg/Bool '{data: true}'
@@ -186,6 +204,10 @@ passes. The project metadata selects `football3v3` and `soccer-match`.
 ## gotchas
 
 - Motion defaults to disabled and a dispatch then returns `motion_disabled`.
+- The `motion_arm` action is an explicit safety boundary. Triggering a trial
+  action while disarmed returns `not ready` and launches no native process.
+- Disarming stops the active native process, revokes its walking target and
+  commands zero velocity before closing the Booster backend.
 - Autostart is empty by default. Setting a trial ID does nothing until the ball,
   pose and stability snapshot is fresh.
 - A live trial needs motion enabled even for T2a, because the experiment must

@@ -1,5 +1,5 @@
 id = "tech.muesli.humanoidapproach"
-version = "0.2.1"
+version = "0.2.2"
 name = { en = "muesli humanoid approach", zh = "muesli humanoid approach" }
 logo = "/res/logo.png"
 description = "Fail-closed Booster K1 host adapter for the muesli-bt humanoid approach experiment"

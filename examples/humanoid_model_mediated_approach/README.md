@@ -136,14 +136,16 @@ must supply and enforce observation timestamps before a physical trial.
 The `booster_studio/` project implements ball context tracking, observation age,
 stability/emergency state, operating-area validation, a bounded pose follower,
 a manifest-verified native runner supervisor and event-derived overlays. Motion
-is disabled by default. The native runner polls adapter snapshots and uses the
-synchronous bridge response as the walking-target callback result. Before
-enabling a robot trial:
+is disabled by default. Studio exposes an explicit `motion_arm` action plus one
+action per trial and a controlled `software_emergency` action. The native
+runner polls adapter snapshots and uses the synchronous bridge response as the
+walking-target callback result. Before enabling a robot trial:
 
 1. build the pinned `sim_x86_64` native payload and verify its manifest;
 2. run the snapshot/dispatch round trip with motion disabled;
-3. run the software-emergency trial in the virtual K1 scene; and
-4. retain the runtime commit gate and both dispatch-time safety checks.
+3. invoke `motion_arm` in the virtual K1 scene;
+4. run the software-emergency trial; and
+5. retain the runtime commit gate and both dispatch-time safety checks.
 
 See `booster_studio/README.md` for the exact payload, trial and video finalising
 commands. The current Studio package advertises only `sim_x86_64`; device

@@ -131,7 +131,10 @@ python3 examples/humanoid_model_mediated_approach/booster_studio/tools/build_nat
 
 The command requires Docker Buildx. It uses a pinned Linux x86-64 container;
 local macOS binaries are rejected. The Booster adapter README contains the
-Studio activation and video-finalisation runbook.
+Studio activation and video-finalisation runbook. The Agent starts with motion
+disabled. In Studio, invoke `motion_arm` before invoking one of `trial_t1`,
+`trial_t2a`, `trial_t2b` or `trial_t3`. The `software_emergency` action supplies
+the controlled T3 interruption.
 
 Run a real-time clip for the full moved-ball trial:
 
@@ -166,9 +169,9 @@ pending artefacts before treating the run as paper evidence.
   generation are recorded in adjacent canonical blackboard writes.
 - A completed runtime bundle is still missing raw video, overlay video and
   replay comparison until the manifest says otherwise.
-- The native runner and adapter pass a local socket round trip. This is not an
-  end-to-end virtual K1 result because Booster Studio and the simulator are not
-  involved in that test.
+- The native runner and adapter pass a local socket round trip. A signed Agent
+  also installs and starts fail-closed in the virtual K1 simulator. Neither
+  result is a motion-enabled end-to-end trial.
 - `build.toml` currently advertises only `sim_x86_64`. Do not add a device or
   ARM target until its native payload has a separate build and test result.
 - A forced rerun is staged and validated before it replaces an existing marked

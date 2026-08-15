@@ -118,6 +118,22 @@ class DispatchAndFollowerTests(unittest.TestCase):
         self.assertFalse(outcome.accepted)
         self.assertEqual(outcome.reason, "motion_disabled")
 
+    def test_operator_arming_enables_dispatch_and_disarming_revokes_motion(
+        self,
+    ) -> None:
+        state = self.ready_state(motion_enabled=False)
+        state.set_motion_enabled(True)
+        self.assertTrue(state.snapshot_payload(10.1)["motion_enabled"])
+        self.assertTrue(state.dispatch(request(), 10.1).accepted)
+
+        state.set_motion_enabled(False)
+
+        self.assertFalse(state.snapshot_payload(10.2)["motion_enabled"])
+        self.assertEqual(state.velocity_command(10.2).reason, "no_target")
+        self.assertEqual(
+            state.dispatch(request(generation=2), 10.2).reason, "motion_disabled"
+        )
+
     def test_stale_robot_pose_and_non_numeric_target_reject(self) -> None:
         state = self.ready_state()
         state.observe_ball(BallObservation(1.2, -0.35, 0.0, 10.4))
@@ -190,6 +206,16 @@ class ManifestTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('"MUESLI_BOOSTER_MOTION_ENABLED", False', runtime)
+        entry = (PROJECT / "src/main.py").read_text(encoding="utf-8")
+        for component_id in (
+            "motion_arm",
+            "trial_t1",
+            "trial_t2a",
+            "trial_t2b",
+            "trial_t3",
+            "software_emergency",
+        ):
+            self.assertIn(f'"{component_id}"', entry)
 
     def test_default_payload_root_finds_packaged_resource(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

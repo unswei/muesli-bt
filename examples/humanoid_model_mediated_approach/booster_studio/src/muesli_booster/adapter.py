@@ -236,8 +236,21 @@ class AdapterState:
         self._robot_stable = False
         self._emergency = False
         self._runtime_fault = False
+        self._motion_enabled = config.motion_enabled
         self._accepted_keys: set[tuple[str, int]] = set()
         self._active_target: _ActiveTarget | None = None
+
+    @property
+    def motion_enabled(self) -> bool:
+        with self._lock:
+            return self._motion_enabled
+
+    def set_motion_enabled(self, enabled: bool) -> None:
+        """Arm or disarm dispatch; disarming immediately revokes active motion."""
+        with self._lock:
+            self._motion_enabled = bool(enabled)
+            if not enabled:
+                self._active_target = None
 
     def observe_ball(self, observation: BallObservation) -> str:
         with self._lock:
@@ -338,7 +351,7 @@ class AdapterState:
         key = (job_id, generation)
         if key in self._accepted_keys:
             return DispatchOutcome(False, "duplicate_dispatch")
-        if not self.config.motion_enabled:
+        if not self._motion_enabled:
             return DispatchOutcome(False, "motion_disabled")
         if snapshot.emergency or not snapshot.robot_stable:
             return DispatchOutcome(False, "robot_unstable")
@@ -493,7 +506,7 @@ class AdapterState:
             },
             "robot_stable": snapshot.robot_stable,
             "emergency": snapshot.emergency,
-            "motion_enabled": self.config.motion_enabled,
+            "motion_enabled": self.motion_enabled,
         }
 
     def dispatch_payload(

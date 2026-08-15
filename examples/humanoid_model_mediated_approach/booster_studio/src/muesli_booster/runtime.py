@@ -104,7 +104,6 @@ class BoosterRuntime:
             payload_root=payload_root,
             evidence_root=evidence_root,
             bridge_socket=socket_path,
-            motion_enabled=motion_enabled,
             state=self._state,
             logger=logger,
         )
@@ -124,6 +123,7 @@ class BoosterRuntime:
         self._spin_thread: threading.Thread | None = None
         self._control_thread: threading.Thread | None = None
         self._autostart_thread: threading.Thread | None = None
+        self._robot_lock = threading.RLock()
         self._robot: Any = None
         self._node: Any = None
         self._executor: Any = None
@@ -157,18 +157,10 @@ class BoosterRuntime:
         self._executor.add_node(self._node)
 
         if self._motion_enabled:
-            from boosteros.robots.booster import BoosterRobot
-
-            self._robot = BoosterRobot(
-                virtual_robot_name=self._robot_name,
-                enable_tf_listener=False,
-                timeout=10.0,
-            )
-            self._robot.set_gait("soccer")
-            self._robot.set_mode("walk")
+            self._robot = self._create_robot_backend()
         self._state.set_robot_stable(False)
         if self._robot is not None:
-            self._poll_stability()
+            self._poll_stability(self._robot)
         self._bridge.start()
         self._stop.clear()
         self._spin_thread = threading.Thread(
@@ -206,14 +198,9 @@ class BoosterRuntime:
         self._spin_thread = None
         self._control_thread = None
         self._autostart_thread = None
-        if self._robot is not None:
-            try:
-                self._robot.set_velocity(vx=0.0, vy=0.0, vyaw=0.0)
-            finally:
-                close = getattr(self._robot, "_close", None)
-                if callable(close):
-                    close()
-        self._robot = None
+        self._motion_enabled = False
+        self._state.set_motion_enabled(False)
+        self._disable_robot_backend()
         if self._node is not None:
             self._node.destroy_node()
         if self._owns_ros_context and self._ros_context is not None:
@@ -225,6 +212,69 @@ class BoosterRuntime:
     def start_trial(self, trial_id: str, run_id: str | None = None) -> pathlib.Path:
         """Start one native trial after the live host has become ready."""
         return self._trial_supervisor.start(trial_id, run_id)
+
+    @property
+    def motion_enabled(self) -> bool:
+        return self._state.motion_enabled
+
+    def arm_motion(self) -> None:
+        """Create the Booster backend after an explicit operator action."""
+        if self._control_thread is None:
+            raise RuntimeError("Booster host is not active")
+        with self._robot_lock:
+            if self._robot is not None:
+                return
+            robot = self._create_robot_backend()
+            self._robot = robot
+            self._motion_enabled = True
+            self._state.set_motion_enabled(True)
+            self._poll_stability(robot)
+        self._logger.info("muesli Booster motion armed by operator")
+
+    def disarm_motion(self) -> None:
+        """Stop the trial and robot backend, revoking any walking target."""
+        self._trial_supervisor.stop()
+        self._motion_enabled = False
+        self._state.set_motion_enabled(False)
+        self._state.set_robot_stable(False)
+        self._disable_robot_backend()
+        self._logger.info("muesli Booster motion disarmed by operator")
+
+    def set_emergency(self, enabled: bool) -> None:
+        """Set or clear the controlled software emergency used by T3."""
+        self._state.set_emergency(enabled)
+        self._logger.info(f"muesli Booster software emergency={enabled}")
+
+    def _create_robot_backend(self) -> Any:
+        from boosteros.robots.booster import BoosterRobot
+
+        robot = BoosterRobot(
+            virtual_robot_name=self._robot_name,
+            enable_tf_listener=False,
+            timeout=10.0,
+        )
+        try:
+            robot.set_gait("soccer")
+            robot.set_mode("walk")
+        except Exception:
+            close = getattr(robot, "_close", None)
+            if callable(close):
+                close()
+            raise
+        return robot
+
+    def _disable_robot_backend(self) -> None:
+        with self._robot_lock:
+            robot = self._robot
+            self._robot = None
+            if robot is None:
+                return
+            try:
+                robot.set_velocity(vx=0.0, vy=0.0, vyaw=0.0)
+            finally:
+                close = getattr(robot, "_close", None)
+                if callable(close):
+                    close()
 
     def _start_trial_when_ready(self) -> None:
         deadline = time.monotonic() + self._trial_startup_timeout_s
@@ -262,23 +312,29 @@ class BoosterRuntime:
         next_stability_poll = 0.0
         while not self._stop.is_set():
             started = time.monotonic()
-            if self._robot is not None and started >= next_stability_poll:
-                self._poll_stability()
-                next_stability_poll = started + 0.5
+            with self._robot_lock:
+                robot = self._robot
+                if robot is not None and started >= next_stability_poll:
+                    self._poll_stability(robot)
+                    next_stability_poll = started + 0.5
             command = self._state.velocity_command(started)
-            if self._robot is not None:
-                try:
-                    self._robot.set_velocity(
-                        vx=command.vx_mps, vy=command.vy_mps, vyaw=command.vyaw_rps
-                    )
-                except Exception as exc:  # noqa: BLE001 - Booster SDK boundary
-                    self._state.set_robot_stable(False)
-                    self._logger.error(f"Booster set_velocity failed: {exc}")
+            with self._robot_lock:
+                robot = self._robot
+                if robot is not None:
+                    try:
+                        robot.set_velocity(
+                            vx=command.vx_mps,
+                            vy=command.vy_mps,
+                            vyaw=command.vyaw_rps,
+                        )
+                    except Exception as exc:  # noqa: BLE001 - Booster SDK boundary
+                        self._state.set_robot_stable(False)
+                        self._logger.error(f"Booster set_velocity failed: {exc}")
             self._stop.wait(max(0.0, period - (time.monotonic() - started)))
 
-    def _poll_stability(self) -> None:
+    def _poll_stability(self, robot: Any) -> None:
         try:
-            state = self._robot.get_fall_down_state()
+            state = robot.get_fall_down_state()
             state_name = getattr(state, "state", None)
             self._state.set_robot_stable(state_name == "normal")
         except Exception as exc:  # noqa: BLE001 - Booster SDK boundary
