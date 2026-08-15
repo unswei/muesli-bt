@@ -1074,8 +1074,8 @@ void test_h8(const scenario_options& options) {
               !recorded.replay_mode && replayed.replay_mode &&
                   recorded.projection == replayed.projection &&
                   recorded.applied_mallet_target == replayed.applied_mallet_target &&
-                  recorded.applied_mallet_target ==
-                      std::array<double, air_hockey_demo::kActionDimension>{0.25, -0.4} &&
+                  recorded.response.action.u == std::vector<double>{0.25, -0.4} &&
+                  replayed.response.action.u == recorded.response.action.u &&
                   recorded.projection ==
                       std::vector<std::string>{"submit:generation-1", "result:accepted",
                                                "dispatch:accepted-current"},
