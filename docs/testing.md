@@ -162,6 +162,23 @@ require GPU access, and refuses to replace a non-empty output directory. It
 uses only the default engineering shot; the `muesli_test` paper split remains
 closed until the later protocol-freeze gate.
 
+WP6 adds a pure protocol check to the local suite and a separate Marvin
+campaign. `run_wp6.py check-protocol` validates the engineering distribution
+and manifest hashes, calibrated delay ordering, H1--H8 matrix, learned-provider
+identity, source-protocol action lock, timing thresholds and the closed paper
+split. The focused host suite exercises its percentile, timing-record and event
+stream projections without MuJoCo.
+
+The remote `run_wp6.py run` command requires an empty output directory, the
+hash-matched checkpoint mounted read-only, and the commit-tagged joint image.
+It runs 26 engineering shots across all nine H1--H8 rows, then runs the frozen
+learned provider on the same shots. Gate G6 fails closed on integrity,
+current-result progress, obsolete dispatches, context rejection, replay,
+fallback, BT tick timing, learned inference timing or save rate. The passing
+campaign used image `local/muesli-air-hockey:8555ffb-1b6bbbb`, 2 CPUs, 8 GB RAM
+and no GPU; it recorded 234 passing deterministic runs and 26/26 learned saves.
+The paper split remained unopened.
+
 ## canonical event fixture suite
 
 Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:

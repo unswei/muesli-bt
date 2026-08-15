@@ -6,6 +6,8 @@ fake host. WP2 adds the C++ `env_backend`, matched Behaviour Trees, proposal
 validator, dispatch gate and deterministic H1--H8 harness. WP3 adds the local
 evidence-bundle, paired-analysis, replay and overlay tooling. WP4 pins the ACRA
 source and container, defines the joint image and packages provider adapters.
+WP5 validates the MuJoCo vertical slice, and WP6 freezes and runs the complete
+engineering pilot without opening the paper split.
 
 The fake host is useful for protocol, lifecycle and information-boundary tests.
 It is not a physics simulator and its observations must not be used as task
@@ -147,6 +149,47 @@ the default ACRA shot only; it did not generate or open the `muesli_test` paper
 split. Evaluation-only MuJoCo state is written separately from public host
 states and is rejected if it crosses into canonical events.
 
+## wp6 calibration and pilot campaign
+
+The frozen protocol is `configs/wp6_protocol.json`. Validate its schema,
+engineering-manifest hashes, calibrated delays and closed paper split locally:
+
+```bash
+uv run --with-requirements \
+  examples/air_hockey_model_mediated_defence/container/requirements-wp4.txt \
+  python examples/air_hockey_model_mediated_defence/run_wp6.py check-protocol
+```
+
+Gate G6 must run from an empty evidence directory with the exact checkpoint
+mounted read-only. The passing Marvin command used the archive-built joint
+image below and exposed no GPU:
+
+```bash
+g6_output=$PWD/build/air-hockey-g6
+checkpoint=/absolute/path/to/structured_k2-14303.npz
+mkdir -p "$g6_output"
+docker run --rm --cpus 2 --memory 8g --ipc host \
+  --env OMP_NUM_THREADS=1 --env OPENBLAS_NUM_THREADS=1 \
+  --env MKL_NUM_THREADS=1 --env NUMEXPR_NUM_THREADS=1 \
+  --mount type=bind,src="$checkpoint",dst=/checkpoint/structured_k2-14303.npz,readonly \
+  --mount type=bind,src="$g6_output",dst=/evidence \
+  local/muesli-air-hockey:8555ffb-1b6bbbb \
+  python3 /opt/muesli-bt/examples/air_hockey_model_mediated_defence/run_wp6.py run \
+    --runner /opt/muesli-bt/build/air-hockey-wp4/muesli_bt_air_hockey_scenario_tests \
+    --checkpoint /checkpoint/structured_k2-14303.npz \
+    --out /evidence/campaign
+```
+
+The passing campaign ran H1--H8 once for each of 26 engineering shots (234
+runs), plus timely, boundary and stale delay calibrations. It recorded 26/26
+current results, 26 context-change rejections, exactly 26 deadline-only
+obsolete dispatches, zero invocation-scoped obsolete dispatches and 26 fallback
+checks. Operational BT tick p99 was 9.605 ms with no 20 ms budget misses. The
+hash-bound `structured_k2` provider saved 26/26 shots, had 0.130 ms p95
+inference latency and required no deadline fallback. Its five-step action lock
+is bound to the checkpoint source-protocol hash rather than inferred from pilot
+outcomes. The `muesli_test` split remained unopened.
+
 ## run the contract tests
 
 From the repository root:
@@ -182,7 +225,7 @@ for the lifecycle and field boundary.
 - `host/`: strict Python protocol host and WP1 tests;
 - `src/`: C++ socket client, `env_backend`, commit validator and dispatch gate;
 - `lisp/`: matched deadline-only and invocation-scoped task BTs;
-- `configs/`: frozen deterministic H1--H8 scenario configurations;
+- `configs/`: frozen deterministic scenarios, engineering split and WP6 protocol;
 - `evidence/`: named Gate G2 evidence predicates;
 - `analysis/`: WP3 validation, replay, statistics and overlay modules;
 - `provider/`: fixed and hash-bound ACRA-export provider adapters;

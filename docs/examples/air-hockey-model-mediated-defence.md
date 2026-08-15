@@ -8,6 +8,9 @@ harness proves the request, context, revocation and dispatch behaviour against
 a strict local fake host. The WP3 workflow turns raw runtime and task records
 into reproducible evidence bundles. WP4 pins the ACRA source and simulator
 image, then checks provider packaging without starting MuJoCo.
+WP5 validates the pinned MuJoCo vertical slice. WP6 freezes the engineering
+protocol and runs the complete authority and learned-provider pilot while the
+paper split remains closed.
 
 The synthetic campaign is an analysis test. It is not MuJoCo task evidence and
 is never paper eligible.
@@ -124,6 +127,28 @@ docker run --rm --cpus 2 --memory 8g --ipc host \
 No GPU is exposed to this command. It is an engineering Gate G5 run and must
 not be pointed at the unopened `muesli_test` split.
 
+Gate G6 is driven by the schema-validated `configs/wp6_protocol.json`. It fixes
+the 26-shot engineering manifest, delay calibration, H1--H8 matrix,
+`structured_k2` checkpoint identity, source-protocol action lock, timing
+limits, save floor and fallback. Check the protocol locally before the Marvin
+run:
+
+```bash
+uv run --with-requirements \
+  examples/air_hockey_model_mediated_defence/container/requirements-wp4.txt \
+  python examples/air_hockey_model_mediated_defence/run_wp6.py check-protocol
+```
+
+The passing campaign used archive-built image
+`local/muesli-air-hockey:8555ffb-1b6bbbb` with 2 CPUs, 8 GB RAM and no exposed
+GPU. All 234 deterministic matrix runs passed. Current-result progress was
+26/26; the deadline-only baseline exposed 26 obsolete dispatches, while the
+invocation-scoped configurations exposed none. Operational BT tick p99 was
+9.605 ms with zero budget misses. The learned provider returned all 26 shots,
+with 0.130 ms p95 inference latency and no deadline fallback. Build, image,
+event, replay, timing and outcome artefacts are checksummed together. The report
+records `paper_split_opened: false`; WP6 does not authorise a `muesli_test` run.
+
 ## example behaviour tree
 
 The deadline-only and invocation-scoped trees are structurally identical. The
@@ -138,8 +163,9 @@ full invocation-scoped source is embedded below.
 - Privileged scoring values may appear only inside the trajectory record's
   `privileged` object. They must not enter events or provider records.
 - A recorded-provider replay requires an exact request SHA-256 match.
-- A learned-provider configuration requires the exact checkpoint SHA-256 and
-  family. WP4 deliberately contains neither a final path nor a final hash.
+- A learned-provider configuration requires the exact family, checkpoint
+  SHA-256, source-protocol SHA-256 and action-lock semantics. WP6 contains the
+  frozen engineering choice; no checkpoint path is committed.
 - The pinned base image is available on Marvin, so local WP4 proves the build
   definition and non-MuJoCo startup path rather than claiming an image run.
 - `--force` replaces only a safe, marked run directory. It refuses unmarked
