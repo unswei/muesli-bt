@@ -125,6 +125,7 @@ The paper-video acceptance gate is:
 
 ## see also
 
+- [T2 moved-ball paper-video comparison](t2-comparison.md)
 - [Booster Studio host adapter](../README.md)
 - [humanoid video experiment](../../README.md)
 - [experiment contract](../../../../docs/project/humanoid-model-mediated-approach-contract.md)

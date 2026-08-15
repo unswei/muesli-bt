@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage the fixed one-K1, one-ball scene for the T1 prototype."""
+"""Stage the fixed one-K1, one-ball scene for a paper-video shot."""
 
 from __future__ import annotations
 
@@ -11,7 +11,13 @@ from typing import Any
 
 
 class StagingError(RuntimeError):
-    """The T1 scene configuration or physics command failed."""
+    """The paper-video scene configuration or physics command failed."""
+
+
+SUPPORTED_SHOT_SCHEMAS = {
+    "humanoid.paper_video_shot.v1",
+    "humanoid.paper_video_comparison.v1",
+}
 
 
 def _read_shot(path: pathlib.Path) -> dict[str, Any]:
@@ -19,8 +25,9 @@ def _read_shot(path: pathlib.Path) -> dict[str, Any]:
         value = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
         raise StagingError(f"failed to read shot configuration: {exc}") from exc
-    if not isinstance(value, dict) or value.get("schema_version") != (
-        "humanoid.paper_video_shot.v1"
+    if (
+        not isinstance(value, dict)
+        or value.get("schema_version") not in SUPPORTED_SHOT_SCHEMAS
     ):
         raise StagingError("unsupported shot configuration")
     return value
@@ -142,9 +149,9 @@ def main() -> int:
     try:
         asyncio.run(stage(_read_shot(args.shot), args.websocket))
     except StagingError as exc:
-        print(f"T1 scene staging error: {exc}")
+        print(f"paper-video scene staging error: {exc}")
         return 2
-    print("PASS staged one K1 and ball A for the T1 prototype")
+    print("PASS staged one K1 and ball A for the paper-video shot")
     return 0
 
 

@@ -1,0 +1,34 @@
+{
+  "schema_version": "humanoid.paper_video_comparison.v1",
+  "shot_id": "t2-moved-ball-comparison",
+  "duration_seconds": 11.0,
+  "request_lead_seconds": 3.0,
+  "output": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "panel_width": 960
+  },
+  "source_crop": {
+    "x": 300,
+    "y": 160,
+    "width": 360,
+    "height": 405
+  },
+  "simulator_scene": {
+    "robot_name": "robot1",
+    "robot_body_id": 3,
+    "ball_body_id": 141,
+    "robot_start_position_m": [-0.6, 0.0, 0.545],
+    "robot_start_quaternion_wxyz": [1.0, 0.0, 0.0, 0.0],
+    "ball_a_position_m": [0.5, 0.0, 0.11],
+    "ball_b_position_m": [1.1, 0.65, 0.11],
+    "reset_wait_seconds": 8.0
+  },
+  "fixed_camera_panel_calibration": {
+    "robot_start": [365, 706],
+    "ball_a": [584, 728],
+    "ball_b": [792, 709],
+    "obsolete_target": [483, 720]
+  }
+}

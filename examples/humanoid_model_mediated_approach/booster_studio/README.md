@@ -6,7 +6,10 @@ starts on a virtual K1 with the pinned Linux payload. With native payload
 commit `9b3385c` and Agent adapter commit `b153e9f`, motion-enabled T1, T2a,
 T2b and T3 rehearsals completed in Booster Studio with canonical evidence.
 T1 also produced visible robot translation towards its accepted target.
-Motion remains disabled by default. Physical capture remains pending.
+The matched T2a/T2b simulation captures also produced an event-validated,
+polished split-screen comparison of stale acceptance and invocation-scoped
+rejection. Motion remains disabled by default. Physical capture remains
+pending.
 
 ## what this is
 
