@@ -219,12 +219,18 @@ def main() -> int:
             {
                 "schema": "mbt.evt.v1",
                 "contract_version": "1.0.0",
-                "type": "vla_poll",
+                "type": "vla_result",
                 "run_id": "trace-validator-smoke",
                 "unix_ms": 1735689600002,
                 "seq": 3,
                 "tick": 1,
-                "data": {"job_id": "job-2", "node_id": 7, "status": "cancelled"},
+                "data": {
+                    "job_id": "job-2",
+                    "generation": 1,
+                    "node_id": 7,
+                    "status": "error",
+                    "decision": "rejected",
+                },
             },
             {
                 "schema": "mbt.evt.v1",
@@ -242,6 +248,107 @@ def main() -> int:
         assert_exit(completed, 1, "async terminal without submit check")
         if "async_terminal_without_submit" not in completed.stdout:
             raise AssertionError("async terminal without submit check should mention async_terminal_without_submit")
+
+        runtime_tail_trace = tmp / "runtime_tail.jsonl"
+        runtime_tail_events = [
+            make_run_start(),
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "tick_begin",
+                "run_id": "trace-validator-smoke",
+                "unix_ms": 1735689600001,
+                "seq": 2,
+                "tick": 1,
+                "data": {"tick_budget_ms": 20},
+            },
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "tick_end",
+                "run_id": "trace-validator-smoke",
+                "unix_ms": 1735689600002,
+                "seq": 3,
+                "tick": 1,
+                "data": {
+                    "root_status": "running",
+                    "tick_ms": 1.0,
+                    "tick_budget_ms": 20.0,
+                },
+            },
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "tick_ok",
+                "run_id": "trace-validator-smoke",
+                "unix_ms": 1735689600003,
+                "seq": 4,
+                "tick": 1,
+                "data": {"status": "running"},
+            },
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "tick_begin",
+                "run_id": "trace-validator-smoke",
+                "unix_ms": 1735689600004,
+                "seq": 5,
+                "tick": 2,
+                "data": {"tick_budget_ms": 20},
+            },
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "vla_result",
+                "run_id": "trace-validator-smoke",
+                "unix_ms": 1735689600005,
+                "seq": 6,
+                "tick": 1,
+                "data": {
+                    "job_id": "provider-request-hash",
+                    "node_id": 0,
+                    "status": "done",
+                    "record": {"schema_version": "vla.result.v1"},
+                },
+            },
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "tick_end",
+                "run_id": "trace-validator-smoke",
+                "unix_ms": 1735689600006,
+                "seq": 7,
+                "tick": 2,
+                "data": {
+                    "root_status": "success",
+                    "tick_ms": 1.0,
+                    "tick_budget_ms": 20.0,
+                },
+            },
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "tick_ok",
+                "run_id": "trace-validator-smoke",
+                "unix_ms": 1735689600007,
+                "seq": 8,
+                "tick": 2,
+                "data": {"status": "success"},
+            },
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "run_end",
+                "run_id": "trace-validator-smoke",
+                "unix_ms": 1735689600008,
+                "seq": 9,
+                "tick": 2,
+                "data": {"status": "success"},
+            },
+        ]
+        write_events(runtime_tail_trace, runtime_tail_events)
+        completed = run_cli("check", str(runtime_tail_trace))
+        assert_ok(completed, "post-tick and model-service telemetry check")
 
         timing_only_trace = tmp / "timing_only.jsonl"
         timing_only_events = load_events(FIXTURE)

@@ -65,6 +65,13 @@ PROFILE_PRESETS: dict[str, dict[str, Any]] = {
 
 TERMINAL_NODE_STATUSES = {"success", "failure"}
 TERMINAL_VLA_STATUSES = {"done", "cancelled", "error", "timeout"}
+POST_TICK_EVENT_TYPES = {
+    "episode_end",
+    "run_end",
+    "tick_audit",
+    "tick_deadline_missed",
+    "tick_ok",
+}
 
 
 class UsageError(RuntimeError):
@@ -330,6 +337,18 @@ def _job_id(event: TraceEvent) -> str | None:
     return str(raw_job)
 
 
+def _is_model_service_result(event: TraceEvent) -> bool:
+    """Return whether a VLA result is provider telemetry, not an authority decision."""
+    if event.event_type != "vla_result":
+        return False
+    data = _event_data(event)
+    return (
+        "record" in data
+        and "generation" not in data
+        and "decision" not in data
+    )
+
+
 def _bool_field(event: TraceEvent, key: str) -> bool | None:
     value = _event_data(event).get(key)
     if isinstance(value, bool):
@@ -546,20 +565,26 @@ def validate_trace(trace_path: str, config: CheckConfig) -> ValidationReport:
             current_tick = None
             continue
 
-        if event.tick is not None:
+        out_of_band_service_result = _is_model_service_result(event)
+        if event.tick is not None and not out_of_band_service_result:
             if current_tick is None:
-                violations.append(
-                    Violation(
-                        code="tick_event_outside_delimiters",
-                        severity="error",
-                        file_name=event.file_name,
-                        line_no=event.line_no,
-                        seq=event.seq,
-                        tick=event.tick,
-                        message=f"event type {event.event_type} for tick {event.tick} occurred outside tick delimiters",
-                        context=_event_context(event),
+                most_recent_completed_tick = max(completed_tick_ids, default=None)
+                if not (
+                    event.event_type in POST_TICK_EVENT_TYPES
+                    and event.tick == most_recent_completed_tick
+                ):
+                    violations.append(
+                        Violation(
+                            code="tick_event_outside_delimiters",
+                            severity="error",
+                            file_name=event.file_name,
+                            line_no=event.line_no,
+                            seq=event.seq,
+                            tick=event.tick,
+                            message=f"event type {event.event_type} for tick {event.tick} occurred outside tick delimiters",
+                            context=_event_context(event),
+                        )
                     )
-                )
             elif current_tick["tick"] != event.tick:
                 violations.append(
                     Violation(
@@ -682,7 +707,11 @@ def validate_trace(trace_path: str, config: CheckConfig) -> ValidationReport:
                 )
             state["terminal_seq"] = event.seq
             active_jobs.pop(job_id, None)
-        elif event.event_type in {"vla_result", "async_completion_dropped"} and job_id is not None:
+        elif (
+            event.event_type in {"vla_result", "async_completion_dropped"}
+            and job_id is not None
+            and not out_of_band_service_result
+        ):
             state = async_state.setdefault(
                 job_id,
                 {
