@@ -155,6 +155,13 @@ uv run --with 'jsonschema>=4.20,<5' \
 These commands do not resolve the Marvin-local base image, start Docker,
 import MuJoCo or select a final learned checkpoint.
 
+The remote WP5 engineering gate is deliberately separate from the local suite.
+After ACRA's unchanged pinned integration tests pass, run `run_wp5.py` inside
+the commit-tagged joint image. The gate requires 2 CPUs and 8 GB RAM, does not
+require GPU access, and refuses to replace a non-empty output directory. It
+uses only the default engineering shot; the `muesli_test` paper split remains
+closed until the later protocol-freeze gate.
+
 ## canonical event fixture suite
 
 Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:

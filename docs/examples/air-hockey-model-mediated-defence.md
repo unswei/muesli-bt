@@ -104,6 +104,26 @@ The command prints the digest-bound `docker buildx build` command. Use
 is free. That deferred command runs ACRA's unchanged integration tests inside
 the joint image before any muesli task trial.
 
+Gate G5 uses `run_wp5.py` after that unchanged suite passes. It starts a fresh
+MuJoCo host for the default fixed shot and each of H1, H2a and H2b, drives the
+compiled C++ runner over the versioned socket contract, validates the canonical
+events and information boundary, and directly replays the exact requested
+actions through a second ACRA environment. The pinned successful command is:
+
+```bash
+g5_output=$PWD/build/air-hockey-g5
+mkdir -p "$g5_output"
+docker run --rm --cpus 2 --memory 8g --ipc host \
+  --volume "$g5_output:/evidence" \
+  local/muesli-air-hockey:65313e4-1b6bbbb \
+  python3 /opt/muesli-bt/examples/air_hockey_model_mediated_defence/run_wp5.py \
+    --runner /opt/muesli-bt/build/air-hockey-wp4/muesli_bt_air_hockey_scenario_tests \
+    --out /evidence
+```
+
+No GPU is exposed to this command. It is an engineering Gate G5 run and must
+not be pointed at the unopened `muesli_test` split.
+
 ## example behaviour tree
 
 The deadline-only and invocation-scoped trees are structurally identical. The

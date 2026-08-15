@@ -124,6 +124,29 @@ Running the joint image without overriding its command executes the H1 fake-host
 scenario through the complete G2 harness. This is a CPU-only packaging check;
 it is not MuJoCo task evidence.
 
+## wp5 MuJoCo vertical slice
+
+On Marvin, run ACRA's unchanged integration tests from the WP4 lock before any
+Muesli trial. Gate G5 then runs the fixed shot and H1/H2a/H2b through fresh
+MuJoCo hosts, validates each canonical event stream and replays every requested
+action through a fresh direct ACRA environment:
+
+```bash
+g5_output=$PWD/build/air-hockey-g5
+mkdir -p "$g5_output"
+docker run --rm --cpus 2 --memory 8g --ipc host \
+  --volume "$g5_output:/evidence" \
+  local/muesli-air-hockey:65313e4-1b6bbbb \
+  python3 /opt/muesli-bt/examples/air_hockey_model_mediated_defence/run_wp5.py \
+    --runner /opt/muesli-bt/build/air-hockey-wp4/muesli_bt_air_hockey_scenario_tests \
+    --out /evidence
+```
+
+This deterministic gate does not request a GPU. The successful Marvin run used
+the default ACRA shot only; it did not generate or open the `muesli_test` paper
+split. Evaluation-only MuJoCo state is written separately from public host
+states and is rejected if it crosses into canonical events.
+
 ## run the contract tests
 
 From the repository root:
