@@ -1,0 +1,11 @@
+{
+  "schema_version": "airhockey.g2.scenario.v1",
+  "scenario": "H1",
+  "acceptance_policy": "invocation_scoped",
+  "bt": "lisp/bt_invocation_scoped.lisp",
+  "intervention": "none",
+  "expected_predicates": [
+    "h1_current_commit_once",
+    "h1_current_dispatch_once"
+  ]
+}

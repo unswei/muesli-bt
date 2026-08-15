@@ -265,6 +265,28 @@ target_include_directories(
 )
 target_link_libraries(humanoid_model_mediated_trial PRIVATE muesli_bt_core)
 
+if (UNIX)
+  add_library(
+    muesli_bt_air_hockey_example
+    examples/air_hockey_model_mediated_defence/src/action_gate.cpp
+    examples/air_hockey_model_mediated_defence/src/env_backend.cpp
+    examples/air_hockey_model_mediated_defence/src/host_client.cpp
+  )
+  target_include_directories(
+    muesli_bt_air_hockey_example
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/examples/air_hockey_model_mediated_defence/src
+  )
+  target_link_libraries(muesli_bt_air_hockey_example PUBLIC muesli_bt_core)
+
+  add_executable(
+    muesli_bt_air_hockey_scenario_tests
+    examples/air_hockey_model_mediated_defence/tests/scenario_tests.cpp
+  )
+  target_link_libraries(
+    muesli_bt_air_hockey_scenario_tests PRIVATE muesli_bt_air_hockey_example
+  )
+endif ()
+
 if (TARGET muesli_bt_integration_ros2)
   add_executable(muslisp_ros2 tools/muslisp_ros2_main.cpp)
   target_link_libraries(muslisp_ros2 PRIVATE muesli_bt_integration_ros2)
@@ -544,6 +566,12 @@ if (Python3_Interpreter_FOUND)
         -p "test_*.py" -v
     )
     add_test(
+      NAME muesli_bt_air_hockey_evidence
+      COMMAND
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_air_hockey_evidence.py"
+    )
+    add_test(
       NAME muesli_bt_humanoid_video_experiment
       COMMAND
         "${Python3_EXECUTABLE}"
@@ -551,10 +579,24 @@ if (Python3_Interpreter_FOUND)
         --runner "$<TARGET_FILE:humanoid_model_mediated_trial>" --check
     )
     set_tests_properties(muesli_bt_humanoid_video_experiment PROPERTIES TIMEOUT 30)
+    if (TARGET muesli_bt_air_hockey_scenario_tests)
+      foreach (scenario IN ITEMS H1 H2a H2b H3 H4 H5 H6 H7 H8)
+        string(TOLOWER "${scenario}" scenario_name)
+        add_test(
+          NAME muesli_bt_air_hockey_${scenario_name}
+          COMMAND
+            "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/examples/air_hockey_model_mediated_defence/run_g2.py"
+            --runner "$<TARGET_FILE:muesli_bt_air_hockey_scenario_tests>"
+            --scenario "${scenario}"
+        )
+        set_tests_properties(muesli_bt_air_hockey_${scenario_name} PROPERTIES TIMEOUT 30)
+      endforeach ()
+    endif ()
   else ()
     message(
       STATUS
-      "jsonschema not found; air-hockey host and humanoid video experiment CTests are not registered"
+      "jsonschema not found; air-hockey and humanoid video experiment CTests are not registered"
     )
   endif ()
   add_test(

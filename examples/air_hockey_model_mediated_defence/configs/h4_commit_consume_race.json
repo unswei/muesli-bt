@@ -1,0 +1,11 @@
+{
+  "schema_version": "airhockey.g2.scenario.v1",
+  "scenario": "H4",
+  "acceptance_policy": "invocation_scoped",
+  "bt": "lisp/bt_invocation_scoped.lisp",
+  "intervention": "context_change_after_commit",
+  "expected_predicates": [
+    "h4_commit_then_context_change_ordered",
+    "h4_dispatch_revalidation_blocks_obsolete"
+  ]
+}

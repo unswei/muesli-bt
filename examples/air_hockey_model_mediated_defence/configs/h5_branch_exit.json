@@ -1,0 +1,11 @@
+{
+  "schema_version": "airhockey.g2.scenario.v1",
+  "scenario": "H5",
+  "acceptance_policy": "invocation_scoped",
+  "bt": "lisp/bt_invocation_scoped.lisp",
+  "intervention": "defence_branch_exit",
+  "expected_predicates": [
+    "h5_branch_exit_revokes_authority",
+    "h5_late_completion_dropped"
+  ]
+}

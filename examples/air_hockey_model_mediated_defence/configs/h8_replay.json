@@ -1,0 +1,10 @@
+{
+  "schema_version": "airhockey.g2.scenario.v1",
+  "scenario": "H8",
+  "acceptance_policy": "invocation_scoped",
+  "bt": "lisp/bt_invocation_scoped.lisp",
+  "intervention": "recorded_provider_replay",
+  "expected_predicates": [
+    "h8_replay_projection_matches"
+  ]
+}

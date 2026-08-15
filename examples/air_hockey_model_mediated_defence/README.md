@@ -1,13 +1,49 @@
 # air-hockey model-mediated defence
 
 This example is the staged integration for the muesli paper's dynamic
-air-hockey demonstration. WP1 contains a versioned local protocol and a pure
-fake host. It deliberately does not import MuJoCo or the ACRA air-hockey
-package.
+air-hockey demonstration. WP1 provides the versioned local protocol and pure
+fake host. WP2 adds the C++ `env_backend`, matched Behaviour Trees, proposal
+validator, dispatch gate and deterministic H1--H8 harness.
 
 The fake host is useful for protocol, lifecycle and information-boundary tests.
 It is not a physics simulator and its observations must not be used as task
 evidence.
+
+## wp2 matrix
+
+The two checked-in BTs differ only at `:acceptance_policy`. Each waiting path
+authors the current mallet position as fallback before polling the provider. A
+proposal can replace that pending fallback only after the runtime commit gate
+and the example dispatch gate accept it.
+
+| Trial | Intervention | Expected result |
+| --- | --- | --- |
+| H1 | Timely current result | Commit and dispatch once. |
+| H2a | Context change, deadline-only baseline | Admit and dispatch one bounded obsolete action in the fake host. |
+| H2b | Same context change, invocation-scoped | Reject with `context_changed`; no obsolete dispatch. |
+| H3 | Replacement request | Revoke generation one; dispatch generation two. |
+| H4 | Context change after commit | Reject at the dispatch gate before any host capability call. |
+| H5 | Defence branch exit | Revoke authority and drop the late completion. |
+| H6 | Completion after 120 ms, both policies | Reject with `deadline_expired`; retain fallback. |
+| H7 | Duplicate terminal polling and dispatch | Record one accepted decision and one host call; reject both duplicates. |
+| H8 | Recorded-provider replay | Consume the cached response and reproduce the decision, dispatch and applied mallet-state projection without live inference. |
+
+H2a is a deliberate research baseline and runs only against the bounded fake
+host. Every invocation-scoped row records zero accepted obsolete dispatches.
+
+Build and run Gate G2 from the repository root:
+
+```bash
+cmake -S . -B build/dev
+cmake --build build/dev --target muesli_bt_air_hockey_scenario_tests -j
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_g2.py \
+  --runner build/dev/muesli_bt_air_hockey_scenario_tests
+```
+
+The runner starts a fresh mode-`0600` fake-host socket for every scenario. It
+checks every predicate declared in `evidence/g2_predicates.json` and verifies
+that the matched BT sources have no structural drift.
 
 ## run the contract tests
 
@@ -38,3 +74,12 @@ The authoritative request and response shapes are in
 `schemas/air_hockey_host/v1/`. See the
 [air-hockey host protocol](../../docs/integration/air-hockey-host-protocol.md)
 for the lifecycle and field boundary.
+
+## layout
+
+- `host/`: strict Python protocol host and WP1 tests;
+- `src/`: C++ socket client, `env_backend`, commit validator and dispatch gate;
+- `lisp/`: matched deadline-only and invocation-scoped task BTs;
+- `configs/`: frozen deterministic H1--H8 scenario configurations;
+- `evidence/`: named Gate G2 evidence predicates;
+- `tests/`: the gate-controlled C++ scenario harness.

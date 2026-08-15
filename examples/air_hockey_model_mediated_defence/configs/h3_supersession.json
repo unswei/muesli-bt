@@ -1,0 +1,11 @@
+{
+  "schema_version": "airhockey.g2.scenario.v1",
+  "scenario": "H3",
+  "acceptance_policy": "invocation_scoped",
+  "bt": "lisp/bt_invocation_scoped.lisp",
+  "intervention": "replacement_request",
+  "expected_predicates": [
+    "h3_superseded_generation_rejected",
+    "h3_replacement_generation_progress"
+  ]
+}

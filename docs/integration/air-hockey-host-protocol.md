@@ -2,8 +2,8 @@
 
 ## overview
 
-`airhockey.host.v1` is the local request/reply boundary between the future C++
-air-hockey runner and a Python process that owns the simulation. It provides
+`airhockey.host.v1` is the local request/reply boundary between the C++
+air-hockey adapter and a Python process that owns the simulation. It provides
 the `info`, `configure`, `reset`, `observe`, `act`, `step` and `close`
 operations required by the `env.*` lifecycle.
 
@@ -32,6 +32,11 @@ The authoritative schemas are:
 Requests and replies are strict JSON objects. Unknown properties, duplicate
 keys, non-finite numbers, invalid dimensions and values outside declared bounds
 fail closed.
+
+The C++ client independently parses the complete response and checks exact
+property sets, request identity, dimensions, finite values, bounds and public
+state invariants. A response that passed the Python schema but violates the C++
+typed contract still fails closed.
 
 Each Unix-domain socket connection carries one request terminated by EOF or a
 newline and one newline-terminated reply. Requests larger than 32 KiB are
@@ -105,6 +110,33 @@ outcome labels, target labels, shot IDs and alias-family IDs cannot cross this
 boundary. Evaluation tooling may record privileged scoring data in a separate
 artefact, but the BT and provider must not receive it.
 
+## c++ env backend and action gate
+
+`air_hockey_env_backend` implements the existing `muslisp::env_backend`
+interface. It registers under an example-owned name and maps the socket
+operations onto `env.info`, `env.configure`, `env.reset`, `env.observe`,
+`env.act` and `env.step`. The adapter does not alter generic `env.api.v1`
+semantics.
+
+The adapter returns the 19-value public state plus episode, context and
+visibility fields. `env.act` requires an action map with
+`action_schema = airhockey.normalised_mallet_target.v1` and a two-value
+`target`.
+
+The asynchronous provider output remains a proposal. The commit validator
+checks the declared frame, exact two-value shape, finite bounds, active episode
+and a maximum public-observation age of six 20 ms steps. The
+invocation-scoped mode also checks the current defence context through the
+runtime gate. The existing stable `ball_stale` reason denotes an over-age
+public puck observation; it does not imply access to privileged puck state.
+
+Immediately before `env.act`, the example dispatch gate rechecks authority,
+generation, deadline, context, exact action identity, source age and
+exactly-once dispatch. Only proposals that pass those local checks emit the
+canonical `cap_call_start` and `cap_call_end` pair for the host-bound
+`cap.vla.action_chunk.v1` call. A locally rejected obsolete proposal therefore
+records no capability call.
+
 ## errors and failure modes
 
 Errors use `ok: false` and a stable code. Framing and schema failures use the
@@ -143,9 +175,9 @@ uv run --with 'jsonschema>=4.20,<5' \
 ```
 
 The runnable source is under
-`examples/air_hockey_model_mediated_defence/host/`. The C++ client added in WP2
-will own normal request sequencing; the socket protocol is not intended as a
-manual operator interface.
+`examples/air_hockey_model_mediated_defence/`. The C++ adapter owns normal
+request sequencing; the socket protocol is not intended as a manual operator
+interface.
 
 ## testing
 
@@ -160,6 +192,19 @@ uv run --with 'jsonschema>=4.20,<5' \
 
 When CMake's selected Python interpreter can import `jsonschema`, the same suite
 is registered as `muesli_bt_air_hockey_host` in CTest.
+
+After building `muesli_bt_air_hockey_scenario_tests`, run the complete WP2
+matrix with:
+
+```bash
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_g2.py \
+  --runner build/dev/muesli_bt_air_hockey_scenario_tests
+```
+
+CMake registers H1, H2a, H2b and H3--H8 as separate
+`muesli_bt_air_hockey_*` CTests. The frozen H2b trace is validated by
+`muesli_bt_air_hockey_evidence`.
 
 ## related pages
 

@@ -1,0 +1,11 @@
+{
+  "schema_version": "airhockey.g2.scenario.v1",
+  "scenario": "H7",
+  "acceptance_policy": "invocation_scoped",
+  "bt": "lisp/bt_invocation_scoped.lisp",
+  "intervention": "duplicate_terminal_and_dispatch",
+  "expected_predicates": [
+    "h7_exactly_one_terminal_decision",
+    "h7_exactly_one_dispatch"
+  ]
+}

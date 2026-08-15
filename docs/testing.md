@@ -8,6 +8,8 @@ Core test binaries:
 - `tests/conformance/test_conformance_main.cpp` (`muesli_bt_conformance_tests`, L0)
 - `tests/test_humanoid_vla_scenarios.cpp`
   (`muesli_bt_humanoid_vla_scenario_tests`)
+- `examples/air_hockey_model_mediated_defence/tests/scenario_tests.cpp`
+  (`muesli_bt_air_hockey_scenario_tests`)
 
 Coverage includes:
 
@@ -87,6 +89,24 @@ CMake registers this CTest only when its selected Python interpreter can import
 the matrix. The standalone runner always fails closed when validation cannot
 run.
 
+## deterministic air-hockey authority scenarios
+
+The air-hockey WP2 harness starts a fresh pure fake host for every row and runs
+the C++ socket `env_backend` with a gate-controlled provider. H1, H2a/H2b and
+H3--H8 have fixed intervention order and named evidence predicates. H2a alone
+demonstrates the bounded deadline-only defect; all invocation-scoped rows have
+zero accepted obsolete dispatches. H6 runs under both policies, H7 exercises
+duplicate terminal polling and dispatch, and H8 reuses a recorded response
+without live inference.
+
+```bash
+ctest --test-dir build/dev --output-on-failure \
+  -R '^muesli_bt_air_hockey_(h1|h2a|h2b|h3|h4|h5|h6|h7|h8|evidence)$'
+```
+
+These tests require `jsonschema` for the Python host boundary. They do not
+import MuJoCo, load a checkpoint, use a GPU or contact Marvin.
+
 ## canonical event fixture suite
 
 Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:
@@ -100,6 +120,7 @@ Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated i
 - `vla_late_completion_drop_run.jsonl` (late completion dropped after cancellation)
 - `vla_authority_revoked_run.jsonl` (invocation-scoped pre-emption)
 - `humanoid_vla_evidence_run.jsonl` (accept, dispatch, moved-context reject and pre-emption)
+- `air_hockey_h2b_context_change.jsonl` (public context change followed by invocation-scoped rejection)
 - `deadline_fallback_run.jsonl` (deadline exceeded with safe fallback)
 - `resetless_unsupported_run.jsonl` (multi-episode request on reset-less backend)
 

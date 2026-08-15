@@ -26,6 +26,7 @@ This directory contains runnable muesli-bt examples.
 - `repl_scripts/ros2_flagship_test_publisher.py`: simple ROS2 odometry publisher for exercising the flagship wrapper against a deterministic straight-line goal trajectory.
 - `isaac_h1_ros2_demo/`: ROS2 H1 locomotion demo assets, including the checked-in Lisp BT, runtime wrapper, and Isaac topic contract.
 - `humanoid_model_mediated_approach/`: executable Booster-oriented video experiment with baseline/full BTs, a delayed fake approach service, four frozen trials, and evidence manifests.
+- `air_hockey_model_mediated_defence/`: local Unix-socket air-hockey host, C++ `env_backend`, matched authority BTs and deterministic H1--H8 evidence harness.
 - `isaac_wheeled_ros2_demo/`: topic contract and runbook assets for the Isaac-backed wheeled demo.
 - `pybullet_racecar/`: PyBullet racecar demo, including the shared `bt_flagship` wheeled mode.
 - `pybullet_epuck_goal/`: PyBullet e-puck-style differential-drive surrogate for the shared wheeled flagship BT.

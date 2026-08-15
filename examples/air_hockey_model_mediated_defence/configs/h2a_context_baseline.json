@@ -1,0 +1,11 @@
+{
+  "schema_version": "airhockey.g2.scenario.v1",
+  "scenario": "H2a",
+  "acceptance_policy": "deadline_only",
+  "bt": "lisp/bt_deadline_only.lisp",
+  "intervention": "blackout_reacquisition",
+  "expected_predicates": [
+    "h2a_baseline_admits_stale_result",
+    "h2a_obsolete_dispatch_observed"
+  ]
+}

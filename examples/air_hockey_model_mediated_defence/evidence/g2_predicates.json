@@ -1,0 +1,21 @@
+{
+  "schema_version": "airhockey.g2.predicates.v1",
+  "predicates": {
+    "h1_current_commit_once": "The current proposal has exactly one accepted terminal decision.",
+    "h1_current_dispatch_once": "The current proposal is dispatched once and is not obsolete.",
+    "h2a_baseline_admits_stale_result": "The deadline-only baseline admits an unexpired proposal from the old context.",
+    "h2a_obsolete_dispatch_observed": "The bounded baseline action reaches the fake host after context change.",
+    "h2b_changed_context_rejected": "Invocation-scoped commit rejects the same old-context result with context_changed.",
+    "h2b_zero_obsolete_dispatch": "Invocation-scoped H2b has no accepted obsolete dispatch.",
+    "h3_superseded_generation_rejected": "Submitting a replacement revokes the prior generation with superseded.",
+    "h3_replacement_generation_progress": "The current replacement generation commits and dispatches.",
+    "h4_commit_then_context_change_ordered": "The context changes after commit and before consumption.",
+    "h4_dispatch_revalidation_blocks_obsolete": "The dispatch gate rejects the admitted result before any host capability call after the consume-time context change.",
+    "h5_branch_exit_revokes_authority": "Leaving the defence branch revokes the active invocation in that tick.",
+    "h5_late_completion_dropped": "Completion after branch revocation is dropped and never dispatched.",
+    "h6_deadline_expired_fallback": "Under both policies, a completion after 120 ms is rejected with deadline_expired while fallback remains authored.",
+    "h7_exactly_one_terminal_decision": "The invocation has exactly one accepted terminal decision and duplicate terminal polling is rejected.",
+    "h7_exactly_one_dispatch": "A repeated dispatch attempt is rejected with duplicate_dispatch.",
+    "h8_replay_projection_matches": "A cached provider response reproduces the recorded submit, acceptance, dispatch and applied mallet-state projection without live inference."
+  }
+}

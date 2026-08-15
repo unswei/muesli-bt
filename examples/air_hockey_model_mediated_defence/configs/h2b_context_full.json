@@ -1,0 +1,11 @@
+{
+  "schema_version": "airhockey.g2.scenario.v1",
+  "scenario": "H2b",
+  "acceptance_policy": "invocation_scoped",
+  "bt": "lisp/bt_invocation_scoped.lisp",
+  "intervention": "blackout_reacquisition",
+  "expected_predicates": [
+    "h2b_changed_context_rejected",
+    "h2b_zero_obsolete_dispatch"
+  ]
+}
