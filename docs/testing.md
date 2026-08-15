@@ -107,6 +107,28 @@ ctest --test-dir build/dev --output-on-failure \
 These tests require `jsonschema` for the Python host boundary. They do not
 import MuJoCo, load a checkpoint, use a GPU or contact Marvin.
 
+## air-hockey evidence-bundle analysis
+
+WP3 has a standalone local gate because its Python analysis does not require a
+native build. The command creates eight temporary synthetic bundles, exercises
+guarded replacement and regenerates all derived table, plot, replay and overlay
+fields from raw artefacts:
+
+```bash
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp3.py check
+```
+
+The focused unit suite also covers exact recorded-provider lookup, privileged
+field rejection and exact binomial interval endpoints:
+
+```bash
+uv run --with 'jsonschema>=4.20,<5' \
+  python -m unittest tests/test_air_hockey_wp3.py -v
+```
+
+Neither command contacts Marvin or imports the ACRA simulator.
+
 ## canonical event fixture suite
 
 Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:

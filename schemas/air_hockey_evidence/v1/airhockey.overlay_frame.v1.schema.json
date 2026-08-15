@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.org/schemas/air_hockey_evidence/v1/airhockey.overlay_frame.v1.schema.json",
+  "title": "Air-hockey evidence overlay frame v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "observation_step",
+    "monotonic_ns",
+    "active_branch",
+    "request_id",
+    "generation",
+    "context_id",
+    "provider_state",
+    "decision",
+    "reason",
+    "authorised_target",
+    "mallet_position"
+  ],
+  "properties": {
+    "schema_version": {"const": "airhockey.overlay_frame.v1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "observation_step": {"type": "integer", "minimum": 0},
+    "monotonic_ns": {"type": "integer", "minimum": 0},
+    "active_branch": {"type": "string", "minLength": 1},
+    "request_id": {"type": ["string", "null"]},
+    "generation": {"type": ["integer", "null"], "minimum": 1},
+    "context_id": {"type": "string", "minLength": 1},
+    "provider_state": {
+      "enum": ["idle", "submitted", "running", "accepted", "rejected", "revoked"]
+    },
+    "decision": {"enum": ["none", "accepted", "rejected"]},
+    "reason": {"type": "string"},
+    "authorised_target": {
+      "oneOf": [
+        {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {"type": "number", "minimum": -1.0, "maximum": 1.0}
+        },
+        {"type": "null"}
+      ]
+    },
+    "mallet_position": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"type": "number", "minimum": -1.0, "maximum": 1.0}
+    }
+  }
+}

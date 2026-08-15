@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.org/schemas/air_hockey_evidence/v1/airhockey.run_manifest.v1.schema.json",
+  "title": "Air-hockey evidence run manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "pair_id",
+    "capture_status",
+    "paper_eligible",
+    "acceptance_policy",
+    "repositories",
+    "container",
+    "simulator",
+    "provider",
+    "shot",
+    "behaviour_tree",
+    "context_rule",
+    "delay_schedule",
+    "seed",
+    "validators",
+    "pairing",
+    "expected_integrity",
+    "raw_artefacts",
+    "derived_artefacts"
+  ],
+  "properties": {
+    "schema_version": {"const": "airhockey.run_manifest.v1"},
+    "run_id": {"$ref": "#/$defs/safeName"},
+    "pair_id": {"$ref": "#/$defs/safeName"},
+    "capture_status": {
+      "enum": ["synthetic_ci", "engineering_complete", "paper_complete"]
+    },
+    "paper_eligible": {"type": "boolean"},
+    "acceptance_policy": {"enum": ["deadline_only", "invocation_scoped"]},
+    "repositories": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["muesli_bt", "air_hockey"],
+      "properties": {
+        "muesli_bt": {"$ref": "#/$defs/repository"},
+        "air_hockey": {"$ref": "#/$defs/repository"}
+      }
+    },
+    "container": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image", "digest"],
+      "properties": {
+        "image": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "simulator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend", "version", "control_period_ms"],
+      "properties": {
+        "backend": {"enum": ["synthetic_wp3", "acra_direct_launch"]},
+        "version": {"type": "string", "minLength": 1},
+        "control_period_ms": {"const": 20}
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "identity",
+        "version",
+        "configuration_sha256",
+        "checkpoint_sha256"
+      ],
+      "properties": {
+        "kind": {"enum": ["deterministic", "acra_frozen"]},
+        "identity": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1},
+        "configuration_sha256": {"$ref": "#/$defs/sha256"},
+        "checkpoint_sha256": {
+          "oneOf": [
+            {"$ref": "#/$defs/sha256"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "shot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["split", "manifest_sha256", "manifest_entry_sha256"],
+      "properties": {
+        "split": {"enum": ["synthetic", "engineering", "muesli_test"]},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "manifest_entry_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "behaviour_tree": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "context_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "reacquisition_starts_new_context", "source_age_limit_steps"],
+      "properties": {
+        "version": {"const": "air_hockey_muesli_contract.v1"},
+        "reacquisition_starts_new_context": {"const": true},
+        "source_age_limit_steps": {"const": 6}
+      }
+    },
+    "delay_schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "delay_ms", "fault", "sha256"],
+      "properties": {
+        "kind": {"enum": ["fixed", "seeded"]},
+        "delay_ms": {"type": "integer", "minimum": 0},
+        "fault": {"type": "string"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "seed": {"type": "integer", "minimum": 0, "maximum": 4294967295},
+    "validators": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event", "trace", "trajectory", "manifest", "analysis"],
+      "properties": {
+        "event": {"type": "string", "minLength": 1},
+        "trace": {"type": "string", "minLength": 1},
+        "trajectory": {"type": "string", "minLength": 1},
+        "manifest": {"type": "string", "minLength": 1},
+        "analysis": {"type": "string", "minLength": 1}
+      }
+    },
+    "pairing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider_response_sha256", "delay_schedule_sha256", "seed"],
+      "properties": {
+        "provider_response_sha256": {"$ref": "#/$defs/sha256"},
+        "delay_schedule_sha256": {"$ref": "#/$defs/sha256"},
+        "seed": {"type": "integer", "minimum": 0, "maximum": 4294967295}
+      }
+    },
+    "expected_integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["terminal_decision", "reason", "obsolete_dispatches"],
+      "properties": {
+        "terminal_decision": {"enum": ["accepted", "rejected"]},
+        "reason": {"type": "string"},
+        "obsolete_dispatches": {"type": "integer", "minimum": 0}
+      }
+    },
+    "raw_artefacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "events.jsonl",
+        "task-trajectory.jsonl",
+        "recorded-provider.jsonl",
+        "replay-events.jsonl",
+        "replay-task-trajectory.jsonl"
+      ],
+      "properties": {
+        "events.jsonl": {"$ref": "#/$defs/artefact"},
+        "task-trajectory.jsonl": {"$ref": "#/$defs/artefact"},
+        "recorded-provider.jsonl": {"$ref": "#/$defs/artefact"},
+        "replay-events.jsonl": {"$ref": "#/$defs/artefact"},
+        "replay-task-trajectory.jsonl": {"$ref": "#/$defs/artefact"}
+      }
+    },
+    "derived_artefacts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "event-validation.json",
+          "trace-validation.json",
+          "trial-summary.json",
+          "replay-report.json",
+          "overlay-timeline.jsonl",
+          "overlay.svg",
+          "bundle-validation.json"
+        ]
+      },
+      "minItems": 7,
+      "maxItems": 7
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"paper_eligible": {"const": true}}},
+      "then": {"properties": {"capture_status": {"const": "paper_complete"}}}
+    }
+  ],
+  "$defs": {
+    "safeName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["present", "commit", "dirty"],
+      "properties": {
+        "present": {"type": "boolean"},
+        "commit": {
+          "oneOf": [
+            {"type": "string", "pattern": "^[0-9a-f]{7,40}$"},
+            {"type": "null"}
+          ]
+        },
+        "dirty": {"type": ["boolean", "null"]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"present": {"const": true}}},
+          "then": {
+            "properties": {
+              "commit": {"type": "string", "pattern": "^[0-9a-f]{7,40}$"},
+              "dirty": {"type": "boolean"}
+            }
+          },
+          "else": {
+            "properties": {
+              "commit": {"type": "null"},
+              "dirty": {"type": "null"}
+            }
+          }
+        }
+      ]
+    },
+    "artefact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256"],
+      "properties": {"sha256": {"$ref": "#/$defs/sha256"}}
+    }
+  }
+}

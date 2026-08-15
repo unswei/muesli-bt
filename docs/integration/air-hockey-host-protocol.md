@@ -206,6 +206,11 @@ CMake registers H1, H2a, H2b and H3--H8 as separate
 `muesli_bt_air_hockey_*` CTests. The frozen H2b trace is validated by
 `muesli_bt_air_hockey_evidence`.
 
+The separate WP3 evidence schemas keep public task-trajectory fields under
+`public` and evaluation-only simulator fields under `privileged`. The analysis
+validator rejects privileged scoring keys in `events.jsonl` or recorded
+provider responses. See the [air-hockey evidence workflow](../examples/air-hockey-model-mediated-defence.md).
+
 ## related pages
 
 - [env API](env-api.md)

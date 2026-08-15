@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.org/schemas/air_hockey_evidence/v1/airhockey.task_trajectory.v1.schema.json",
+  "title": "Air-hockey task trajectory record v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "seq",
+    "observation_step",
+    "monotonic_ns",
+    "public",
+    "privileged"
+  ],
+  "properties": {
+    "schema_version": {"const": "airhockey.task_trajectory.v1"},
+    "run_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "seq": {"type": "integer", "minimum": 1},
+    "observation_step": {"type": "integer", "minimum": 0},
+    "monotonic_ns": {"type": "integer", "minimum": 0},
+    "public": {"$ref": "#/$defs/publicState"},
+    "privileged": {"$ref": "#/$defs/privilegedScoring"}
+  },
+  "$defs": {
+    "target": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"type": "number", "minimum": -1.0, "maximum": 1.0}
+    },
+    "point": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"type": "number"}
+    },
+    "nullableTarget": {
+      "oneOf": [
+        {"$ref": "#/$defs/target"},
+        {"type": "null"}
+      ]
+    },
+    "publicState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_id",
+        "defence_context_id",
+        "puck_visible",
+        "action_locked",
+        "episode_active",
+        "terminated",
+        "truncated",
+        "mallet_position",
+        "visible_puck_position",
+        "requested_target",
+        "authorised_target",
+        "applied_target"
+      ],
+      "properties": {
+        "episode_id": {
+          "type": "string",
+          "pattern": "^episode-[0-9]{6,}$"
+        },
+        "defence_context_id": {
+          "type": "string",
+          "pattern": "^episode-[0-9]{6,}/track-[0-9]{4,}$"
+        },
+        "puck_visible": {"type": "boolean"},
+        "action_locked": {"type": "boolean"},
+        "episode_active": {"type": "boolean"},
+        "terminated": {"type": "boolean"},
+        "truncated": {"type": "boolean"},
+        "mallet_position": {"$ref": "#/$defs/target"},
+        "visible_puck_position": {"$ref": "#/$defs/point"},
+        "requested_target": {"$ref": "#/$defs/target"},
+        "authorised_target": {"$ref": "#/$defs/nullableTarget"},
+        "applied_target": {"$ref": "#/$defs/target"}
+      }
+    },
+    "privilegedScoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "true_puck_position",
+        "true_puck_velocity",
+        "target_goal",
+        "privileged_intercept_target",
+        "contact",
+        "outcome"
+      ],
+      "properties": {
+        "true_puck_position": {"$ref": "#/$defs/point"},
+        "true_puck_velocity": {"$ref": "#/$defs/point"},
+        "target_goal": {"$ref": "#/$defs/point"},
+        "privileged_intercept_target": {"$ref": "#/$defs/target"},
+        "contact": {"type": "boolean"},
+        "outcome": {
+          "enum": ["pending", "save", "concession", "timeout", "other"]
+        }
+      }
+    }
+  }
+}

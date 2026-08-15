@@ -3,7 +3,8 @@
 This example is the staged integration for the muesli paper's dynamic
 air-hockey demonstration. WP1 provides the versioned local protocol and pure
 fake host. WP2 adds the C++ `env_backend`, matched Behaviour Trees, proposal
-validator, dispatch gate and deterministic H1--H8 harness.
+validator, dispatch gate and deterministic H1--H8 harness. WP3 adds the local
+evidence-bundle, paired-analysis, replay and overlay tooling.
 
 The fake host is useful for protocol, lifecycle and information-boundary tests.
 It is not a physics simulator and its observations must not be used as task
@@ -45,6 +46,38 @@ The runner starts a fresh mode-`0600` fake-host socket for every scenario. It
 checks every predicate declared in `evidence/g2_predicates.json` and verifies
 that the matched BT sources have no structural drift.
 
+## wp3 analysis and reproducibility
+
+Run the complete local Gate G3 check with:
+
+```bash
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp3.py check
+```
+
+The check generates eight synthetic runs in four matched pairs inside a
+temporary directory. It validates immutable raw artefact hashes, the public
+and privileged field boundary, manifests, canonical events, cross-event traces
+and recorded-provider replay. It then regenerates integrity counts,
+obsolete-target motion, exact binomial intervals, paired bootstrap intervals,
+table rows, plot fields, overlay timelines and SVG overlays.
+
+To exercise the two-stage workflow explicitly:
+
+```bash
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp3.py \
+  generate-synthetic --out build/air-hockey-wp3/runs
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp3.py \
+  analyse --runs build/air-hockey-wp3/runs \
+  --out build/air-hockey-wp3/analysis
+```
+
+`--force` replaces only basename-safe run directories carrying the
+`.air-hockey-evidence-run` marker. It refuses an unmarked destination. The
+synthetic outcomes exercise analysis code only and are never paper evidence.
+
 ## run the contract tests
 
 From the repository root:
@@ -82,4 +115,5 @@ for the lifecycle and field boundary.
 - `lisp/`: matched deadline-only and invocation-scoped task BTs;
 - `configs/`: frozen deterministic H1--H8 scenario configurations;
 - `evidence/`: named Gate G2 evidence predicates;
+- `analysis/`: WP3 validation, replay, statistics and overlay modules;
 - `tests/`: the gate-controlled C++ scenario harness.
