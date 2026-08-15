@@ -29,7 +29,7 @@ RUN cmake -S . -B build/booster-sim-x86_64 -G Ninja \
       -DMUESLI_BT_BUILD_PYTHON_BRIDGE=OFF \
       -DMUESLI_BT_BUILD_WEBOTS_EXAMPLES=OFF \
     && cmake --build build/booster-sim-x86_64 \
-      --target humanoid_model_mediated_trial --parallel \
+      --target humanoid_model_mediated_trial --parallel 2 \
     && strip build/booster-sim-x86_64/humanoid_model_mediated_trial
 
 FROM scratch AS export
