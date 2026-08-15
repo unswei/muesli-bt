@@ -59,7 +59,9 @@ def build_stage_commands(shot: dict[str, Any]) -> tuple[float, list[dict[str, An
 
     robot_position = scene.get("robot_start_position_m")
     robot_quaternion = scene.get("robot_start_quaternion_wxyz")
-    ball_position = scene.get("ball_a_position_m")
+    ball_position = scene.get(
+        "original_ball_position_m", scene.get("ball_a_position_m")
+    )
     if not isinstance(robot_position, list) or len(robot_position) != 3:
         raise StagingError("robot start position must contain three values")
     if not isinstance(robot_quaternion, list) or len(robot_quaternion) != 4:

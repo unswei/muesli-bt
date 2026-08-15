@@ -6,9 +6,9 @@ starts on a virtual K1 with the pinned Linux payload. With native payload
 commit `9b3385c` and Agent adapter commit `b153e9f`, motion-enabled T1, T2a,
 T2b and T3 rehearsals completed in Booster Studio with canonical evidence.
 T1 also produced visible robot translation towards its accepted target.
-The matched T2a/T2b simulation captures also produced an event-validated,
-polished split-screen comparison of stale acceptance and invocation-scoped
-rejection, followed by fresh current-B requests and visible recovery walking.
+The T2 video workflow now supports an explicitly unsafe, simulation-only T2a
+panel that walks towards obsolete target A, beside invocation-scoped rejection
+and visible recovery walking towards current target B.
 Motion remains disabled by default. Physical capture remains pending.
 
 ## what this is
@@ -107,6 +107,7 @@ Runtime settings:
 | Environment variable | Default | Meaning |
 | --- | --- | --- |
 | `MUESLI_BOOSTER_MOTION_ENABLED` | `false` | Permit creation of the robot backend and velocity output. |
+| `MUESLI_BOOSTER_UNSAFE_SIM_BASELINE` | `false` | Simulation-only T2a paper-video override that permits dispatch against the original ball context. Never enable this on hardware. |
 | `MUESLI_BOOSTER_TEAM_ID` | `1` | Team namespace used by simulation topics. |
 | `MUESLI_BOOSTER_ROBOT_NAME` | `robot1` | Controlled virtual robot name. |
 | `MUESLI_BOOSTER_GAIT` | `default` | BoosterOS gait selected before entering walk mode. |
@@ -134,6 +135,10 @@ Studio exposes six operator actions after the Agent starts:
 
 The Agent always starts fail-closed unless
 `MUESLI_BOOSTER_MOTION_ENABLED=true` is supplied by a controlled deployment.
+The host context gate also remains enabled unless the separate
+`MUESLI_BOOSTER_UNSAFE_SIM_BASELINE=true` paper-video override is supplied.
+That override applies only to T2a. It exists solely to make the baseline failure
+physically visible in simulation. Never use it on a physical robot.
 For interactive Studio work, use `motion_arm` so arming is a visible operator
 action. A trial action refuses to launch until motion is armed and the ball,
 robot pose and stability observations are fresh.
@@ -247,9 +252,10 @@ passes. The project metadata selects `football3v3` and `soccer-match`.
   commands zero velocity before closing the Booster backend.
 - Autostart is empty by default. Setting a trial ID does nothing until the ball,
   pose and stability snapshot is fresh.
-- A live trial needs motion enabled even for T2a, because the experiment must
-  show that the host blocks the stale target for `context_changed`, not merely
-  because all motion was disabled.
+- A live trial needs motion enabled even for T2a. With the default host envelope,
+  the stale target is rejected for `context_changed`. With the explicit
+  simulation-only video override, T2a dispatches obsolete target A so the
+  baseline failure is visible.
 - The adapter creates no second event log. `events.jsonl` from muesli remains
   the sole external runtime evidence stream.
 - The ball context frame is field-aligned in the frozen experiment contract.

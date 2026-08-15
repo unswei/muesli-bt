@@ -72,6 +72,9 @@ class BoosterRuntime:
             raise ValueError("MUESLI_BOOSTER_GAIT must not be empty")
         self._control_hz = _env_float("MUESLI_BOOSTER_CONTROL_HZ", 20.0)
         motion_enabled = _env_bool("MUESLI_BOOSTER_MOTION_ENABLED", False)
+        unsafe_simulation_baseline_enabled = _env_bool(
+            "MUESLI_BOOSTER_UNSAFE_SIM_BASELINE", False
+        )
         self._state = AdapterState(
             AdapterConfig(
                 context_change_threshold_m=_env_float(
@@ -109,6 +112,7 @@ class BoosterRuntime:
             bridge_socket=socket_path,
             state=self._state,
             logger=logger,
+            unsafe_simulation_baseline_enabled=unsafe_simulation_baseline_enabled,
         )
         self._autostart_trial = os.environ.get(
             "MUESLI_BOOSTER_AUTOSTART_TRIAL", ""

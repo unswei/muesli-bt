@@ -157,6 +157,7 @@ class BallContextTracker:
         self._context_id = ""
         self._ball: BallObservation | None = None
         self._context_anchor: BallObservation | None = None
+        self._context_anchors: dict[str, BallObservation] = {}
         self._advance_on_observation = True
 
     @property
@@ -187,10 +188,15 @@ class BallContextTracker:
             )
             > self._threshold_m
         )
+        if gap_is_loss:
+            self._context_anchors.clear()
         if self._advance_on_observation or gap_is_loss or moved:
             self._sequence += 1
             self._context_id = f"ball-{self._sequence:04d}"
             self._context_anchor = observation
+            self._context_anchors[self._context_id] = observation
+            while len(self._context_anchors) > 16:
+                del self._context_anchors[next(iter(self._context_anchors))]
         self._advance_on_observation = False
         self._ball = observation
         return self._context_id
@@ -198,7 +204,12 @@ class BallContextTracker:
     def mark_lost(self) -> None:
         self._ball = None
         self._context_anchor = None
+        self._context_anchors.clear()
         self._advance_on_observation = True
+
+    def context_anchor(self, context_id: str) -> BallObservation | None:
+        """Return an anchor retained within the current continuous ball track."""
+        return self._context_anchors.get(context_id)
 
     def snapshot(
         self,
@@ -239,6 +250,7 @@ class AdapterState:
         self._motion_enabled = config.motion_enabled
         self._accepted_keys: set[tuple[str, int]] = set()
         self._active_target: _ActiveTarget | None = None
+        self._unsafe_simulation_stale_dispatch = False
 
     @property
     def motion_enabled(self) -> bool:
@@ -290,11 +302,21 @@ class AdapterState:
             self._runtime_fault = True
             self._active_target = None
 
-    def prepare_trial(self) -> None:
+    def prepare_trial(
+        self, *, unsafe_simulation_stale_dispatch: bool = False
+    ) -> None:
         """Clear per-process dispatch authority before starting a new trial."""
         with self._lock:
             self._accepted_keys.clear()
             self._active_target = None
+            self._unsafe_simulation_stale_dispatch = bool(
+                unsafe_simulation_stale_dispatch
+            )
+
+    def set_unsafe_simulation_stale_dispatch(self, enabled: bool) -> None:
+        """Set the explicitly unsafe T2 video override without changing motion."""
+        with self._lock:
+            self._unsafe_simulation_stale_dispatch = bool(enabled)
 
     def cancel_motion(self) -> None:
         """Remove the active walking target without changing observation state."""
@@ -357,8 +379,13 @@ class AdapterState:
             return DispatchOutcome(False, "robot_unstable")
         if not snapshot.ball_available or snapshot.ball is None:
             return DispatchOutcome(False, "ball_stale")
+        reference_ball = snapshot.ball
         if captured_context_id != snapshot.ball_context_id:
-            return DispatchOutcome(False, "context_changed")
+            if not self._unsafe_simulation_stale_dispatch:
+                return DispatchOutcome(False, "context_changed")
+            reference_ball = self._tracker.context_anchor(captured_context_id)
+            if reference_ball is None:
+                return DispatchOutcome(False, "context_changed")
         if snapshot.robot_pose is None:
             return DispatchOutcome(False, "robot_pose_stale")
         frame_id = target_value.get("frame_id")
@@ -399,8 +426,8 @@ class AdapterState:
         # so field_T_ball_context has translation only.
         field_target = ApproachPose(
             frame_id="field",
-            x_m=snapshot.ball.x_m + target.x_m,
-            y_m=snapshot.ball.y_m + target.y_m,
+            x_m=reference_ball.x_m + target.x_m,
+            y_m=reference_ball.y_m + target.y_m,
             yaw_rad=_normalise_angle(target.yaw_rad),
         )
         if not (

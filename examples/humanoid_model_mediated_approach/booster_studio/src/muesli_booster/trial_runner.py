@@ -210,6 +210,7 @@ class NativeTrialSupervisor:
         state: AdapterState,
         logger: Any,
         process_factory: Callable[..., subprocess.Popen[str]] = subprocess.Popen,
+        unsafe_simulation_baseline_enabled: bool = False,
     ) -> None:
         self._payload_root = payload_root
         self._evidence_root = evidence_root
@@ -217,6 +218,9 @@ class NativeTrialSupervisor:
         self._state = state
         self._logger = logger
         self._process_factory = process_factory
+        self._unsafe_simulation_baseline_enabled = bool(
+            unsafe_simulation_baseline_enabled
+        )
         self._lock = threading.RLock()
         self._process: subprocess.Popen[str] | None = None
         self._watcher: threading.Thread | None = None
@@ -270,7 +274,12 @@ class NativeTrialSupervisor:
                 bridge_socket=self._bridge_socket,
                 motion_enabled=self._state.motion_enabled,
             )
-            self._state.prepare_trial()
+            unsafe_simulation_baseline = (
+                self._unsafe_simulation_baseline_enabled and trial_id == "T2a"
+            )
+            self._state.prepare_trial(
+                unsafe_simulation_stale_dispatch=unsafe_simulation_baseline
+            )
             manifest: dict[str, Any] = {
                 "schema_version": LIVE_MANIFEST_SCHEMA,
                 "status": "running",
@@ -280,6 +289,11 @@ class NativeTrialSupervisor:
                 "source_git_dirty": payload.source_git_dirty,
                 "payload_manifest_sha256": sha256_file(payload.root / "manifest.json"),
                 "motion_enabled": self._state.motion_enabled,
+                "safety_profile": (
+                    "unsafe_simulation_baseline"
+                    if unsafe_simulation_baseline
+                    else "full_host_envelope"
+                ),
                 "runner_command": command,
                 "event_log": {"path": "events.jsonl", "schema": "mbt.evt.v1"},
             }
@@ -297,6 +311,7 @@ class NativeTrialSupervisor:
                 manifest["status"] = "launch_failed"
                 manifest["launch_error"] = str(exc)
                 _write_json_atomic(run_dir / "live-manifest.json", manifest)
+                self._state.set_unsafe_simulation_stale_dispatch(False)
                 self._state.latch_runtime_fault()
                 raise TrialError(f"failed to launch native trial: {exc}") from exc
             self._process = process
@@ -327,6 +342,7 @@ class NativeTrialSupervisor:
                 process.wait(timeout=2.0)
         if watcher is not None and watcher is not threading.current_thread():
             watcher.join(timeout=3.0)
+        self._state.set_unsafe_simulation_stale_dispatch(False)
         self._state.cancel_motion()
 
     def _watch_process(self, process: subprocess.Popen[str]) -> None:
@@ -337,6 +353,7 @@ class NativeTrialSupervisor:
                 if message:
                     self._logger.info(f"native trial: {message}")
         return_code = process.wait()
+        self._state.set_unsafe_simulation_stale_dispatch(False)
         with self._lock:
             stopping = self._stopping
             manifest = self._manifest

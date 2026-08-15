@@ -88,8 +88,8 @@ def t2_events(role: str) -> list[dict]:
                     "generation": 1,
                     "captured_context_id": "ball-0001",
                     "current_context_id": "ball-0002",
-                    "decision": "rejected",
-                    "reason": "context_changed",
+                    "decision": "accepted",
+                    "reason": "",
                     "target": {
                         "frame_id": "ball_context",
                         "x_m": -0.45,
@@ -116,7 +116,10 @@ def t2_events(role: str) -> list[dict]:
             8,
             1_006_600,
             "run_end",
-            {"trial_id": trial_id, "recording_dispatch_calls": 0},
+            {
+                "trial_id": trial_id,
+                "recording_dispatch_calls": 1 if role == "baseline" else 0,
+            },
         )
     )
     return events
@@ -204,10 +207,8 @@ def shot() -> dict:
         },
         "fixed_camera_panel_calibration": {
             "robot_start": [365, 706],
-            "ball_a": [584, 728],
-            "ball_b": [792, 709],
-            "obsolete_target": [483, 720],
-            "current_target_b": [691, 701],
+            "target_a": [483, 720],
+            "target_b": [691, 701],
         },
     }
 
@@ -220,44 +221,38 @@ class T2ComparisonTests(unittest.TestCase):
         full = comparison.build_trial_timeline(
             t2_events("full"), capture(), shot(), role="full"
         )
-        baseline_recovery = comparison.build_recovery_timeline(
-            recovery_events(), capture(), baseline
-        )
         full_recovery = comparison.build_recovery_timeline(
             recovery_events(), capture(), full
         )
-        comparison.validate_matched_trials(
-            baseline, full, baseline_recovery, full_recovery
-        )
+        comparison.validate_matched_trials(baseline, full, full_recovery)
 
         self.assertAlmostEqual(baseline.submit_seconds, 3.0)
         self.assertAlmostEqual(baseline.move_seconds, 4.1)
         self.assertAlmostEqual(baseline.decision_seconds, 5.5)
         self.assertEqual(baseline.runtime_decision, "accepted")
-        self.assertEqual(baseline.dispatch_decision, "rejected")
+        self.assertEqual(baseline.dispatch_decision, "accepted")
         self.assertEqual(full.runtime_decision, "rejected")
         self.assertIsNone(full.dispatch_decision)
         self.assertEqual(full.runtime_reason, "context_changed")
-        self.assertEqual(baseline.recording_dispatch_calls, 0)
-        self.assertEqual(baseline_recovery.recording_dispatch_calls, 1)
-        self.assertEqual(baseline_recovery.context_id, "ball-0002")
-        self.assertAlmostEqual(baseline_recovery.submit_seconds, 6.0)
-        self.assertAlmostEqual(baseline_recovery.accept_seconds, 8.5)
+        self.assertEqual(baseline.recording_dispatch_calls, 1)
+        self.assertEqual(full_recovery.recording_dispatch_calls, 1)
+        self.assertEqual(full_recovery.context_id, "ball-0002")
+        self.assertAlmostEqual(full_recovery.submit_seconds, 6.0)
+        self.assertAlmostEqual(full_recovery.accept_seconds, 8.5)
         for observed, expected in zip(
-            baseline.obsolete_target_field_position_m,
+            baseline.target_a_field_position_m,
             (0.05, 0.08, 0.0),
             strict=True,
         ):
             self.assertAlmostEqual(observed, expected)
 
-        overlay = comparison.generate_ass(
-            baseline, full, baseline_recovery, full_recovery, shot()
-        )
-        self.assertIn("RUNTIME ACCEPTED  →  HOST BLOCKED", overlay)
-        self.assertIn("RUNTIME REJECTED  →  NO DISPATCH", overlay)
-        self.assertEqual(overlay.count("0 COMMANDS TO OLD TARGET"), 2)
-        self.assertEqual(overlay.count("ROBOT WALKS TO CURRENT TARGET B"), 2)
-        self.assertIn("CURRENT B ACCEPTED  →  WALKING", overlay)
+        overlay = comparison.generate_ass(baseline, full, full_recovery, shot())
+        self.assertIn("STALE RESULT ACCEPTED  →  DISPATCHED", overlay)
+        self.assertIn("STALE RESULT REJECTED  →  NO DISPATCH", overlay)
+        self.assertIn("BASELINE WALKS TO OBSOLETE TARGET A", overlay)
+        self.assertIn("FULL SYSTEM WALKS TO CURRENT TARGET B", overlay)
+        self.assertNotIn("BALL A", overlay)
+        self.assertNotIn("BALL B", overlay)
         self.assertIn(r"\pos(483,720)", overlay)
         self.assertIn(r"\pos(1443,720)", overlay)
 
@@ -285,15 +280,36 @@ class T2ComparisonTests(unittest.TestCase):
         with self.assertRaisesRegex(comparison.ComparisonError, "before.*dispatch"):
             comparison.build_trial_timeline(events, capture(), shot(), role="full")
 
-    def test_paper_evidence_refuses_a_backend_dispatch_call(self) -> None:
+    def test_baseline_requires_one_obsolete_backend_dispatch_call(self) -> None:
         events = copy.deepcopy(t2_events("baseline"))
-        events[-1]["data"]["recording_dispatch_calls"] = 1
+        events[-1]["data"]["recording_dispatch_calls"] = 0
 
         with self.assertRaisesRegex(
-            comparison.ComparisonError, "zero backend dispatch calls"
+            comparison.ComparisonError, "T2a must contain 1 backend dispatch calls"
         ):
             comparison.build_trial_timeline(
                 events, capture(), shot(), role="baseline"
+            )
+
+    def test_baseline_manifest_must_declare_unsafe_simulation_profile(self) -> None:
+        baseline = comparison.build_trial_timeline(
+            t2_events("baseline"), capture(), shot(), role="baseline"
+        )
+        manifest = {
+            "schema_version": "humanoid.booster_live_trial.v1",
+            "status": "completed",
+            "return_code": 0,
+            "trial_id": "T2a",
+            "run_id": baseline.run_id,
+            "safety_profile": "full_host_envelope",
+            "event_log": {"sha256": "sha256:events"},
+        }
+
+        with self.assertRaisesRegex(
+            comparison.ComparisonError, "unsafe simulation profile"
+        ):
+            comparison.validate_unsafe_baseline_manifest(
+                manifest, baseline, "events"
             )
 
     def test_recovery_refuses_a_request_for_the_old_context(self) -> None:
@@ -302,7 +318,7 @@ class T2ComparisonTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(
-            comparison.ComparisonError, "current ball B context"
+            comparison.ComparisonError, "current ball context"
         ):
             comparison.build_recovery_timeline(
                 recovery_events("ball-0001"), capture(), baseline

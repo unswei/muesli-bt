@@ -5,8 +5,10 @@ offline-tested Booster Studio host bridge, native supervisor and overlay path.
 The signed Linux package and all four live trials ran on a virtual K1 at source
 commit `e88bdaa`. Polished, canonical-event-validated T1 and matched T2
 simulation prototypes are reproducible from clean Booster Studio captures.
-The T2 comparison includes fresh current-context recovery requests and visible
-walking towards ball B. Physical video capture remains integration work.
+The T2 comparison supports a simulation-only unsafe baseline that visibly
+walks towards an obsolete target, beside current-context recovery and visible
+walking towards the current target. Physical video capture remains integration
+work.
 
 ## what this is
 
@@ -42,13 +44,19 @@ compiled `vla-request` and binds its model, keys, dimensions, bounds,
 | Trial | Policy | Intervention | Required runtime outcome |
 | --- | --- | --- | --- |
 | T1 | `invocation_scoped` | none | Accept and dispatch once. |
-| T2a | `deadline_only` | move A to B | Accept the stale proposal; the independent host envelope rejects dispatch. |
-| T2b | `invocation_scoped` | move A to B | Reject with `context_changed`, enter `rejected_safe_wait` and do not attempt dispatch. |
+| T2a | `deadline_only` | move the ball | Accept the stale proposal; the independent host envelope rejects dispatch. |
+| T2b | `invocation_scoped` | move the ball | Reject with `context_changed`, enter `rejected_safe_wait` and do not attempt dispatch. |
 | T3 | `invocation_scoped` | software emergency | Enter `safe_stand`, revoke authority and drop the delayed completion. |
 
 T2a deliberately demonstrates an unsafe commit decision. It does not weaken
 the host dispatch boundary. The physical robot therefore cannot be driven
 towards the obsolete target by this example.
+
+The polished simulation video has a separate, explicit T2a-only override. It
+disables the host context check so the baseline failure becomes physically
+visible as motion towards obsolete target A. The override is false by default,
+cannot cross loss of the ball track and must never be enabled on hardware. See
+the [T2 video workflow](booster_studio/video/t2-comparison.md).
 
 ## build and check
 

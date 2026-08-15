@@ -77,6 +77,19 @@ class BallContextTrackerTests(unittest.TestCase):
             tracker.observe(BallObservation(1.16, 0.0, 0.0, 10.2)), "ball-0002"
         )
 
+    def test_context_anchors_are_retained_only_within_a_continuous_track(
+        self,
+    ) -> None:
+        tracker = BallContextTracker(0.15, 0.5)
+        first = BallObservation(1.0, 0.0, 0.0, 10.0)
+        tracker.observe(first)
+        tracker.observe(BallObservation(1.3, 0.0, 0.0, 10.1))
+        self.assertEqual(tracker.context_anchor("ball-0001"), first)
+
+        tracker.mark_lost()
+
+        self.assertIsNone(tracker.context_anchor("ball-0001"))
+
 
 class DispatchAndFollowerTests(unittest.TestCase):
     def ready_state(self, *, motion_enabled: bool = True) -> AdapterState:
@@ -111,6 +124,31 @@ class DispatchAndFollowerTests(unittest.TestCase):
         state.set_emergency(True)
         emergency = state.dispatch(request("ball-0002", 2), 10.2)
         self.assertEqual(emergency.reason, "robot_unstable")
+
+    def test_explicit_unsafe_simulation_override_dispatches_obsolete_target(
+        self,
+    ) -> None:
+        state = self.ready_state()
+        state.observe_ball(BallObservation(1.5, -0.35, 0.0, 10.1))
+        state.prepare_trial(unsafe_simulation_stale_dispatch=True)
+
+        stale = state.dispatch(request(), 10.2)
+
+        self.assertTrue(stale.accepted)
+        self.assertAlmostEqual(stale.field_target.x_m, 0.75)
+        self.assertAlmostEqual(stale.field_target.y_m, -0.27)
+        self.assertEqual(state.velocity_command(10.2).reason, "walking")
+
+    def test_unsafe_simulation_override_cannot_cross_ball_track_loss(self) -> None:
+        state = self.ready_state()
+        state.prepare_trial(unsafe_simulation_stale_dispatch=True)
+        state.mark_ball_lost()
+        state.observe_ball(BallObservation(1.5, -0.35, 0.0, 10.1))
+
+        stale = state.dispatch(request(), 10.2)
+
+        self.assertFalse(stale.accepted)
+        self.assertEqual(stale.reason, "context_changed")
 
     def test_motion_is_disabled_by_default(self) -> None:
         state = self.ready_state(motion_enabled=False)
@@ -206,6 +244,7 @@ class ManifestTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('"MUESLI_BOOSTER_MOTION_ENABLED", False', runtime)
+        self.assertIn('"MUESLI_BOOSTER_UNSAFE_SIM_BASELINE", False', runtime)
         self.assertIn('"MUESLI_BOOSTER_GAIT", "default"', runtime)
         self.assertIn('Bool, "/muesli/motion_arm"', runtime)
         self.assertIn('String, "/muesli/trial_command"', runtime)

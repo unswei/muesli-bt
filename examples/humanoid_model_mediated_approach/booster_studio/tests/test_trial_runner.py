@@ -201,6 +201,81 @@ class NativeTrialSupervisorTests(unittest.TestCase):
             state.set_emergency(False)
             self.assertTrue(state.snapshot(time.monotonic()).emergency)
 
+    def test_unsafe_simulation_baseline_is_explicit_and_t2a_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            payload_root = self.stage_payload(root)
+
+            def run(trial_id: str, expected_acceptance: bool) -> dict[str, object]:
+                state = ready_state()
+                outcome: dict[str, object] = {}
+
+                def factory(command: list[str], **_: object) -> FinishedProcess:
+                    event_path = pathlib.Path(command[command.index("--events") + 1])
+                    event_path.write_text(
+                        '{"schema":"mbt.evt.v1","type":"run_start","seq":1,'
+                        '"data":{}}\n',
+                        encoding="utf-8",
+                    )
+                    state.observe_ball(
+                        BallObservation(1.5, -0.35, 0.0, time.monotonic())
+                    )
+                    dispatch = state.dispatch(
+                        {
+                            "schema_version": (
+                                "humanoid.booster_dispatch_request.v1"
+                            ),
+                            "job_id": "job-1",
+                            "generation": 1,
+                            "captured_context_id": "ball-0001",
+                            "target": {
+                                "frame_id": "ball_context",
+                                "x_m": -0.45,
+                                "y_m": 0.08,
+                                "yaw_rad": 0.0,
+                            },
+                        },
+                        time.monotonic(),
+                    )
+                    outcome["accepted"] = dispatch.accepted
+                    outcome["reason"] = dispatch.reason
+                    if dispatch.field_target is not None:
+                        outcome["target_x_m"] = dispatch.field_target.x_m
+                    return FinishedProcess(0)
+
+                supervisor = NativeTrialSupervisor(
+                    payload_root=payload_root,
+                    evidence_root=root / f"evidence-{trial_id}",
+                    bridge_socket="/tmp/test-bridge.sock",
+                    state=state,
+                    logger=Logger(),
+                    process_factory=factory,
+                    unsafe_simulation_baseline_enabled=True,
+                )
+                run_dir = supervisor.start(trial_id, f"test-{trial_id.lower()}")
+                for _ in range(100):
+                    manifest = json.loads(
+                        (run_dir / "live-manifest.json").read_text(
+                            encoding="utf-8"
+                        )
+                    )
+                    if manifest["status"] != "running":
+                        break
+                    time.sleep(0.005)
+                self.assertEqual(outcome["accepted"], expected_acceptance)
+                return manifest
+
+            baseline_manifest = run("T2a", True)
+            full_manifest = run("T2b", False)
+
+            self.assertEqual(
+                baseline_manifest["safety_profile"],
+                "unsafe_simulation_baseline",
+            )
+            self.assertEqual(
+                full_manifest["safety_profile"], "full_host_envelope"
+            )
+
     def test_disarmed_host_cannot_start_trial(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
