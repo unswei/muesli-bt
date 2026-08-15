@@ -179,6 +179,27 @@ campaign used image `local/muesli-air-hockey:8555ffb-1b6bbbb`, 2 CPUs, 8 GB RAM
 and no GPU; it recorded 234 passing deterministic runs and 26/26 learned saves.
 The paper split remained unopened.
 
+WP7 adds the final split-safe `run_wp7.py check-protocol` check, native and
+MuJoCo engineering preflights, and the separately authorised paper campaign.
+The passing archive-built image
+`local/muesli-air-hockey:38c8a19-1b6bbbb` ran 228 matched pairs and produced
+456 validated bundles, including exact replay. All 228 deadline-only pairs
+dispatched the authored obsolete proposal; none of the invocation-scoped pairs
+did. Missing terminal invocations, reason-code failures, replay mismatches,
+trace failures and direct-replay failures were all zero. Operational tick p99
+was 9.145 ms, although 9/1,824 samples exceeded the 20 ms budget and the
+maximum was 51.976 ms.
+
+`run_wp7.py seal` is a separate, fail-closed step. It writes a complete SHA-256
+manifest, verifies a compressed backup and then changes campaign files to
+mode `0444` and directories to `0555`. The passing campaign's checksum-manifest
+SHA-256 is
+`80af405a8c05cf035525af27c27b532b29f82d0e33cd90e4cfe6b6262f0031f1`;
+its verified backup SHA-256 is
+`99f70a25e6736a24ddf3f1422d70336d59054919be12a3b60c5d2c7a7c3f903b`.
+Because the full condition's current fallback only holds position, its lower
+save rate is a documented fallback limitation, not a Gate G7 integrity failure.
+
 ## canonical event fixture suite
 
 Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:

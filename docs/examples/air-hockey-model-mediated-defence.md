@@ -10,7 +10,7 @@ into reproducible evidence bundles. WP4 pins the ACRA source and simulator
 image, then checks provider packaging without starting MuJoCo.
 WP5 validates the pinned MuJoCo vertical slice. WP6 freezes the engineering
 protocol and runs the complete authority and learned-provider pilot while the
-paper split remains closed.
+paper split remains closed. WP7 runs and seals the frozen paper campaign.
 
 The synthetic campaign is an analysis test. It is not MuJoCo task evidence and
 is never paper eligible.
@@ -149,6 +149,33 @@ with 0.130 ms p95 inference latency and no deadline fallback. Build, image,
 event, replay, timing and outcome artefacts are checksummed together. The report
 records `paper_split_opened: false`; WP6 does not authorise a `muesli_test` run.
 
+Gate G7 is driven by `configs/wp7_protocol.json`. `run_wp7.py check-protocol`
+is the last split-safe local check; the `run` command opens the 72-shot
+`muesli_test` split and therefore requires explicit authorisation, an empty
+output directory, the exact read-only checkpoint and the immutable joint
+image. The passing campaign used
+`local/muesli-air-hockey:38c8a19-1b6bbbb`, image ID
+`sha256:203151fc7bd897851a5cf998d30df62eccbb2c4c6ecc1d6d43136f933c609621`,
+2 CPUs, 8 GB RAM and no exposed GPU.
+
+All 228 matched pairs and 456 policy bundles passed per-run validation and
+exact replay. The deadline-only baseline dispatched an obsolete proposal in
+228/228 pairs, whereas invocation-scoped authority dispatched none. There
+were no missing terminal invocations, reason-code failures, replay mismatches,
+trace failures or direct-replay failures. BT tick p99 was 9.145 ms; 9/1,824
+samples exceeded the 20 ms budget and the maximum was 51.976 ms. Learned
+inference p95 was 0.212 ms over the predeclared 12-shot subset.
+
+The task outcome exposes a necessary design trade-off. The full condition's
+post-rejection continuation merely holds position, so save rate fell from
+0.9079 to 0.0132. Gate G7 therefore supports the authority claim, while also
+showing that rejection requires a task-capable fallback; it does not support a
+task-performance claim. The campaign is read-only and backed up. Its checksum
+manifest has SHA-256
+`80af405a8c05cf035525af27c27b532b29f82d0e33cd90e4cfe6b6262f0031f1`,
+and the verified backup has SHA-256
+`99f70a25e6736a24ddf3f1422d70336d59054919be12a3b60c5d2c7a7c3f903b`.
+
 ## example behaviour tree
 
 The deadline-only and invocation-scoped trees are structurally identical. The
@@ -165,15 +192,16 @@ full invocation-scoped source is embedded below.
 - A recorded-provider replay requires an exact request SHA-256 match.
 - A learned-provider configuration requires the exact family, checkpoint
   SHA-256, source-protocol SHA-256 and action-lock semantics. WP6 contains the
-  frozen engineering choice; no checkpoint path is committed.
+  frozen engineering choice and WP7 binds the paper campaign; no checkpoint
+  path is committed.
 - The pinned base image is available on Marvin, so local WP4 proves the build
   definition and non-MuJoCo startup path rather than claiming an image run.
 - `--force` replaces only a safe, marked run directory. It refuses unmarked
   data and path traversal.
 - Exact binomial intervals describe observed integrity counts. A zero count is
   reported with an upper confidence bound, not as zero probability.
-- SVG overlays and synthetic outcomes validate tooling only. Paper videos and
-  task claims require the later MuJoCo gates.
+- WP3 SVG overlays and synthetic outcomes validate tooling only. WP7's figures
+  and videos are generated from the validated MuJoCo paper bundles.
 
 ## see also
 

@@ -6,8 +6,9 @@ fake host. WP2 adds the C++ `env_backend`, matched Behaviour Trees, proposal
 validator, dispatch gate and deterministic H1--H8 harness. WP3 adds the local
 evidence-bundle, paired-analysis, replay and overlay tooling. WP4 pins the ACRA
 source and container, defines the joint image and packages provider adapters.
-WP5 validates the MuJoCo vertical slice, and WP6 freezes and runs the complete
-engineering pilot without opening the paper split.
+WP5 validates the MuJoCo vertical slice, WP6 freezes and runs the complete
+engineering pilot without opening the paper split, and WP7 runs and seals the
+frozen paper campaign.
 
 The fake host is useful for protocol, lifecycle and information-boundary tests.
 It is not a physics simulator and its observations must not be used as task
@@ -190,6 +191,78 @@ inference latency and required no deadline fallback. Its five-step action lock
 is bound to the checkpoint source-protocol hash rather than inferred from pilot
 outcomes. The `muesli_test` split remained unopened.
 
+## wp7 frozen paper campaign
+
+WP7 is governed by `configs/wp7_protocol.json`. The local protocol check
+validates all frozen hashes and campaign counts without generating or reading
+the paper split:
+
+```bash
+uv run --with-requirements \
+  examples/air_hockey_model_mediated_defence/container/requirements-wp4.txt \
+  python examples/air_hockey_model_mediated_defence/run_wp7.py check-protocol
+```
+
+The authorised campaign ran from an empty output directory inside the
+archive-built image `local/muesli-air-hockey:38c8a19-1b6bbbb` (image ID
+`sha256:203151fc7bd897851a5cf998d30df62eccbb2c4c6ecc1d6d43136f933c609621`)
+with 2 CPUs, 8 GB RAM and no exposed GPU:
+
+```bash
+g7_root=$PWD/build/air-hockey-g7
+checkpoint=/absolute/path/to/structured_k2-14303.npz
+mkdir -p "$g7_root/evidence"
+docker run --rm --cpus 2 --memory 8g --ipc host \
+  --env OMP_NUM_THREADS=1 --env OPENBLAS_NUM_THREADS=1 \
+  --env MKL_NUM_THREADS=1 --env NUMEXPR_NUM_THREADS=1 \
+  --mount type=bind,src="$checkpoint",dst=/checkpoint/structured_k2-14303.npz,readonly \
+  --mount type=bind,src="$g7_root",dst=/wp7 \
+  local/muesli-air-hockey:38c8a19-1b6bbbb \
+  python3 /opt/muesli-bt/examples/air_hockey_model_mediated_defence/run_wp7.py run \
+    --runner /opt/muesli-bt/build/air-hockey-wp4/muesli_bt_air_hockey_scenario_tests \
+    --checkpoint /checkpoint/structured_k2-14303.npz \
+    --out /wp7/evidence/campaign \
+    --image local/muesli-air-hockey:38c8a19-1b6bbbb \
+    --image-digest sha256:203151fc7bd897851a5cf998d30df62eccbb2c4c6ecc1d6d43136f933c609621
+```
+
+After Gate G7 passes, seal it in a separate container invocation:
+
+```bash
+docker run --rm \
+  --mount type=bind,src="$g7_root",dst=/wp7 \
+  local/muesli-air-hockey:38c8a19-1b6bbbb \
+  python3 /opt/muesli-bt/examples/air_hockey_model_mediated_defence/run_wp7.py seal \
+    --campaign /wp7/evidence/campaign \
+    --backup /wp7/backups/wp7-g7-38c8a19-1b6bbbb.tar.gz \
+    --seal-report /wp7/evidence/g7-seal.json
+```
+
+The frozen 72-shot `muesli_test` manifest produced 216 deterministic pairs
+across three delay seeds and 12 predeclared learned-provider pairs. All 228
+pairs, or 456 policy bundles including exact replay, passed. The deadline-only
+baseline dispatched an obsolete proposal in 228/228 pairs; invocation-scoped
+authority dispatched none. There were no missing terminal decisions,
+reason-code failures, replay mismatches, trace failures or direct-replay
+failures. BT tick p99 was 9.145 ms, with 9/1,824 samples above 20 ms and a
+51.976 ms maximum. Learned inference p95 was 0.212 ms over 12 samples.
+
+This campaign demonstrates authority and evidence integrity, not improved task
+success. The current invocation-scoped continuation holds position after
+rejection and has no capable defensive fallback: its save rate was 0.0132,
+compared with 0.9079 for the deliberately unsafe deadline-only baseline. Any
+paper use must report this fallback limitation rather than interpreting the
+result as a policy-performance gain.
+
+The sealed campaign is retained on Marvin under
+`/home/oliver/experiments/muesli-air-hockey/wp7-gate-g7-38c8a19-1b6bbbb/`.
+Its campaign checksum-manifest SHA-256 is
+`80af405a8c05cf035525af27c27b532b29f82d0e33cd90e4cfe6b6262f0031f1`;
+the verified backup SHA-256 is
+`99f70a25e6736a24ddf3f1422d70336d59054919be12a3b60c5d2c7a7c3f903b`.
+`g7-report.json` is part of the checksummed campaign and necessarily records
+pre-seal flags; the external `g7-seal.json` is the authoritative seal record.
+
 ## run the contract tests
 
 From the repository root:
@@ -225,7 +298,7 @@ for the lifecycle and field boundary.
 - `host/`: strict Python protocol host and WP1 tests;
 - `src/`: C++ socket client, `env_backend`, commit validator and dispatch gate;
 - `lisp/`: matched deadline-only and invocation-scoped task BTs;
-- `configs/`: frozen deterministic scenarios, engineering split and WP6 protocol;
+- `configs/`: frozen deterministic scenarios and WP6/WP7 protocols;
 - `evidence/`: named Gate G2 evidence predicates;
 - `analysis/`: WP3 validation, replay, statistics and overlay modules;
 - `provider/`: fixed and hash-bound ACRA-export provider adapters;
