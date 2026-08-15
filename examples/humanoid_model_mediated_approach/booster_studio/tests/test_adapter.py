@@ -160,7 +160,7 @@ class DispatchAndFollowerTests(unittest.TestCase):
         stale = state.dispatch(request(), 10.2)
 
         self.assertFalse(stale.accepted)
-        self.assertEqual(stale.reason, "context_changed")
+        self.assertEqual(stale.reason, "unsafe_baseline_context_unavailable")
 
     def test_motion_is_disabled_by_default(self) -> None:
         state = self.ready_state(motion_enabled=False)
