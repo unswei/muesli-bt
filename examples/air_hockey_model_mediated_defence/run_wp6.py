@@ -188,7 +188,12 @@ def _timing_records(stdout: str) -> list[dict[str, Any]]:
             or record.get("schema_version") != "airhockey.wp6.timing.v1"
         ):
             raise GateG6Error("C++ runner emitted an unsupported timing record")
-        for name in ("tick_duration_ns", "provider_wall_duration_ns"):
+        for name in (
+            "tick_duration_ns",
+            "provider_wall_duration_ns",
+            "raw_tick_duration_ns",
+            "fixture_intervention_duration_ns",
+        ):
             values = record.get(name)
             if (
                 not isinstance(values, list)
@@ -196,6 +201,22 @@ def _timing_records(stdout: str) -> list[dict[str, Any]]:
                 or any(not isinstance(value, int) or value < 0 for value in values)
             ):
                 raise GateG6Error(f"C++ timing record has invalid {name}")
+        tick_samples = len(record["tick_duration_ns"])
+        if (
+            len(record["raw_tick_duration_ns"]) != tick_samples
+            or len(record["fixture_intervention_duration_ns"]) != tick_samples
+        ):
+            raise GateG6Error("C++ tick timing projections have inconsistent lengths")
+        if any(
+            operational + fixture != raw
+            for operational, fixture, raw in zip(
+                record["tick_duration_ns"],
+                record["fixture_intervention_duration_ns"],
+                record["raw_tick_duration_ns"],
+                strict=True,
+            )
+        ):
+            raise GateG6Error("C++ operational tick timing does not reconcile to raw time")
         records.append(record)
     if not records:
         raise GateG6Error("C++ runner emitted no timing records")
@@ -403,6 +424,8 @@ def _run_deterministic_campaign(
     configurations, _ = load_contracts()
     schemas = SchemaRegistry(REPOSITORY_ROOT / "schemas" / "air_hockey_host" / "v1")
     tick_ns: list[int] = []
+    raw_tick_ns: list[int] = []
+    fixture_intervention_ns: list[int] = []
     provider_ns: list[int] = []
     scenario_counts: Counter[str] = Counter()
     accepted_obsolete = 0
@@ -426,6 +449,10 @@ def _run_deterministic_campaign(
         calibration_results.append(result)
         for timing in result["timing"]:
             tick_ns.extend(timing["tick_duration_ns"])
+            raw_tick_ns.extend(timing["raw_tick_duration_ns"])
+            fixture_intervention_ns.extend(
+                timing["fixture_intervention_duration_ns"]
+            )
             provider_ns.extend(timing["provider_wall_duration_ns"])
         maximum_replay_error = max(
             maximum_replay_error,
@@ -457,6 +484,10 @@ def _run_deterministic_campaign(
             context_rejections += counts["context_changed_rejections"]
             for timing in result["timing"]:
                 tick_ns.extend(timing["tick_duration_ns"])
+                raw_tick_ns.extend(timing["raw_tick_duration_ns"])
+                fixture_intervention_ns.extend(
+                    timing["fixture_intervention_duration_ns"]
+                )
                 provider_ns.extend(timing["provider_wall_duration_ns"])
             maximum_replay_error = max(
                 maximum_replay_error,
@@ -491,6 +522,9 @@ def _run_deterministic_campaign(
         "fallback_checks": scenario_counts["H6"],
         "maximum_public_observation_replay_error": maximum_replay_error,
         "tick_timing": tick,
+        "raw_tick_timing": _timing_summary(raw_tick_ns),
+        "fixture_intervention_timing": _timing_summary(fixture_intervention_ns),
+        "tick_measurement_scope": protocol["timing"]["measurement_scope"],
         "deterministic_provider_wall_timing": _timing_summary(provider_ns),
         "status": "passed",
     }

@@ -369,11 +369,19 @@ public:
 
     bt::status tick() {
         const auto started_at = std::chrono::steady_clock::now();
+        const std::int64_t fixture_before_ns = fixture_intervention_duration_ns_;
         const bt::status result = host_.tick_instance(instance_handle_);
-        tick_durations_ns_.push_back(
+        const std::int64_t raw_duration_ns =
             std::chrono::duration_cast<std::chrono::nanoseconds>(
                 std::chrono::steady_clock::now() - started_at)
-                .count());
+                .count();
+        const std::int64_t fixture_duration_ns =
+            fixture_intervention_duration_ns_ - fixture_before_ns;
+        check(fixture_duration_ns >= 0 && fixture_duration_ns <= raw_duration_ns,
+              "air-hockey fixture timing was inconsistent with the enclosing tick");
+        raw_tick_durations_ns_.push_back(raw_duration_ns);
+        fixture_intervention_durations_ns_.push_back(fixture_duration_ns);
+        tick_durations_ns_.push_back(raw_duration_ns - fixture_duration_ns);
         for (const auto& [job_id, invocation] : instance_->vla_invocations) {
             if (!validator_.source_step(job_id).has_value()) {
                 validator_.record_source_step(job_id, backend_->last_state().observation_step);
@@ -485,6 +493,20 @@ public:
             }
             std::cout << provider_durations[index];
         }
+        std::cout << "],\"raw_tick_duration_ns\":[";
+        for (std::size_t index = 0; index < raw_tick_durations_ns_.size(); ++index) {
+            if (index != 0) {
+                std::cout << ',';
+            }
+            std::cout << raw_tick_durations_ns_[index];
+        }
+        std::cout << "],\"fixture_intervention_duration_ns\":[";
+        for (std::size_t index = 0; index < fixture_intervention_durations_ns_.size(); ++index) {
+            if (index != 0) {
+                std::cout << ',';
+            }
+            std::cout << fixture_intervention_durations_ns_[index];
+        }
         std::cout << "]}\n";
         events_finished_ = true;
     }
@@ -587,7 +609,12 @@ private:
                 if (before_dispatch_) {
                     std::function<void(bt::tick_context&)> callback = std::move(before_dispatch_);
                     before_dispatch_ = {};
+                    const auto fixture_started_at = std::chrono::steady_clock::now();
                     callback(context);
+                    fixture_intervention_duration_ns_ +=
+                        std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            std::chrono::steady_clock::now() - fixture_started_at)
+                            .count();
                 }
                 last_dispatch_ = dispatch_gate_.dispatch(context.inst, invocation->job_id, node, *action);
                 context.bb_put("air-hockey-dispatch-reason", bt::bb_value{last_dispatch_->reason},
@@ -625,6 +652,9 @@ private:
         last_fallback_target_;
     std::size_t fallback_requests_ = 0;
     bool events_finished_ = false;
+    std::int64_t fixture_intervention_duration_ns_ = 0;
+    std::vector<std::int64_t> raw_tick_durations_ns_;
+    std::vector<std::int64_t> fixture_intervention_durations_ns_;
     std::vector<std::int64_t> tick_durations_ns_;
     std::int64_t instance_handle_ = 0;
     bt::instance* instance_ = nullptr;

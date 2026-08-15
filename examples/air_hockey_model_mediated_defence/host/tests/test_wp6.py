@@ -58,6 +58,8 @@ class GateG6PureTest(unittest.TestCase):
             "schema_version": "airhockey.wp6.timing.v1",
             "scenario": "H1",
             "tick_duration_ns": [100, 200],
+            "raw_tick_duration_ns": [110, 220],
+            "fixture_intervention_duration_ns": [10, 20],
             "provider_wall_duration_ns": [300],
         }
         parsed = _timing_records("TIMING " + json.dumps(timing))

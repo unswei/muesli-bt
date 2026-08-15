@@ -114,11 +114,23 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "measurement_scope",
+        "reported_fields",
         "tick_budget_ms",
         "maximum_tick_p99_ms",
         "maximum_tick_budget_miss_rate"
       ],
       "properties": {
+        "measurement_scope": {
+          "const": "runtime_tick_excluding_scenario_fixture_intervention"
+        },
+        "reported_fields": {
+          "const": [
+            "tick_duration_ns",
+            "raw_tick_duration_ns",
+            "fixture_intervention_duration_ns"
+          ]
+        },
         "tick_budget_ms": {"const": 20},
         "maximum_tick_p99_ms": {"type": "number", "exclusiveMinimum": 0},
         "maximum_tick_budget_miss_rate": {"type": "number", "minimum": 0, "maximum": 1}

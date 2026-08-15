@@ -39,6 +39,12 @@
     "maximum_inference_ms": 120.0
   },
   "timing": {
+    "measurement_scope": "runtime_tick_excluding_scenario_fixture_intervention",
+    "reported_fields": [
+      "tick_duration_ns",
+      "raw_tick_duration_ns",
+      "fixture_intervention_duration_ns"
+    ],
     "tick_budget_ms": 20,
     "maximum_tick_p99_ms": 20.0,
     "maximum_tick_budget_miss_rate": 0.01
