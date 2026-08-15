@@ -3,8 +3,9 @@
 !!! note "status"
 
     Status: experimental software experiment harness with an offline-tested
-    Booster Studio host-adapter scaffold. Live C++ bridge wiring, simulator
-    execution and physical video capture remain integration work.
+    Booster Studio host bridge. Local C++/Python bridge wiring is complete and
+    offline tested. Simulator execution and physical video capture remain
+    integration work.
 
 ## what this is
 
@@ -25,13 +26,14 @@ Use this example to:
 - verify moved-ball and emergency evidence before robot integration; and
 - generate provenance-rich runtime bundles for later video reconciliation.
 
-Do not use the included recording dispatcher for physical motion. The native
-helper rejects physical-motion mode until a Booster host adapter exists.
+Do not use the included recording dispatcher for physical motion. Physical
+motion is available only through an explicit Booster bridge whose reported
+motion state matches the runner option.
 
 The Booster Studio subproject implements the platform-owned context, safety,
 dispatch and bounded velocity policy. Motion is disabled by default. The muesli
-C++ bridge client that supplies live state and receives the synchronous host
-decision remains pending.
+C++ bridge client supplies live state and receives the synchronous host
+decision.
 
 ## how it works
 
@@ -108,6 +110,13 @@ python3 -m unittest discover \
   -p 'test_*.py' -v
 ```
 
+Run all three local bridge layers, including the native runner:
+
+```bash
+ctest --test-dir build/dev --output-on-failure \
+  -R '^muesli_bt_booster_(bridge|bridge_runner|studio_adapter)$'
+```
+
 Run a real-time clip for the full moved-ball trial:
 
 ```bash
@@ -141,8 +150,9 @@ pending artefacts before treating the run as paper evidence.
   generation are recorded in adjacent canonical blackboard writes.
 - A completed runtime bundle is still missing raw video, overlay video and
   replay comparison until the manifest says otherwise.
-- The Booster adapter socket is not yet called by the native muesli runner. A
-  passing offline adapter test is not an end-to-end K1 result.
+- The native runner and adapter pass a local socket round trip. This is not an
+  end-to-end virtual K1 result because Booster Studio and the simulator are not
+  involved in that test.
 - A forced rerun is staged and validated before it replaces an existing marked
   evidence bundle. A selected matrix is fully validated before publication
   starts.
@@ -157,3 +167,4 @@ pending artefacts before treating the run as paper evidence.
 - [VLA logging](../observability/vla-logging.md)
 - [testing and verification](../testing.md)
 - [Booster Studio adapter README](https://github.com/unswei/muesli-bt/blob/main/examples/humanoid_model_mediated_approach/booster_studio/README.md)
+- [Booster Studio bridge](../integration/booster-studio-bridge.md)

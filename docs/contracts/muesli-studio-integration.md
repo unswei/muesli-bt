@@ -199,6 +199,16 @@ add_executable(mbt_inspector ...)
 target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_pybullet)
 ```
 
+Optional Booster local-host bridge target (when built and installed with
+`MUESLI_BT_BUILD_INTEGRATION_BOOSTER=ON`):
+
+```cmake
+find_package(muesli_bt CONFIG REQUIRED)
+
+add_executable(mbt_inspector ...)
+target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integration_booster)
+```
+
 Optional Webots integration target (when built and installed with `MUESLI_BT_BUILD_INTEGRATION_WEBOTS=ON` and Webots SDK is available):
 
 ```cmake
@@ -220,6 +230,10 @@ target_link_libraries(mbt_inspector PRIVATE muesli_bt::runtime muesli_bt::integr
 Optional-target probe pattern for downstream consumers:
 
 ```cmake
+if(TARGET muesli_bt::integration_booster)
+  target_link_libraries(mbt_inspector PRIVATE muesli_bt::integration_booster)
+endif()
+
 if(TARGET muesli_bt::integration_webots)
   target_link_libraries(mbt_inspector PRIVATE muesli_bt::integration_webots)
 endif()

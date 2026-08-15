@@ -26,6 +26,7 @@ Core runtime target:
 Optional integration targets (only when built and exported):
 
 - `muesli_bt::integration_pybullet`
+- `muesli_bt::integration_booster` (SDK-independent local host bridge)
 - `muesli_bt::integration_webots`
 - `muesli_bt::integration_ros2` (Linux ROS2 transport target)
 
@@ -60,6 +61,10 @@ Optional integration probe pattern:
 ```cmake
 if(TARGET muesli_bt::integration_pybullet)
   target_link_libraries(app PRIVATE muesli_bt::integration_pybullet)
+endif()
+
+if(TARGET muesli_bt::integration_booster)
+  target_link_libraries(app PRIVATE muesli_bt::integration_booster)
 endif()
 
 if(TARGET muesli_bt::integration_webots)
@@ -107,6 +112,8 @@ Studio/tooling contract assets are installed with the package and exposed via
 ## gotchas
 
 - `muesli_bt::integration_webots` is omitted when Webots SDK is unavailable.
+- `muesli_bt::integration_booster` uses Unix-domain sockets at runtime and
+  fails closed on platforms without them.
 - `muesli_bt::integration_ros2` currently targets Ubuntu 22.04 + ROS 2 Humble with `nav_msgs/msg/Odometry` input and `geometry_msgs/msg/Twist` output.
 - enabling `MUESLI_BT_BUILD_PYTHON_BRIDGE` requires PyBullet integration.
 - do not link against non-exported internal targets; only use imported

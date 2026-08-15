@@ -18,6 +18,7 @@ option(MUESLI_BT_BUILD_WEBOTS_EXAMPLES "Build the Webots e-puck example controll
 option(MUESLI_BT_BUILD_INTEGRATION_PYBULLET "Build the PyBullet integration library" ON)
 option(MUESLI_BT_BUILD_INTEGRATION_WEBOTS "Build the Webots integration library" ON)
 option(MUESLI_BT_BUILD_INTEGRATION_ROS2 "Build the ROS2 integration library" OFF)
+option(MUESLI_BT_BUILD_INTEGRATION_BOOSTER "Build the SDK-independent Booster host bridge" ON)
 option(MUESLI_BT_BUILD_MODEL_SERVICE_BRIDGE "Build the optional muesli-model-service bridge target" OFF)
 option(MUESLI_BT_BUILD_BENCHMARKS "Build the optional benchmark harness" OFF)
 option(MUESLI_BT_BENCH_WITH_BTCPP "Build the optional BehaviorTree.CPP benchmark adapter" OFF)
@@ -109,6 +110,21 @@ if (MUESLI_BT_BUILD_MODEL_SERVICE_BRIDGE)
   )
   target_compile_definitions(muesli_bt_integration_model_service
                              PUBLIC MUESLI_BT_WITH_MODEL_SERVICE_BRIDGE=1)
+endif ()
+
+if (MUESLI_BT_BUILD_INTEGRATION_BOOSTER)
+  add_library(muesli_bt_integration_booster integrations/booster/bridge_client.cpp)
+  target_link_libraries(muesli_bt_integration_booster PUBLIC muesli_bt_core)
+  target_include_directories(
+    muesli_bt_integration_booster
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/integrations>
+           $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+  )
+  set_target_properties(
+    muesli_bt_integration_booster PROPERTIES EXPORT_NAME integration_booster
+                                                POSITION_INDEPENDENT_CODE ON
+  )
+  target_compile_features(muesli_bt_integration_booster PUBLIC cxx_std_20)
 endif ()
 
 set(MUESLI_BT_HAVE_WEBOTS OFF)
@@ -264,6 +280,10 @@ target_include_directories(
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/examples/humanoid_model_mediated_approach/src
 )
 target_link_libraries(humanoid_model_mediated_trial PRIVATE muesli_bt_core)
+if (TARGET muesli_bt_integration_booster)
+  target_link_libraries(humanoid_model_mediated_trial PRIVATE muesli_bt_integration_booster)
+  target_compile_definitions(humanoid_model_mediated_trial PRIVATE MUESLI_BT_HAVE_BOOSTER_BRIDGE=1)
+endif ()
 
 if (UNIX)
   add_library(
@@ -445,6 +465,13 @@ endif ()
 
 add_test(NAME muslisp_tests COMMAND muslisp_tests)
 
+if (TARGET muesli_bt_integration_booster AND UNIX)
+  add_executable(muesli_bt_booster_bridge_tests tests/test_booster_bridge.cpp)
+  target_link_libraries(muesli_bt_booster_bridge_tests PRIVATE muesli_bt_integration_booster)
+  add_test(NAME muesli_bt_booster_bridge COMMAND muesli_bt_booster_bridge_tests)
+  set_tests_properties(muesli_bt_booster_bridge PROPERTIES TIMEOUT 10)
+endif ()
+
 add_executable(muesli_bt_humanoid_vla_scenario_tests tests/test_humanoid_vla_scenarios.cpp)
 if (TARGET muesli_bt_integration_model_service)
   target_link_libraries(muesli_bt_humanoid_vla_scenario_tests PRIVATE muesli_bt_integration_model_service)
@@ -551,6 +578,15 @@ if (Python3_Interpreter_FOUND)
       -s "${CMAKE_CURRENT_SOURCE_DIR}/examples/humanoid_model_mediated_approach/booster_studio/tests"
       -p "test_*.py" -v
   )
+  if (TARGET muesli_bt_integration_booster AND UNIX)
+    add_test(
+      NAME muesli_bt_booster_bridge_runner
+      COMMAND
+        "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_booster_bridge_runner.py"
+        --runner "$<TARGET_FILE:humanoid_model_mediated_trial>"
+    )
+    set_tests_properties(muesli_bt_booster_bridge_runner PROPERTIES TIMEOUT 15)
+  endif ()
   execute_process(
     COMMAND "${Python3_EXECUTABLE}" -c "import jsonschema"
     RESULT_VARIABLE MUESLI_BT_JSONSCHEMA_IMPORT_RESULT
@@ -656,6 +692,16 @@ if (MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
   )
 endif ()
 
+if (TARGET muesli_bt_integration_booster)
+  install(
+    TARGETS muesli_bt_integration_booster
+    EXPORT muesli_btTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
+endif ()
+
 if (TARGET muesli_bt_integration_webots)
   install(
     TARGETS muesli_bt_integration_webots
@@ -693,6 +739,15 @@ if (MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
   install(
     DIRECTORY integrations/pybullet/
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/pybullet
+    FILES_MATCHING
+    PATTERN "*.hpp"
+  )
+endif ()
+
+if (TARGET muesli_bt_integration_booster)
+  install(
+    DIRECTORY integrations/booster/
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/booster
     FILES_MATCHING
     PATTERN "*.hpp"
   )

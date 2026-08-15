@@ -135,6 +135,7 @@ nav:
       - Agent-proposed Task Logic: integration/agent-proposed-task-logic.md
       - VLA Backend Integration Plan: integration/vla-backend-integration-plan.md
       - Air-hockey Host Protocol: integration/air-hockey-host-protocol.md
+      - Booster Studio Bridge: integration/booster-studio-bridge.md
       - ROS2 Backend Scope: integration/ros2-backend-scope.md
       - ROS2 Tutorial: integration/ros2-tutorial.md
       - ROS2 Flagship Source: integration/ros2-flagship-source.md

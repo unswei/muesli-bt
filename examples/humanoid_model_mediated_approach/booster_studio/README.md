@@ -1,7 +1,7 @@
 # Booster Studio host adapter
 
-Status: offline-tested integration scaffold. Motion is disabled by default. The
-live C++ bridge client, Studio package build and virtual K1 trial remain pending.
+Status: locally integrated and offline tested. Motion is disabled by default.
+The Studio package build and virtual K1 trial remain pending.
 
 ## what this is
 
@@ -21,9 +21,9 @@ rechecks live Booster state before admitting it to the walking controller.
 
 ## when to use it
 
-Use this project after the SDK-independent trial matrix passes. Start in the
-Booster `football3v3` scene with one K1. Do not enable motion until the muesli
-C++ bridge client is connected and the snapshot/dispatch round trip passes.
+Use this project after the SDK-independent trial matrix and local bridge tests
+pass. Start in the Booster `football3v3` scene with one K1. Do not enable motion
+until the snapshot/dispatch round trip passes in that scene.
 
 ## how it works
 
@@ -39,8 +39,8 @@ The robot backend uses `BoosterRobot`, the `soccer` gait, `walk` mode,
 motion is disabled.
 
 The platform-independent adapter serves one JSON request per Unix-domain socket
-connection. A future C++ `walking_target_dispatcher` must use the response as
-its synchronous host decision so the canonical `walking_target_dispatch` event
+connection. The C++ `bridge_walking_target_dispatcher` uses the response as its
+synchronous host decision so the canonical `walking_target_dispatch` event
 records the actual Booster acceptance or rejection.
 
 ## api / syntax
@@ -102,6 +102,13 @@ python3 -m unittest discover \
   -p 'test_*.py' -v
 ```
 
+Run the C++ client, Python adapter and end-to-end native-runner checks:
+
+```bash
+ctest --test-dir build/dev --output-on-failure \
+  -R '^muesli_bt_booster_(bridge|bridge_runner|studio_adapter)$'
+```
+
 Open `booster_studio/` as a Booster Studio project only after the offline test
 passes. The project metadata selects `football3v3` and `soccer-match`.
 
@@ -114,8 +121,9 @@ passes. The project metadata selects `football3v3` and `soccer-match`.
   Conversion therefore adds the ball translation and does not rotate offsets.
 - A context change, stale ball, stale robot pose, instability or emergency
   clears the active target and outputs zero velocity.
-- The current bridge server is ready, but no C++ client invokes it yet. Do not
-  claim a complete end-to-end Booster run until that client is implemented.
+- The C++ and Python bridge ends have passed a local end-to-end smoke test. Do
+  not claim a Booster simulation result until the Studio package runs in a
+  virtual K1 scene.
 - The `football3v3` scene includes other robots and referee state. Freeze or
   park irrelevant actors before recording the one-robot paper trial.
 
@@ -124,3 +132,4 @@ passes. The project metadata selects `football3v3` and `soccer-match`.
 - [experiment directory README](../README.md)
 - [experiment contract](../../../../docs/project/humanoid-model-mediated-approach-contract.md)
 - [approach-pose validation](../../../../docs/bt/approach-pose-validation.md)
+- [Booster Studio bridge](../../../../docs/integration/booster-studio-bridge.md)

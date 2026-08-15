@@ -11,8 +11,9 @@
     SDK-independent three-component approach-pose validator for VLA BT nodes.
     It also provides matched baseline/full BTs, a delayed deterministic service,
     a four-trial runner, evidence manifests, an exactly-once walking-target host
-    callback and canonical dispatch evidence. The repository does not yet
-    provide the Booster K1 state or walking-controller adapters or video overlay.
+    callback, a local Booster Studio host bridge and canonical dispatch
+    evidence. The repository does not yet provide a Booster Studio or K1
+    execution result, or the video overlay.
 
 ## what this is
 
@@ -279,8 +280,10 @@ current ball context and robot stability. Dispatch rechecks the invocation,
 context, frame, exact accepted target and exactly-once state before calling the
 host. The Booster Studio scaffold now implements state acquisition,
 observation-age and operating-area policy, a synchronous host-side dispatch
-gate and a bounded pose follower. Its live C++ client, Booster package build and
-virtual-robot execution remain experiment integration work.
+gate and a bounded pose follower. The C++ client polls that state and forwards
+the invocation-scoped dispatch envelope. The complete path passes a local
+SDK-independent smoke test. Booster package build and virtual-robot execution
+remain experiment integration work.
 
 The deterministic runtime suite covers normal acceptance, moved-ball context
 change, supersession, late completion, duplicate completion, direct branch
@@ -295,8 +298,8 @@ frozen trial configurations and per-trial evidence protocols. The matrix runner
 creates canonical event logs, trial summaries, validation reports and
 provenance-rich run manifests. Each evidence protocol contains named predicates
 that the runner evaluates against the event stream. Raw video, overlay video,
-recorded-result replay, live muesli-to-Booster bridge wiring and Booster
-simulation evidence remain explicit pending artefacts.
+recorded-result replay and Booster simulation evidence remain explicit pending
+artefacts.
 
 Existing canonical event types should be extended where their meaning already
 fits. Any new event type must be added to the v1 schema and documented in the

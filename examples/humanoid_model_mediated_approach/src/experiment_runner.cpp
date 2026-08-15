@@ -3,6 +3,9 @@
 #include "bt/runtime.hpp"
 #include "bt/runtime_host.hpp"
 #include "delayed_fake_service.hpp"
+#if defined(MUESLI_BT_HAVE_BOOSTER_BRIDGE)
+#include "booster/bridge_client.hpp"
+#endif
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
 #include "muslisp/reader.hpp"
@@ -74,6 +77,8 @@ struct options
   std::vector<double> moved_ball_position_m{0.75, 0.40, 0.0};
   double context_change_threshold_m = 0.15;
   bool physical_motion_enabled = false;
+  std::string booster_bridge_socket;
+  std::int64_t booster_bridge_timeout_ms = 100;
 };
 
 [[noreturn]] void fail(std::string message)
@@ -324,6 +329,14 @@ options parse_options(int argc, char** argv)
     {
       out.physical_motion_enabled = parse_bool(require_value(argc, argv, i, arg), arg);
     }
+    else if (arg == "--booster-bridge-socket")
+    {
+      out.booster_bridge_socket = require_value(argc, argv, i, arg);
+    }
+    else if (arg == "--booster-bridge-timeout-ms")
+    {
+      out.booster_bridge_timeout_ms = parse_integer(require_value(argc, argv, i, arg), arg);
+    }
     else if (arg == "--help")
     {
       std::cout << "usage: humanoid_model_mediated_trial --tree FILE --events FILE --run-id ID "
@@ -351,6 +364,7 @@ options parse_options(int argc, char** argv)
     fail("--intervention must be none, moved_ball or emergency");
   }
   if (out.delay_ms <= 0 || out.deadline_ms <= 0 || out.intervention_ms < 0 ||
+      out.booster_bridge_timeout_ms <= 0 ||
       !std::isfinite(out.tick_hz) || out.tick_hz <= 0.0)
   {
     fail("delay, deadline, intervention time and tick rate must be valid positive values");
@@ -402,11 +416,22 @@ options parse_options(int argc, char** argv)
       fail("moved-ball intervention must cross the context threshold and change context ID");
     }
   }
-  if (out.physical_motion_enabled)
+  if (out.physical_motion_enabled && out.booster_bridge_socket.empty())
   {
-    fail("the SDK-independent fake runner cannot enable physical motion; install a Booster host "
-         "adapter first");
+    fail("physical motion requires --booster-bridge-socket and an explicitly enabled Booster "
+         "host adapter");
   }
+  if (!out.booster_bridge_socket.empty() &&
+      !std::filesystem::path(out.booster_bridge_socket).is_absolute())
+  {
+    fail("--booster-bridge-socket must be an absolute path");
+  }
+#if !defined(MUESLI_BT_HAVE_BOOSTER_BRIDGE)
+  if (!out.booster_bridge_socket.empty())
+  {
+    fail("this runner was built without MUESLI_BT_BUILD_INTEGRATION_BOOSTER");
+  }
+#endif
   if (std::filesystem::exists(out.event_path))
   {
     fail("event file already exists: " + out.event_path.string());
@@ -618,7 +643,36 @@ struct experiment_host_state
   bool ball_available = true;
   bool robot_stable = true;
   bool emergency = false;
+  bool bridge_available = false;
+  std::string bridge_fault_reason = "not_configured";
 };
+
+#if defined(MUESLI_BT_HAVE_BOOSTER_BRIDGE)
+void apply_bridge_snapshot(experiment_host_state& state,
+                           const muesli_bt::booster::bridge_snapshot& snapshot)
+{
+  state.ball_context_id = snapshot.ball_context_id;
+  state.ball_available = snapshot.ball_available && snapshot.ball_position_m.has_value();
+  if (snapshot.ball_position_m)
+  {
+    state.ball_position_m.assign(snapshot.ball_position_m->begin(),
+                                 snapshot.ball_position_m->end());
+  }
+  state.emergency = snapshot.emergency;
+  state.robot_stable = snapshot.robot_stable && !snapshot.emergency;
+  state.bridge_available = true;
+  state.bridge_fault_reason.clear();
+}
+
+void fail_closed_bridge_state(experiment_host_state& state, std::string reason)
+{
+  state.ball_available = false;
+  state.robot_stable = false;
+  state.emergency = true;
+  state.bridge_available = false;
+  state.bridge_fault_reason = std::move(reason);
+}
+#endif
 
 class deadline_only_baseline_validator final : public bt::vla_commit_validator
 {
@@ -762,6 +816,10 @@ void register_experiment_callbacks(bt::runtime_host& host, experiment_host_state
                        "experiment-host-state");
         put_if_changed(context, "robot-stable", host_state.robot_stable, "experiment-host-state");
         put_if_changed(context, "emergency", host_state.emergency, "experiment-host-state");
+        put_if_changed(context, "bridge-available", host_state.bridge_available,
+                       "experiment-host-state");
+        put_if_changed(context, "bridge-fault-reason", host_state.bridge_fault_reason,
+                       "experiment-host-state");
         return bt::status::success;
       });
 
@@ -936,6 +994,31 @@ int run(const options& opts)
 
   experiment_host_state host_state{.ball_context_id = opts.initial_context_id,
                                     .ball_position_m = opts.initial_ball_position_m};
+#if defined(MUESLI_BT_HAVE_BOOSTER_BRIDGE)
+  std::unique_ptr<muesli_bt::booster::bridge_walking_target_dispatcher> bridge_dispatcher;
+  std::string initial_bridge_context_id;
+  if (!opts.booster_bridge_socket.empty())
+  {
+    bridge_dispatcher =
+        std::make_unique<muesli_bt::booster::bridge_walking_target_dispatcher>(
+            muesli_bt::booster::bridge_client_config{
+                .socket_path = opts.booster_bridge_socket,
+                .timeout = std::chrono::milliseconds(opts.booster_bridge_timeout_ms),
+            });
+    const muesli_bt::booster::snapshot_result initial_snapshot =
+        bridge_dispatcher->client().snapshot();
+    if (!initial_snapshot.ok)
+    {
+      fail("Booster bridge initial snapshot failed: " + initial_snapshot.reason);
+    }
+    if (initial_snapshot.snapshot.motion_enabled != opts.physical_motion_enabled)
+    {
+      fail("Booster bridge motion state does not match --physical-motion-enabled");
+    }
+    apply_bridge_snapshot(host_state, initial_snapshot.snapshot);
+    initial_bridge_context_id = host_state.ball_context_id;
+  }
+#endif
   bt::runtime_host host;
   host.events().set_path(opts.event_path.string());
   host.events().set_file_enabled(true);
@@ -945,7 +1028,8 @@ int run(const options& opts)
   host.events().set_host_info("humanoid-model-mediated-trial", "experimental", opts.platform);
   host.events().ensure_run_started(
       definition.canonical_dsl_hash,
-      "{\"reset\":true,\"walking_target_dispatch\":true,\"physical_motion\":false}");
+      std::string("{\"reset\":true,\"walking_target_dispatch\":true,\"physical_motion\":") +
+          (opts.physical_motion_enabled ? "true}" : "false}"));
 
   const auto backend = std::make_shared<humanoid_experiment::delayed_fake_service>(
       humanoid_experiment::delayed_fake_service_config{
@@ -979,7 +1063,14 @@ int run(const options& opts)
                                     : static_cast<bt::vla_commit_validator*>(&full_validator));
 
   recording_walking_dispatcher dispatcher(host_state);
+#if defined(MUESLI_BT_HAVE_BOOSTER_BRIDGE)
+  host.set_walking_target_dispatcher(bridge_dispatcher
+                                         ? static_cast<bt::walking_target_dispatcher*>(
+                                               bridge_dispatcher.get())
+                                         : static_cast<bt::walking_target_dispatcher*>(&dispatcher));
+#else
   host.set_walking_target_dispatcher(&dispatcher);
+#endif
   register_experiment_callbacks(host, host_state, opts);
 
   const std::int64_t definition_handle = host.store_definition(std::move(definition));
@@ -1002,6 +1093,21 @@ int run(const options& opts)
   while (std::chrono::steady_clock::now() - started_at <= maximum_runtime)
   {
     const auto now = std::chrono::steady_clock::now();
+#if defined(MUESLI_BT_HAVE_BOOSTER_BRIDGE)
+    if (bridge_dispatcher)
+    {
+      const muesli_bt::booster::snapshot_result live_snapshot =
+          bridge_dispatcher->client().snapshot();
+      if (live_snapshot.ok)
+      {
+        apply_bridge_snapshot(host_state, live_snapshot.snapshot);
+      }
+      else
+      {
+        fail_closed_bridge_state(host_state, live_snapshot.reason);
+      }
+    }
+#endif
     if (!request_submitted_at.has_value() && !instance->vla_invocations.empty())
     {
       request_submitted_at = instance->vla_invocations.begin()->second.submitted_at;
@@ -1013,10 +1119,24 @@ int run(const options& opts)
         request_submitted_at.has_value()
             ? std::chrono::duration_cast<std::chrono::milliseconds>(now - *request_submitted_at)
             : 0ms;
-    if (!intervention_applied && request_submitted_at.has_value() &&
-        request_elapsed.count() >= opts.intervention_ms)
+    bool intervention_observed = false;
+#if defined(MUESLI_BT_HAVE_BOOSTER_BRIDGE)
+    if (bridge_dispatcher && request_submitted_at.has_value())
+    {
+      intervention_observed =
+          (opts.intervention == "moved_ball" && !host_state.ball_context_id.empty() &&
+           host_state.ball_context_id != initial_bridge_context_id) ||
+          (opts.intervention == "emergency" && host_state.emergency);
+    }
+    else
+#endif
+    if (request_submitted_at.has_value() && request_elapsed.count() >= opts.intervention_ms)
     {
       apply_intervention(host_state, opts);
+      intervention_observed = true;
+    }
+    if (!intervention_applied && intervention_observed)
+    {
       intervention_applied = true;
       std::cout << "INTERVENTION trial=" << opts.trial_id << " kind=" << opts.intervention << '\n'
                 << std::flush;
@@ -1047,9 +1167,15 @@ int run(const options& opts)
   }
 
   std::ostringstream run_end;
+#if defined(MUESLI_BT_HAVE_BOOSTER_BRIDGE)
+  const std::size_t dispatch_calls =
+      bridge_dispatcher ? bridge_dispatcher->dispatch_count() : dispatcher.calls;
+#else
+  const std::size_t dispatch_calls = dispatcher.calls;
+#endif
   run_end << "{\"status\":\"" << (complete ? "complete" : "timeout") << "\",\"trial_id\":\""
           << bt::event_log::json_escape(opts.trial_id) << "\",\"ticks\":" << instance->tick_index
-          << ",\"recording_dispatch_calls\":" << dispatcher.calls << '}';
+          << ",\"recording_dispatch_calls\":" << dispatch_calls << '}';
   (void)host.events().emit("run_end", instance->tick_index, run_end.str());
 
   host.set_vla_commit_validator(nullptr);

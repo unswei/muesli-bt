@@ -1,8 +1,8 @@
 # humanoid model-mediated approach video experiment
 
-Status: experimental software experiment harness with an offline-tested Booster
-Studio host-adapter scaffold. The live C++ bridge client, Studio package build,
-virtual K1 run and physical video capture remain integration work.
+Status: experimental software experiment harness with a locally integrated,
+offline-tested Booster Studio host bridge. The Studio package build, virtual K1
+run and physical video capture remain integration work.
 
 ## what this is
 
@@ -12,7 +12,8 @@ while a deterministic approach-pose service waits for 2.5 seconds.
 
 The external service returns one bounded pose in `ball_context`. It never
 returns joint, balance or footstep commands. The checked-in runner uses a
-recording walking adapter and refuses to enable physical motion.
+recording walking adapter by default. An explicit local bridge option replaces
+that adapter with the Booster host gate.
 
 ## contents
 
@@ -133,18 +134,19 @@ must supply and enforce observation timestamps before a physical trial.
 
 The `booster_studio/` project implements ball context tracking, observation age,
 stability/emergency state, operating-area validation and a bounded pose
-follower. Motion is disabled by default. Before enabling a robot trial:
+follower. Motion is disabled by default. The native runner now polls adapter
+snapshots and uses the synchronous bridge response as the walking-target
+callback result. Before enabling a robot trial:
 
-1. implement the C++ client for the adapter's snapshot and synchronous dispatch
-   socket operations;
-2. feed each snapshot into the existing muesli state sync and use the dispatch
-   response as the walking-target callback result;
-3. build and package the C++ runtime for the Booster agent environment; and
+1. build and package the C++ runtime and Studio agent in the Booster environment;
+2. run the snapshot/dispatch round trip with motion disabled;
+3. run the software-emergency trial in the virtual K1 scene; and
 4. retain the runtime commit gate and both dispatch-time safety checks.
 
-The fake runner rejects `--physical-motion-enabled true`. Do not bypass that
-guard. A physical push is outside this example and should follow a successful
-software-emergency trial and the robot safety review.
+Physical motion requires an absolute `--booster-bridge-socket`, an explicit
+`--physical-motion-enabled true` and a host snapshot that also reports motion
+enabled. A physical push remains outside this example until the software trial
+and robot safety review pass.
 
 `--force` replaces only a basename-safe, experiment-marked run directory. It
 refuses unmarked directories and paths outside the selected output root. A
