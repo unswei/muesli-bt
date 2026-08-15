@@ -148,8 +148,10 @@ walking-target callback result. Before enabling a robot trial:
 5. retain the runtime commit gate and both dispatch-time safety checks.
 
 See `booster_studio/README.md` for the exact payload, trial and video finalising
-commands. The current Studio package advertises only `sim_x86_64`; device
-targets remain deliberately unavailable until separately built and tested.
+commands, including the equivalent ROS operator topics required by the
+`football3v3` match runner. The current Studio package advertises only
+`sim_x86_64`; device targets remain deliberately unavailable until separately
+built and tested.
 
 Physical motion requires an absolute `--booster-bridge-socket`, an explicit
 `--physical-motion-enabled true` and a host snapshot that also reports motion

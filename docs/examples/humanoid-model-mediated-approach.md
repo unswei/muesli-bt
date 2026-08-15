@@ -134,7 +134,10 @@ local macOS binaries are rejected. The Booster adapter README contains the
 Studio activation and video-finalisation runbook. The Agent starts with motion
 disabled. In Studio, invoke `motion_arm` before invoking one of `trial_t1`,
 `trial_t2a`, `trial_t2b` or `trial_t3`. The `software_emergency` action supplies
-the controlled T3 interruption.
+the controlled T3 interruption. In the `football3v3` match runner, use the
+equivalent `/muesli/motion_arm`, `/muesli/trial_command` and
+`/muesli/emergency` ROS 2 topics because Studio does not route active-Agent UI
+clicks to team processes.
 
 Run a real-time clip for the full moved-ball trial:
 

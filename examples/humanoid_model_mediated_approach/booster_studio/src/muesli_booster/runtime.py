@@ -137,7 +137,7 @@ class BoosterRuntime:
         from geometry_msgs.msg import Pose2D
         from rclpy.executors import SingleThreadedExecutor
         from rclpy.qos import QoSProfile, ReliabilityPolicy
-        from std_msgs.msg import Bool
+        from std_msgs.msg import Bool, String
 
         context = rclpy.get_default_context()
         self._ros_context = context
@@ -152,6 +152,12 @@ class BoosterRuntime:
         self._node.create_subscription(Pose2D, robot_topic, self._on_robot_pose, qos)
         self._node.create_subscription(
             Bool, "/muesli/emergency", self._on_emergency, qos
+        )
+        self._node.create_subscription(
+            Bool, "/muesli/motion_arm", self._on_motion_arm, qos
+        )
+        self._node.create_subscription(
+            String, "/muesli/trial_command", self._on_trial_command, qos
         )
         self._executor = SingleThreadedExecutor(context=context)
         self._executor.add_node(self._node)
@@ -358,3 +364,23 @@ class BoosterRuntime:
 
     def _on_emergency(self, message: Any) -> None:
         self._state.set_emergency(bool(message.data))
+
+    def _on_motion_arm(self, message: Any) -> None:
+        try:
+            if bool(message.data):
+                self.arm_motion()
+            else:
+                self.disarm_motion()
+        except Exception as exc:  # noqa: BLE001 - ROS/Booster SDK callback boundary
+            self._logger.error(f"motion arming command failed: {exc}")
+
+    def _on_trial_command(self, message: Any) -> None:
+        trial_id = str(message.data).strip()
+        if trial_id not in TRIAL_FILES:
+            self._logger.error(f"unsupported muesli trial command: {trial_id}")
+            return
+        try:
+            run_dir = self.start_trial(trial_id)
+            self._logger.info(f"muesli trial evidence directory: {run_dir}")
+        except TrialError as exc:
+            self._logger.error(f"{trial_id} did not start: {exc}")

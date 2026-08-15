@@ -130,6 +130,17 @@ For interactive Studio work, use `motion_arm` so arming is a visible operator
 action. A trial action refuses to launch until motion is armed and the ball,
 robot pose and stability observations are fresh.
 
+The `football3v3` match runner starts team processes outside Agent Manager's
+normal active-Agent route. Studio `1.110.1` therefore cannot deliver component
+clicks to a running team Agent. Use the equivalent ROS 2 control topics in that
+scene:
+
+| Topic | Type | Meaning |
+| --- | --- | --- |
+| `/muesli/motion_arm` | `std_msgs/msg/Bool` | `true` arms motion; `false` stops the trial, clears the target and closes the backend. |
+| `/muesli/trial_command` | `std_msgs/msg/String` | Start exactly one of `T1`, `T2a`, `T2b` or `T3`. |
+| `/muesli/emergency` | `std_msgs/msg/Bool` | Set or clear the controlled emergency state. |
+
 ## example
 
 Run the adapter policy and socket tests without ROS, BoosterOS or a simulator:
@@ -174,11 +185,18 @@ MUESLI_BOOSTER_MOTION_ENABLED=true
 MUESLI_BOOSTER_AUTOSTART_TRIAL=T2b
 ```
 
-For an interactive trial, start recording, activate the Agent, invoke
-`motion_arm`, then invoke one trial action. Move the ball after the
-`REQUEST_SUBMITTED` cue for T2a or T2b. For T3, invoke
-`software_emergency` after the cue. Run one trial at a time and retain its
-evidence directory.
+For an interactive trial in ordinary Agent mode, start recording, activate the
+Agent, invoke `motion_arm`, then invoke one trial action. In `football3v3`,
+publish the corresponding ROS commands instead:
+
+```bash
+ros2 topic pub --once /muesli/motion_arm std_msgs/msg/Bool '{data: true}'
+ros2 topic pub --once /muesli/trial_command std_msgs/msg/String '{data: T2b}'
+```
+
+Move the ball after the `REQUEST_SUBMITTED` cue for T2a or T2b. For T3,
+publish the controlled software emergency after the cue. Run one trial at a
+time and retain its evidence directory.
 
 ```bash
 ros2 topic pub --once /muesli/emergency std_msgs/msg/Bool '{data: true}'
