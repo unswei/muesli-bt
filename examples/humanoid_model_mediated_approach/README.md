@@ -55,7 +55,7 @@ towards the obsolete target by this example.
 The polished simulation video has a separate, explicit T2a-only override. It
 disables the host context check so the baseline failure becomes physically
 visible as motion towards obsolete target A. The override is false by default,
-cannot cross loss of the ball track and must never be enabled on hardware. See
+is cleared on explicit ball loss and must never be enabled on hardware. See
 the [T2 video workflow](booster_studio/video/t2-comparison.md).
 
 ## build and check

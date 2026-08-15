@@ -129,8 +129,8 @@ class DispatchAndFollowerTests(unittest.TestCase):
         self,
     ) -> None:
         state = self.ready_state()
-        state.observe_ball(BallObservation(1.5, -0.35, 0.0, 10.1))
         state.prepare_trial(unsafe_simulation_stale_dispatch=True)
+        state.observe_ball(BallObservation(1.5, -0.35, 0.0, 10.1))
 
         stale = state.dispatch(request(), 10.2)
 
@@ -138,6 +138,18 @@ class DispatchAndFollowerTests(unittest.TestCase):
         self.assertAlmostEqual(stale.field_target.x_m, 0.75)
         self.assertAlmostEqual(stale.field_target.y_m, -0.27)
         self.assertEqual(state.velocity_command(10.2).reason, "walking")
+
+    def test_unsafe_simulation_trial_anchor_survives_observation_gap(self) -> None:
+        state = self.ready_state()
+        state.prepare_trial(unsafe_simulation_stale_dispatch=True)
+        state.observe_ball(BallObservation(1.5, -0.35, 0.0, 10.7))
+        state.observe_robot(RobotPose(0.0, 0.0, 0.0, 10.7))
+
+        stale = state.dispatch(request(), 10.8)
+
+        self.assertTrue(stale.accepted)
+        self.assertAlmostEqual(stale.field_target.x_m, 0.75)
+        self.assertAlmostEqual(stale.field_target.y_m, -0.27)
 
     def test_unsafe_simulation_override_cannot_cross_ball_track_loss(self) -> None:
         state = self.ready_state()

@@ -251,6 +251,8 @@ class AdapterState:
         self._accepted_keys: set[tuple[str, int]] = set()
         self._active_target: _ActiveTarget | None = None
         self._unsafe_simulation_stale_dispatch = False
+        self._unsafe_simulation_context_id = ""
+        self._unsafe_simulation_context_anchor: BallObservation | None = None
 
     @property
     def motion_enabled(self) -> bool:
@@ -272,6 +274,8 @@ class AdapterState:
         with self._lock:
             self._tracker.mark_lost()
             self._active_target = None
+            self._unsafe_simulation_context_id = ""
+            self._unsafe_simulation_context_anchor = None
 
     def observe_robot(self, pose: RobotPose) -> None:
         if not _finite(pose.x_m, pose.y_m, pose.yaw_rad, pose.observed_at):
@@ -312,11 +316,22 @@ class AdapterState:
             self._unsafe_simulation_stale_dispatch = bool(
                 unsafe_simulation_stale_dispatch
             )
+            self._unsafe_simulation_context_id = ""
+            self._unsafe_simulation_context_anchor = None
+            if self._unsafe_simulation_stale_dispatch:
+                context_id = self._tracker.context_id
+                context_anchor = self._tracker.context_anchor(context_id)
+                if context_id and context_anchor is not None:
+                    self._unsafe_simulation_context_id = context_id
+                    self._unsafe_simulation_context_anchor = context_anchor
 
     def set_unsafe_simulation_stale_dispatch(self, enabled: bool) -> None:
         """Set the explicitly unsafe T2 video override without changing motion."""
         with self._lock:
             self._unsafe_simulation_stale_dispatch = bool(enabled)
+            if not enabled:
+                self._unsafe_simulation_context_id = ""
+                self._unsafe_simulation_context_anchor = None
 
     def cancel_motion(self) -> None:
         """Remove the active walking target without changing observation state."""
@@ -383,7 +398,9 @@ class AdapterState:
         if captured_context_id != snapshot.ball_context_id:
             if not self._unsafe_simulation_stale_dispatch:
                 return DispatchOutcome(False, "context_changed")
-            reference_ball = self._tracker.context_anchor(captured_context_id)
+            reference_ball = None
+            if captured_context_id == self._unsafe_simulation_context_id:
+                reference_ball = self._unsafe_simulation_context_anchor
             if reference_ball is None:
                 return DispatchOutcome(False, "context_changed")
         if snapshot.robot_pose is None:
