@@ -67,6 +67,9 @@ class BoosterRuntime:
         self._logger = logger
         self._team_id = int(os.environ.get("MUESLI_BOOSTER_TEAM_ID", "1"))
         self._robot_name = os.environ.get("MUESLI_BOOSTER_ROBOT_NAME", "robot1")
+        self._robot_gait = os.environ.get("MUESLI_BOOSTER_GAIT", "default").strip()
+        if not self._robot_gait:
+            raise ValueError("MUESLI_BOOSTER_GAIT must not be empty")
         self._control_hz = _env_float("MUESLI_BOOSTER_CONTROL_HZ", 20.0)
         motion_enabled = _env_bool("MUESLI_BOOSTER_MOTION_ENABLED", False)
         self._state = AdapterState(
@@ -189,7 +192,7 @@ class BoosterRuntime:
         )
         self._logger.info(
             f"muesli Booster host started; motion_enabled={self._motion_enabled} "
-            f"bridge={bridge_path}"
+            f"gait={self._robot_gait} bridge={bridge_path}"
         )
 
     def stop(self) -> None:
@@ -260,7 +263,7 @@ class BoosterRuntime:
             timeout=10.0,
         )
         try:
-            robot.set_gait("soccer")
+            robot.set_gait(self._robot_gait)
             robot.set_mode("walk")
         except Exception:
             close = getattr(robot, "_close", None)

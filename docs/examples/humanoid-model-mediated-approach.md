@@ -175,6 +175,9 @@ pending artefacts before treating the run as paper evidence.
 - The native runner and adapter pass a local socket round trip. A signed Agent
   also installs and starts fail-closed in the virtual K1 simulator. Neither
   result is a motion-enabled end-to-end trial.
+- The Booster host defaults to the standard `default` walking gait. Override
+  `MUESLI_BOOSTER_GAIT` only after confirming that the selected simulator or
+  device gait translates bounded velocity commands as expected.
 - `build.toml` currently advertises only `sim_x86_64`. Do not add a device or
   ARM target until its native payload has a separate build and test result.
 - A forced rerun is staged and validated before it replaces an existing marked

@@ -104,6 +104,7 @@ Runtime settings:
 | `MUESLI_BOOSTER_MOTION_ENABLED` | `false` | Permit creation of the robot backend and velocity output. |
 | `MUESLI_BOOSTER_TEAM_ID` | `1` | Team namespace used by simulation topics. |
 | `MUESLI_BOOSTER_ROBOT_NAME` | `robot1` | Controlled virtual robot name. |
+| `MUESLI_BOOSTER_GAIT` | `default` | BoosterOS gait selected before entering walk mode. |
 | `MUESLI_BOOSTER_CONTROL_HZ` | `20` | Walking follower rate. |
 | `MUESLI_BOOSTER_CONTEXT_THRESHOLD_M` | `0.15` | Ball displacement that creates a new context. |
 | `MUESLI_BOOSTER_BALL_MAX_AGE_S` | `0.5` | Maximum ball observation age. |
@@ -257,6 +258,10 @@ passes. The project metadata selects `football3v3` and `soccer-match`.
   rejected. Use the pinned container build for `sim_x86_64`.
 - The `football3v3` scene includes other robots and referee state. Freeze or
   park irrelevant actors before recording the one-robot paper trial.
+- Booster Studio `0.6.5-beta` accepts velocity calls in the `soccer` gait but
+  produces negligible translation in the virtual K1 used for this experiment.
+  The adapter therefore defaults to the standard `default` walking gait. Set
+  `MUESLI_BOOSTER_GAIT` explicitly when validating a different SDK or device.
 
 ## see also
 

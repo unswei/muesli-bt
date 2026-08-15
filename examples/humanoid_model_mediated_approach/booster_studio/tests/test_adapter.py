@@ -206,6 +206,7 @@ class ManifestTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('"MUESLI_BOOSTER_MOTION_ENABLED", False', runtime)
+        self.assertIn('"MUESLI_BOOSTER_GAIT", "default"', runtime)
         self.assertIn('Bool, "/muesli/motion_arm"', runtime)
         self.assertIn('String, "/muesli/trial_command"', runtime)
         entry = (PROJECT / "src/main.py").read_text(encoding="utf-8")
