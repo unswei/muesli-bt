@@ -72,6 +72,40 @@ class OverlayEvidenceTests(unittest.TestCase):
         self.assertIn(r"{\c&H000000FF&}walking target:", overlay)
         self.assertIn("0:00:02.00", overlay)
 
+    def test_overlay_separates_runtime_acceptance_from_dispatch_rejection(self) -> None:
+        events = [
+            event(1, 0, "run_start", {}),
+            event(
+                2,
+                100,
+                "vla_submit",
+                {
+                    "job_id": "job-1",
+                    "generation": 1,
+                    "captured_context_id": "ball-0001",
+                },
+            ),
+            event(
+                3,
+                2600,
+                "vla_result",
+                {"job_id": "job-1", "generation": 1, "decision": "accepted"},
+            ),
+            event(
+                4,
+                2610,
+                "walking_target_dispatch",
+                {"decision": "rejected", "reason": "context_changed"},
+            ),
+            event(5, 2620, "run_end", {}),
+        ]
+
+        overlay = generate_ass(events)
+
+        self.assertIn("result: accepted    reason: -", overlay)
+        self.assertIn("dispatch: rejected    reason: context_changed", overlay)
+        self.assertNotIn("result: rejected    reason: context_changed", overlay)
+
     def test_loader_rejects_non_contiguous_sequence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "events.jsonl"

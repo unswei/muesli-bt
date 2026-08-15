@@ -20,8 +20,10 @@ class OverlayState:
     generation: str = "-"
     ball_context_id: str = "-"
     request_state: str = "idle"
-    decision: str = "-"
-    reason: str = "-"
+    result_decision: str = "-"
+    result_reason: str = "-"
+    dispatch_decision: str = "-"
+    dispatch_reason: str = "-"
     walking_target_state: str = "none"
     walking_target: str = "-"
 
@@ -78,27 +80,29 @@ def apply_event(state: OverlayState, event: dict[str, Any]) -> bool:
         state.generation = _display(data.get("generation"))
         state.ball_context_id = _display(data.get("captured_context_id"))
         state.request_state = "running"
-        state.decision = "-"
-        state.reason = "-"
+        state.result_decision = "-"
+        state.result_reason = "-"
+        state.dispatch_decision = "-"
+        state.dispatch_reason = "-"
     elif event_type == "vla_result" and "decision" in data:
         state.job_id = _display(data.get("job_id"))
         state.generation = _display(data.get("generation"))
-        state.decision = _display(data.get("decision"))
-        state.reason = _display(data.get("reason"))
+        state.result_decision = _display(data.get("decision"))
+        state.result_reason = _display(data.get("reason"))
         state.request_state = (
             "done" if data.get("decision") == "accepted" else "rejected"
         )
     elif event_type == "async_authority_revoked":
         state.job_id = _display(data.get("job_id"))
         state.generation = _display(data.get("generation"))
-        state.decision = "rejected"
-        state.reason = _display(data.get("reason"))
+        state.result_decision = "rejected"
+        state.result_reason = _display(data.get("reason"))
         state.request_state = "revoked"
         state.walking_target_state = "none"
         state.walking_target = "-"
     elif event_type == "walking_target_dispatch":
-        state.decision = _display(data.get("decision"))
-        state.reason = _display(data.get("reason"))
+        state.dispatch_decision = _display(data.get("decision"))
+        state.dispatch_reason = _display(data.get("reason"))
 
     if event_type == "bb_write":
         key = data.get("key")
@@ -110,9 +114,11 @@ def apply_event(state: OverlayState, event: dict[str, Any]) -> bool:
         elif key == "request-state":
             state.request_state = _display(value)
         elif key == "result-decision":
-            state.decision = _display(value)
-        elif key in {"result-reason", "dispatch-reason"}:
-            state.reason = _display(value)
+            state.result_decision = _display(value)
+        elif key == "result-reason":
+            state.result_reason = _display(value)
+        elif key == "dispatch-reason":
+            state.dispatch_reason = _display(value)
         elif key == "walking-target-state":
             state.walking_target_state = _display(value)
             if value == "none":
@@ -146,7 +152,14 @@ def _render_state(state: OverlayState) -> str:
             f"job: {_ass_escape(state.job_id)}    generation: {_ass_escape(state.generation)}"
         ),
         f"ball context: {_ass_escape(state.ball_context_id)}",
-        f"result: {_ass_escape(state.decision)}    reason: {_ass_escape(state.reason)}",
+        (
+            f"result: {_ass_escape(state.result_decision)}    "
+            f"reason: {_ass_escape(state.result_reason)}"
+        ),
+        (
+            f"dispatch: {_ass_escape(state.dispatch_decision)}    "
+            f"reason: {_ass_escape(state.dispatch_reason)}"
+        ),
     ]
     target = (
         f"walking target: {_ass_escape(state.walking_target)} "

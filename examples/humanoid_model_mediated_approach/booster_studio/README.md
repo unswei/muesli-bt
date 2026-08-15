@@ -2,8 +2,10 @@
 
 Status: the Studio package source, native-runner supervisor and video-overlay
 path are locally integrated and offline tested. The signed Agent installs and
-starts on a virtual K1 with the pinned Linux payload. Motion is disabled by
-default. A motion-enabled virtual K1 trial remains pending.
+starts on a virtual K1 with the pinned Linux payload. At source commit
+`e88bdaa`, motion-enabled T1, T2a, T2b and T3 rehearsals completed in Booster
+Studio with canonical evidence. Motion remains disabled by default. Physical
+capture remains pending.
 
 ## what this is
 
@@ -216,6 +218,12 @@ This requires `ffmpeg`. The finaliser retains the raw clip, writes
 `overlay-video.mp4`, and records hashes and the cue alignment in
 `live-manifest.json`.
 
+For the paper video, keep the hardware shot to one K1 and one ball. Simulation
+can carry the richer comparison: use a fixed camera, park irrelevant robots,
+show T2a and T2b side by side, and add field markers for the old target and the
+current target. The canonical overlay reports runtime result and host dispatch
+as separate decisions so the timeout-only baseline is not ambiguous.
+
 Open `booster_studio/` as a Booster Studio project only after the offline test
 passes. The project metadata selects `football3v3` and `soccer-match`.
 
@@ -242,8 +250,9 @@ passes. The project metadata selects `football3v3` and `soccer-match`.
   context, observation, stability or emergency failure. Agent shutdown also
   clears it.
 - The C++ and Python bridge, supervisor, payload verifier and overlay generator
-  have passed local tests. Do not claim a Booster simulation result until the
-  Studio package runs in a virtual K1 scene.
+  have passed local tests. The full live matrix passed on a virtual K1 at
+  source commit `e88bdaa`; re-run the matrix and retain fresh evidence after a
+  behavioural change.
 - An Apple Silicon build of the C++ runner is Mach-O/ARM and is deliberately
   rejected. Use the pinned container build for `sim_x86_64`.
 - The `football3v3` scene includes other robots and referee state. Freeze or

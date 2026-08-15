@@ -2,8 +2,8 @@
 
 Status: experimental software experiment harness with a locally integrated,
 offline-tested Booster Studio host bridge, native supervisor and overlay path.
-The Linux package build, virtual K1 run and physical video capture remain
-integration work.
+The signed Linux package and all four live trials ran on a virtual K1 at source
+commit `e88bdaa`. Physical video capture remains integration work.
 
 ## what this is
 
@@ -119,8 +119,10 @@ not paper-eligible until those steps are complete.
 - request identity and generation from `vla_submit`;
 - context from `bb_write` on `ball-context-id`;
 - request state from `vla_poll` and `request-state`;
-- decision and reason from `vla_result` or `async_authority_revoked`; and
-- accepted or dispatch-blocked targets from `walking_target_dispatch`;
+- runtime decision and reason from `vla_result` or
+  `async_authority_revoked`;
+- the separate host dispatch decision and reason from
+  `walking_target_dispatch`;
 - a rejected or dispatch-blocked candidate from `candidate-walking-target`, correlated
   by `candidate-target-job-id` and `candidate-target-generation`; and
 - target colour from `walking-target-state` (`current` is green and `obsolete`
