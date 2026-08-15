@@ -1,0 +1,59 @@
+{
+  "schema_version": "airhockey.integration_lock.v1",
+  "acra": {
+    "repository": "git@github.com:unswei/airhockey-distillation.git",
+    "revision": "1b6bbbbf19743b0042f01eabf0628eba5621cacf",
+    "python_distribution": "airhockey-memory-distillation",
+    "import_package": "airhockey_distill",
+    "package_version": "0.1.0"
+  },
+  "base_container": {
+    "image": "marvin/drl-air-hockey:2025-a41081c4c386-blackwell-rebuilt",
+    "digest": "sha256:de846e25961d2408db73a6b5cfe2afc7ecf0e14e0e8ac837f97212a180e51d5f",
+    "immutable_reference": "marvin/drl-air-hockey:2025-a41081c4c386-blackwell-rebuilt@sha256:de846e25961d2408db73a6b5cfe2afc7ecf0e14e0e8ac837f97212a180e51d5f"
+  },
+  "joint_container": {
+    "dockerfile": "container/Dockerfile",
+    "requirements": "container/requirements-wp4.txt",
+    "output_image": "local/muesli-air-hockey:wp4",
+    "muesli_context": "git_archive_head",
+    "acra_context": "git_archive_pinned_revision",
+    "runner_target": "muesli_bt_air_hockey_scenario_tests"
+  },
+  "provider_contract": {
+    "protocol": "MMSP v0.2",
+    "capability": "cap.vla.action_chunk.v1",
+    "mode": "session",
+    "input_schema": "airhockey.provider.request.v1",
+    "output_schema": "airhockey.provider.response.v1",
+    "observation_dimension": 19,
+    "action_dimension": 2,
+    "action_frame": "airhockey.normalised_mallet_target.v1",
+    "control_period_ms": 20,
+    "maximum_source_age_steps": 6
+  },
+  "learned_provider": {
+    "loader": "airhockey_distill.students.load_principal_policy",
+    "supported_families": [
+      "feed_forward",
+      "finite_stack_10",
+      "structured_k0",
+      "structured_k1",
+      "structured_k2",
+      "structured_k4",
+      "gru_n64"
+    ],
+    "checkpoint_selection": "unresolved_until_acra_freeze",
+    "checkpoint_sha256": null
+  },
+  "mujoco_smoke": {
+    "requires_marvin_release": true,
+    "command": "docker run --rm --gpus all --ipc host --env PYTHONPATH=/opt/airhockey-distillation/src:/src/2025-challenge --workdir /opt/airhockey-distillation local/muesli-air-hockey:wp4 python3 -m pytest -q -m integration tests/test_marvin_integration.py",
+    "estimated_resources": {
+      "gpus": 1,
+      "cpus": 2,
+      "memory_gb": 8,
+      "walltime_minutes": 10
+    }
+  }
+}

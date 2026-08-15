@@ -6,7 +6,8 @@ The air-hockey example is a staged paper demonstration of
 [invocation-scoped authority](../bt/invocation-scoped-authority.md). The WP2
 harness proves the request, context, revocation and dispatch behaviour against
 a strict local fake host. The WP3 workflow turns raw runtime and task records
-into reproducible evidence bundles.
+into reproducible evidence bundles. WP4 pins the ACRA source and simulator
+image, then checks provider packaging without starting MuJoCo.
 
 The synthetic campaign is an analysis test. It is not MuJoCo task evidence and
 is never paper eligible.
@@ -19,7 +20,9 @@ Use the local workflow to change or review:
 - event, trajectory, manifest or recorded-provider schemas;
 - paired integrity and obsolete-target motion summaries;
 - binomial or paired-bootstrap reporting; or
-- trace-derived overlay fields.
+- trace-derived overlay fields;
+- the fixed or ACRA-export provider boundary; or
+- immutable joint-container build contexts.
 
 The local workflow requires no GPU, checkpoint, ACRA import or Marvin access.
 
@@ -71,6 +74,36 @@ The versioned schemas are under `schemas/air_hockey_evidence/v1/`. The primary
 implementation is in
 `examples/air_hockey_model_mediated_defence/analysis/evidence.py`.
 
+Run the local WP4 packaging gate against the sibling ACRA checkout:
+
+```bash
+uv run \
+  --with 'numpy>=1.26,<2' \
+  --with 'gymnasium>=1.0,<2' \
+  --with 'pyyaml>=6,<7' \
+  --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp4.py check
+```
+
+The gate exports ACRA commit
+`1b6bbbbf19743b0042f01eabf0628eba5621cacf` to a temporary directory and
+loads an engineering-only NumPy checkpoint through the real committed import
+surface. It does not read mutable ACRA source files, select a final checkpoint,
+resolve the Marvin-local image or contact Marvin.
+
+After committing WP4, prepare the two immutable Git-archive contexts with:
+
+```bash
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp4.py \
+  prepare-context --out build/air-hockey-wp4/context
+```
+
+The command prints the digest-bound `docker buildx build` command. Use
+`print-mujoco-smoke` only after the ACRA experiment owner confirms that Marvin
+is free. That deferred command runs ACRA's unchanged integration tests inside
+the joint image before any muesli task trial.
+
 ## example behaviour tree
 
 The deadline-only and invocation-scoped trees are structurally identical. The
@@ -85,6 +118,10 @@ full invocation-scoped source is embedded below.
 - Privileged scoring values may appear only inside the trajectory record's
   `privileged` object. They must not enter events or provider records.
 - A recorded-provider replay requires an exact request SHA-256 match.
+- A learned-provider configuration requires the exact checkpoint SHA-256 and
+  family. WP4 deliberately contains neither a final path nor a final hash.
+- The pinned base image is available on Marvin, so local WP4 proves the build
+  definition and non-MuJoCo startup path rather than claiming an image run.
 - `--force` replaces only a safe, marked run directory. It refuses unmarked
   data and path traversal.
 - Exact binomial intervals describe observed integrity counts. A zero count is

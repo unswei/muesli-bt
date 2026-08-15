@@ -4,7 +4,8 @@ This example is the staged integration for the muesli paper's dynamic
 air-hockey demonstration. WP1 provides the versioned local protocol and pure
 fake host. WP2 adds the C++ `env_backend`, matched Behaviour Trees, proposal
 validator, dispatch gate and deterministic H1--H8 harness. WP3 adds the local
-evidence-bundle, paired-analysis, replay and overlay tooling.
+evidence-bundle, paired-analysis, replay and overlay tooling. WP4 pins the ACRA
+source and container, defines the joint image and packages provider adapters.
 
 The fake host is useful for protocol, lifecycle and information-boundary tests.
 It is not a physics simulator and its observations must not be used as task
@@ -78,6 +79,45 @@ uv run --with 'jsonschema>=4.20,<5' \
 `.air-hockey-evidence-run` marker. It refuses an unmarked destination. The
 synthetic outcomes exercise analysis code only and are never paper evidence.
 
+## wp4 integration packaging
+
+`container/wp4.lock.json` pins ACRA commit
+`1b6bbbbf19743b0042f01eabf0628eba5621cacf` and the audited base-image digest.
+The learned-provider checkpoint remains explicitly unresolved until the ACRA
+freeze. The joint Dockerfile consumes Git archives, not mutable working trees.
+
+Run every non-MuJoCo startup, schema and provider check locally:
+
+```bash
+uv run \
+  --with 'numpy>=1.26,<2' \
+  --with 'gymnasium>=1.0,<2' \
+  --with 'pyyaml>=6,<7' \
+  --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp4.py check
+```
+
+After WP4 is committed, export immutable build contexts. The command prints
+the exact `docker buildx build` invocation:
+
+```bash
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp4.py \
+  prepare-context --out build/air-hockey-wp4/context
+```
+
+The pinned base image is Marvin-local, so WP4 validates the build definition
+without resolving or running that image. Once the ACRA experiment owner has
+released Marvin, print the single deferred MuJoCo smoke command with:
+
+```bash
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp4.py \
+  print-mujoco-smoke
+```
+
+Do not run the printed command while the ACRA experiments are active.
+
 ## run the contract tests
 
 From the repository root:
@@ -116,4 +156,6 @@ for the lifecycle and field boundary.
 - `configs/`: frozen deterministic H1--H8 scenario configurations;
 - `evidence/`: named Gate G2 evidence predicates;
 - `analysis/`: WP3 validation, replay, statistics and overlay modules;
+- `provider/`: fixed and hash-bound ACRA-export provider adapters;
+- `container/`: the pinned WP4 lock, requirements and joint Dockerfile;
 - `tests/`: the gate-controlled C++ scenario harness.

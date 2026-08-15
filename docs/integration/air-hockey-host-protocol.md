@@ -211,6 +211,13 @@ The separate WP3 evidence schemas keep public task-trajectory fields under
 validator rejects privileged scoring keys in `events.jsonl` or recorded
 provider responses. See the [air-hockey evidence workflow](../examples/air-hockey-model-mediated-defence.md).
 
+WP4 keeps the provider proposal boundary separate from the host protocol. Its
+versioned request contains only the 19-value public observation, captured
+context, source step, deadline and action frame. Its response contains one
+bounded two-value action proposal. The fixed and hash-bound ACRA-export
+adapters are checked through a MuJoCo-free MMSP v0.2 lifecycle mock before a
+proposal can reach the existing commit and dispatch gates.
+
 ## related pages
 
 - [env API](env-api.md)

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.org/schemas/air_hockey_integration/v1/airhockey.provider.request.v1.schema.json",
+  "title": "Air-hockey provider request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "request_id",
+    "captured_context_id",
+    "source_observation_step",
+    "deadline_ms",
+    "action_frame",
+    "observation"
+  ],
+  "properties": {
+    "schema_version": {"const": "airhockey.provider.request.v1"},
+    "request_id": {"type": "string", "pattern": "^[A-Za-z0-9._:-]{1,64}$"},
+    "captured_context_id": {"type": "string", "pattern": "^episode-[A-Za-z0-9._-]+/track-[A-Za-z0-9._-]+$"},
+    "source_observation_step": {"type": "integer", "minimum": 0},
+    "deadline_ms": {"type": "integer", "minimum": 1, "maximum": 60000},
+    "action_frame": {"const": "airhockey.normalised_mallet_target.v1"},
+    "observation": {
+      "type": "array",
+      "minItems": 19,
+      "maxItems": 19,
+      "items": {"type": "number", "minimum": -1, "maximum": 1}
+    }
+  }
+}

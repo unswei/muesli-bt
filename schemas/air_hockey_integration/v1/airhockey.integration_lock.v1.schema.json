@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.org/schemas/air_hockey_integration/v1/airhockey.integration_lock.v1.schema.json",
+  "title": "Air-hockey WP4 integration lock v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "acra",
+    "base_container",
+    "joint_container",
+    "provider_contract",
+    "learned_provider",
+    "mujoco_smoke"
+  ],
+  "properties": {
+    "schema_version": {"const": "airhockey.integration_lock.v1"},
+    "acra": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "revision",
+        "python_distribution",
+        "import_package",
+        "package_version"
+      ],
+      "properties": {
+        "repository": {"const": "git@github.com:unswei/airhockey-distillation.git"},
+        "revision": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "python_distribution": {"const": "airhockey-memory-distillation"},
+        "import_package": {"const": "airhockey_distill"},
+        "package_version": {"const": "0.1.0"}
+      }
+    },
+    "base_container": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image", "digest", "immutable_reference"],
+      "properties": {
+        "image": {"type": "string", "minLength": 1},
+        "digest": {"$ref": "#/$defs/sha256"},
+        "immutable_reference": {"type": "string", "minLength": 1}
+      }
+    },
+    "joint_container": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dockerfile",
+        "requirements",
+        "output_image",
+        "muesli_context",
+        "acra_context",
+        "runner_target"
+      ],
+      "properties": {
+        "dockerfile": {"const": "container/Dockerfile"},
+        "requirements": {"const": "container/requirements-wp4.txt"},
+        "output_image": {"const": "local/muesli-air-hockey:wp4"},
+        "muesli_context": {"const": "git_archive_head"},
+        "acra_context": {"const": "git_archive_pinned_revision"},
+        "runner_target": {"const": "muesli_bt_air_hockey_scenario_tests"}
+      }
+    },
+    "provider_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol",
+        "capability",
+        "mode",
+        "input_schema",
+        "output_schema",
+        "observation_dimension",
+        "action_dimension",
+        "action_frame",
+        "control_period_ms",
+        "maximum_source_age_steps"
+      ],
+      "properties": {
+        "protocol": {"const": "MMSP v0.2"},
+        "capability": {"const": "cap.vla.action_chunk.v1"},
+        "mode": {"const": "session"},
+        "input_schema": {"const": "airhockey.provider.request.v1"},
+        "output_schema": {"const": "airhockey.provider.response.v1"},
+        "observation_dimension": {"const": 19},
+        "action_dimension": {"const": 2},
+        "action_frame": {"const": "airhockey.normalised_mallet_target.v1"},
+        "control_period_ms": {"const": 20},
+        "maximum_source_age_steps": {"const": 6}
+      }
+    },
+    "learned_provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "loader",
+        "supported_families",
+        "checkpoint_selection",
+        "checkpoint_sha256"
+      ],
+      "properties": {
+        "loader": {"const": "airhockey_distill.students.load_principal_policy"},
+        "supported_families": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "feed_forward",
+              "finite_stack_10",
+              "structured_k0",
+              "structured_k1",
+              "structured_k2",
+              "structured_k4",
+              "gru_n64"
+            ]
+          }
+        },
+        "checkpoint_selection": {"const": "unresolved_until_acra_freeze"},
+        "checkpoint_sha256": {"type": "null"}
+      }
+    },
+    "mujoco_smoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "requires_marvin_release",
+        "command",
+        "estimated_resources"
+      ],
+      "properties": {
+        "requires_marvin_release": {"const": true},
+        "command": {"type": "string", "minLength": 1},
+        "estimated_resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["gpus", "cpus", "memory_gb", "walltime_minutes"],
+          "properties": {
+            "gpus": {"const": 1},
+            "cpus": {"type": "integer", "minimum": 1},
+            "memory_gb": {"type": "integer", "minimum": 1},
+            "walltime_minutes": {"type": "integer", "minimum": 1}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}

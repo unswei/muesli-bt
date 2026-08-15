@@ -129,6 +129,32 @@ uv run --with 'jsonschema>=4.20,<5' \
 
 Neither command contacts Marvin or imports the ACRA simulator.
 
+## air-hockey integration packaging
+
+WP4 validates the digest-bound container definition, provider schemas, fixed
+provider lifecycle and the real committed ACRA export loader. It obtains the
+ACRA source using `git archive` at the pinned revision, so unrelated changes in
+the local ACRA working tree cannot enter the check:
+
+```bash
+uv run \
+  --with 'numpy>=1.26,<2' \
+  --with 'gymnasium>=1.0,<2' \
+  --with 'pyyaml>=6,<7' \
+  --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp4.py check
+```
+
+The focused pure unit suite requires only `jsonschema`:
+
+```bash
+uv run --with 'jsonschema>=4.20,<5' \
+  python -m unittest tests/test_air_hockey_wp4.py -v
+```
+
+These commands do not resolve the Marvin-local base image, start Docker,
+import MuJoCo or select a final learned checkpoint.
+
 ## canonical event fixture suite
 
 Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:
