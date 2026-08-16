@@ -6,13 +6,14 @@ This workflow produces the polished 14-second T3 simulation shot. A Booster K1
 submits a delayed model request. A controlled software emergency then activates
 the higher-priority `safe_stand` branch while the request is still running.
 
-The video shows the authority transition, not merely a stationary robot. The
-request loses authority immediately. Its late completion is subsequently
-dropped, the candidate target is marked as revoked and the walking backend is
-never called.
+The video shows the authority transition, not merely a stationary robot. A
+live BT panel changes from `model_wait` to `safe_stand`. The request loses
+authority immediately. When its late completion arrives, an animated result
+packet is dropped and a red ghost trajectory shows the motion that was
+prevented. The walking backend is never called.
 
-The single ball is not labelled. The only pose marker is `REVOKED TARGET ·
-NEVER DISPATCHED`.
+The single ball is not labelled. The only pose marker is `GHOST TARGET · NEVER
+DISPATCHED`.
 
 ## when to use it
 
@@ -41,8 +42,10 @@ request cue. On the next BT evaluation, the reactive selector enters
 The delayed service still finishes, but the runtime records the completion as
 cancelled and drops it with `completion_after_cancel`.
 
-`render_t3_emergency.py` refuses to render unless the evidence proves all of
-these claims:
+`render_t3_emergency.py` places the live BT panel in the empty right-hand field
+space without changing the simulator crop used for T1. The panel uses the same
+amber, red and green authority language as the T1 and T2 overlays. The
+renderer refuses to render unless the evidence proves all of these claims:
 
 - T3 uses `invocation_scoped` acceptance;
 - the software emergency occurs after submission;
@@ -116,7 +119,8 @@ The paper-video acceptance gate is:
 
 - the emergency transition is unmistakable without narration;
 - `safe_stand` and `branch_revoked` remain readable at 1080p;
-- the revoked target is visually distinct from an accepted target;
+- the red ghost target and trajectory are visually distinct from the green
+  accepted-target language used in T1 and T2;
 - the robot remains at its staged position; and
 - the hash-bound manifest reports zero walking dispatch events and zero
   backend calls.

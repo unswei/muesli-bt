@@ -449,20 +449,26 @@ ScaledBorderAndShadow: yes
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Overall,DejaVu Sans,35,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HDA111820,-1,0,0,0,100,100,1,0,3,2,0,8,32,32,24,1
-Style: Header,DejaVu Sans,48,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HC8182028,-1,0,0,0,100,100,0,0,3,2,0,7,62,62,84,1
-Style: HeaderAmber,DejaVu Sans,48,&H0014A5FF,&H0014A5FF,&H00131A20,&HC8182028,-1,0,0,0,100,100,0,0,3,2,0,7,62,62,84,1
-Style: HeaderRed,DejaVu Sans,48,&H003B4CFF,&H003B4CFF,&H00131A20,&HC8182028,-1,0,0,0,100,100,0,0,3,2,0,7,62,62,84,1
-Style: HeaderGreen,DejaVu Sans,48,&H006BE62E,&H006BE62E,&H00131A20,&HC8182028,-1,0,0,0,100,100,0,0,3,2,0,7,62,62,84,1
-Style: Body,DejaVu Sans,29,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HBC182028,0,0,0,0,100,100,0,0,3,1,0,7,66,66,150,1
+Style: Header,DejaVu Sans,45,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HC8182028,-1,0,0,0,100,100,0,0,3,2,0,7,0,0,0,1
+Style: HeaderAmber,DejaVu Sans,45,&H0014A5FF,&H0014A5FF,&H00131A20,&HC8182028,-1,0,0,0,100,100,0,0,3,2,0,7,0,0,0,1
+Style: HeaderRed,DejaVu Sans,45,&H003B4CFF,&H003B4CFF,&H00131A20,&HC8182028,-1,0,0,0,100,100,0,0,3,2,0,7,0,0,0,1
+Style: HeaderGreen,DejaVu Sans,45,&H006BE62E,&H006BE62E,&H00131A20,&HC8182028,-1,0,0,0,100,100,0,0,3,2,0,7,0,0,0,1
+Style: Body,DejaVu Sans,27,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HBC182028,0,0,0,0,100,100,0,0,3,1,0,7,0,0,0,1
 Style: Badge,DejaVu Sans,25,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HB0182028,-1,0,0,0,100,100,1,0,3,1,0,9,42,42,42,1
-Style: Alert,DejaVu Sans,94,&H003B4CFF,&H003B4CFF,&H00131A20,&H98182028,-1,0,0,0,100,100,0,0,3,3,0,5,0,0,0,1
-Style: SafeMarker,DejaVu Sans,40,&H006BE62E,&H006BE62E,&H00131A20,&HC0182028,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
-Style: TargetRed,DejaVu Sans,92,&H003B4CFF,&H003B4CFF,&H00131A20,&H00000000,-1,0,0,0,100,100,0,0,1,5,0,5,0,0,0,1
-Style: RedLabel,DejaVu Sans,25,&H003B4CFF,&H003B4CFF,&H00131A20,&HBC182028,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
-Style: PipelineRed,DejaVu Sans,33,&H003B4CFF,&H003B4CFF,&H00131A20,&HDC182028,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
-Style: PipelineGreen,DejaVu Sans,33,&H006BE62E,&H006BE62E,&H00131A20,&HDC182028,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
-Style: NoCommand,DejaVu Sans,25,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HD0182028,-1,0,0,0,100,100,0,0,3,1,0,2,0,0,0,1
-Style: Vector,Arial,20,&H003B4CFF,&H003B4CFF,&H003B4CFF,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
+Style: PanelTitle,DejaVu Sans,25,&H00FFFFFF,&H00FFFFFF,&H00131A20,&H00000000,-1,0,0,0,100,100,1,0,1,1,0,7,0,0,0,1
+Style: NodeIdle,DejaVu Sans,22,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HD0182028,-1,0,0,0,100,100,0,0,3,1,0,5,0,0,0,1
+Style: NodeAmber,DejaVu Sans,22,&H0014A5FF,&H0014A5FF,&H00131A20,&HD0182028,-1,0,0,0,100,100,0,0,3,2,0,5,0,0,0,1
+Style: NodeGreen,DejaVu Sans,22,&H006BE62E,&H006BE62E,&H00131A20,&HD0182028,-1,0,0,0,100,100,0,0,3,2,0,5,0,0,0,1
+Style: NodeRed,DejaVu Sans,22,&H003B4CFF,&H003B4CFF,&H00131A20,&HD0182028,-1,0,0,0,100,100,0,0,3,2,0,5,0,0,0,1
+Style: Packet,DejaVu Sans,20,&H0014A5FF,&H0014A5FF,&H00131A20,&HE0182028,-1,0,0,0,100,100,0,0,3,1,0,5,0,0,0,1
+Style: Drop,DejaVu Sans,24,&H003B4CFF,&H003B4CFF,&H00131A20,&HD0182028,-1,0,0,0,100,100,0,0,3,2,0,5,0,0,0,1
+Style: SafeMarker,DejaVu Sans,30,&H006BE62E,&H006BE62E,&H00131A20,&HC0182028,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
+Style: TargetRed,DejaVu Sans,88,&H003B4CFF,&H003B4CFF,&H00131A20,&H00000000,-1,0,0,0,100,100,0,0,1,5,0,5,0,0,0,1
+Style: RedLabel,DejaVu Sans,24,&H003B4CFF,&H003B4CFF,&H00131A20,&HBC182028,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
+Style: PipelineRed,DejaVu Sans,31,&H003B4CFF,&H003B4CFF,&H00131A20,&HDC182028,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
+Style: PipelineGreen,DejaVu Sans,31,&H006BE62E,&H006BE62E,&H00131A20,&HDC182028,-1,0,0,0,100,100,0,0,3,2,0,2,0,0,0,1
+Style: NoCommand,DejaVu Sans,23,&H00FFFFFF,&H00FFFFFF,&H00131A20,&HD0182028,-1,0,0,0,100,100,0,0,3,1,0,2,0,0,0,1
+Style: Vector,Arial,20,&H00FFFFFF,&H00FFFFFF,&H00FFFFFF,&H00000000,0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -477,6 +483,38 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     flash = (
         r"{\p1\c&H183B4C&\1a&HC5&\fad(40,180)}"
         r"m 0 0 l 1920 0 l 1920 1080 l 0 1080{\p0}"
+    )
+    panel = (
+        r"{\p1\c&H111820&\1a&H25&\fad(140,0)}"
+        r"m 1280 240 l 1895 240 l 1895 870 l 1280 870{\p0}"
+    )
+    pending_connectors = (
+        r"{\p1\fad(140,0)}"
+        r"{\c&H727A80&}m 1582 357 l 1588 357 l 1588 386 l 1407 386 "
+        r"l 1407 416 l 1413 416 l 1413 392 l 1582 392 "
+        r"{\c&H14A5FF&}m 1588 386 l 1742 386 l 1742 416 l 1748 416 "
+        r"l 1748 380 l 1588 380 "
+        r"m 1742 464 l 1748 464 l 1748 546 l 1742 546 "
+        r"{\c&H727A80&}m 1742 614 l 1748 614 l 1748 691 l 1742 691{\p0}"
+    )
+    revoked_connectors = (
+        r"{\p1}"
+        r"{\c&H6BE62E&}m 1582 357 l 1588 357 l 1588 386 l 1407 386 "
+        r"l 1407 416 l 1413 416 l 1413 392 l 1582 392 "
+        r"{\c&H3B4CFF&}m 1588 380 l 1748 380 l 1748 416 l 1742 416 "
+        r"l 1742 386 l 1588 386 "
+        r"m 1742 464 l 1748 464 l 1748 546 l 1742 546 "
+        r"{\c&H14A5FF&}m 1742 614 l 1748 614 l 1748 691 l 1742 691{\p0}"
+    )
+    ghost_arrow = (
+        rf"{{\p1\c&H3B4CFF&\1a&H65&\fad(120,0)}}"
+        rf"m {robot_x} {robot_y - 5} "
+        rf"l {target_x - 18} {target_y - 7} "
+        rf"l {target_x - 20} {target_y - 16} "
+        rf"l {target_x} {target_y} "
+        rf"l {target_x - 24} {target_y + 13} "
+        rf"l {target_x - 20} {target_y + 5} "
+        rf"l {robot_x} {robot_y + 5}{{\p0}}"
     )
     rows = [
         _dialogue(
@@ -497,21 +535,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             0.0,
             submit,
             "Header",
-            r"ROBOT STABLE  ·  SAFETY BRANCH READY",
+            r"{\an7\pos(60,90)}ROBOT STABLE  ·  SAFETY BRANCH READY",
             3,
         ),
         _dialogue(
             0.0,
             submit,
             "Body",
-            rf"NO WALKING TARGET\NCURRENT CONTEXT  ·  {context}",
+            (
+                rf"{{\an7\pos(64,156)}}NO WALKING TARGET\N"
+                rf"CURRENT CONTEXT  ·  {context}"
+            ),
             3,
         ),
         _dialogue(
             submit,
             emergency,
             "HeaderAmber",
-            r"MODEL REQUEST PENDING",
+            r"{\an7\pos(60,90)}MODEL REQUEST PENDING",
             3,
         ),
         _dialogue(
@@ -519,10 +560,60 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             emergency,
             "Body",
             (
-                rf"JOB {job}  ·  GENERATION {timeline.generation}\N"
+                rf"{{\an7\pos(64,156)}}JOB {job}  ·  GENERATION {timeline.generation}\N"
                 rf"ACTIVE BRANCH  ·  model_wait  ·  CAPTURED {context}"
             ),
             3,
+        ),
+        _dialogue(submit, end, "Vector", panel, 3),
+        _dialogue(
+            submit,
+            end,
+            "PanelTitle",
+            r"{\an7\pos(1320,266)\fad(140,0)}LIVE BEHAVIOUR TREE",
+            4,
+        ),
+        _dialogue(
+            submit,
+            end,
+            "NodeIdle",
+            r"{\an5\pos(1585,335)\fad(140,0)}REACTIVE SELECTOR",
+            4,
+        ),
+        _dialogue(
+            submit,
+            emergency,
+            "Vector",
+            pending_connectors,
+            4,
+        ),
+        _dialogue(
+            submit,
+            emergency,
+            "NodeIdle",
+            r"{\an5\pos(1410,440)\fad(140,0)}1  SAFE STAND  ·  READY",
+            5,
+        ),
+        _dialogue(
+            submit,
+            emergency,
+            "NodeAmber",
+            r"{\an5\pos(1745,440)\fad(140,0)}2  MODEL WAIT  ·  ACTIVE",
+            5,
+        ),
+        _dialogue(
+            submit,
+            emergency,
+            "NodeIdle",
+            r"{\an5\pos(1745,580)\fad(140,0)}3  WALK DISPATCH  ·  BLOCKED",
+            5,
+        ),
+        _dialogue(
+            submit,
+            emergency,
+            "NodeAmber",
+            r"{\an5\pos(1745,725)\fad(140,0)}DELAYED MODEL  ·  RUNNING",
+            5,
         ),
         _dialogue(
             emergency,
@@ -536,7 +627,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             emergency,
             completion,
             "HeaderRed",
-            r"SOFTWARE EMERGENCY ASSERTED",
+            r"{\an7\pos(60,90)}EMERGENCY  →  SAFE STAND",
             7,
         ),
         _dialogue(
@@ -544,23 +635,59 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             completion,
             "Body",
             (
-                r"ACTIVE BRANCH  ·  safe_stand  ·  REQUEST STATE  ·  revoked\N"
-                r"AUTHORITY REVOKED  ·  branch_revoked  ·  TARGET STATE  ·  none"
+                rf"{{\an7\pos(64,156)}}AUTHORITY REVOKED ON BT TICK "
+                rf"{timeline.emergency_tick}\N"
+                r"branch_revoked  ·  MODEL SERVICE STILL RUNNING"
             ),
             7,
         ),
         _dialogue(
             emergency,
-            min(end, emergency + 1.1),
-            "Alert",
-            r"{\an5\pos(1580,540)\fad(70,180)}!",
-            7,
+            end,
+            "Vector",
+            revoked_connectors,
+            4,
+        ),
+        _dialogue(
+            emergency,
+            end,
+            "NodeGreen",
+            r"{\an5\pos(1410,440)}1  SAFE STAND  ·  ACTIVE",
+            5,
+        ),
+        _dialogue(
+            emergency,
+            end,
+            "NodeRed",
+            r"{\an5\pos(1745,440)}2  MODEL WAIT  ·  REVOKED",
+            5,
+        ),
+        _dialogue(
+            emergency,
+            end,
+            "NodeRed",
+            r"{\an5\pos(1745,580)}3  WALK DISPATCH  ·  INHIBITED",
+            5,
+        ),
+        _dialogue(
+            emergency,
+            completion,
+            "NodeAmber",
+            r"{\an5\pos(1745,725)}DELAYED MODEL  ·  STILL RUNNING",
+            5,
+        ),
+        _dialogue(
+            completion,
+            end,
+            "NodeIdle",
+            r"{\an5\pos(1745,725)}DELAYED MODEL  ·  COMPLETE",
+            5,
         ),
         _dialogue(
             emergency,
             end,
             "SafeMarker",
-            rf"{{\an2\pos({robot_x},{robot_y - 82})}}SAFE STAND ACTIVE",
+            rf"{{\an2\pos({robot_x},{robot_y - 78})}}SAFE STAND",
             7,
         ),
         _dialogue(
@@ -569,7 +696,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             "PipelineRed",
             (
                 r"{\an2\pos(960,1014)}AUTHORITY REVOKED IMMEDIATELY"
-                r"  ·  WALKING INHIBITED"
+                r"  ·  WAITING RESULT HAS NO AUTHORITY"
             ),
             7,
         ),
@@ -577,7 +704,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             completion,
             end,
             "HeaderGreen",
-            r"LATE MODEL COMPLETION DROPPED",
+            r"{\an7\pos(60,90)}LATE RESULT BLOCKED",
             7,
         ),
         _dialogue(
@@ -585,11 +712,29 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             end,
             "Body",
             (
-                r"ACTIVE BRANCH  ·  safe_stand  ·  completion_after_cancel\N"
-                r"REVOKED GENERATION CANNOT REGAIN AUTHORITY"
+                r"{\an7\pos(64,156)}completion_after_cancel\N"
+                r"REVOKED GENERATION CANNOT WRITE A WALKING TARGET"
             ),
             7,
         ),
+        _dialogue(
+            completion,
+            min(end, completion + 0.9),
+            "Packet",
+            (
+                rf"{{\move(1745,700,1745,490,0,800)}}RESULT  ·  GEN "
+                rf"{timeline.generation}"
+            ),
+            8,
+        ),
+        _dialogue(
+            min(end, completion + 0.9),
+            end,
+            "Drop",
+            r"{\an5\pos(1745,500)\fad(100,0)}×  DROPPED",
+            8,
+        ),
+        _dialogue(completion, end, "Vector", ghost_arrow, 6),
         _dialogue(
             completion,
             end,
@@ -601,7 +746,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             completion,
             end,
             "RedLabel",
-            rf"{{\an6\pos({target_x - 50},{target_y - 58})}}REVOKED TARGET  ·  NEVER DISPATCHED",
+            (
+                rf"{{\an6\pos({target_x - 45},{target_y - 58})}}"
+                r"GHOST TARGET  ·  NEVER DISPATCHED"
+            ),
             7,
         ),
         _dialogue(
@@ -610,7 +758,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             "PipelineGreen",
             (
                 r"{\an2\pos(960,1014)}LATE COMPLETION DROPPED"
-                r"  ·  ZERO WALKING DISPATCHES"
+                r"  ·  WALK DISPATCH COUNT 0"
             ),
             8,
         ),
@@ -618,7 +766,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             min(end, completion + 0.8),
             end,
             "NoCommand",
-            r"{\an2\pos(960,1060)}SAFE STAND HELD  ·  ROBOT DOES NOT WALK",
+            (
+                r"{\an2\pos(960,1060)}GHOST TRAJECTORY SHOWS THE MOTION"
+                r" THAT WAS PREVENTED"
+            ),
             8,
         ),
     ]
@@ -725,6 +876,7 @@ def render(
     manifest = {
         "schema_version": "humanoid.t3_polished_emergency.v1",
         "shot_id": shot.get("shot_id"),
+        "visual_design": "live_bt_and_ghost_trajectory_v2",
         "timeline": dataclasses.asdict(timeline),
         "paper_claim": {
             "software_emergency_during_request": True,

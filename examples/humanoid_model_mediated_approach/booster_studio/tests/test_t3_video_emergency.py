@@ -228,10 +228,11 @@ class T3EmergencyVideoTests(unittest.TestCase):
             self.assertAlmostEqual(observed, expected)
 
         overlay = emergency_video.generate_ass(timeline, shot())
-        self.assertIn("SOFTWARE EMERGENCY ASSERTED", overlay)
-        self.assertIn("SAFE STAND ACTIVE", overlay)
-        self.assertIn("REVOKED TARGET  ·  NEVER DISPATCHED", overlay)
-        self.assertIn("ZERO WALKING DISPATCHES", overlay)
+        self.assertIn("LIVE BEHAVIOUR TREE", overlay)
+        self.assertIn("1  SAFE STAND  ·  ACTIVE", overlay)
+        self.assertIn("2  MODEL WAIT  ·  REVOKED", overlay)
+        self.assertIn("GHOST TARGET  ·  NEVER DISPATCHED", overlay)
+        self.assertIn("WALK DISPATCH COUNT 0", overlay)
         self.assertNotIn("BALL A", overlay)
 
     def test_rejects_safe_stand_later_than_one_tick(self) -> None:
