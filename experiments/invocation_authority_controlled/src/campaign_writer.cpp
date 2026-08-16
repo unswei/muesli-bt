@@ -162,6 +162,8 @@ void write_raw_result(std::ostream& output, const trial_result& result,
   write_string_array(output, task_paths);
   output << ",\"variant_event_streams\":";
   write_string_array(output, variant_paths);
+  output << ",\"replay_mismatch_schedule_ids\":";
+  write_string_array(output, result.replay_mismatch_schedule_ids);
   output << ",\"effects\":[";
   for (std::size_t index = 0; index < result.effects.size(); ++index)
   {

@@ -78,6 +78,11 @@ def main() -> int:
             "reason": "incomplete_paper_campaign",
         }
         assert len(campaign["run_manifests"]) == 64
+        raw_trials = [
+            json.loads(line)
+            for line in (output / "raw_trials.jsonl").read_text(encoding="utf-8").splitlines()
+        ]
+        assert all(not trial["replay_mismatch_schedule_ids"] for trial in raw_trials)
 
         manifests: list[dict] = []
         duplicate_full_manifest: dict | None = None
