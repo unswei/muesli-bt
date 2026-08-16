@@ -21,6 +21,13 @@ RUN_SCHEMA = ROOT / "schemas" / "controlled_authority" / "v1" / "run-manifest.sc
 CAMPAIGN_SCHEMA = (
     ROOT / "schemas" / "controlled_authority" / "v1" / "campaign-manifest.schema.json"
 )
+MATRIX_PATH = (
+    ROOT
+    / "experiments"
+    / "invocation_authority_controlled"
+    / "configs"
+    / "fault-matrix.v1.json"
+)
 
 
 def load(path: Path) -> dict:
@@ -63,6 +70,8 @@ def main() -> int:
         assert campaign["expected_outcomes_met"] == 64
         assert campaign["canonical_trace_failures"] == 0
         assert campaign["campaign_valid"] is True
+        assert campaign["matrix_id"] == "controlled-authority.c0.fault-matrix.v1"
+        assert campaign["inputs"]["fault_matrix"]["path"] == str(MATRIX_PATH)
         assert campaign["paper_gate"] == {
             "evaluated": False,
             "passed": None,
@@ -80,6 +89,9 @@ def main() -> int:
             assert run["expected_outcome_met"] is True
             assert run["metrics"]["canonical_trace_valid"] is True
             assert run["manual_exclusion"] is False
+            assert run["matrix_id"] == campaign["matrix_id"]
+            assert run["fault"]["authority_dimensions"]
+            assert run["fault"]["claim"]
             if (
                 run["schedule"]["internal_id"] == "F08"
                 and run["variant"]["short_label"] == "B3"
@@ -102,6 +114,7 @@ def main() -> int:
         )
         assert not re.search(r"\bF(?:0[1-9]|1[0-6])\b", table)
         assert "branch exit and re-entry before completion" in table
+        assert "epoch and generation identity" in table
         assert "invocation-scoped authority" in table
         assert (output / "summary" / "trials.csv").is_file()
         assert (output / "summary" / "schedule-summary.json").is_file()
@@ -125,6 +138,18 @@ def main() -> int:
             / "schedules"
             / "catalogue.v1.json"
         )
+        matrix = load(MATRIX_PATH)
+        reordered_matrix = copy.deepcopy(matrix)
+        reordered_matrix["rows"][0], reordered_matrix["rows"][1] = (
+            reordered_matrix["rows"][1],
+            reordered_matrix["rows"][0],
+        )
+        try:
+            driver["validate_matrix_contract"](protocol, catalogue, reordered_matrix)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("campaign accepted a matrix that drifted from catalogue order")
         paper_seed = protocol["seed_sets"]["paper"]
         paper_seeds = list(
             range(paper_seed["first"], paper_seed["first"] + paper_seed["count"])
@@ -132,13 +157,29 @@ def main() -> int:
         synthetic_paper_runs = manifests * len(paper_seeds)
         gate = driver["paper_gate"](
             protocol,
+            matrix,
             synthetic_paper_runs,
             catalogue["schedules"],
             protocol["variants"],
             paper_seeds,
         )
         assert gate["evaluated"] is True and gate["passed"] is True
+        assert gate["negative_control_exposure_met"] is True
         assert all(gate["negative_control_witnesses"].values())
+
+        unwitnessed_matrix = copy.deepcopy(matrix)
+        for row in unwitnessed_matrix["rows"]:
+            row["negative_control_for"] = []
+        unwitnessed_gate = driver["paper_gate"](
+            protocol,
+            unwitnessed_matrix,
+            synthetic_paper_runs,
+            catalogue["schedules"],
+            protocol["variants"],
+            paper_seeds,
+        )
+        assert unwitnessed_gate["negative_control_exposure_met"] is False
+        assert unwitnessed_gate["passed"] is False
 
         failed_runs = list(synthetic_paper_runs)
         unsafe_full = copy.deepcopy(
@@ -153,6 +194,7 @@ def main() -> int:
         failed_runs[unsafe_index] = unsafe_full
         failed_gate = driver["paper_gate"](
             protocol,
+            matrix,
             failed_runs,
             catalogue["schedules"],
             protocol["variants"],

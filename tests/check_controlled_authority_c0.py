@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 EXPERIMENT = ROOT / "experiments" / "invocation_authority_controlled"
 PROTOCOL_PATH = EXPERIMENT / "configs" / "protocol.v1.json"
 CATALOGUE_PATH = EXPERIMENT / "schedules" / "catalogue.v1.json"
+MATRIX_PATH = EXPERIMENT / "configs" / "fault-matrix.v1.json"
 PROTOCOL_SCHEMA = ROOT / "schemas" / "controlled_authority" / "v1" / "protocol.schema.json"
 CATALOGUE_SCHEMA = (
     ROOT
@@ -20,6 +21,9 @@ CATALOGUE_SCHEMA = (
     / "controlled_authority"
     / "v1"
     / "schedule-catalogue.schema.json"
+)
+MATRIX_SCHEMA = (
+    ROOT / "schemas" / "controlled_authority" / "v1" / "fault-matrix.schema.json"
 )
 
 
@@ -43,8 +47,16 @@ def contiguous_seed_set(seed_set: dict) -> set[int]:
 def main() -> int:
     protocol = load(PROTOCOL_PATH)
     catalogue = load(CATALOGUE_PATH)
+    matrix = load(MATRIX_PATH)
     validate_schema(protocol, PROTOCOL_SCHEMA)
     validate_schema(catalogue, CATALOGUE_SCHEMA)
+    validate_schema(matrix, MATRIX_SCHEMA)
+
+    assert (PROTOCOL_PATH.parent / protocol["schedule_catalogue"]).resolve() == CATALOGUE_PATH
+    assert (PROTOCOL_PATH.parent / protocol["fault_matrix"]).resolve() == MATRIX_PATH
+    assert matrix["status"] == "frozen"
+    assert matrix["protocol_id"] == protocol["protocol_id"]
+    assert matrix["catalogue_id"] == catalogue["catalogue_id"]
 
     schedules = catalogue["schedules"]
     schedule_ids = [schedule["schedule_id"] for schedule in schedules]
@@ -61,7 +73,8 @@ def main() -> int:
         assert times == sorted(times), f"{schedule['schedule_id']} events must be time ordered"
 
     variants = protocol["variants"]
-    assert [variant["short_label"] for variant in variants] == ["B0", "B1", "B2", "B3"]
+    variant_labels = [variant["short_label"] for variant in variants]
+    assert variant_labels == ["B0", "B1", "B2", "B3"]
     assert len({variant["reader_label"] for variant in variants}) == 4
 
     engineering = contiguous_seed_set(protocol["seed_sets"]["engineering"])
@@ -69,26 +82,51 @@ def main() -> int:
     assert engineering.isdisjoint(paper), "engineering and paper seeds must be disjoint"
     assert len(engineering) == 32 and len(paper) == 128
 
-    assert protocol["semantic_lane"]["primary_integrity_schedule_ids"] == [
+    primary_schedule_ids = [
         "F03",
         "F04",
         "F05",
         "F06",
         "F07",
     ]
-    expected_outcomes = protocol["expected_variant_outcomes"]
-    assert list(expected_outcomes) == expected_ids
-    for schedule_id, outcomes in expected_outcomes.items():
-        assert list(outcomes) == ["B0", "B1", "B2", "B3"], (
-            f"{schedule_id} must freeze one expected outcome for every variant"
-        )
-    assert protocol["negative_control_witnesses"] == {
-        "without_epoch_or_generation": "F03",
-        "without_context_identity": "F06",
-        "without_local_revocation": "F04",
-        "without_terminal_claim": "F08",
-        "without_dispatch_revalidation": "F07",
+    rows = matrix["rows"]
+    assert [row["schedule_id"] for row in rows] == expected_ids
+    assert len({row["fault_id"] for row in rows}) == len(rows)
+    assert [
+        row["schedule_id"] for row in rows if row["paper_role"] == "primary_integrity"
+    ] == primary_schedule_ids
+    defined_dimensions = set(matrix["authority_dimension_definitions"])
+    allowed_metrics = set(protocol["run_level_metrics"]) | {
+        "active_jobs_at_end",
+        "blocked_submissions",
+        "fallback_activations",
+        "result_rejections",
+        "safe_stand_activations",
     }
+    witnesses: dict[str, str] = {}
+    for row in rows:
+        assert list(row["expected_variant_outcomes"]) == variant_labels, (
+            f"{row['schedule_id']} must freeze one expected outcome for every variant"
+        )
+        assert set(row["authority_dimensions"]) <= defined_dimensions
+        assert set(row["negative_control_for"]) <= set(row["authority_dimensions"])
+        assert set(row["primary_metrics"]) <= allowed_metrics
+        assert not internal_token.search(row["claim"])
+        for dimension in row["negative_control_for"]:
+            assert dimension not in witnesses, f"duplicate negative-control witness for {dimension}"
+            witnesses[dimension] = row["schedule_id"]
+    assert witnesses == {
+        "epoch_generation": "F03",
+        "context_identity": "F06",
+        "logical_revocation": "F04",
+        "terminal_claim": "F08",
+        "dispatch_revalidation": "F07",
+    }
+
+    assert "expected_variant_outcomes" not in protocol
+    assert "negative_control_witnesses" not in protocol
+    assert "primary_integrity_schedule_ids" not in protocol["semantic_lane"]
+    assert all("required_full_outcome" not in schedule for schedule in schedules)
     assert protocol["paper_gate"]["manual_run_exclusion_allowed"] is False
     assert protocol["identifier_policy"]["schedule_ids_are_internal"] is True
 

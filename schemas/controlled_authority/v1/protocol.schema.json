@@ -12,13 +12,12 @@
     "common_task",
     "variants",
     "schedule_catalogue",
+    "fault_matrix",
     "seed_sets",
     "semantic_lane",
     "timing_lane",
     "run_level_metrics",
     "oracle_precedence",
-    "expected_variant_outcomes",
-    "negative_control_witnesses",
     "paper_gate"
   ],
   "properties": {
@@ -62,6 +61,7 @@
       }
     },
     "schedule_catalogue": {"type": "string"},
+    "fault_matrix": {"type": "string"},
     "seed_sets": {
       "type": "object",
       "required": ["engineering", "paper"],
@@ -81,30 +81,6 @@
     },
     "oracle_precedence": {
       "const": ["branch_revoked", "superseded", "context_changed", "deadline_expired", "current"]
-    },
-    "expected_variant_outcomes": {
-      "type": "object",
-      "minProperties": 16,
-      "maxProperties": 16,
-      "patternProperties": {
-        "^F(0[1-9]|1[0-6])$": {
-          "type": "object",
-          "required": ["B0", "B1", "B2", "B3"],
-          "properties": {
-            "B0": {"type": "string", "minLength": 5},
-            "B1": {"type": "string", "minLength": 5},
-            "B2": {"type": "string", "minLength": 5},
-            "B3": {"type": "string", "minLength": 5}
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    },
-    "negative_control_witnesses": {
-      "type": "object",
-      "required": ["without_epoch_or_generation", "without_context_identity", "without_local_revocation", "without_terminal_claim", "without_dispatch_revalidation"],
-      "additionalProperties": {"type": "string", "pattern": "^F(0[1-9]|1[0-6])$"}
     },
     "paper_gate": {"type": "object"}
   },

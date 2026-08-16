@@ -124,6 +124,11 @@ campaign_plan read_campaign_plan(const std::filesystem::path& path)
       require_fields(fields, 2, line_number);
       plan.catalogue_id = fields[1];
     }
+    else if (kind == "matrix_id")
+    {
+      require_fields(fields, 2, line_number);
+      plan.matrix_id = fields[1];
+    }
     else if (kind == "initial_context_id")
     {
       require_fields(fields, 2, line_number);
@@ -209,9 +214,9 @@ campaign_plan read_campaign_plan(const std::filesystem::path& path)
   }
 
   if (!saw_version || plan.protocol_id.empty() || plan.catalogue_id.empty() ||
-      plan.initial_context_id.empty() || plan.request_deadline.count() <= 0 ||
-      plan.validation.frame_id.empty() || plan.common_task_path.empty() || plan.schedules.empty() ||
-      plan.runs.empty())
+      plan.matrix_id.empty() || plan.initial_context_id.empty() ||
+      plan.request_deadline.count() <= 0 || plan.validation.frame_id.empty() ||
+      plan.common_task_path.empty() || plan.schedules.empty() || plan.runs.empty())
   {
     throw std::invalid_argument("campaign plan is missing required metadata");
   }

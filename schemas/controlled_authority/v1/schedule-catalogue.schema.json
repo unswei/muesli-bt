@@ -15,7 +15,7 @@
       "maxItems": 16,
       "items": {
         "type": "object",
-        "required": ["schedule_id", "reader_label", "purpose", "events", "required_full_outcome"],
+        "required": ["schedule_id", "reader_label", "purpose", "events"],
         "properties": {
           "schedule_id": {"type": "string", "pattern": "^F(0[1-9]|1[0-6])$"},
           "reader_label": {"type": "string", "minLength": 12},
@@ -32,8 +32,7 @@
               },
               "additionalProperties": true
             }
-          },
-          "required_full_outcome": {"type": "string", "minLength": 5}
+          }
         },
         "additionalProperties": false
       }

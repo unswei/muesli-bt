@@ -13,8 +13,7 @@
         {"at": 0, "event": "submit_request", "request": "r1"},
         {"at": 200, "event": "receive_result", "request": "r1"},
         {"at": 220, "event": "dispatch_result", "request": "r1"}
-      ],
-      "required_full_outcome": "accept_current_exactly_once"
+      ]
     },
     {
       "schedule_id": "F02",
@@ -24,8 +23,7 @@
         {"at": 0, "event": "enter_model_branch"},
         {"at": 0, "event": "submit_request", "request": "r1"},
         {"at": 501, "event": "receive_result", "request": "r1"}
-      ],
-      "required_full_outcome": "reject_deadline_expired"
+      ]
     },
     {
       "schedule_id": "F03",
@@ -37,8 +35,7 @@
         {"at": 80, "event": "leave_model_branch"},
         {"at": 120, "event": "reenter_model_branch"},
         {"at": 200, "event": "receive_result", "request": "r1"}
-      ],
-      "required_full_outcome": "reject_branch_revoked"
+      ]
     },
     {
       "schedule_id": "F04",
@@ -49,8 +46,7 @@
         {"at": 0, "event": "submit_request", "request": "r1"},
         {"at": 80, "event": "activate_emergency"},
         {"at": 200, "event": "receive_result", "request": "r1"}
-      ],
-      "required_full_outcome": "reject_branch_revoked_and_activate_safe_stand"
+      ]
     },
     {
       "schedule_id": "F05",
@@ -62,8 +58,7 @@
         {"at": 120, "event": "submit_request", "request": "r2"},
         {"at": 200, "event": "receive_result", "request": "r1"},
         {"at": 240, "event": "receive_result", "request": "r2"}
-      ],
-      "required_full_outcome": "reject_superseded_then_accept_current"
+      ]
     },
     {
       "schedule_id": "F06",
@@ -74,8 +69,7 @@
         {"at": 0, "event": "submit_request", "request": "r1"},
         {"at": 80, "event": "change_context", "context_id": "context-b"},
         {"at": 200, "event": "receive_result", "request": "r1"}
-      ],
-      "required_full_outcome": "reject_context_changed"
+      ]
     },
     {
       "schedule_id": "F07",
@@ -88,8 +82,7 @@
         {"at": 200, "event": "admit_result", "request": "r1"},
         {"at": 210, "event": "change_context", "context_id": "context-b"},
         {"at": 220, "event": "dispatch_result", "request": "r1"}
-      ],
-      "required_full_outcome": "reject_dispatch_context_changed"
+      ]
     },
     {
       "schedule_id": "F08",
@@ -100,8 +93,7 @@
         {"at": 0, "event": "submit_request", "request": "r1"},
         {"at": 200, "event": "receive_result", "request": "r1"},
         {"at": 201, "event": "receive_result", "request": "r1", "duplicate": true}
-      ],
-      "required_full_outcome": "one_terminal_decision"
+      ]
     },
     {
       "schedule_id": "F09",
@@ -112,8 +104,7 @@
         {"at": 0, "event": "submit_request", "request": "r1"},
         {"at": 200, "event": "cancel_request", "request": "r1", "ordering": 0},
         {"at": 200, "event": "receive_result", "request": "r1", "ordering": 1}
-      ],
-      "required_full_outcome": "one_deterministic_terminal_decision"
+      ]
     },
     {
       "schedule_id": "F10",
@@ -123,8 +114,7 @@
         {"at": 0, "event": "enter_model_branch"},
         {"at": 0, "event": "submit_request", "request": "r1"},
         {"at": 200, "event": "receive_malformed_result", "request": "r1"}
-      ],
-      "required_full_outcome": "reject_invalid_schema"
+      ]
     },
     {
       "schedule_id": "F11",
@@ -134,8 +124,7 @@
         {"at": 0, "event": "enter_model_branch"},
         {"at": 0, "event": "submit_request", "request": "r1"},
         {"at": 200, "event": "receive_host_invalid_result", "request": "r1"}
-      ],
-      "required_full_outcome": "reject_host_validation"
+      ]
     },
     {
       "schedule_id": "F12",
@@ -145,8 +134,7 @@
         {"at": 0, "event": "enter_model_branch"},
         {"at": 0, "event": "submit_request", "request": "r1"},
         {"at": 200, "event": "service_disconnect", "request": "r1"}
-      ],
-      "required_full_outcome": "one_failure_and_fallback"
+      ]
     },
     {
       "schedule_id": "F13",
@@ -156,8 +144,7 @@
         {"at": 0, "event": "enter_model_branch"},
         {"at": 0, "event": "submit_request_burst", "count": 16},
         {"at": 200, "event": "receive_result_burst", "count": 16}
-      ],
-      "required_full_outcome": "no_cross_job_effect"
+      ]
     },
     {
       "schedule_id": "F14",
@@ -168,8 +155,7 @@
         {"at": 0, "event": "submit_request", "request": "r1", "job_key": "shared"},
         {"at": 120, "event": "submit_request", "request": "r2", "job_key": "shared"},
         {"at": 200, "event": "receive_result", "request": "r1"}
-      ],
-      "required_full_outcome": "reject_superseded_without_clearing_new_request"
+      ]
     },
     {
       "schedule_id": "F15",
@@ -180,8 +166,7 @@
         {"at": 0, "event": "submit_request", "request": "r1"},
         {"at": 80, "event": "reset_runtime"},
         {"at": 200, "event": "receive_result", "request": "r1"}
-      ],
-      "required_full_outcome": "reject_branch_revoked_after_reset"
+      ]
     },
     {
       "schedule_id": "F16",
@@ -189,8 +174,7 @@
       "purpose": "test task-level replay parity for every preceding schedule",
       "events": [
         {"at": 0, "event": "replay_recorded_schedules", "schedule_range": "F01-F15"}
-      ],
-      "required_full_outcome": "task_decisions_equal"
+      ]
     }
   ]
 }

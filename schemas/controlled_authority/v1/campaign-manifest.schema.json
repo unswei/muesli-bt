@@ -9,6 +9,7 @@
     "created_at",
     "protocol_id",
     "catalogue_id",
+    "matrix_id",
     "seed_set",
     "seeds",
     "schedule_internal_ids",
@@ -34,6 +35,7 @@
     "created_at": {"type": "string", "format": "date-time"},
     "protocol_id": {"type": "string", "minLength": 1},
     "catalogue_id": {"type": "string", "minLength": 1},
+    "matrix_id": {"type": "string", "minLength": 1},
     "seed_set": {"enum": ["engineering", "paper", "explicit"]},
     "seeds": {
       "type": "array",
@@ -81,6 +83,7 @@
         "canonical_trace_failures": {"type": "integer", "minimum": 0},
         "replay_mismatches": {"type": "integer", "minimum": 0},
         "expected_outcome_failures": {"type": "integer", "minimum": 0},
+        "negative_control_exposure_met": {"type": "boolean"},
         "negative_control_witnesses": {
           "type": "object",
           "additionalProperties": {"type": "boolean"}
@@ -88,7 +91,26 @@
       },
       "additionalProperties": false
     },
-    "inputs": {"type": "object"},
+    "inputs": {
+      "type": "object",
+      "required": [
+        "protocol",
+        "catalogue",
+        "fault_matrix",
+        "common_task",
+        "resolved_plan",
+        "engine"
+      ],
+      "properties": {
+        "protocol": {"$ref": "#/$defs/file"},
+        "catalogue": {"$ref": "#/$defs/file"},
+        "fault_matrix": {"$ref": "#/$defs/file"},
+        "common_task": {"$ref": "#/$defs/file"},
+        "resolved_plan": {"$ref": "#/$defs/file"},
+        "engine": {"$ref": "#/$defs/file"}
+      },
+      "additionalProperties": false
+    },
     "environment": {"type": "object"},
     "raw_trials": {"$ref": "#/$defs/file"},
     "run_manifests": {

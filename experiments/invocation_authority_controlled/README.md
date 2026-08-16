@@ -2,7 +2,9 @@
 
 ## status
 
-Gate C0 is frozen as protocol `controlled-authority.c0.v1`.
+Gate C0 is frozen as protocol `controlled-authority.c0.v1`. Its authoritative
+fault interpretation is frozen as matrix
+`controlled-authority.c0.fault-matrix.v1`.
 
 The shared task, independent authority oracle, common effect recorder, all four
 authority adapters, shared Lisp task runner, semantic schedule driver and
@@ -22,8 +24,11 @@ before completion". The schedule numbers are not reader-facing terminology.
 
 - `configs/protocol.v1.json` freezes variants, units, metrics, seed sets and
   acceptance gates.
-- `schedules/catalogue.v1.json` freezes the schedule meanings and canonical
-  event orderings.
+- `configs/fault-matrix.v1.json` is the single source for fault classes,
+  authority dimensions, claims, primary metrics, unsafe effects, expected
+  B0--B3 outcomes and negative-control witnesses.
+- `schedules/catalogue.v1.json` freezes reader labels and canonical event
+  orderings. It does not repeat fault interpretations or expected outcomes.
 - `lisp/common_task.lisp` is the task shared by every variant.
 - `src/common_task.*` provides common state, request capture, the independent
   obsolescence oracle and a stepped coordinator.
@@ -76,11 +81,16 @@ new one.
 The campaign root contains `campaign-manifest.json`, `raw_trials.jsonl`, one
 run manifest per experimental unit, canonical streams under `events/`,
 machine-readable summaries under `summary/`, and reader-facing CSV and
-Markdown tables under `paper/`.
+Markdown tables under `paper/`. The campaign and run manifests identify the
+matrix, and the campaign manifest records its SHA-256 digest.
 
 ## c0 invariants
 
 - Every schedule has an internal ID and a plain-language reader label.
+- Every schedule maps to exactly one frozen fault-matrix row in catalogue
+  order.
+- Fault expectations, full-variant requirements and negative-control witnesses
+  occur only in the fault matrix.
 - All variants receive the same observation, request, proposal and event order.
 - The oracle, rather than the tested variant, decides whether an effect is
   obsolete.

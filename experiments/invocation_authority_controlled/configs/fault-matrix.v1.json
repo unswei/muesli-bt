@@ -1,0 +1,369 @@
+{
+  "$schema": "../../../schemas/controlled_authority/v1/fault-matrix.schema.json",
+  "schema_version": "controlled-authority.fault-matrix.v1",
+  "matrix_id": "controlled-authority.c0.fault-matrix.v1",
+  "protocol_id": "controlled-authority.c0.v1",
+  "catalogue_id": "controlled-authority.c0.schedules.v1",
+  "status": "frozen",
+  "reader_language": "en-AU",
+  "identifier_policy": {
+    "schedule_ids_are_internal": true,
+    "reader_labels_come_from_catalogue": true
+  },
+  "authority_dimension_definitions": {
+    "current_admission": {
+      "reader_label": "current-result admission",
+      "definition": "A valid result belonging to the active request is accepted exactly once."
+    },
+    "non_blocking": {
+      "reader_label": "non-blocking execution",
+      "definition": "A pending provider call does not prevent the reactive task from processing later events."
+    },
+    "deadline": {
+      "reader_label": "deadline authority",
+      "definition": "A result loses authority only after the request's inclusive logical deadline."
+    },
+    "epoch_generation": {
+      "reader_label": "epoch and generation identity",
+      "definition": "A result belongs to the same branch epoch and request generation that created it."
+    },
+    "context_identity": {
+      "reader_label": "observation-context identity",
+      "definition": "A result belongs to the same observation context that was captured at submission."
+    },
+    "logical_revocation": {
+      "reader_label": "logical revocation",
+      "definition": "Loss of branch authority is terminal even when provider cancellation is late or ineffective."
+    },
+    "terminal_claim": {
+      "reader_label": "exactly-once terminal ownership",
+      "definition": "Only one acceptance, rejection or cancellation can own a request's terminal outcome."
+    },
+    "dispatch_revalidation": {
+      "reader_label": "dispatch-time revalidation",
+      "definition": "Authority is checked again before an accepted result reaches the walking capability."
+    },
+    "cancellation_ordering": {
+      "reader_label": "cancellation ordering",
+      "definition": "Cancellation and completion at one logical time resolve in the frozen event order."
+    },
+    "structural_validation": {
+      "reader_label": "structural validation",
+      "definition": "Malformed provider output is rejected before it can become a task-level proposal."
+    },
+    "host_validation": {
+      "reader_label": "host validation",
+      "definition": "The host checks frame, bounds, current context and stability before accepting a pose."
+    },
+    "provider_availability": {
+      "reader_label": "provider-failure handling",
+      "definition": "A provider failure becomes one explicit terminal outcome and selects the authored fallback."
+    },
+    "job_isolation": {
+      "reader_label": "concurrent-job isolation",
+      "definition": "Completions from independent task instances cannot alter another instance's state."
+    },
+    "job_key_isolation": {
+      "reader_label": "generation-safe key reuse",
+      "definition": "An older generation cannot write through or clear a key now owned by a newer request."
+    },
+    "reset_revocation": {
+      "reader_label": "reset-time revocation",
+      "definition": "Reset revokes pending work before invocation-owned state is cleared or reused."
+    },
+    "replay_parity": {
+      "reader_label": "task-decision replay parity",
+      "definition": "Recorded semantic trials reproduce the same task decisions without a live provider."
+    }
+  },
+  "rows": [
+    {
+      "schedule_id": "F01",
+      "fault_id": "current-result",
+      "fault_class": "positive_control",
+      "paper_role": "positive_control",
+      "authority_dimensions": ["current_admission"],
+      "claim": "Every mechanism accepts one valid current result exactly once.",
+      "primary_metrics": ["current_result_accepted_exactly_once", "obsolete_effect"],
+      "unsafe_effects": [],
+      "expected_variant_outcomes": {
+        "B0": "accept_current_exactly_once",
+        "B1": "accept_current_exactly_once",
+        "B2": "accept_current_exactly_once",
+        "B3": "accept_current_exactly_once"
+      },
+      "negative_control_for": [],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F02",
+      "fault_id": "deadline-expiry",
+      "fault_class": "deadline_authority",
+      "paper_role": "boundary_control",
+      "authority_dimensions": ["deadline"],
+      "claim": "A result arriving after its inclusive deadline no longer has task authority.",
+      "primary_metrics": ["obsolete_effect", "terminal_outcome_count"],
+      "unsafe_effects": ["obsolete_commit"],
+      "expected_variant_outcomes": {
+        "B0": "obsolete_effect_without_deadline",
+        "B1": "obsolete_effect_without_deadline",
+        "B2": "reject_deadline_expired",
+        "B3": "reject_deadline_expired"
+      },
+      "negative_control_for": [],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F03",
+      "fault_id": "branch-reentry",
+      "fault_class": "branch_authority",
+      "paper_role": "primary_integrity",
+      "authority_dimensions": ["epoch_generation", "logical_revocation"],
+      "claim": "A result from an exited branch cannot satisfy the same node after re-entry.",
+      "primary_metrics": ["obsolete_effect", "terminal_outcome_count"],
+      "unsafe_effects": ["obsolete_commit"],
+      "expected_variant_outcomes": {
+        "B0": "obsolete_effect_after_unobserved_branch_change",
+        "B1": "obsolete_effect",
+        "B2": "obsolete_effect",
+        "B3": "reject_branch_revoked"
+      },
+      "negative_control_for": ["epoch_generation"],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F04",
+      "fault_id": "higher-priority-preemption",
+      "fault_class": "branch_authority",
+      "paper_role": "primary_integrity",
+      "authority_dimensions": ["non_blocking", "logical_revocation"],
+      "claim": "Higher-priority pre-emption revokes pending model work and activates safe stand.",
+      "primary_metrics": ["obsolete_effect", "safe_stand_activations", "terminal_outcome_count"],
+      "unsafe_effects": ["obsolete_commit", "blocked_reactive_tick"],
+      "expected_variant_outcomes": {
+        "B0": "obsolete_effect_after_unobserved_preemption",
+        "B1": "obsolete_effect",
+        "B2": "obsolete_effect",
+        "B3": "reject_branch_revoked_and_activate_safe_stand"
+      },
+      "negative_control_for": ["logical_revocation"],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F05",
+      "fault_id": "request-supersession",
+      "fault_class": "generation_authority",
+      "paper_role": "primary_integrity",
+      "authority_dimensions": ["non_blocking", "epoch_generation", "terminal_claim"],
+      "claim": "A newer request supersedes an older request within the same live branch.",
+      "primary_metrics": ["obsolete_effect", "blocked_submissions", "terminal_outcome_count"],
+      "unsafe_effects": ["obsolete_commit", "blocked_reactive_tick"],
+      "expected_variant_outcomes": {
+        "B0": "new_request_cannot_start_while_blocked",
+        "B1": "obsolete_effect",
+        "B2": "obsolete_effect",
+        "B3": "reject_superseded_then_accept_current"
+      },
+      "negative_control_for": [],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F06",
+      "fault_id": "context-change-before-admission",
+      "fault_class": "context_authority",
+      "paper_role": "primary_integrity",
+      "authority_dimensions": ["context_identity"],
+      "claim": "A proposal captured from an old observation context is rejected at admission.",
+      "primary_metrics": ["obsolete_effect", "terminal_outcome_count"],
+      "unsafe_effects": ["obsolete_commit"],
+      "expected_variant_outcomes": {
+        "B0": "obsolete_effect_after_unobserved_context_change",
+        "B1": "obsolete_effect",
+        "B2": "obsolete_effect",
+        "B3": "reject_context_changed"
+      },
+      "negative_control_for": ["context_identity"],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F07",
+      "fault_id": "context-change-before-dispatch",
+      "fault_class": "dispatch_authority",
+      "paper_role": "primary_integrity",
+      "authority_dimensions": ["context_identity", "dispatch_revalidation"],
+      "claim": "A context change after admission still prevents obsolete capability dispatch.",
+      "primary_metrics": ["obsolete_effect", "terminal_outcome_count"],
+      "unsafe_effects": ["obsolete_dispatch"],
+      "expected_variant_outcomes": {
+        "B0": "obsolete_dispatch",
+        "B1": "obsolete_dispatch",
+        "B2": "obsolete_dispatch",
+        "B3": "reject_dispatch_context_changed"
+      },
+      "negative_control_for": ["dispatch_revalidation"],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F08",
+      "fault_id": "duplicate-completion",
+      "fault_class": "terminal_ownership",
+      "paper_role": "boundary_control",
+      "authority_dimensions": ["terminal_claim"],
+      "claim": "Duplicate completion cannot create a second terminal task effect.",
+      "primary_metrics": ["terminal_outcome_count"],
+      "unsafe_effects": ["duplicate_terminal_outcome"],
+      "expected_variant_outcomes": {
+        "B0": "not_applicable_to_synchronous_return",
+        "B1": "duplicate_effect_exposed",
+        "B2": "one_terminal_decision",
+        "B3": "one_terminal_decision"
+      },
+      "negative_control_for": ["terminal_claim"],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F09",
+      "fault_id": "cancel-completion-race",
+      "fault_class": "terminal_ownership",
+      "paper_role": "boundary_control",
+      "authority_dimensions": ["terminal_claim", "cancellation_ordering"],
+      "claim": "Cancellation and completion at one logical time produce one deterministic terminal outcome.",
+      "primary_metrics": ["terminal_outcome_count"],
+      "unsafe_effects": ["duplicate_terminal_outcome"],
+      "expected_variant_outcomes": {
+        "B0": "not_applicable_without_cancellation",
+        "B1": "not_applicable_without_cancellation",
+        "B2": "one_terminal_decision",
+        "B3": "one_deterministic_terminal_decision"
+      },
+      "negative_control_for": [],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F10",
+      "fault_id": "malformed-provider-result",
+      "fault_class": "validation",
+      "paper_role": "validation_control",
+      "authority_dimensions": ["structural_validation"],
+      "claim": "A malformed provider result is rejected before publication or dispatch.",
+      "primary_metrics": ["result_rejections", "terminal_outcome_count"],
+      "unsafe_effects": ["invalid_proposal_commit"],
+      "expected_variant_outcomes": {
+        "B0": "reject_invalid_schema",
+        "B1": "reject_invalid_schema",
+        "B2": "reject_invalid_schema",
+        "B3": "reject_invalid_schema"
+      },
+      "negative_control_for": [],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F11",
+      "fault_id": "host-invalid-proposal",
+      "fault_class": "validation",
+      "paper_role": "validation_control",
+      "authority_dimensions": ["host_validation"],
+      "claim": "The host rejects an invalid frame, pose, context or stability state.",
+      "primary_metrics": ["result_rejections", "terminal_outcome_count"],
+      "unsafe_effects": ["invalid_proposal_commit"],
+      "expected_variant_outcomes": {
+        "B0": "reject_host_validation",
+        "B1": "reject_host_validation",
+        "B2": "reject_host_validation",
+        "B3": "reject_host_validation"
+      },
+      "negative_control_for": [],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F12",
+      "fault_id": "provider-disconnect",
+      "fault_class": "provider_failure",
+      "paper_role": "robustness_control",
+      "authority_dimensions": ["non_blocking", "provider_availability"],
+      "claim": "A provider disconnect creates one explicit failure and activates the authored fallback.",
+      "primary_metrics": ["intervention_to_fallback_ms", "fallback_activations", "terminal_outcome_count"],
+      "unsafe_effects": ["missing_fallback", "blocked_reactive_tick"],
+      "expected_variant_outcomes": {
+        "B0": "one_failure_and_delayed_fallback",
+        "B1": "one_failure_and_fallback",
+        "B2": "one_failure_and_fallback",
+        "B3": "one_failure_and_fallback"
+      },
+      "negative_control_for": [],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F13",
+      "fault_id": "concurrent-completion-burst",
+      "fault_class": "concurrency_isolation",
+      "paper_role": "robustness_control",
+      "authority_dimensions": ["non_blocking", "job_isolation"],
+      "claim": "Concurrent completions remain isolated across independent task instances.",
+      "primary_metrics": ["obsolete_effect", "terminal_outcome_count"],
+      "unsafe_effects": ["cross_job_effect", "blocked_reactive_tick"],
+      "expected_variant_outcomes": {
+        "B0": "no_cross_job_effect_across_parallel_instances",
+        "B1": "no_cross_job_effect",
+        "B2": "no_cross_job_effect",
+        "B3": "no_cross_job_effect"
+      },
+      "negative_control_for": [],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F14",
+      "fault_id": "logical-key-reuse",
+      "fault_class": "key_reuse",
+      "paper_role": "robustness_control",
+      "authority_dimensions": ["non_blocking", "epoch_generation", "job_key_isolation"],
+      "claim": "An old generation cannot write through or clear a key reused by newer work.",
+      "primary_metrics": ["obsolete_effect", "blocked_submissions", "active_jobs_at_end"],
+      "unsafe_effects": ["obsolete_commit", "wrong_request_key_write", "blocked_reactive_tick"],
+      "expected_variant_outcomes": {
+        "B0": "request_key_reuse_cannot_start_while_blocked",
+        "B1": "obsolete_effect_or_old_key_write",
+        "B2": "obsolete_effect_or_old_key_write",
+        "B3": "reject_superseded_without_clearing_new_request"
+      },
+      "negative_control_for": [],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F15",
+      "fault_id": "runtime-reset",
+      "fault_class": "reset_authority",
+      "paper_role": "robustness_control",
+      "authority_dimensions": ["logical_revocation", "reset_revocation"],
+      "claim": "Reset revokes pending work before invocation-owned state is destroyed or reused.",
+      "primary_metrics": ["obsolete_effect", "active_jobs_at_end", "terminal_outcome_count"],
+      "unsafe_effects": ["obsolete_commit"],
+      "expected_variant_outcomes": {
+        "B0": "obsolete_effect_after_unobserved_reset",
+        "B1": "obsolete_effect",
+        "B2": "obsolete_effect",
+        "B3": "reject_branch_revoked_after_reset"
+      },
+      "negative_control_for": [],
+      "include_in_paper_table": true
+    },
+    {
+      "schedule_id": "F16",
+      "fault_id": "semantic-replay",
+      "fault_class": "replay",
+      "paper_role": "reproducibility_control",
+      "authority_dimensions": ["replay_parity"],
+      "claim": "Deterministic replay reproduces task decisions without a live provider.",
+      "primary_metrics": ["task_replay_equal", "canonical_trace_valid"],
+      "unsafe_effects": ["replay_divergence"],
+      "expected_variant_outcomes": {
+        "B0": "task_decisions_equal",
+        "B1": "task_decisions_equal",
+        "B2": "task_decisions_equal",
+        "B3": "task_decisions_equal"
+      },
+      "negative_control_for": [],
+      "include_in_paper_table": true
+    }
+  ]
+}

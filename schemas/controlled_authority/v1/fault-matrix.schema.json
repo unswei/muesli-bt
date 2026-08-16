@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.invalid/schemas/controlled_authority/v1/fault-matrix.schema.json",
+  "title": "Controlled invocation-authority fault matrix v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "matrix_id",
+    "protocol_id",
+    "catalogue_id",
+    "status",
+    "reader_language",
+    "identifier_policy",
+    "authority_dimension_definitions",
+    "rows"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "controlled-authority.fault-matrix.v1"},
+    "matrix_id": {"const": "controlled-authority.c0.fault-matrix.v1"},
+    "protocol_id": {"const": "controlled-authority.c0.v1"},
+    "catalogue_id": {"const": "controlled-authority.c0.schedules.v1"},
+    "status": {"const": "frozen"},
+    "reader_language": {"const": "en-AU"},
+    "identifier_policy": {
+      "type": "object",
+      "required": ["schedule_ids_are_internal", "reader_labels_come_from_catalogue"],
+      "properties": {
+        "schedule_ids_are_internal": {"const": true},
+        "reader_labels_come_from_catalogue": {"const": true}
+      },
+      "additionalProperties": false
+    },
+    "authority_dimension_definitions": {
+      "type": "object",
+      "minProperties": 14,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["reader_label", "definition"],
+        "properties": {
+          "reader_label": {"type": "string", "minLength": 5},
+          "definition": {"type": "string", "minLength": 20}
+        },
+        "additionalProperties": false
+      }
+    },
+    "rows": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": [
+          "schedule_id",
+          "fault_id",
+          "fault_class",
+          "paper_role",
+          "authority_dimensions",
+          "claim",
+          "primary_metrics",
+          "unsafe_effects",
+          "expected_variant_outcomes",
+          "negative_control_for",
+          "include_in_paper_table"
+        ],
+        "properties": {
+          "schedule_id": {"type": "string", "pattern": "^F(0[1-9]|1[0-6])$"},
+          "fault_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"},
+          "fault_class": {
+            "enum": [
+              "positive_control",
+              "deadline_authority",
+              "branch_authority",
+              "generation_authority",
+              "context_authority",
+              "dispatch_authority",
+              "terminal_ownership",
+              "validation",
+              "provider_failure",
+              "concurrency_isolation",
+              "key_reuse",
+              "reset_authority",
+              "replay"
+            ]
+          },
+          "paper_role": {
+            "enum": [
+              "positive_control",
+              "primary_integrity",
+              "boundary_control",
+              "validation_control",
+              "robustness_control",
+              "reproducibility_control"
+            ]
+          },
+          "authority_dimensions": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/authorityDimension"}
+          },
+          "claim": {"type": "string", "minLength": 20},
+          "primary_metrics": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 3}
+          },
+          "unsafe_effects": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "obsolete_commit",
+                "obsolete_dispatch",
+                "duplicate_terminal_outcome",
+                "wrong_request_key_write",
+                "blocked_reactive_tick",
+                "cross_job_effect",
+                "invalid_proposal_commit",
+                "missing_fallback",
+                "replay_divergence"
+              ]
+            }
+          },
+          "expected_variant_outcomes": {
+            "type": "object",
+            "required": ["B0", "B1", "B2", "B3"],
+            "properties": {
+              "B0": {"type": "string", "minLength": 5},
+              "B1": {"type": "string", "minLength": 5},
+              "B2": {"type": "string", "minLength": 5},
+              "B3": {"type": "string", "minLength": 5}
+            },
+            "additionalProperties": false
+          },
+          "negative_control_for": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/authorityDimension"}
+          },
+          "include_in_paper_table": {"type": "boolean"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "authorityDimension": {
+      "enum": [
+        "current_admission",
+        "non_blocking",
+        "deadline",
+        "epoch_generation",
+        "context_identity",
+        "logical_revocation",
+        "terminal_claim",
+        "dispatch_revalidation",
+        "cancellation_ordering",
+        "structural_validation",
+        "host_validation",
+        "provider_availability",
+        "job_isolation",
+        "job_key_isolation",
+        "reset_revocation",
+        "replay_parity"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

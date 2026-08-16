@@ -7,8 +7,10 @@
     "schema_version",
     "protocol_id",
     "catalogue_id",
+    "matrix_id",
     "schedule",
     "variant",
+    "fault",
     "seed",
     "raw_trial_index",
     "expected_outcome",
@@ -24,6 +26,7 @@
     "schema_version": {"const": "controlled-authority.run-manifest.v1"},
     "protocol_id": {"type": "string", "minLength": 1},
     "catalogue_id": {"type": "string", "minLength": 1},
+    "matrix_id": {"type": "string", "minLength": 1},
     "schedule": {
       "type": "object",
       "required": ["internal_id", "reader_label"],
@@ -40,6 +43,51 @@
         "short_label": {"type": "string", "pattern": "^B[0-3]$"},
         "variant_id": {"type": "string", "pattern": "^authority-b[0-3]-"},
         "reader_label": {"type": "string", "minLength": 8}
+      },
+      "additionalProperties": false
+    },
+    "fault": {
+      "type": "object",
+      "required": [
+        "fault_id",
+        "fault_class",
+        "paper_role",
+        "authority_dimensions",
+        "claim",
+        "primary_metrics",
+        "unsafe_effects"
+      ],
+      "properties": {
+        "fault_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"},
+        "fault_class": {"type": "string", "minLength": 1},
+        "paper_role": {
+          "enum": [
+            "positive_control",
+            "primary_integrity",
+            "boundary_control",
+            "validation_control",
+            "robustness_control",
+            "reproducibility_control"
+          ]
+        },
+        "authority_dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "claim": {"type": "string", "minLength": 1},
+        "primary_metrics": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "unsafe_effects": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
       },
       "additionalProperties": false
     },

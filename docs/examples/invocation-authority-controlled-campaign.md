@@ -52,6 +52,13 @@ four real adapters. The driver then validates each canonical event stream and
 derives manifests, summaries and paper tables. Derived files never replace the
 canonical runtime evidence.
 
+One frozen fault matrix is the authoritative interpretation of the schedules.
+Each row names the fault class, affected authority properties, paper claim,
+primary metrics, unsafe effects, expected outcome for every implementation and
+any negative-control witness. The protocol retains task mechanics, variants,
+seed sets and paper gates. The schedule catalogue retains event timing and
+plain-language labels. Neither file repeats the matrix judgements.
+
 The completion-burst schedule creates 16 independent task instances before it
 releases their provider barriers at one logical time. The replay schedule runs
 the preceding schedules again with the same deterministic scripted provider
@@ -66,6 +73,7 @@ never pooled.
 The frozen C0 files are:
 
 - `experiments/invocation_authority_controlled/configs/protocol.v1.json`;
+- `experiments/invocation_authority_controlled/configs/fault-matrix.v1.json`;
 - `experiments/invocation_authority_controlled/schedules/catalogue.v1.json`;
 - `experiments/invocation_authority_controlled/lisp/common_task.lisp`; and
 - `schemas/controlled_authority/v1/`.
@@ -171,17 +179,21 @@ paper/variant-summary.md
 ```
 
 Run manifests retain internal schedule and variant keys for auditability, and
-pair each key with its reader label. Paper tables omit internal schedule keys
-and use the reader labels directly. Every canonical stream and frozen input is
-identified by a SHA-256 digest in a manifest. The compact paper table reports
-obsolete-effect trials and terminal-outcome counts. The terminal count exposes
-duplicate completion and blocked-submission controls that an obsolete-effect
-column alone would hide.
+pair each key with its reader label and frozen fault metadata. Paper tables omit
+internal schedule keys, use the reader labels directly and name the relevant
+authority properties from the matrix. Every canonical stream and frozen input,
+including the fault matrix, is identified by a SHA-256 digest in a manifest.
+The compact paper table reports obsolete-effect trials and terminal-outcome
+counts. The terminal count exposes duplicate completion and blocked-submission
+controls that an obsolete-effect column alone would hide.
 
 ## gotchas
 
 - Internal schedule identifiers are for manifests and regression fixtures, not
   unexplained prose.
+- Change a fault interpretation only by versioning the frozen matrix. Do not
+  add a second expected-outcome or witness map to the protocol, catalogue or
+  paper scripts.
 - A completion at the exact deadline is current. It becomes expired only after
   the deadline.
 - Best-effort provider cancellation does not change the oracle's authority

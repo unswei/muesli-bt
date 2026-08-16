@@ -42,6 +42,7 @@ struct campaign_plan
 {
   std::string protocol_id;
   std::string catalogue_id;
+  std::string matrix_id;
   std::string initial_context_id;
   logical_time request_deadline{500};
   proposal_validation_config validation;

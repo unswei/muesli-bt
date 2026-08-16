@@ -21,6 +21,13 @@ EXPERIMENT = Path(__file__).resolve().parent
 ROOT = EXPERIMENT.parents[1]
 DEFAULT_PROTOCOL = EXPERIMENT / "configs" / "protocol.v1.json"
 EVENT_SCHEMA = ROOT / "schemas" / "event_log" / "v1" / "mbt.evt.v1.schema.json"
+PROTOCOL_SCHEMA = ROOT / "schemas" / "controlled_authority" / "v1" / "protocol.schema.json"
+CATALOGUE_SCHEMA = (
+    ROOT / "schemas" / "controlled_authority" / "v1" / "schedule-catalogue.schema.json"
+)
+FAULT_MATRIX_SCHEMA = (
+    ROOT / "schemas" / "controlled_authority" / "v1" / "fault-matrix.schema.json"
+)
 RUN_MANIFEST_SCHEMA = (
     ROOT / "schemas" / "controlled_authority" / "v1" / "run-manifest.schema.json"
 )
@@ -82,6 +89,29 @@ def resolve_seeds(protocol: dict[str, Any], seed_set: str, override: str | None)
     return list(range(definition["first"], definition["first"] + definition["count"]))
 
 
+def validate_matrix_contract(
+    protocol: dict[str, Any], catalogue: dict[str, Any], matrix: dict[str, Any]
+) -> None:
+    if matrix["protocol_id"] != protocol["protocol_id"]:
+        raise ValueError("fault matrix references a different protocol")
+    if matrix["catalogue_id"] != catalogue["catalogue_id"]:
+        raise ValueError("fault matrix references a different schedule catalogue")
+    schedule_ids = [item["schedule_id"] for item in catalogue["schedules"]]
+    row_ids = [item["schedule_id"] for item in matrix["rows"]]
+    if row_ids != schedule_ids or len(row_ids) != len(set(row_ids)):
+        raise ValueError("fault matrix must cover the ordered schedule catalogue exactly once")
+    variant_labels = [item["short_label"] for item in protocol["variants"]]
+    defined_dimensions = set(matrix["authority_dimension_definitions"])
+    for row in matrix["rows"]:
+        if list(row["expected_variant_outcomes"]) != variant_labels:
+            raise ValueError(
+                f"{row['schedule_id']} fault row must define outcomes in variant order"
+            )
+        dimensions = set(row["authority_dimensions"]) | set(row["negative_control_for"])
+        if dimensions - defined_dimensions:
+            raise ValueError(f"{row['schedule_id']} uses an undefined authority dimension")
+
+
 def tsv_field(value: Any) -> str:
     text = "" if value is None else str(value)
     if "\t" in text or "\n" in text or "\r" in text:
@@ -93,6 +123,7 @@ def write_plan(
     path: Path,
     protocol: dict[str, Any],
     catalogue: dict[str, Any],
+    matrix: dict[str, Any],
     schedules: list[dict[str, Any]],
     variants: list[dict[str, Any]],
     seeds: list[int],
@@ -103,6 +134,7 @@ def write_plan(
         ["plan_version", "controlled-authority.plan.v1"],
         ["protocol_id", protocol["protocol_id"]],
         ["catalogue_id", catalogue["catalogue_id"]],
+        ["matrix_id", matrix["matrix_id"]],
         ["initial_context_id", common["initial_context_id"]],
         ["request_deadline_ms", common["request_deadline_ms"]],
         ["frame_id", proposal["frame_id"]],
@@ -128,7 +160,7 @@ def write_plan(
             )
         rows.append(["end_schedule"])
 
-    expected = protocol["expected_variant_outcomes"]
+    fault_by_schedule = {row["schedule_id"]: row for row in matrix["rows"]}
     run_count = 0
     for variant in variants:
         short_label = variant["short_label"]
@@ -136,7 +168,13 @@ def write_plan(
             for schedule in schedules:
                 schedule_id = schedule["schedule_id"]
                 rows.append(
-                    ["run", schedule_id, short_label, seed, expected[schedule_id][short_label]]
+                    [
+                        "run",
+                        schedule_id,
+                        short_label,
+                        seed,
+                        fault_by_schedule[schedule_id]["expected_variant_outcomes"][short_label],
+                    ]
                 )
                 run_count += 1
 
@@ -217,9 +255,11 @@ def write_trial_manifests(
     variant_by_label: dict[str, dict[str, Any]],
     protocol: dict[str, Any],
     catalogue: dict[str, Any],
+    matrix: dict[str, Any],
 ) -> tuple[list[dict[str, Any]], int]:
     manifests: list[dict[str, Any]] = []
     trace_failures = 0
+    fault_by_schedule = {row["schedule_id"]: row for row in matrix["rows"]}
     for raw_trial_index, trial in enumerate(trials, 1):
         trace_records: list[dict[str, Any]] = []
         all_valid = True
@@ -247,6 +287,7 @@ def write_trial_manifests(
 
         schedule = schedule_by_id[trial["schedule_id"]]
         variant = variant_by_label[trial["variant_label"]]
+        fault = fault_by_schedule[trial["schedule_id"]]
         manifest_path = (
             output
             / "runs"
@@ -263,6 +304,7 @@ def write_trial_manifests(
             "schema_version": "controlled-authority.run-manifest.v1",
             "protocol_id": protocol["protocol_id"],
             "catalogue_id": catalogue["catalogue_id"],
+            "matrix_id": matrix["matrix_id"],
             "schedule": {
                 "internal_id": trial["schedule_id"],
                 "reader_label": schedule["reader_label"],
@@ -271,6 +313,15 @@ def write_trial_manifests(
                 "short_label": trial["variant_label"],
                 "variant_id": trial["variant_id"],
                 "reader_label": variant["reader_label"],
+            },
+            "fault": {
+                "fault_id": fault["fault_id"],
+                "fault_class": fault["fault_class"],
+                "paper_role": fault["paper_role"],
+                "authority_dimensions": fault["authority_dimensions"],
+                "claim": fault["claim"],
+                "primary_metrics": fault["primary_metrics"],
+                "unsafe_effects": fault["unsafe_effects"],
             },
             "seed": trial["seed"],
             "raw_trial_index": raw_trial_index,
@@ -368,12 +419,15 @@ def write_summaries(
     manifests: list[dict[str, Any]],
     schedules: list[dict[str, Any]],
     variants: list[dict[str, Any]],
+    matrix: dict[str, Any],
 ) -> dict[str, str]:
     trial_rows: list[dict[str, Any]] = []
     for item in manifests:
         trial_rows.append(
             {
                 "schedule": item["schedule"]["reader_label"],
+                "fault": item["fault"]["fault_id"],
+                "paper_role": item["fault"]["paper_role"],
                 "variant": item["variant"]["reader_label"],
                 "seed": item["seed"],
                 "expected_outcome_met": item["expected_outcome_met"],
@@ -396,11 +450,25 @@ def write_summaries(
         (row["schedule_reader_label"], row["variant_reader_label"]): row
         for row in schedule_summary
     }
+    fault_by_schedule = {row["schedule_id"]: row for row in matrix["rows"]}
+    dimension_definitions = matrix["authority_dimension_definitions"]
     paper_rows: list[dict[str, Any]] = []
     for schedule in schedules:
+        fault = fault_by_schedule[schedule["schedule_id"]]
+        if not fault["include_in_paper_table"]:
+            continue
+        authority_properties = "; ".join(
+            dimension_definitions[item]["reader_label"]
+            for item in fault["authority_dimensions"]
+        )
         for variant in variants:
             paper_rows.append(
-                summary_lookup[(schedule["reader_label"], variant["reader_label"])]
+                {
+                    "condition": schedule["reader_label"],
+                    "authority_properties": authority_properties,
+                    "claim": fault["claim"],
+                    **summary_lookup[(schedule["reader_label"], variant["reader_label"])],
+                }
             )
     write_csv(output / "paper" / "controlled-authority-table.csv", paper_rows)
 
@@ -415,9 +483,20 @@ def write_summaries(
             "submissions are therefore visible even when no obsolete target is produced. "
             "Internal schedule identifiers are deliberately omitted.\n\n"
         )
-        handle.write("| Controlled event schedule | " + " | ".join(variant_labels) + " |\n")
-        handle.write("|---|" + "---:|" * len(variant_labels) + "\n")
+        handle.write(
+            "| Controlled condition | Authority property | "
+            + " | ".join(variant_labels)
+            + " |\n"
+        )
+        handle.write("|---|---|" + "---:|" * len(variant_labels) + "\n")
         for schedule in schedules:
+            fault = fault_by_schedule[schedule["schedule_id"]]
+            if not fault["include_in_paper_table"]:
+                continue
+            authority_properties = "; ".join(
+                dimension_definitions[item]["reader_label"]
+                for item in fault["authority_dimensions"]
+            )
             cells: list[str] = []
             for variant in variants:
                 row = summary_lookup[(schedule["reader_label"], variant["reader_label"])]
@@ -425,7 +504,11 @@ def write_summaries(
                     f"O {row['obsolete_effects']}/{row['trials']}; "
                     f"T {row['terminal_outcomes']}/{row['trials']}"
                 )
-            handle.write(f"| {schedule['reader_label']} | " + " | ".join(cells) + " |\n")
+            handle.write(
+                f"| {schedule['reader_label']} | {authority_properties} | "
+                + " | ".join(cells)
+                + " |\n"
+            )
 
     variant_markdown = output / "paper" / "variant-summary.md"
     with variant_markdown.open("w", encoding="utf-8") as handle:
@@ -465,6 +548,7 @@ def git_revision() -> str:
 
 def paper_gate(
     protocol: dict[str, Any],
+    matrix: dict[str, Any],
     manifests: list[dict[str, Any]],
     schedules: list[dict[str, Any]],
     variants: list[dict[str, Any]],
@@ -474,7 +558,7 @@ def paper_gate(
     required_seeds = list(range(paper_seed["first"], paper_seed["first"] + paper_seed["count"]))
     complete = (
         [schedule["schedule_id"] for schedule in schedules]
-        == list(protocol["expected_variant_outcomes"])
+        == [row["schedule_id"] for row in matrix["rows"]]
         and [variant["short_label"] for variant in variants] == ["B0", "B1", "B2", "B3"]
         and seeds == required_seeds
     )
@@ -499,22 +583,27 @@ def paper_gate(
         if item["schedule"]["internal_id"] == "F16"
     )
     witness_results: dict[str, bool] = {}
-    for name, schedule_id in protocol["negative_control_witnesses"].items():
-        witness_results[name] = any(
-            item["schedule"]["internal_id"] == schedule_id
-            and item["variant"]["short_label"] != "B3"
-            and item["expected_outcome_met"]
-            and not item["expected_outcome"].startswith("not_applicable")
-            for item in manifests
-        )
+    for row in matrix["rows"]:
+        for dimension in row["negative_control_for"]:
+            witness_results[dimension] = any(
+                item["schedule"]["internal_id"] == row["schedule_id"]
+                and item["variant"]["short_label"] != "B3"
+                and item["expected_outcome_met"]
+                and not item["expected_outcome"].startswith("not_applicable")
+                for item in manifests
+            )
     expected_outcome_failures = sum(not item["expected_outcome_met"] for item in manifests)
     limits = protocol["paper_gate"]
+    negative_control_exposure_met = bool(witness_results) and all(witness_results.values())
     passed = (
         obsolete <= limits["maximum_full_obsolete_effects"]
         and false_rejections <= limits["maximum_full_false_rejections"]
         and trace_failures <= limits["maximum_full_trace_failures"]
         and replay_mismatches <= limits["maximum_full_replay_mismatches"]
-        and (not limits["required_negative_control_exposure"] or all(witness_results.values()))
+        and (
+            not limits["required_negative_control_exposure"]
+            or negative_control_exposure_met
+        )
         and expected_outcome_failures == 0
     )
     return {
@@ -525,6 +614,7 @@ def paper_gate(
         "canonical_trace_failures": trace_failures,
         "replay_mismatches": replay_mismatches,
         "expected_outcome_failures": expected_outcome_failures,
+        "negative_control_exposure_met": negative_control_exposure_met,
         "negative_control_witnesses": witness_results,
     }
 
@@ -556,6 +646,12 @@ def main() -> int:
     protocol = load_json(protocol_path)
     catalogue_path = (protocol_path.parent / protocol["schedule_catalogue"]).resolve()
     catalogue = load_json(catalogue_path)
+    matrix_path = (protocol_path.parent / protocol["fault_matrix"]).resolve()
+    matrix = load_json(matrix_path)
+    validate_against_schema(protocol, PROTOCOL_SCHEMA)
+    validate_against_schema(catalogue, CATALOGUE_SCHEMA)
+    validate_against_schema(matrix, FAULT_MATRIX_SCHEMA)
+    validate_matrix_contract(protocol, catalogue, matrix)
     available_schedules = [item["schedule_id"] for item in catalogue["schedules"]]
     available_variants = [item["short_label"] for item in protocol["variants"]]
     selected_schedule_ids = split_selection(args.schedules, available_schedules, "schedules")
@@ -571,7 +667,9 @@ def main() -> int:
     seeds = resolve_seeds(protocol, args.seed_set, args.seeds)
 
     plan_path = output / "resolved-plan.tsv"
-    expected_runs = write_plan(plan_path, protocol, catalogue, schedules, variants, seeds)
+    expected_runs = write_plan(
+        plan_path, protocol, catalogue, matrix, schedules, variants, seeds
+    )
     engine = args.engine.resolve()
     if not engine.is_file():
         raise ValueError(f"campaign engine does not exist: {engine}")
@@ -584,14 +682,15 @@ def main() -> int:
     schedule_by_id = {item["schedule_id"]: item for item in schedules}
     variant_by_label = {item["short_label"]: item for item in variants}
     manifests, trace_failures = write_trial_manifests(
-        output, trials, schedule_by_id, variant_by_label, protocol, catalogue
+        output, trials, schedule_by_id, variant_by_label, protocol, catalogue, matrix
     )
-    artefacts = write_summaries(output, manifests, schedules, variants)
+    artefacts = write_summaries(output, manifests, schedules, variants, matrix)
 
     campaign_material = json.dumps(
         {
             "protocol": sha256(protocol_path),
             "catalogue": sha256(catalogue_path),
+            "matrix": sha256(matrix_path),
             "common_task": sha256(EXPERIMENT / "lisp" / "common_task.lisp"),
             "seeds": seeds,
             "schedules": selected_schedule_ids,
@@ -614,6 +713,7 @@ def main() -> int:
         "created_at": datetime.now(timezone.utc).isoformat(),
         "protocol_id": protocol["protocol_id"],
         "catalogue_id": catalogue["catalogue_id"],
+        "matrix_id": matrix["matrix_id"],
         "seed_set": args.seed_set if not args.seeds else "explicit",
         "seeds": seeds,
         "schedule_internal_ids": selected_schedule_ids,
@@ -625,10 +725,11 @@ def main() -> int:
         "canonical_trace_failures": trace_failures,
         "campaign_valid": all(item["expected_outcome_met"] for item in manifests)
         and trace_failures == 0,
-        "paper_gate": paper_gate(protocol, manifests, schedules, variants, seeds),
+        "paper_gate": paper_gate(protocol, matrix, manifests, schedules, variants, seeds),
         "inputs": {
             "protocol": {"path": str(protocol_path), "sha256": sha256(protocol_path)},
             "catalogue": {"path": str(catalogue_path), "sha256": sha256(catalogue_path)},
+            "fault_matrix": {"path": str(matrix_path), "sha256": sha256(matrix_path)},
             "common_task": {
                 "path": str((EXPERIMENT / "lisp" / "common_task.lisp").resolve()),
                 "sha256": sha256(EXPERIMENT / "lisp" / "common_task.lisp"),
