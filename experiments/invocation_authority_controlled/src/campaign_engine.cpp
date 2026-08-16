@@ -298,7 +298,7 @@ public:
     {
       measure([this] { (void)runner_->pump(); });
       measure([this] { (void)runner_->tick(); });
-      if (variant_label_ != "B3" || terminal_recorded(request->second))
+      if (terminal_recorded(request->second))
       {
         return;
       }
