@@ -205,11 +205,13 @@ def build_timeline(
         ],
         "post-submission software emergency",
     )
+    emergency_tick = _event_tick(emergency, "software emergency")
     unstable = _single(
         [
             event
             for event in _blackboard_writes(events, "robot-stable", False)
-            if event["seq"] >= emergency["seq"]
+            if event["unix_ms"] == emergency["unix_ms"]
+            and _event_tick(event, "instability") == emergency_tick
         ],
         "emergency instability state",
     )
@@ -238,7 +240,6 @@ def build_timeline(
         "cleared walking-target state",
     )
 
-    emergency_tick = _event_tick(emergency, "software emergency")
     safe_tick = _event_tick(safe_stand, "safe-stand transition")
     if safe_tick < emergency_tick or safe_tick > emergency_tick + 1:
         raise EmergencyVideoError(

@@ -90,14 +90,14 @@ def t3_events() -> list[dict]:
             8,
             1_005_100,
             "bb_write",
-            {"key": "emergency", "preview": True},
+            {"key": "robot-stable", "preview": False},
             tick=23,
         ),
         event(
             9,
             1_005_100,
             "bb_write",
-            {"key": "robot-stable", "preview": False},
+            {"key": "emergency", "preview": True},
             tick=23,
         ),
         event(
