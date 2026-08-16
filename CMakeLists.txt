@@ -302,6 +302,7 @@ if (UNIX)
     examples/air_hockey_model_mediated_defence/src/action_gate.cpp
     examples/air_hockey_model_mediated_defence/src/env_backend.cpp
     examples/air_hockey_model_mediated_defence/src/host_client.cpp
+    examples/air_hockey_model_mediated_defence/src/recovery_policy.cpp
   )
   target_include_directories(
     muesli_bt_air_hockey_example
@@ -733,6 +734,18 @@ endif ()
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if (Python3_Interpreter_FOUND)
+  if (DEFINED ENV{TLA2TOOLS_JAR} AND EXISTS "$ENV{TLA2TOOLS_JAR}")
+    add_test(
+      NAME muesli_bt_invocation_authority_model_check
+      COMMAND
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/experiments/invocation_authority_model_check/run_tlc.py"
+        --jar "$ENV{TLA2TOOLS_JAR}"
+    )
+    set_tests_properties(muesli_bt_invocation_authority_model_check PROPERTIES TIMEOUT 30)
+  else ()
+    message(STATUS "TLA2TOOLS_JAR not found; invocation-authority model-check CTest is not registered")
+  endif ()
   add_test(
     NAME muesli_bt_controlled_authority_c0
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_controlled_authority_c0.py"
@@ -850,6 +863,14 @@ if (Python3_Interpreter_FOUND)
           check-native --runner "$<TARGET_FILE:muesli_bt_air_hockey_scenario_tests>"
       )
       set_tests_properties(muesli_bt_air_hockey_wp7_native PROPERTIES TIMEOUT 30)
+      add_test(
+        NAME muesli_bt_air_hockey_wp8_recovery
+        COMMAND
+          "${Python3_EXECUTABLE}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/examples/air_hockey_model_mediated_defence/run_recovery.py"
+          --runner "$<TARGET_FILE:muesli_bt_air_hockey_scenario_tests>"
+      )
+      set_tests_properties(muesli_bt_air_hockey_wp8_recovery PROPERTIES TIMEOUT 30)
     endif ()
   else ()
     message(

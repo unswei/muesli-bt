@@ -1,0 +1,81 @@
+{
+  "schema_version": "airhockey.wp8.recovery.protocol.v1",
+  "status": "frozen_before_recovery_campaign",
+  "parent_wp7_protocol": "configs/wp7_protocol.json",
+  "parent_wp7_protocol_sha256": "cc0a29e7a02126ef24859f74685fa89c48da57f6c5652bd608e90a1e6e7ff268",
+  "control_period_ms": 20,
+  "deadline_ms": 120,
+  "paper_split": {
+    "distribution_config": "configs/direct_launch_muesli_v1.yaml",
+    "distribution_config_sha256": "7d2819356dad664ede5d879845082b52bedcb69f0a2ae68ec27f389ea69603a5",
+    "name": "muesli_test",
+    "seed": 6303,
+    "expected_shots": 72,
+    "manifest_sha256": "59527e9f55537d127fc401ee3ab5fbbfedbc36dc22cbca0322935eb99ea1d665"
+  },
+  "paired_trial": {
+    "blackout_start_step": 1,
+    "blackout_length_steps": 1,
+    "timeout_steps": 125,
+    "context_change_step": 2,
+    "fault": "blackout_reacquisition",
+    "source_age_limit_steps": 6,
+    "completion_delay_ms": [50, 80, 110],
+    "treatments": [
+      "deadline_only",
+      "invocation_scoped_hold",
+      "invocation_scoped_current_context_recovery"
+    ]
+  },
+  "treatments": {
+    "deadline_only": {
+      "acceptance_policy": "deadline_only",
+      "recovery_policy": "hold_current_normalised_mallet_target",
+      "tree": "lisp/bt_deadline_only.lisp",
+      "tree_sha256": "20f31248eb9cb1b93f5f8d4530bdb1d1f883cebf2658f623d89e1f2820fdddae"
+    },
+    "invocation_scoped_hold": {
+      "acceptance_policy": "invocation_scoped",
+      "recovery_policy": "hold_current_normalised_mallet_target",
+      "tree": "lisp/bt_invocation_scoped.lisp",
+      "tree_sha256": "c7b6fb13b7a1c38e4fa2409dad43e354ce5f568a9ca919011f3ab1dade4e10f1"
+    },
+    "invocation_scoped_current_context_recovery": {
+      "acceptance_policy": "invocation_scoped",
+      "recovery_policy": "current_context_recovery.v1",
+      "tree": "lisp/bt_invocation_scoped_current_context_recovery.lisp",
+      "tree_sha256": "3e4d4e00b60d8d7a7414332ce9f60ff12345cae87b244681d2a0f7a244b5344f"
+    }
+  },
+  "recovery_policy": {
+    "id": "current_context_recovery.v1",
+    "input": "public_observation.v1",
+    "visible_flag_index": 18,
+    "visible_target_indices": [16, 17],
+    "hidden_target_indices": [14, 15],
+    "operation": "clip_to_normalised_action_bounds",
+    "privileged_state": false,
+    "external_inference": false,
+    "availability": "same_tick_after_rejection"
+  },
+  "campaign": {
+    "deterministic_pairs": 216,
+    "learned_pairs": 12,
+    "total_pairs": 228,
+    "treatment_runs": 684,
+    "exact_provider_replay": true,
+    "bootstrap_samples": 10000,
+    "bootstrap_seed": 6303,
+    "status": "pending_external_campaign"
+  },
+  "gate": {
+    "maximum_deadline_only_obsolete_dispatch_pairs": 228,
+    "maximum_invocation_scoped_hold_obsolete_dispatch_pairs": 0,
+    "maximum_recovery_obsolete_dispatch_pairs": 0,
+    "minimum_recovery_policy_actions": 1,
+    "maximum_missing_terminal_invocations": 0,
+    "maximum_replay_mismatches": 0,
+    "maximum_trace_failures": 0,
+    "maximum_tick_p99_ms": 20.0
+  }
+}

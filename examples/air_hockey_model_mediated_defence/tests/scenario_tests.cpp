@@ -3,6 +3,7 @@
 #include "bt/runtime.hpp"
 #include "bt/runtime_host.hpp"
 #include "env_backend.hpp"
+#include "recovery_policy.hpp"
 #include "muslisp/env_api.hpp"
 #include "muslisp/gc.hpp"
 #include "muslisp/printer.hpp"
@@ -475,6 +476,15 @@ public:
         return last_fallback_target_;
     }
 
+    [[nodiscard]] std::size_t recovery_requests() const noexcept {
+        return recovery_requests_;
+    }
+
+    [[nodiscard]] const std::optional<std::array<double, air_hockey_demo::kActionDimension>>&
+    last_recovery_target() const noexcept {
+        return last_recovery_target_;
+    }
+
     void finish_events() {
         if (events_finished_) {
             return;
@@ -599,6 +609,20 @@ private:
                 return bt::status::success;
             });
         callbacks.register_action(
+            "air-hockey-current-context-recovery",
+            [this](bt::tick_context& context, bt::node_id, bt::node_memory&,
+                   std::span<const muslisp::value>) {
+                const auto& state = backend_->last_state();
+                const auto target = air_hockey_demo::current_context_recovery_target(state.observation);
+                backend_->act_target(target);
+                context.bb_put("air-hockey-recovery-policy",
+                               bt::bb_value{"current_context_recovery.v1"},
+                               "air-hockey-current-context-recovery");
+                last_recovery_target_ = target;
+                ++recovery_requests_;
+                return bt::status::success;
+            });
+        callbacks.register_action(
             "air-hockey-terminal-hold",
             [](bt::tick_context&, bt::node_id, bt::node_memory&,
                std::span<const muslisp::value>) { return bt::status::running; },
@@ -659,6 +683,9 @@ private:
     std::optional<std::array<double, air_hockey_demo::kActionDimension>>
         last_fallback_target_;
     std::size_t fallback_requests_ = 0;
+    std::optional<std::array<double, air_hockey_demo::kActionDimension>>
+        last_recovery_target_;
+    std::size_t recovery_requests_ = 0;
     bool events_finished_ = false;
     std::int64_t fixture_intervention_duration_ns_ = 0;
     std::vector<std::int64_t> raw_tick_durations_ns_;
@@ -901,6 +928,75 @@ void test_p7_deadline_only(const scenario_options& options) {
 void test_p7_invocation_scoped(const scenario_options& options) {
     run_p7_pair_half(options, bt::vla_acceptance_policy::invocation_scoped,
                      "P7-invocation-scoped");
+}
+
+void test_p8_current_context_recovery(const scenario_options& options) {
+    check(options.paper.has_value(), "P8 recovery options were not supplied");
+    const paper_scenario_options& paper = *options.paper;
+    auto completion = std::make_shared<completion_gate>();
+    completion->action.assign(paper.provider_action.begin(), paper.provider_action.end());
+    scenario_rig rig(
+        options.socket_path, options.tree_path, "P8-current-context-recovery",
+        bt::vla_acceptance_policy::invocation_scoped, {completion}, true,
+        options.event_path, std::nullopt,
+        air_hockey_demo::host_configuration{
+            .blackout_start_step = paper.blackout_start_step,
+            .blackout_length_steps = paper.blackout_length_steps,
+            .timeout_steps = paper.timeout_steps,
+            .action_lock_steps = paper.action_lock_steps,
+            .replace_track_steps = {},
+            .terminate_at_step = std::nullopt,
+        },
+        paper.run_id);
+    check(rig.tick() == bt::status::running,
+          "P8 recovery trial did not submit its request");
+    const std::uint64_t job = rig.only_job_id();
+    const std::string captured_context = rig.invocation(job).captured_context_id;
+    adopt_running_invocation(rig, job);
+    completion->wait_for_start();
+
+    int control_steps = 0;
+    while (rig.state().episode_active &&
+           rig.state().defence_context_id == captured_context) {
+        (void)rig.step_control();
+        ++control_steps;
+        if (rig.state().episode_active &&
+            rig.state().defence_context_id == captured_context) {
+            (void)rig.tick();
+        }
+    }
+    check(rig.state().episode_active &&
+              rig.state().defence_context_id != captured_context,
+          "P8 recovery trial did not produce the predeclared context reacquisition");
+    const int elapsed_control_ms = control_steps * 20;
+    check(paper.completion_delay_ms >= elapsed_control_ms,
+          "P8 recovery completion delay precedes the context change");
+    rig.advance_clock(std::chrono::milliseconds{
+        paper.completion_delay_ms - elapsed_control_ms});
+    completion->release();
+
+    wait_for_authority(rig, job, bt::vla_authority_state::rejected);
+    const auto expected_target =
+        air_hockey_demo::current_context_recovery_target(rig.state().observation);
+    predicate("p8_current_context_recovery_target",
+              rig.invocation(job).authority_reason == "context_changed" &&
+                  rig.last_recovery_target().has_value() &&
+                  *rig.last_recovery_target() == expected_target,
+              "P8 recovery must use the current public observation after rejection");
+    predicate("p8_zero_obsolete_dispatch",
+              rig.accepted_dispatches() == 0 && rig.obsolete_dispatches() == 0,
+              "P8 recovery must not dispatch the obsolete model result");
+
+    (void)rig.step_control();
+    while (rig.state().episode_active) {
+        (void)rig.tick();
+        (void)rig.step_control();
+    }
+    predicate("p8_recovery_episode_completed",
+              rig.recovery_requests() > 0 &&
+                  (rig.state().terminated || rig.state().truncated),
+              "P8 recovery must continue with the local policy until episode end");
+    rig.finish_events();
 }
 
 void run_g6_current_delay(const scenario_options& options,
@@ -1253,6 +1349,7 @@ const std::vector<std::pair<std::string_view, scenario_fn>> kScenarios{
     {"G6-delay-stale", test_g6_delay_stale},
     {"P7-deadline-only", test_p7_deadline_only},
     {"P7-invocation-scoped", test_p7_invocation_scoped},
+    {"P8-current-context-recovery", test_p8_current_context_recovery},
 };
 
 }  // namespace
@@ -1264,12 +1361,13 @@ int main(int argc, char** argv) {
     }
     const std::string_view requested = argv[1];
     const bool paper_requested =
-        requested == "P7-deadline-only" || requested == "P7-invocation-scoped";
+        requested == "P7-deadline-only" || requested == "P7-invocation-scoped" ||
+        requested == "P8-current-context-recovery";
     if ((!paper_requested && (argc < 4 || argc > 5)) ||
         (paper_requested && argc != 14)) {
         std::cerr
             << "usage: muesli_bt_air_hockey_scenario_tests SCENARIO SOCKET TREE [EVENTS]\n"
-            << "paper usage: ... P7-* SOCKET TREE EVENTS RUN_ID ACTION_X ACTION_Y "
+            << "paper usage: ... P7-* or P8-* SOCKET TREE EVENTS RUN_ID ACTION_X ACTION_Y "
                "BLACKOUT_START BLACKOUT_LENGTH TIMEOUT ACTION_LOCK DELAY_MS live|replay\n";
         return 2;
     }

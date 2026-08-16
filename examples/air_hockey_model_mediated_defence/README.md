@@ -263,6 +263,33 @@ the verified backup SHA-256 is
 `g7-report.json` is part of the checksummed campaign and necessarily records
 pre-seal flags; the external `g7-seal.json` is the authoritative seal record.
 
+## wp8 current-context recovery arm
+
+WP8 freezes a third, non-paper arm for the recovery question raised by the
+WP7 result. It keeps the invocation-scoped admission and dispatch contract,
+but replaces hold-position fallback with `current_context_recovery.v1`.
+After an obsolete model result is rejected, the policy uses only the current
+public observation: a visible puck target when available, otherwise the
+current public mallet position. It has no privileged-state access and no
+external inference.
+
+The frozen protocol is `configs/wp8_recovery_protocol.json`. It is paired
+with the existing deadline-only and invocation-scoped hold treatments, but
+the WP7 two-arm seal is not modified. The external campaign remains pending;
+the local check exercises the new tree, policy callback, event evidence and
+zero-obsolete-dispatch predicate:
+
+```bash
+cmake --build build/dev --target muesli_bt_air_hockey_scenario_tests -j
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_recovery.py \
+  --runner build/dev/muesli_bt_air_hockey_scenario_tests
+```
+
+A successful WP8 campaign should report integrity and recovery separately:
+the rejected proposal must never be dispatched, while the recovery policy
+must produce at least one current-context action and complete the episode.
+
 ## run the contract tests
 
 From the repository root:
