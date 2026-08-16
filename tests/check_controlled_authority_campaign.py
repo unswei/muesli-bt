@@ -83,6 +83,7 @@ def main() -> int:
             for line in (output / "raw_trials.jsonl").read_text(encoding="utf-8").splitlines()
         ]
         assert all(not trial["replay_mismatch_schedule_ids"] for trial in raw_trials)
+        assert all(not trial["replay_mismatch_details"] for trial in raw_trials)
 
         manifests: list[dict] = []
         duplicate_full_manifest: dict | None = None

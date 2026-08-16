@@ -30,6 +30,7 @@ struct trial_result
   std::optional<double> intervention_to_fallback_ms;
   bool replay_equal = true;
   std::vector<std::string> replay_mismatch_schedule_ids;
+  std::vector<std::string> replay_mismatch_details;
   std::vector<std::vector<std::string>> task_streams;
   std::vector<std::vector<std::string>> variant_streams;
 };

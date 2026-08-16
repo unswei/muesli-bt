@@ -634,10 +634,14 @@ campaign_engine_result execute_campaign_plan(const campaign_plan& plan,
                                .expected_outcome = live->second.expected_outcome};
         trial_result replay = execute_trial(plan, plan.schedules.at(schedule_id.str()), replay_run,
                                             common_task_source);
-        if (decision_signature(live->second) != decision_signature(replay))
+        const std::string live_signature = decision_signature(live->second);
+        const std::string replay_signature = decision_signature(replay);
+        if (live_signature != replay_signature)
         {
           result.replay_equal = false;
           result.replay_mismatch_schedule_ids.push_back(schedule_id.str());
+          result.replay_mismatch_details.push_back(schedule_id.str() + "|live=" + live_signature +
+                                                   "|replay=" + replay_signature);
         }
         result.maximum_tick_ms = std::max(result.maximum_tick_ms, replay.maximum_tick_ms);
         result.task_streams.insert(result.task_streams.end(), replay.task_streams.begin(),
