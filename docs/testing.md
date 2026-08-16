@@ -359,6 +359,12 @@ python3 bench/scripts/run_publication_benchmarks.py
 
 Add `--with-btcpp` when the optional comparison preset is available. The script writes one timestamped bundle under `bench/results/`, including per-run summaries, per-benchmark manifests, and generated figure/report artefacts.
 
+Add `--comparison-only` with `--with-btcpp` to run only the shared `A1`, `A2`,
+`B1`, `B2` and supported `B5` comparison surface. The resulting bundle contains
+the generated `cross-runtime/comparison.md` report and a hash manifest for its
+source summaries. Runtime-specific `B6`--`B9` evidence remains outside these
+ratios.
+
 Each benchmark result directory writes:
 
 - `run_summary.csv`

@@ -44,6 +44,35 @@ def main() -> int:
     if "btcpp" not in output:
         raise AssertionError("publication dry-run should still include the optional btcpp subset")
 
+    comparison = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--profile",
+            "smoke",
+            "--skip-build",
+            "--with-btcpp",
+            "--comparison-only",
+            "--dry-run",
+            "--output-root",
+            str(output_root),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    for fragment in ("muesli-a1-baseline", "btcpp-b5-lifecycle", "compare_results.py"):
+        if fragment not in comparison:
+            raise AssertionError(f"comparison-only dry-run missing expected output: {fragment}")
+    for excluded in (
+        "muesli-b6-logging",
+        "muesli-b7-memory-gc",
+        "muesli-b8-async-contract",
+        "muesli-b9-generated-subtree-contract",
+    ):
+        if excluded in comparison:
+            raise AssertionError(f"comparison-only dry-run included unsupported run: {excluded}")
+
     return 0
 
 

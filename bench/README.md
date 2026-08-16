@@ -119,6 +119,17 @@ python3 bench/scripts/run_publication_benchmarks.py --with-btcpp
 
 `--with-btcpp` configures and builds the `bench-release-btcpp` preset unless `--skip-build` is also passed. That preset uses CMake `FetchContent` to fetch the pinned `BehaviorTree.CPP` `4.9.0` source into the build tree, usually under `build/bench-release-btcpp/_deps/`. No system-wide `BehaviorTree.CPP` install or fixed external checkout path is required.
 
+Use the frozen shared subset without the muesli-specific evidence groups with:
+
+```bash
+python3 bench/scripts/run_publication_benchmarks.py \
+  --with-btcpp --comparison-only
+```
+
+This mode runs only `A1`, `A2`, `B1`, `B2` and the supported `B5` phases. It
+writes a combined generated report to `cross-runtime/comparison.md` and records
+the source-result hashes in `cross-runtime/manifest.json`.
+
 If `--skip-build --with-btcpp` is used, the script expects the comparison binary to already exist at `build/bench-release-btcpp/bench/bench`. Override that path with `--btcpp-bench-bin /path/to/bench` when using a prebuilt binary.
 
 Check the script path without collecting publication-length data:
