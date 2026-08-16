@@ -108,10 +108,12 @@ campaign_plan read_campaign_plan(const std::filesystem::path& path)
     if (kind == "plan_version")
     {
       require_fields(fields, 2, line_number);
-      if (fields[1] != "controlled-authority.plan.v1")
+      if (fields[1] != "controlled-authority.plan.v1" &&
+          fields[1] != "controlled-authority.btcpp-plan.v1")
       {
         throw std::invalid_argument("unsupported controlled-authority campaign plan version");
       }
+      plan.plan_version = fields[1];
       saw_version = true;
     }
     else if (kind == "protocol_id")
@@ -246,8 +248,14 @@ campaign_plan read_campaign_plan(const std::filesystem::path& path)
       throw std::invalid_argument("campaign run references an unknown schedule: " +
                                   run.schedule_id);
     }
-    if (run.variant_label != "B0" && run.variant_label != "B1" && run.variant_label != "B2" &&
-        run.variant_label != "B3")
+    const bool c0_variant = run.variant_label == "B0" || run.variant_label == "B1" ||
+                            run.variant_label == "B2" || run.variant_label == "B3";
+    const bool btcpp_variant =
+        run.variant_label == "MBT-ordinary" || run.variant_label == "BTCPP-ordinary" ||
+        run.variant_label == "MBT-full" || run.variant_label == "BTCPP-full";
+    const bool variant_allowed =
+        plan.plan_version == "controlled-authority.plan.v1" ? c0_variant : btcpp_variant;
+    if (!variant_allowed)
     {
       throw std::invalid_argument("campaign run references an unknown variant: " +
                                   run.variant_label);

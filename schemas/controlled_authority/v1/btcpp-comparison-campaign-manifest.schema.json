@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.invalid/schemas/controlled_authority/v1/btcpp-comparison-campaign-manifest.schema.json",
+  "title": "BehaviorTree.CPP authority-comparison campaign manifest v1",
+  "type": "object",
+  "required": [
+    "schema_version", "campaign_id", "created_at", "protocol_id", "seed_set",
+    "seeds", "schedule_internal_ids", "schedule_reader_labels", "variant_labels",
+    "trial_count", "campaign_valid", "paper_gate", "frameworks", "code_inventory",
+    "inputs", "environment", "raw_trials", "run_manifests", "derived_artefacts",
+    "manual_run_exclusion_allowed"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "controlled-authority.btcpp-comparison-campaign-manifest.v1"},
+    "campaign_id": {"type": "string", "pattern": "^controlled-authority-btcpp-[0-9a-f]{16}$"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "protocol_id": {"const": "controlled-authority.btcpp-comparison.e1.v1"},
+    "seed_set": {"enum": ["engineering", "paper", "explicit"]},
+    "seeds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "integer", "minimum": 0}},
+    "schedule_internal_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+    "schedule_reader_labels": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+    "variant_labels": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+    "trial_count": {"type": "integer", "minimum": 1},
+    "campaign_valid": {"type": "boolean"},
+    "paper_gate": {
+      "type": "object",
+      "required": ["evaluated", "passed", "reason", "full_ports_safe", "paired_inputs_equal", "trace_failures"],
+      "properties": {
+        "evaluated": {"type": "boolean"},
+        "passed": {"type": ["boolean", "null"]},
+        "reason": {"type": ["string", "null"]},
+        "full_ports_safe": {"type": "boolean"},
+        "paired_inputs_equal": {"type": "boolean"},
+        "trace_failures": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "frameworks": {"type": "array", "minItems": 2},
+    "code_inventory": {"type": "object", "minProperties": 1},
+    "inputs": {"type": "object", "minProperties": 7, "additionalProperties": {"$ref": "#/$defs/file"}},
+    "environment": {"type": "object"},
+    "raw_trials": {"$ref": "#/$defs/file"},
+    "run_manifests": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/file"}},
+    "derived_artefacts": {"type": "object", "minProperties": 1, "additionalProperties": {"$ref": "#/$defs/file"}},
+    "manual_run_exclusion_allowed": {"const": false}
+  },
+  "$defs": {
+    "file": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

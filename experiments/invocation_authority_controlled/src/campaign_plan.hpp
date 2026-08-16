@@ -40,6 +40,7 @@ struct planned_run
 
 struct campaign_plan
 {
+  std::string plan_version;
   std::string protocol_id;
   std::string catalogue_id;
   std::string matrix_id;

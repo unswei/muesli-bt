@@ -145,6 +145,35 @@ if (MUESLI_BT_BENCH_WITH_BTCPP AND MUESLI_BT_BUILD_CONTROLLED_AUTHORITY_EXPERIME
     NAME muesli_bt_controlled_authority_btcpp
     COMMAND muesli_bt_controlled_authority_btcpp_tests
   )
+
+  add_library(
+    muesli_bt_controlled_authority_btcpp_campaign_engine
+    ${CMAKE_SOURCE_DIR}/experiments/invocation_authority_btcpp/src/btcpp_campaign_engine.cpp
+  )
+  target_link_libraries(
+    muesli_bt_controlled_authority_btcpp_campaign_engine
+    PUBLIC muesli_bt_controlled_authority_btcpp
+           muesli_bt_controlled_authority_campaign_engine
+  )
+  target_compile_features(muesli_bt_controlled_authority_btcpp_campaign_engine PUBLIC cxx_std_20)
+  if (MSVC)
+    target_compile_options(
+      muesli_bt_controlled_authority_btcpp_campaign_engine PRIVATE /W4 /permissive-
+    )
+  else ()
+    target_compile_options(
+      muesli_bt_controlled_authority_btcpp_campaign_engine PRIVATE -Wall -Wextra -Wpedantic
+    )
+  endif ()
+
+  add_executable(
+    muesli_bt_controlled_authority_btcpp_campaign
+    ${CMAKE_SOURCE_DIR}/experiments/invocation_authority_btcpp/src/btcpp_campaign_main.cpp
+  )
+  target_link_libraries(
+    muesli_bt_controlled_authority_btcpp_campaign
+    PRIVATE muesli_bt_controlled_authority_btcpp_campaign_engine
+  )
   if (Python3_Interpreter_FOUND)
     add_test(
       NAME muesli_bt_controlled_authority_btcpp_events
@@ -152,6 +181,13 @@ if (MUESLI_BT_BENCH_WITH_BTCPP AND MUESLI_BT_BUILD_CONTROLLED_AUTHORITY_EXPERIME
         "${Python3_EXECUTABLE}"
         "${CMAKE_SOURCE_DIR}/tests/check_controlled_authority_btcpp_events.py"
         "$<TARGET_FILE:muesli_bt_controlled_authority_btcpp_tests>"
+    )
+    add_test(
+      NAME muesli_bt_controlled_authority_btcpp_campaign
+      COMMAND
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/tests/check_controlled_authority_btcpp_campaign.py"
+        "$<TARGET_FILE:muesli_bt_controlled_authority_btcpp_campaign>"
     )
   endif ()
 endif ()

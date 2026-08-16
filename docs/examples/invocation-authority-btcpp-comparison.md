@@ -103,6 +103,27 @@ ctest --preset bench-release-btcpp \
   -R muesli_bt_controlled_authority_btcpp --output-on-failure
 ```
 
+Run one complete engineering seed with:
+
+```sh
+python3 experiments/invocation_authority_btcpp/run_campaign.py \
+  --output /path/to/new-comparison-directory \
+  --seeds 0
+```
+
+Use `--seed-set engineering` for the frozen 32-seed engineering lane and
+`--seed-set paper` for the 128-seed paper lane. The driver writes raw trials,
+one manifest and canonical stream set per experimental unit, schedule and
+variant summaries, a code-location inventory and reader-facing CSV and
+Markdown tables. It records one paired-input digest for each schedule and seed;
+all four implementations must have the same digest.
+
+The paper gate judges both full ports against zero obsolete effects, zero false
+rejections, valid evidence and deterministic replay. Ordinary asynchronous
+results retain the C0 profile as a predeclared reference, but a competent
+framework lifecycle is allowed to outperform that reference. Such differences
+are reported as reference deviations rather than converted into failures.
+
 ## gotchas
 
 - The C0 protocol and matrix remain unchanged. Version E1 if this comparison
@@ -114,6 +135,8 @@ ctest --preset bench-release-btcpp \
 - Canonical runtime evidence is `mbt.evt.v1`. CSV and Markdown tables are
   derived artefacts.
 - Partial and engineering runs cannot pass the paper gate.
+- The deterministic semantic lane records maximum tick duration for diagnosis,
+  but it is not the generic runtime-cost comparison.
 - Report results even when they do not favour muesli-bt.
 
 ## see also

@@ -7,9 +7,9 @@ External-comparison gate E1 is frozen as protocol
 the BehaviorTree.CPP authority adapters were implemented.
 
 The documented ordinary asynchronous adapter, full invocation-scoped port,
-equivalent BehaviorTree.CPP task runner and deterministic adapter tests are now
-implemented. The campaign driver and paper-scale artefact writer are the next
-work package.
+equivalent BehaviorTree.CPP task runner, deterministic tests and campaign
+artefact writer are implemented. Paper-scale execution remains a deliberate
+action on the recorded comparison host.
 
 ## purpose
 
@@ -35,3 +35,19 @@ See [the public experiment contract](../../docs/examples/invocation-authority-bt
   dispatch, duplicate and racing completion, host validation and reset.
 - `tests/check_controlled_authority_btcpp_events.py` validates the emitted
   canonical evidence.
+- `run_campaign.py` resolves the frozen four-way plan, invokes the matched
+  engine and writes paired manifests, summaries and reader-facing paper tables.
+
+## run
+
+Run one complete engineering seed with:
+
+```sh
+python3 experiments/invocation_authority_btcpp/run_campaign.py \
+  --output /path/to/new-comparison-directory \
+  --seeds 0
+```
+
+Use `--seed-set engineering` for 32 seeds or `--seed-set paper` for the frozen
+128-seed paper campaign. A replay run requires all preceding schedules. The
+driver refuses to mix results into a non-empty output directory.
