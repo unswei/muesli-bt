@@ -130,6 +130,8 @@ public:
                      .frame_id = frame_id_,
                      .pose = {0.2, -0.1, 0.3},
                      .schema_valid = true},
+        .reason = {},
+        .completion_copies = 1,
     };
   }
 
@@ -213,7 +215,8 @@ timing_result execute_trial(const timing_plan& plan, const timing_run& run,
         plan.initial_context_id,
         std::vector<task_event>{{.sequence = 1,
                                  .at = 0ms,
-                                 .kind = task_event_kind::enter_model_branch}});
+                                 .kind = task_event_kind::enter_model_branch,
+                                 .context_id = {}}});
     deterministic_coordinator* const coordinator = unit.coordinator.get();
     unit.recorder = std::make_unique<effect_recorder>(
         [coordinator](const request_record& request, logical_time at)
