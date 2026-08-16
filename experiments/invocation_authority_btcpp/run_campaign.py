@@ -50,6 +50,13 @@ DEFAULT_ENGINE = (
     / "muesli_bt_controlled_authority_btcpp_campaign"
 )
 
+try:
+    import jsonschema
+except ImportError:
+    jsonschema = None
+
+_SCHEMA_VALIDATORS: dict[Path, Any] = {}
+
 
 def load_json(path: Path) -> dict[str, Any]:
     with path.open(encoding="utf-8") as handle:
@@ -70,11 +77,13 @@ def sha256(path: Path) -> str:
 
 
 def validate(instance: Any, schema_path: Path) -> None:
-    try:
-        import jsonschema
-    except ImportError:
+    if jsonschema is None:
         return
-    jsonschema.Draft202012Validator(load_json(schema_path)).validate(instance)
+    validator = _SCHEMA_VALIDATORS.get(schema_path)
+    if validator is None:
+        validator = jsonschema.Draft202012Validator(load_json(schema_path))
+        _SCHEMA_VALIDATORS[schema_path] = validator
+    validator.validate(instance)
 
 
 def parse_args() -> argparse.Namespace:
