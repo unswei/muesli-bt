@@ -66,6 +66,18 @@ The manifest labels are `MBT-ordinary`, `BTCPP-ordinary`, `MBT-full` and
 `BTCPP-full`. A paper must define these implementations before using shortened
 labels.
 
+`btcpp_task_runner.hpp` exposes the comparison runner. Scheduled submissions
+are queued with `request_submission()`, `tick()` advances the BehaviorTree.CPP
+tree, `cancel_request()` exposes the explicit cancellation race and `reset()`
+halts the tree before rebuilding its node state. `task_events()` and
+`variant_events()` return separate canonical streams.
+
+`btcpp_variant.hpp` exposes `btcpp_asynchronous_variant` and
+`btcpp_invocation_scoped_variant`. The ordinary variant requests best-effort
+cancellation from `onHalted()` but does not convert an acknowledgement into
+logical authority. The full variant owns the terminal claim, invocation
+identity, authority checks and committed target until dispatch.
+
 ## example
 
 The equivalent task shape in both runtimes is:
@@ -87,6 +99,8 @@ Configure the optional comparison build with:
 ```sh
 cmake --preset bench-release-btcpp
 cmake --build --preset bench-release-btcpp -j
+ctest --preset bench-release-btcpp \
+  -R muesli_bt_controlled_authority_btcpp --output-on-failure
 ```
 
 ## gotchas
