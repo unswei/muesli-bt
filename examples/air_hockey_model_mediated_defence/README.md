@@ -294,7 +294,7 @@ Run the authorised Marvin campaign into a new evidence root after rebuilding
 the joint image from the pushed WP8 revision:
 
 ```bash
-g8_root=/home/oliver/experiments/muesli-air-hockey/wp8-recovery-9cb7954-1b6bbbb
+g8_root=/home/oliver/experiments/muesli-air-hockey/wp8-recovery-91ef1f7-1b6bbbb
 checkpoint=/home/oliver/experiments/airhockey-memory-distillation/principal-sweep-v1-2026-08-14-v3/final/structured_k2/14303/checkpoint.npz
 docker run --rm --cpus 2 --memory 8g --ipc host \
   --mount type=bind,src="$checkpoint",dst=/checkpoint/structured_k2-14303.npz,readonly \

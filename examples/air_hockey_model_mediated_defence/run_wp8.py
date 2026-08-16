@@ -19,6 +19,7 @@ import run_wp7 as wp7
 from analysis.evidence import (
     DERIVED_ARTEFACTS,
     EvidenceError,
+    RUN_MARKER,
     RecordedProviderReplay,
     analyse_run,
     file_sha256,
@@ -438,7 +439,7 @@ def _capture_run(
     ) as temp:
         staged = Path(temp) / run_id
         staged.mkdir()
-        (staged / RUN_ROOT_MARKER).write_text(
+        (staged / RUN_MARKER).write_text(
             "airhockey.run_manifest.v1\n", encoding="utf-8"
         )
         live = _run_native_half(
@@ -540,7 +541,7 @@ def _campaign_summary(runs: Path) -> dict[str, Any]:
     groups: defaultdict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
     run_dirs = sorted(
         path.parent
-        for path in runs.glob(f"*/{RUN_ROOT_MARKER}")
+        for path in runs.glob(f"*/{RUN_MARKER}")
         if (path.parent / "manifest.json").is_file()
     )
     if not run_dirs:
@@ -626,7 +627,7 @@ def _measurements(
 ) -> dict[str, Any]:
     run_dirs = sorted(
         path.parent
-        for path in runs.glob(f"*/{RUN_ROOT_MARKER}")
+        for path in runs.glob(f"*/{RUN_MARKER}")
         if (path.parent / "manifest.json").is_file()
     )
     tick_ns: list[int] = []
