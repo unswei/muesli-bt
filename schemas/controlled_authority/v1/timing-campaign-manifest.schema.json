@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.invalid/schemas/controlled_authority/v1/timing-campaign-manifest.schema.json",
+  "title": "Controlled invocation-authority timing campaign manifest v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "created_at",
+    "protocol_id",
+    "timing_contract_id",
+    "lane",
+    "clock",
+    "condition_design",
+    "condition_ids",
+    "condition_reader_labels",
+    "variant_short_labels",
+    "variant_reader_labels",
+    "warmups_executed",
+    "trial_count",
+    "host_before",
+    "host_after",
+    "paper_gate",
+    "campaign_valid",
+    "inputs",
+    "environment",
+    "raw_trials",
+    "derived_artefacts",
+    "manual_run_exclusion_allowed"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "controlled-authority.timing-campaign-manifest.v1"},
+    "campaign_id": {
+      "type": "string",
+      "pattern": "^controlled-authority-timing-[0-9a-f]{16}$"
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "protocol_id": {"const": "controlled-authority.c0.v1"},
+    "timing_contract_id": {"const": "controlled-authority.c0.timing.v1"},
+    "lane": {"const": "timing"},
+    "clock": {"const": "steady_clock"},
+    "condition_design": {"const": "primary_plus_one_factor_at_a_time"},
+    "condition_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 3}
+    },
+    "condition_reader_labels": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 8}
+    },
+    "variant_short_labels": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^B[0-3]$"}
+    },
+    "variant_reader_labels": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 8}
+    },
+    "warmups_executed": {"type": "integer", "minimum": 0},
+    "trial_count": {"type": "integer", "minimum": 1},
+    "host_before": {"$ref": "#/$defs/host"},
+    "host_after": {"$ref": "#/$defs/host"},
+    "paper_gate": {
+      "type": "object",
+      "required": [
+        "evaluated",
+        "passed",
+        "reason",
+        "host_load_within_limit",
+        "validation_failures"
+      ],
+      "properties": {
+        "evaluated": {"type": "boolean"},
+        "passed": {"type": ["boolean", "null"]},
+        "reason": {"type": ["string", "null"]},
+        "host_load_within_limit": {"type": "boolean"},
+        "validation_failures": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "campaign_valid": {"type": "boolean"},
+    "inputs": {
+      "type": "object",
+      "required": ["protocol", "common_task", "resolved_plan", "engine"],
+      "properties": {
+        "protocol": {"$ref": "#/$defs/file"},
+        "common_task": {"$ref": "#/$defs/file"},
+        "resolved_plan": {"$ref": "#/$defs/file"},
+        "engine": {"$ref": "#/$defs/file"}
+      },
+      "additionalProperties": false
+    },
+    "environment": {"type": "object"},
+    "raw_trials": {"$ref": "#/$defs/file"},
+    "derived_artefacts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/file"}
+    },
+    "manual_run_exclusion_allowed": {"const": false}
+  },
+  "$defs": {
+    "host": {
+      "type": "object",
+      "required": [
+        "hostname",
+        "operating_system",
+        "operating_system_release",
+        "kernel",
+        "architecture",
+        "cpu_model",
+        "logical_cpu_count",
+        "memory_bytes",
+        "cpu_affinity",
+        "load_average",
+        "background_processes",
+        "cpu_scaling_governor",
+        "turbo_disabled"
+      ],
+      "properties": {
+        "hostname": {"type": "string", "minLength": 1},
+        "operating_system": {"type": "string", "minLength": 1},
+        "operating_system_release": {"type": "string", "minLength": 1},
+        "kernel": {"type": "string", "minLength": 1},
+        "architecture": {"type": "string", "minLength": 1},
+        "cpu_model": {"type": "string", "minLength": 1},
+        "logical_cpu_count": {"type": "integer", "minimum": 1},
+        "memory_bytes": {"type": "integer", "minimum": 1},
+        "cpu_affinity": {"type": "string", "minLength": 1},
+        "load_average": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 3,
+          "items": {"type": "number", "minimum": 0}
+        },
+        "background_processes": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "cpu_scaling_governor": {"type": ["string", "null"]},
+        "turbo_disabled": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "file": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

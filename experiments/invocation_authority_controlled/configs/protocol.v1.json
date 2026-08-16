@@ -95,8 +95,28 @@
     "complete_schedule_is_experimental_unit": true
   },
   "timing_lane": {
+    "contract_id": "controlled-authority.c0.timing.v1",
     "clock": "steady_clock",
-    "canonical_host": "Apple M3",
+    "host_policy": {
+      "selection": "one_recorded_host_per_campaign",
+      "required_fingerprint_fields": [
+        "hostname",
+        "operating_system",
+        "kernel",
+        "architecture",
+        "cpu_model",
+        "logical_cpu_count",
+        "memory_bytes",
+        "cpu_affinity",
+        "load_average",
+        "background_processes"
+      ],
+      "background_load_must_be_recorded": true,
+      "maximum_normalised_load_average": 0.5
+    },
+    "condition_design": "primary_plus_one_factor_at_a_time",
+    "warmup_repetitions_per_condition_and_variant": 5,
+    "seed_first": 20000,
     "primary": {
       "service_delay_ms": 500,
       "tick_rate_hz": 50,
@@ -107,7 +127,24 @@
     "service_delay_ms": [0, 5, 20, 50, 100, 250, 500, 1000, 2000],
     "tick_rate_hz": [20, 50],
     "concurrent_jobs": [1, 4, 16],
-    "delay_distributions": ["fixed", "uniform", "bimodal", "long_tail"],
+    "delay_distributions": {
+      "fixed": {
+        "values": [1.0],
+        "probabilities": [1.0]
+      },
+      "uniform": {
+        "minimum_multiplier": 0.0,
+        "maximum_multiplier": 2.0
+      },
+      "bimodal": {
+        "values": [0.5, 1.5],
+        "probabilities": [0.5, 0.5]
+      },
+      "long_tail": {
+        "values": [0.5, 5.5],
+        "probabilities": [0.9, 0.1]
+      }
+    },
     "secondary_repetitions": 30
   },
   "run_level_metrics": [

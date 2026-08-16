@@ -594,6 +594,39 @@ if (MUESLI_BT_BUILD_CONTROLLED_AUTHORITY_EXPERIMENT)
     muesli_bt_controlled_authority_campaign
     PRIVATE muesli_bt_controlled_authority_campaign_engine
   )
+
+  add_library(
+    muesli_bt_controlled_authority_timing_engine
+    experiments/invocation_authority_controlled/src/timing_engine.cpp
+    experiments/invocation_authority_controlled/src/timing_plan.cpp
+  )
+  target_include_directories(
+    muesli_bt_controlled_authority_timing_engine
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/experiments/invocation_authority_controlled/src
+  )
+  target_link_libraries(
+    muesli_bt_controlled_authority_timing_engine
+    PUBLIC muesli_bt_controlled_authority_runner
+  )
+  target_compile_features(muesli_bt_controlled_authority_timing_engine PUBLIC cxx_std_20)
+  if (MSVC)
+    target_compile_options(
+      muesli_bt_controlled_authority_timing_engine PRIVATE /W4 /permissive-
+    )
+  else ()
+    target_compile_options(
+      muesli_bt_controlled_authority_timing_engine PRIVATE -Wall -Wextra -Wpedantic
+    )
+  endif ()
+
+  add_executable(
+    muesli_bt_controlled_authority_timing
+    experiments/invocation_authority_controlled/src/timing_main.cpp
+  )
+  target_link_libraries(
+    muesli_bt_controlled_authority_timing
+    PRIVATE muesli_bt_controlled_authority_timing_engine
+  )
 endif ()
 
 add_executable(muslisp_tests tests/test_main.cpp src/repl_support.cpp)
@@ -711,6 +744,13 @@ if (Python3_Interpreter_FOUND)
         "${Python3_EXECUTABLE}"
         "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_controlled_authority_campaign.py"
         "$<TARGET_FILE:muesli_bt_controlled_authority_campaign>"
+    )
+    add_test(
+      NAME muesli_bt_controlled_authority_timing_campaign
+      COMMAND
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_controlled_authority_timing_campaign.py"
+        "$<TARGET_FILE:muesli_bt_controlled_authority_timing>"
     )
   endif ()
   add_test(

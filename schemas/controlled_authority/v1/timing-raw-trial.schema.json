@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.invalid/schemas/controlled_authority/v1/timing-raw-trial.schema.json",
+  "title": "Controlled invocation-authority raw timing trial v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "condition_id",
+    "axis",
+    "reader_label",
+    "variant_label",
+    "seed",
+    "repetition",
+    "service_delay_ms",
+    "tick_rate_hz",
+    "concurrent_jobs",
+    "distribution",
+    "maximum_tick_ms",
+    "maximum_task_tick_ms",
+    "wall_duration_ms",
+    "tick_cycles",
+    "terminal_decisions",
+    "provider_completions",
+    "active_jobs_at_end",
+    "requested_delays_ms",
+    "actual_service_ms"
+  ],
+  "properties": {
+    "schema_version": {"const": "controlled-authority.timing-raw-trial.v1"},
+    "condition_id": {"type": "string", "minLength": 3},
+    "axis": {
+      "enum": ["primary", "service_delay", "tick_rate", "concurrency", "distribution"]
+    },
+    "reader_label": {"type": "string", "minLength": 8},
+    "variant_label": {"type": "string", "pattern": "^B[0-3]$"},
+    "seed": {"type": "integer", "minimum": 0},
+    "repetition": {"type": "integer", "minimum": 0},
+    "service_delay_ms": {"type": "integer", "minimum": 0},
+    "tick_rate_hz": {"type": "integer", "minimum": 1},
+    "concurrent_jobs": {"type": "integer", "minimum": 1},
+    "distribution": {"enum": ["fixed", "uniform", "bimodal", "long_tail"]},
+    "maximum_tick_ms": {"type": "number", "minimum": 0},
+    "maximum_task_tick_ms": {"type": "number", "minimum": 0},
+    "wall_duration_ms": {"type": "number", "minimum": 0},
+    "tick_cycles": {"type": "integer", "minimum": 1},
+    "terminal_decisions": {"type": "integer", "minimum": 1},
+    "provider_completions": {"type": "integer", "minimum": 0},
+    "active_jobs_at_end": {"const": 0},
+    "requested_delays_ms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "integer", "minimum": 0}
+    },
+    "actual_service_ms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "number", "minimum": 0}
+    }
+  },
+  "additionalProperties": false
+}

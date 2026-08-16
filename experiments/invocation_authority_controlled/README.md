@@ -7,9 +7,10 @@ fault interpretation is frozen as matrix
 `controlled-authority.c0.fault-matrix.v1`.
 
 The shared task, independent authority oracle, common effect recorder, all four
-authority adapters, shared Lisp task runner, semantic schedule driver and
-artefact writer are implemented. Paper-scale execution remains a deliberate
-separate action because it runs every frozen paper seed.
+authority adapters, shared Lisp task runner, deterministic semantic lane and
+real-clock timing lane are implemented. Paper-scale execution remains a
+deliberate action because it runs every frozen semantic seed and timing
+repetition.
 
 ## purpose
 
@@ -45,6 +46,10 @@ before completion". The schedule numbers are not reader-facing terminology.
   serialise raw evidence without combining those responsibilities.
 - `run_campaign.py` resolves the frozen inputs, invokes the engine, validates
   evidence and writes manifests, summaries and paper tables.
+- `src/timing_plan.*` and `src/timing_engine.*` execute the separate real-clock
+  lane across independent task instances.
+- `run_timing_campaign.py` constructs the frozen one-factor-at-a-time timing
+  design, fingerprints the host and writes timing-only summaries and tables.
 - `tests/common_task_tests.cpp` checks the task and oracle foundation.
 - `tests/variant_tests.cpp` checks B0-B2 lifecycle, stale-result, timeout and
   shared-validation behaviour.
@@ -58,11 +63,13 @@ separate so each stream retains a valid envelope and sequence.
 
 ## run
 
-Build the driver once:
+Build both lane drivers once:
 
 ```sh
 cmake -S . -B build -DMUESLI_BT_BUILD_CONTROLLED_AUTHORITY_EXPERIMENT=ON
-cmake --build build --target muesli_bt_controlled_authority_campaign -j
+cmake --build build --target \
+  muesli_bt_controlled_authority_campaign \
+  muesli_bt_controlled_authority_timing -j
 ```
 
 Run the 32-seed engineering campaign into a new directory:
@@ -84,6 +91,21 @@ machine-readable summaries under `summary/`, and reader-facing CSV and
 Markdown tables under `paper/`. The campaign and run manifests identify the
 matrix, and the campaign manifest records its SHA-256 digest.
 
+Run the complete timing lane into a different directory:
+
+```sh
+python3 experiments/invocation_authority_controlled/run_timing_campaign.py \
+  --output /path/to/authority-timing
+```
+
+On Linux, `--cpu-set 0-7` pins the engine and its provider workers to a declared
+CPU set. The timing manifest captures the actual host, affinity, governor and
+load before and after execution, including the busiest background processes.
+The paper gate requires the one-minute load average to remain at or below 0.5
+per logical CPU. The lane contains 2,480 recorded trials and 300 warm-ups. A
+partial timing run can select conditions, override repetitions or override
+warm-ups, but cannot pass the paper timing gate.
+
 ## c0 invariants
 
 - Every schedule has an internal ID and a plain-language reader label.
@@ -103,6 +125,14 @@ matrix, and the campaign manifest records its SHA-256 digest.
   frozen paper gate.
 - Replay depends on all preceding schedules. Selecting the replay schedule
   alone is therefore an error.
+- The timing lane uses 15 conditions: one primary point and 14
+  one-factor-at-a-time variations. It never pools measurements with the
+  deterministic semantic lane.
+- Concurrent timing jobs are independent common-task instances. A scheduler
+  cycle ticks every instance once, and `maximum_tick_ms` is the longest complete
+  scheduler cycle in a trial.
+- The primary timing statistic is the nearest-rank p99 across 200 per-trial
+  maxima. Secondary conditions use 30 paired repetitions.
 
 See [the documentation](../../docs/examples/invocation-authority-controlled-campaign.md)
 for the public experiment contract.

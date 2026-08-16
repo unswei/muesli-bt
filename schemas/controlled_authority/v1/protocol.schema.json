@@ -72,7 +72,90 @@
       "additionalProperties": false
     },
     "semantic_lane": {"type": "object"},
-    "timing_lane": {"type": "object"},
+    "timing_lane": {
+      "type": "object",
+      "required": [
+        "contract_id",
+        "clock",
+        "host_policy",
+        "condition_design",
+        "warmup_repetitions_per_condition_and_variant",
+        "seed_first",
+        "primary",
+        "service_delay_ms",
+        "tick_rate_hz",
+        "concurrent_jobs",
+        "delay_distributions",
+        "secondary_repetitions"
+      ],
+      "properties": {
+        "contract_id": {"const": "controlled-authority.c0.timing.v1"},
+        "clock": {"const": "steady_clock"},
+        "host_policy": {
+          "type": "object",
+          "required": [
+            "selection",
+            "required_fingerprint_fields",
+            "background_load_must_be_recorded",
+            "maximum_normalised_load_average"
+          ],
+          "properties": {
+            "selection": {"const": "one_recorded_host_per_campaign"},
+            "required_fingerprint_fields": {
+              "const": [
+                "hostname",
+                "operating_system",
+                "kernel",
+                "architecture",
+                "cpu_model",
+                "logical_cpu_count",
+                "memory_bytes",
+                "cpu_affinity",
+                "load_average",
+                "background_processes"
+              ]
+            },
+            "background_load_must_be_recorded": {"const": true},
+            "maximum_normalised_load_average": {"const": 0.5}
+          },
+          "additionalProperties": false
+        },
+        "condition_design": {"const": "primary_plus_one_factor_at_a_time"},
+        "warmup_repetitions_per_condition_and_variant": {"const": 5},
+        "seed_first": {"const": 20000},
+        "primary": {
+          "type": "object",
+          "required": [
+            "service_delay_ms",
+            "tick_rate_hz",
+            "concurrent_jobs",
+            "repetitions",
+            "statistic"
+          ],
+          "properties": {
+            "service_delay_ms": {"const": 500},
+            "tick_rate_hz": {"const": 50},
+            "concurrent_jobs": {"const": 1},
+            "repetitions": {"const": 200},
+            "statistic": {"const": "p99_of_maximum_tick_per_trial"}
+          },
+          "additionalProperties": false
+        },
+        "service_delay_ms": {"const": [0, 5, 20, 50, 100, 250, 500, 1000, 2000]},
+        "tick_rate_hz": {"const": [20, 50]},
+        "concurrent_jobs": {"const": [1, 4, 16]},
+        "delay_distributions": {
+          "const": {
+            "fixed": {"values": [1.0], "probabilities": [1.0]},
+            "uniform": {"minimum_multiplier": 0.0, "maximum_multiplier": 2.0},
+            "bimodal": {"values": [0.5, 1.5], "probabilities": [0.5, 0.5]},
+            "long_tail": {"values": [0.5, 5.5], "probabilities": [0.9, 0.1]}
+          }
+        },
+        "secondary_repetitions": {"const": 30}
+      },
+      "additionalProperties": false
+    },
     "run_level_metrics": {
       "type": "array",
       "minItems": 8,

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import re
+import runpy
 from pathlib import Path
 
 
@@ -129,6 +130,30 @@ def main() -> int:
     assert all("required_full_outcome" not in schedule for schedule in schedules)
     assert protocol["paper_gate"]["manual_run_exclusion_allowed"] is False
     assert protocol["identifier_policy"]["schedule_ids_are_internal"] is True
+
+    timing = protocol["timing_lane"]
+    assert timing["contract_id"] == "controlled-authority.c0.timing.v1"
+    assert timing["clock"] == "steady_clock"
+    assert "canonical_host" not in timing
+    assert timing["host_policy"]["selection"] == "one_recorded_host_per_campaign"
+    assert timing["host_policy"]["maximum_normalised_load_average"] == 0.5
+    assert timing["condition_design"] == "primary_plus_one_factor_at_a_time"
+    assert timing["warmup_repetitions_per_condition_and_variant"] == 5
+    distributions = timing["delay_distributions"]
+    assert distributions["fixed"] == {"values": [1.0], "probabilities": [1.0]}
+    assert distributions["bimodal"] == {
+        "values": [0.5, 1.5],
+        "probabilities": [0.5, 0.5],
+    }
+    assert distributions["long_tail"] == {
+        "values": [0.5, 5.5],
+        "probabilities": [0.9, 0.1],
+    }
+    timing_driver = runpy.run_path(str(EXPERIMENT / "run_timing_campaign.py"))
+    conditions = timing_driver["condition_catalogue"](timing)
+    assert len(conditions) == 15
+    assert len({condition["condition_id"] for condition in conditions}) == 15
+    assert sum(condition["repetitions"] for condition in conditions) * 4 == 2480
 
     print("controlled-authority C0 protocol valid")
     return 0

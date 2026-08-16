@@ -65,8 +65,21 @@ the preceding schedules again with the same deterministic scripted provider
 and compares task-decision signatures. Neither schedule substitutes an
 analysis-only model for runtime execution.
 
-The timing lane uses the real monotonic clock. Semantic and timing results are
-never pooled.
+The timing lane uses the real monotonic clock and a delayed provider. It has one
+primary operating point and varies service delay, tick rate, concurrent task
+instances and delay distribution one factor at a time. Each concurrent job is
+an independent copy of the common Lisp task. One scheduler cycle ticks every
+copy once. The per-trial timing value is the longest complete scheduler cycle.
+The primary paper statistic is the nearest-rank p99 across 200 per-trial
+maxima. Secondary conditions use 30 paired repetitions. Semantic and timing
+results are never pooled.
+
+The timing protocol does not name a permanent machine model. A timing campaign
+records one host fingerprint, CPU affinity, scaling governor, system load and
+the busiest background processes before and after execution. The paper gate
+requires one-minute load at or below 0.5 per logical CPU. Replacing a retired
+host therefore does not silently reuse its name or mix measurements from
+different machines.
 
 ## api and syntax
 
@@ -112,6 +125,12 @@ concatenated because each has its own canonical sequence and run envelope.
 evaluate the frozen expectations and serialise raw trial records plus canonical
 streams. `run_campaign.py` is the supported command-line entry point and is
 responsible for all derived artefacts.
+
+`timing_plan.hpp` defines a different resolved-plan boundary for the real-clock
+lane. `timing_engine.hpp` runs independent common-task instances against
+real delayed providers. `run_timing_campaign.py` randomises paired mechanism
+order, validates trial completeness, records the host and derives timing-only
+CSV, JSON and Markdown artefacts.
 
 ## example
 
@@ -163,6 +182,20 @@ python3 experiments/invocation_authority_controlled/run_campaign.py \
 The standard seed sets are selected with `--seed-set engineering` and
 `--seed-set paper`. The output directory must be new or empty.
 
+Build and run the complete timing lane separately with:
+
+```sh
+cmake --build build --target muesli_bt_controlled_authority_timing -j
+python3 experiments/invocation_authority_controlled/run_timing_campaign.py \
+  --output /tmp/controlled-authority-timing
+```
+
+On Linux, use `--cpu-set` to declare a stable CPU affinity. For example,
+`--cpu-set 0-7` confines the engine and delayed-provider workers to CPUs 0--7.
+The full lane executes 2,480 recorded trials after 300 warm-ups. Test runs may
+use `--conditions`, `--repetitions` and `--warmups`; those runs remain explicitly
+ineligible for the paper gate.
+
 The artefact tree is:
 
 ```text
@@ -176,6 +209,17 @@ summary/schedule-summary.{csv,json}
 summary/variant-summary.{csv,json}
 paper/controlled-authority-table.{csv,md}
 paper/variant-summary.md
+```
+
+The separate timing artefact tree is:
+
+```text
+timing-campaign-manifest.json
+resolved-timing-plan.tsv
+raw_timing_trials.jsonl
+summary/timing-trials.csv
+summary/timing-summary.{csv,json}
+paper/controlled-authority-timing-table.{csv,md}
 ```
 
 Run manifests retain internal schedule and variant keys for auditability, and
@@ -213,6 +257,12 @@ controls that an obsolete-effect column alone would hide.
   exact four variants, 16 schedules and frozen 128 paper seeds do so.
 - The replay schedule requires every preceding schedule for the same variant
   and seed.
+- Do not interpret `maximum_tick_ms` from the stepped semantic lane as a timing
+  result. Only the real-clock timing manifest and table belong to that lane.
+- Do not pool timing data across machines. Run a complete timing campaign on
+  one fingerprinted host.
+- CPU affinity reduces scheduler migration but does not erase background load.
+  Preserve the recorded load and governor fields with reported results.
 
 ## see also
 
