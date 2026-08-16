@@ -17,6 +17,7 @@ class StagingError(RuntimeError):
 SUPPORTED_SHOT_SCHEMAS = {
     "humanoid.paper_video_shot.v1",
     "humanoid.paper_video_comparison.v1",
+    "humanoid.paper_video_emergency.v1",
 }
 
 

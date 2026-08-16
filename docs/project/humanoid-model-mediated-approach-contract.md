@@ -210,8 +210,9 @@ T3 passes when all of the following are true:
 
 - the safety branch becomes active no later than the first BT tick after the
   intervention is visible to the runtime;
-- the outstanding authority is revoked;
-- the late result is rejected with `branch_revoked`; and
+- the outstanding authority is rejected with `branch_revoked` and revoked;
+- a completion that arrives after revocation is dropped with
+  `completion_after_cancel`; and
 - no walking target is dispatched after revocation.
 
 The full experiment passes only when the canonical trace validates, replay

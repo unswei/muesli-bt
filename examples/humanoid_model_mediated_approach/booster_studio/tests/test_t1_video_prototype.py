@@ -115,6 +115,19 @@ class T1PrototypeTests(unittest.TestCase):
             loaded["schema_version"], "humanoid.paper_video_comparison.v1"
         )
 
+    def test_scene_staging_accepts_the_t3_emergency_schema(self) -> None:
+        configured_shot = shot()
+        configured_shot["schema_version"] = "humanoid.paper_video_emergency.v1"
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = pathlib.Path(temporary_directory) / "shot.json"
+            path.write_text(json.dumps(configured_shot), encoding="utf-8")
+
+            loaded = staging._read_shot(path)
+
+        self.assertEqual(
+            loaded["schema_version"], "humanoid.paper_video_emergency.v1"
+        )
+
     def test_scene_staging_uses_the_frozen_robot_and_ball_poses(self) -> None:
         configured_shot = shot()
         configured_shot["simulator_scene"] = {

@@ -118,14 +118,16 @@ The paper-video acceptance gate is:
 - The pixel calibration is valid only for the frozen camera and crop. Reframe
   the camera only after updating the calibration and reviewing a new marker
   alignment frame.
-- The letters `A` and `B` are video labels. The actual monotonic context ID is
-  also displayed and retained in the render manifest.
+- T2 uses `A` and `B` only for its two distinct target poses. The single ball
+  is not labelled. Actual monotonic context IDs remain in the overlays and
+  render manifests.
 - Disarm motion after every take. Disarming clears the target and closes the
   Booster backend.
 
 ## see also
 
 - [T2 moved-ball paper-video comparison](t2-comparison.md)
+- [T3 higher-priority interruption](t3-emergency.md)
 - [Booster Studio host adapter](../README.md)
 - [humanoid video experiment](../../README.md)
 - [experiment contract](../../../../docs/project/humanoid-model-mediated-approach-contract.md)
