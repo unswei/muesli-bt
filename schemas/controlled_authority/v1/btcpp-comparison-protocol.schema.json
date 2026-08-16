@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.invalid/schemas/controlled_authority/v1/btcpp-comparison-protocol.schema.json",
+  "title": "Controlled invocation-authority BehaviorTree.CPP comparison protocol v1",
+  "type": "object",
+  "required": [
+    "schema_version", "protocol_id", "gate", "status", "reader_language",
+    "purpose", "source_contract", "frameworks", "variants", "semantic_lane",
+    "fairness_controls", "semantic_metrics", "engineering_metrics",
+    "generic_performance_lane", "evidence_contract", "paper_gate"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "controlled-authority.btcpp-comparison-protocol.v1"},
+    "protocol_id": {"const": "controlled-authority.btcpp-comparison.e1.v1"},
+    "gate": {"const": "E1"},
+    "status": {"const": "frozen"},
+    "reader_language": {"const": "en-AU"},
+    "purpose": {"type": "string", "minLength": 30},
+    "source_contract": {
+      "type": "object",
+      "required": ["protocol", "schedule_catalogue", "fault_matrix", "common_task", "protocol_id", "catalogue_id", "matrix_id"],
+      "properties": {
+        "protocol": {"type": "string", "minLength": 1},
+        "schedule_catalogue": {"type": "string", "minLength": 1},
+        "fault_matrix": {"type": "string", "minLength": 1},
+        "common_task": {"type": "string", "minLength": 1},
+        "protocol_id": {"const": "controlled-authority.c0.v1"},
+        "catalogue_id": {"const": "controlled-authority.c0.schedules.v1"},
+        "matrix_id": {"const": "controlled-authority.c0.fault-matrix.v1"}
+      },
+      "additionalProperties": false
+    },
+    "frameworks": {
+      "type": "array", "minItems": 2, "maxItems": 2,
+      "items": {"type": "object", "required": ["runtime_id", "framework_lifecycle"], "additionalProperties": true}
+    },
+    "variants": {
+      "type": "array", "minItems": 4, "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["variant_id", "manifest_label", "reader_label", "runtime_id", "authority_profile", "expected_outcome_source", "contract_ownership"],
+        "properties": {
+          "variant_id": {"type": "string", "minLength": 8},
+          "manifest_label": {"enum": ["MBT-ordinary", "BTCPP-ordinary", "MBT-full", "BTCPP-full"]},
+          "reader_label": {"type": "string", "minLength": 16},
+          "runtime_id": {"enum": ["muesli-bt", "behaviortree-cpp"]},
+          "authority_profile": {"enum": ["ordinary_asynchronous", "invocation_scoped"]},
+          "expected_outcome_source": {"enum": ["B1", "B3"]},
+          "contract_ownership": {"type": "string", "minLength": 12}
+        },
+        "additionalProperties": false
+      }
+    },
+    "semantic_lane": {
+      "type": "object",
+      "required": ["clock", "ordering", "schedule_scope", "seed_sets", "provider_outputs", "scoring_authority", "result_policy"],
+      "properties": {
+        "clock": {"const": "stepped"},
+        "ordering": {"const": "event_barriers"},
+        "schedule_scope": {"$ref": "#/$defs/allSchedules"},
+        "seed_sets": {
+          "type": "object", "required": ["engineering", "paper"],
+          "properties": {
+            "engineering": {"const": {"first": 0, "count": 32}},
+            "paper": {"const": {"first": 10000, "count": 128}}
+          },
+          "additionalProperties": false
+        },
+        "provider_outputs": {"const": "identical_for_runtime_pair_by_schedule_and_seed"},
+        "scoring_authority": {"const": "shared_independent_c0_oracle"},
+        "result_policy": {"const": "report_all_frozen_results_even_if_they_do_not_favour_muesli-bt"}
+      },
+      "additionalProperties": false
+    },
+    "fairness_controls": {"type": "array", "minItems": 9, "uniqueItems": true, "items": {"type": "string"}},
+    "semantic_metrics": {"type": "array", "minItems": 9, "uniqueItems": true, "items": {"type": "string"}},
+    "engineering_metrics": {"type": "array", "minItems": 5, "uniqueItems": true, "items": {"type": "string"}},
+    "generic_performance_lane": {
+      "type": "object",
+      "required": ["separate_from_authority_lane", "runtimes", "scenario_selectors", "unsupported_cross_runtime_scenarios", "core", "jitter", "lifecycle", "ratios_only_for_shared_supported_scenarios", "tracing", "allocation_measurement"],
+      "properties": {
+        "separate_from_authority_lane": {"const": true},
+        "runtimes": {"const": ["muesli", "btcpp"]},
+        "scenario_selectors": {"const": ["A1", "A2-alt-255-jitter-off", "B1", "B2", "B5"]},
+        "unsupported_cross_runtime_scenarios": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "core": {"const": {"warmup_ms": 1000, "run_ms": 5000, "repetitions": 10}},
+        "jitter": {"const": {"warmup_ms": 3000, "run_ms": 60000, "repetitions": 5}},
+        "lifecycle": {"const": {"repetitions": 200}},
+        "ratios_only_for_shared_supported_scenarios": {"const": true},
+        "tracing": {"const": "off"},
+        "allocation_measurement": {"const": "enabled"}
+      },
+      "additionalProperties": false
+    },
+    "evidence_contract": {"type": "object", "required": ["canonical_runtime_format", "separate_stream_per_runtime_instance", "campaign_manifest_records", "derived_tables_are_not_runtime_logs", "partial_or_engineering_runs_cannot_pass_paper_gate"], "additionalProperties": true},
+    "paper_gate": {
+      "type": "object",
+      "required": ["exact_variants_required", "exact_schedule_scope_required", "paper_seed_first", "paper_seed_count", "maximum_full_obsolete_effects", "maximum_full_false_rejections", "maximum_full_trace_failures", "maximum_full_replay_mismatches", "ordinary_async_must_be_competent", "identical_seed_and_provider_digest_required", "manual_run_exclusion_allowed"],
+      "properties": {
+        "exact_variants_required": {"const": ["MBT-ordinary", "BTCPP-ordinary", "MBT-full", "BTCPP-full"]},
+        "exact_schedule_scope_required": {"$ref": "#/$defs/allSchedules"},
+        "paper_seed_first": {"const": 10000},
+        "paper_seed_count": {"const": 128},
+        "maximum_full_obsolete_effects": {"const": 0},
+        "maximum_full_false_rejections": {"const": 0},
+        "maximum_full_trace_failures": {"const": 0},
+        "maximum_full_replay_mismatches": {"const": 0},
+        "ordinary_async_must_be_competent": {"const": true},
+        "identical_seed_and_provider_digest_required": {"const": true},
+        "manual_run_exclusion_allowed": {"const": false}
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "allSchedules": {"const": ["F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08", "F09", "F10", "F11", "F12", "F13", "F14", "F15", "F16"]}
+  },
+  "additionalProperties": false
+}

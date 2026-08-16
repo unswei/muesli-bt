@@ -737,6 +737,12 @@ if (Python3_Interpreter_FOUND)
     NAME muesli_bt_controlled_authority_c0
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_controlled_authority_c0.py"
   )
+  add_test(
+    NAME muesli_bt_controlled_authority_btcpp_protocol
+    COMMAND
+      "${Python3_EXECUTABLE}"
+      "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_controlled_authority_btcpp_protocol.py"
+  )
   if (MUESLI_BT_BUILD_CONTROLLED_AUTHORITY_EXPERIMENT)
     add_test(
       NAME muesli_bt_controlled_authority_campaign

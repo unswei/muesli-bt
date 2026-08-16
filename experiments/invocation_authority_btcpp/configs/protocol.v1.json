@@ -1,0 +1,167 @@
+{
+  "$schema": "../../../schemas/controlled_authority/v1/btcpp-comparison-protocol.schema.json",
+  "schema_version": "controlled-authority.btcpp-comparison-protocol.v1",
+  "protocol_id": "controlled-authority.btcpp-comparison.e1.v1",
+  "gate": "E1",
+  "status": "frozen",
+  "reader_language": "en-AU",
+  "purpose": "Test portability of ordinary asynchronous and invocation-scoped authority semantics across muesli-bt and BehaviorTree.CPP, separately from generic runtime-cost measurements.",
+  "source_contract": {
+    "protocol": "../../invocation_authority_controlled/configs/protocol.v1.json",
+    "schedule_catalogue": "../../invocation_authority_controlled/schedules/catalogue.v1.json",
+    "fault_matrix": "../../invocation_authority_controlled/configs/fault-matrix.v1.json",
+    "common_task": "../../invocation_authority_controlled/lisp/common_task.lisp",
+    "protocol_id": "controlled-authority.c0.v1",
+    "catalogue_id": "controlled-authority.c0.schedules.v1",
+    "matrix_id": "controlled-authority.c0.fault-matrix.v1"
+  },
+  "frameworks": [
+    {
+      "runtime_id": "muesli-bt",
+      "version_source": "campaign_git_commit",
+      "framework_lifecycle": "compiled Lisp Behaviour Tree actions and halt callbacks"
+    },
+    {
+      "runtime_id": "behaviortree-cpp",
+      "version": "4.9.0",
+      "commit": "3ff6a32ba0497a08519c77a1436e3b81eff1bcd6",
+      "source_policy": "isolated_fetchcontent_build",
+      "framework_lifecycle": "BT::StatefulActionNode onStart(), onRunning() and onHalted()"
+    }
+  ],
+  "variants": [
+    {
+      "variant_id": "muesli-bt-ordinary-asynchronous",
+      "manifest_label": "MBT-ordinary",
+      "reader_label": "muesli-bt ordinary asynchronous lifecycle",
+      "runtime_id": "muesli-bt",
+      "authority_profile": "ordinary_asynchronous",
+      "expected_outcome_source": "B1",
+      "contract_ownership": "experiment adapter"
+    },
+    {
+      "variant_id": "btcpp-ordinary-asynchronous",
+      "manifest_label": "BTCPP-ordinary",
+      "reader_label": "BehaviorTree.CPP documented ordinary asynchronous lifecycle",
+      "runtime_id": "behaviortree-cpp",
+      "authority_profile": "ordinary_asynchronous",
+      "expected_outcome_source": "B1",
+      "contract_ownership": "StatefulActionNode lifecycle plus experiment provider boundary"
+    },
+    {
+      "variant_id": "muesli-bt-invocation-scoped",
+      "manifest_label": "MBT-full",
+      "reader_label": "muesli-bt invocation-scoped authority",
+      "runtime_id": "muesli-bt",
+      "authority_profile": "invocation_scoped",
+      "expected_outcome_source": "B3",
+      "contract_ownership": "production muesli-bt authority and dispatch gates"
+    },
+    {
+      "variant_id": "btcpp-invocation-scoped",
+      "manifest_label": "BTCPP-full",
+      "reader_label": "BehaviorTree.CPP with the full invocation-scoped contract port",
+      "runtime_id": "behaviortree-cpp",
+      "authority_profile": "invocation_scoped",
+      "expected_outcome_source": "B3",
+      "contract_ownership": "StatefulActionNode lifecycle plus explicit experiment-owned authority and dispatch gates"
+    }
+  ],
+  "semantic_lane": {
+    "clock": "stepped",
+    "ordering": "event_barriers",
+    "schedule_scope": [
+      "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08",
+      "F09", "F10", "F11", "F12", "F13", "F14", "F15", "F16"
+    ],
+    "seed_sets": {
+      "engineering": {"first": 0, "count": 32},
+      "paper": {"first": 10000, "count": 128}
+    },
+    "provider_outputs": "identical_for_runtime_pair_by_schedule_and_seed",
+    "scoring_authority": "shared_independent_c0_oracle",
+    "result_policy": "report_all_frozen_results_even_if_they_do_not_favour_muesli-bt"
+  },
+  "fairness_controls": [
+    "equivalent_control_flow_structure",
+    "identical_observations_proposals_provider_results_and_logical_event_order",
+    "identical_host_validation_policy",
+    "identical_fallback_and_safe_stand_effects",
+    "documented_non_blocking_btcpp_baseline",
+    "same_compiler_build_type_optimisation_host_and_affinity",
+    "implementation_cannot_score_its_own_effect",
+    "framework_and_custom_contract_code_reported_separately",
+    "custom_comparison_code_publicly_available"
+  ],
+  "semantic_metrics": [
+    "obsolete_commits",
+    "obsolete_dispatches",
+    "valid_current_result_false_rejections",
+    "terminal_outcome_count",
+    "fallback_activations",
+    "safe_stand_activations",
+    "active_jobs_at_end",
+    "canonical_trace_valid",
+    "task_replay_equal"
+  ],
+  "engineering_metrics": [
+    "maximum_complete_tick_ms",
+    "cancellation_acknowledgement_ms_when_observable",
+    "task_specific_source_lines",
+    "authority_state_source_lines",
+    "logging_source_lines"
+  ],
+  "generic_performance_lane": {
+    "separate_from_authority_lane": true,
+    "runtimes": ["muesli", "btcpp"],
+    "scenario_selectors": ["A1", "A2-alt-255-jitter-off", "B1", "B2", "B5"],
+    "unsupported_cross_runtime_scenarios": [
+      "A1-single-leaf-log",
+      "B5-alt-31-parse-off",
+      "B5-alt-31-loadbin-off",
+      "B5-alt-255-parse-off",
+      "B5-alt-255-loadbin-off",
+      "B5-alt-1023-parse-off",
+      "B5-alt-1023-loadbin-off"
+    ],
+    "core": {"warmup_ms": 1000, "run_ms": 5000, "repetitions": 10},
+    "jitter": {"warmup_ms": 3000, "run_ms": 60000, "repetitions": 5},
+    "lifecycle": {"repetitions": 200},
+    "ratios_only_for_shared_supported_scenarios": true,
+    "tracing": "off",
+    "allocation_measurement": "enabled"
+  },
+  "evidence_contract": {
+    "canonical_runtime_format": "mbt.evt.v1",
+    "separate_stream_per_runtime_instance": true,
+    "campaign_manifest_records": [
+      "protocol_and_input_sha256",
+      "repository_commit",
+      "btcpp_version_and_commit",
+      "compiler_and_flags",
+      "host_and_cpu_affinity",
+      "schedule_seed_and_provider_output_digest",
+      "framework_supplied_and_custom_code_inventory"
+    ],
+    "derived_tables_are_not_runtime_logs": true,
+    "partial_or_engineering_runs_cannot_pass_paper_gate": true
+  },
+  "paper_gate": {
+    "exact_variants_required": [
+      "MBT-ordinary", "BTCPP-ordinary", "MBT-full", "BTCPP-full"
+    ],
+    "exact_schedule_scope_required": [
+      "F01", "F02", "F03", "F04", "F05", "F06", "F07", "F08",
+      "F09", "F10", "F11", "F12", "F13", "F14", "F15", "F16"
+    ],
+    "paper_seed_first": 10000,
+    "paper_seed_count": 128,
+    "maximum_full_obsolete_effects": 0,
+    "maximum_full_false_rejections": 0,
+    "maximum_full_trace_failures": 0,
+    "maximum_full_replay_mismatches": 0,
+    "ordinary_async_must_be_competent": true,
+    "identical_seed_and_provider_digest_required": true,
+    "manual_run_exclusion_allowed": false
+  }
+}
