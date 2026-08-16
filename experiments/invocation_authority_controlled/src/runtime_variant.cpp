@@ -51,7 +51,7 @@ class accepting_walking_dispatcher final : public bt::walking_target_dispatcher
 {
 public:
   bt::walking_target_dispatch_result dispatch(const bt::walking_target_dispatch_context&,
-                                               const bt::walking_target&) override
+                                              const bt::walking_target&) override
   {
     return {.accepted = true, .reason = {}};
   }
@@ -153,8 +153,8 @@ public:
 
     {
       std::lock_guard lock(mutex_);
-      completions_.insert_or_assign(
-          request_id, bridge_completion{.result = result, .completed_at = now_()});
+      completions_.insert_or_assign(request_id,
+                                    bridge_completion{.result = result, .completed_at = now_()});
     }
     return translate(runtime_request, result);
   }
@@ -169,8 +169,7 @@ private:
     return response;
   }
 
-  static bt::vla_response translate(const bt::vla_request& request,
-                                    const provider_result& result)
+  static bt::vla_response translate(const bt::vla_request& request, const provider_result& result)
   {
     if (result.status != provider_status::ok)
     {
@@ -225,10 +224,14 @@ std::string runtime_tree(logical_time deadline, std::string_view action_frame)
   std::ostringstream source;
   source << "(reactive-sel "
             "  (seq (cond bb-truthy controlled-revoke-now) (succeed)) "
+            "  (seq (cond bb-truthy controlled-cancel-now) "
+            "       (vla-cancel :name \"controlled-cancel\" :job_key controlled-job) "
+            "       (succeed)) "
             "  (seq (vla-wait :name \"controlled-approach\" :job_key controlled-job "
             "                 :action_key controlled-action :meta_key controlled-meta "
             "                 :clear_job #f) "
             "       (succeed)) "
+            "  (seq (cond bb-truthy controlled-submit-enabled) "
             "  (vla-request :name \"controlled-approach\" :job_key controlled-job "
             "               :instruction \"choose an approach pose\" :state_key controlled-state "
             "               :task_key controlled-task-id :model_name \"controlled-provider\" "
@@ -239,7 +242,7 @@ std::string runtime_tree(logical_time deadline, std::string_view action_frame)
             "               :action_frame \""
          << lisp_string(action_frame)
          << "\" :acceptance_policy invocation_scoped "
-            "               :context_key controlled-context))";
+            "               :context_key controlled-context)))";
   return source.str();
 }
 
@@ -250,7 +253,7 @@ struct invocation_binding
   bool terminal_recorded = false;
 };
 
-}  // namespace
+} // namespace
 
 class invocation_scoped_variant::implementation
 {
@@ -260,15 +263,15 @@ public:
                  proposal_validation_config validation)
       : recorder_(recorder), now_(std::move(now)), clock_(now_),
         backend_(std::make_shared<provider_backend>(std::move(provider), now_)),
-        validator_(bt::approach_pose_validator_config{
-                       .frame_id = validation.frame_id,
-                       .bounds = {.min_x_m = validation.minimum[0],
-                                  .max_x_m = validation.maximum[0],
-                                  .min_y_m = validation.minimum[1],
-                                  .max_y_m = validation.maximum[1],
-                                  .min_yaw_rad = validation.minimum[2],
-                                  .max_yaw_rad = validation.maximum[2]}},
-                   [this] { return host_state_; })
+        validator_(
+            bt::approach_pose_validator_config{.frame_id = validation.frame_id,
+                                               .bounds = {.min_x_m = validation.minimum[0],
+                                                          .max_x_m = validation.maximum[0],
+                                                          .min_y_m = validation.minimum[1],
+                                                          .max_y_m = validation.maximum[1],
+                                                          .min_yaw_rad = validation.minimum[2],
+                                                          .max_yaw_rad = validation.maximum[2]}},
+            [this] { return host_state_; })
   {
     if (!now_ || !backend_)
     {
@@ -279,16 +282,14 @@ public:
       throw std::invalid_argument("invocation-scoped variant deadline must be positive");
     }
 
-    host_.enable_deterministic_test_mode(0x4233494e564f4b45ull,
-                                         "controlled-authority-b3");
+    host_.enable_deterministic_test_mode(0x4233494e564f4b45ull, "controlled-authority-b3");
     host_.set_clock_interface(&clock_);
     host_.set_vla_commit_validator(&validator_);
     host_.set_walking_target_dispatcher(&dispatcher_);
     host_.vla_ref().set_cache_ttl_ms(0);
     host_.vla_ref().register_backend("controlled-provider", backend_);
-    const std::int64_t definition = host_.store_definition(
-        bt::compile_definition(
-            muslisp::read_one(runtime_tree(request_deadline, validation.frame_id))));
+    const std::int64_t definition = host_.store_definition(bt::compile_definition(
+        muslisp::read_one(runtime_tree(request_deadline, validation.frame_id))));
     instance_handle_ = host_.create_instance(definition);
     instance_ = host_.find_instance(instance_handle_);
     if (!instance_)
@@ -297,6 +298,8 @@ public:
     }
     put("controlled-state", bt::bb_value{std::vector<double>{0.0, 0.0, 0.0}});
     put("controlled-revoke-now", bt::bb_value{false});
+    put("controlled-cancel-now", bt::bb_value{false});
+    put("controlled-submit-enabled", bt::bb_value{false});
   }
 
   ~implementation()
@@ -342,7 +345,9 @@ public:
     put("controlled-task-id", bt::bb_value{static_cast<std::int64_t>(request.request_id)});
     put("controlled-context", bt::bb_value{request.captured_context_id});
     put("controlled-job", bt::bb_value{std::monostate{}});
+    put("controlled-submit-enabled", bt::bb_value{true});
     const bt::status status = host_.tick_instance(instance_handle_);
+    put("controlled-submit-enabled", bt::bb_value{false});
     if (status == bt::status::failure || instance_->vla_invocations.empty())
     {
       recorder_.record_rejection(kInvocationScopedDescriptor.variant_id, request, {},
@@ -357,18 +362,18 @@ public:
       const auto binding = bindings_.find(old_job);
       if (binding != bindings_.end() && !binding->second.terminal_recorded)
       {
-        recorder_.record_rejection(kInvocationScopedDescriptor.variant_id,
-                                   binding->second.request, {}, "superseded", now_());
+        recorder_.record_rejection(kInvocationScopedDescriptor.variant_id, binding->second.request,
+                                   {}, "superseded", now_());
         binding->second.terminal_recorded = true;
         ++update.rejections;
         update.last_reason = "superseded";
       }
     }
 
-    const auto newest = std::max_element(
-        instance_->vla_invocations.begin(), instance_->vla_invocations.end(),
-        [](const auto& left, const auto& right)
-        { return left.second.generation < right.second.generation; });
+    const auto newest =
+        std::max_element(instance_->vla_invocations.begin(), instance_->vla_invocations.end(),
+                         [](const auto& left, const auto& right)
+                         { return left.second.generation < right.second.generation; });
     bindings_.insert_or_assign(newest->first, invocation_binding{.request = request});
     return update;
   }
@@ -419,14 +424,41 @@ public:
     return false;
   }
 
+  variant_update cancel(std::uint64_t request_id, logical_time cancelled_at)
+  {
+    const auto binding = std::find_if(bindings_.begin(), bindings_.end(),
+                                      [request_id](const auto& entry)
+                                      {
+                                        return entry.second.request.request_id == request_id &&
+                                               !entry.second.terminal_recorded;
+                                      });
+    if (binding == bindings_.end())
+    {
+      return {};
+    }
+    const auto invocation = instance_->vla_invocations.find(binding->first);
+    if (invocation == instance_->vla_invocations.end() ||
+        invocation->second.authority_state != bt::vla_authority_state::active)
+    {
+      return {};
+    }
+
+    recorder_.record_cancellation(kInvocationScopedDescriptor.variant_id, binding->second.request,
+                                  cancelled_at, "explicit_cancel");
+    put("controlled-job", bt::bb_value{static_cast<std::int64_t>(binding->first)});
+    put("controlled-cancel-now", bt::bb_value{true});
+    (void)host_.tick_instance(instance_handle_);
+    put("controlled-cancel-now", bt::bb_value{false});
+    return collect_transitions(cancelled_at);
+  }
+
   void synchronise(const task_snapshot& task)
   {
     task_ = task;
     host_state_.ball_context_id = task.context_id;
     host_state_.robot_stable = !task.emergency;
     put("controlled-context", bt::bb_value{task.context_id});
-    put("controlled-revoke-now",
-        bt::bb_value{task.emergency || !task.model_branch_active});
+    put("controlled-revoke-now", bt::bb_value{task.emergency || !task.model_branch_active});
   }
 
   void halt(logical_time halted_at, std::string_view)
@@ -444,6 +476,8 @@ public:
     put("controlled-state", bt::bb_value{std::vector<double>{0.0, 0.0, 0.0}});
     put("controlled-context", bt::bb_value{task_.context_id});
     put("controlled-revoke-now", bt::bb_value{true});
+    put("controlled-cancel-now", bt::bb_value{false});
+    put("controlled-submit-enabled", bt::bb_value{false});
   }
 
   [[nodiscard]] std::vector<std::string> canonical_events() const
@@ -454,8 +488,7 @@ public:
   [[nodiscard]] std::size_t active_jobs() const
   {
     return static_cast<std::size_t>(std::count_if(
-        instance_->vla_invocations.begin(), instance_->vla_invocations.end(),
-        [](const auto& entry)
+        instance_->vla_invocations.begin(), instance_->vla_invocations.end(), [](const auto& entry)
         { return entry.second.authority_state == bt::vla_authority_state::active; }));
   }
 
@@ -475,10 +508,9 @@ private:
           backend_->completion(binding.request.request_id);
       if (completion && !binding.provider_recorded)
       {
-        recorder_.record_provider_completion(kInvocationScopedDescriptor.variant_id,
-                                             binding.request,
-                                             completion->result.proposal.response_id,
-                                             completion->completed_at);
+        recorder_.record_provider_completion(
+            kInvocationScopedDescriptor.variant_id, binding.request,
+            completion->result.proposal.response_id, completion->completed_at);
         binding.provider_recorded = true;
         ++update.provider_completions;
       }
@@ -531,12 +563,12 @@ private:
   task_snapshot task_;
 };
 
-invocation_scoped_variant::invocation_scoped_variant(
-    std::shared_ptr<proposal_provider> provider, effect_recorder& recorder, logical_now now,
-    logical_time request_deadline, proposal_validation_config validation)
-    : implementation_(std::make_unique<implementation>(std::move(provider), recorder,
-                                                       std::move(now), request_deadline,
-                                                       std::move(validation)))
+invocation_scoped_variant::invocation_scoped_variant(std::shared_ptr<proposal_provider> provider,
+                                                     effect_recorder& recorder, logical_now now,
+                                                     logical_time request_deadline,
+                                                     proposal_validation_config validation)
+    : implementation_(std::make_unique<implementation>(
+          std::move(provider), recorder, std::move(now), request_deadline, std::move(validation)))
 {
 }
 
@@ -560,6 +592,12 @@ variant_update invocation_scoped_variant::poll(logical_time admission_at)
 bool invocation_scoped_variant::dispatch(logical_time dispatch_at)
 {
   return implementation_->dispatch(dispatch_at);
+}
+
+variant_update invocation_scoped_variant::cancel(std::uint64_t request_id,
+                                                 logical_time cancelled_at)
+{
+  return implementation_->cancel(request_id, cancelled_at);
 }
 
 void invocation_scoped_variant::synchronise(const task_snapshot& task)
@@ -587,4 +625,4 @@ std::size_t invocation_scoped_variant::active_jobs() const
   return implementation_->active_jobs();
 }
 
-}  // namespace muesli_bt::experiments::controlled_authority
+} // namespace muesli_bt::experiments::controlled_authority

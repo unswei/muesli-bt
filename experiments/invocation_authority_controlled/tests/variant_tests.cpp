@@ -47,12 +47,13 @@ provider_result valid_result(std::string response_id = "response-1")
 {
   return provider_result{
       .status = provider_status::ok,
-      .proposal = task_proposal{
-          .response_id = std::move(response_id),
-          .frame_id = "task_context",
-          .pose = {0.2, -0.1, 0.3},
-          .schema_valid = true,
-      },
+      .proposal =
+          task_proposal{
+              .response_id = std::move(response_id),
+              .frame_id = "task_context",
+              .pose = {0.2, -0.1, 0.3},
+              .schema_valid = true,
+          },
       .reason = {},
   };
 }
@@ -135,9 +136,8 @@ private:
 
 effect_recorder make_recorder(deterministic_coordinator& coordinator)
 {
-  return effect_recorder(
-      [&coordinator](const request_record& request, logical_time effect_at)
-      { return coordinator.assess(request, effect_at); });
+  return effect_recorder([&coordinator](const request_record& request, logical_time effect_at)
+                         { return coordinator.assess(request, effect_at); });
 }
 
 request_record start_request(deterministic_coordinator& coordinator)
@@ -149,12 +149,11 @@ request_record start_request(deterministic_coordinator& coordinator)
 void test_effect_recorder_reassesses_at_dispatch()
 {
   deterministic_coordinator coordinator(
-      "context-a",
-      {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
-       {.sequence = 2,
-        .at = 80ms,
-        .kind = task_event_kind::context_changed,
-        .context_id = "context-b"}});
+      "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
+                    {.sequence = 2,
+                     .at = 80ms,
+                     .kind = task_event_kind::context_changed,
+                     .context_id = "context-b"}});
   const request_record request = start_request(coordinator);
   effect_recorder recorder = make_recorder(coordinator);
 
@@ -174,12 +173,11 @@ void test_effect_recorder_reassesses_at_dispatch()
 void test_blocking_variant_exposes_unobserved_context_change()
 {
   deterministic_coordinator coordinator(
-      "context-a",
-      {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
-       {.sequence = 2,
-        .at = 80ms,
-        .kind = task_event_kind::context_changed,
-        .context_id = "context-b"}});
+      "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
+                    {.sequence = 2,
+                     .at = 80ms,
+                     .kind = task_event_kind::context_changed,
+                     .context_id = "context-b"}});
   const request_record request = start_request(coordinator);
   effect_recorder recorder = make_recorder(coordinator);
   auto provider = std::make_shared<gated_provider>(valid_result());
@@ -213,12 +211,11 @@ void test_blocking_variant_exposes_unobserved_context_change()
 void test_asynchronous_variant_returns_before_completion_and_accepts_stale_result()
 {
   deterministic_coordinator coordinator(
-      "context-a",
-      {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
-       {.sequence = 2,
-        .at = 80ms,
-        .kind = task_event_kind::context_changed,
-        .context_id = "context-b"}});
+      "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
+                    {.sequence = 2,
+                     .at = 80ms,
+                     .kind = task_event_kind::context_changed,
+                     .context_id = "context-b"}});
   const request_record request = start_request(coordinator);
   effect_recorder recorder = make_recorder(coordinator);
   auto provider = std::make_shared<gated_provider>(valid_result());
@@ -323,12 +320,11 @@ void test_timeout_variant_claims_deadline_once_and_requests_cancellation()
 void test_timeout_variant_does_not_gain_context_authority()
 {
   deterministic_coordinator coordinator(
-      "context-a",
-      {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
-       {.sequence = 2,
-        .at = 80ms,
-        .kind = task_event_kind::context_changed,
-        .context_id = "context-b"}});
+      "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
+                    {.sequence = 2,
+                     .at = 80ms,
+                     .kind = task_event_kind::context_changed,
+                     .context_id = "context-b"}});
   const request_record request = start_request(coordinator);
   effect_recorder recorder = make_recorder(coordinator);
   auto provider = std::make_shared<gated_provider>(valid_result());
@@ -348,7 +344,69 @@ void test_timeout_variant_does_not_gain_context_authority()
         "B2 must remain blind to context identity before the deadline");
 }
 
-}  // namespace
+void test_duplicate_completion_distinguishes_ordinary_async_from_terminal_claim()
+{
+  for (const bool terminal_claim : {false, true})
+  {
+    deterministic_coordinator coordinator(
+        "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch}});
+    const request_record request = start_request(coordinator);
+    effect_recorder recorder = make_recorder(coordinator);
+    provider_result duplicated = valid_result();
+    duplicated.completion_copies = 2;
+    auto provider = std::make_shared<immediate_provider>(std::move(duplicated));
+    std::unique_ptr<authority_variant> variant;
+    if (terminal_claim)
+    {
+      variant = std::make_unique<timeout_variant>(provider, recorder,
+                                                  [&coordinator] { return coordinator.now(); });
+    }
+    else
+    {
+      variant = std::make_unique<asynchronous_variant>(provider, recorder, [&coordinator]
+                                                       { return coordinator.now(); });
+    }
+    const std::string variant_id = variant->descriptor().variant_id;
+
+    variant->submit(request);
+    wait_for([&] { return variant->poll(200ms).provider_completions == 2; },
+             "duplicate provider completions did not become available");
+    const effect_summary summary = recorder.summary(variant_id);
+    check(summary.provider_completions == 2,
+          "both duplicate provider notifications must remain observable");
+    check(summary.terminal_decisions == (terminal_claim ? 1u : 2u),
+          "only an adapter with a terminal claim may collapse duplicate completion");
+  }
+}
+
+void test_timeout_explicit_cancel_owns_one_terminal_outcome()
+{
+  deterministic_coordinator coordinator(
+      "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch}});
+  const request_record request = start_request(coordinator);
+  effect_recorder recorder = make_recorder(coordinator);
+  auto provider = std::make_shared<gated_provider>(valid_result());
+  timeout_variant variant(provider, recorder, [&coordinator] { return coordinator.now(); });
+
+  variant.submit(request);
+  provider->wait_for_start();
+  const variant_update cancelled = variant.cancel(request.request_id, 200ms);
+  check(cancelled.rejections == 1 && cancelled.last_reason == "cancelled",
+        "explicit cancellation should claim a stable terminal rejection");
+  check(provider->cancellation_requests() == 1,
+        "explicit cancellation should be forwarded to the provider");
+  provider->release();
+  provider->wait_for_finish();
+  wait_for([&] { return variant.poll(200ms).provider_completions == 1; },
+           "completion concurrent with cancellation was not observed");
+
+  const effect_summary summary = recorder.summary(variant.descriptor().variant_id);
+  check(summary.terminal_decisions == 1 && summary.result_rejections == 1 &&
+            summary.current_commits == 0,
+        "cancellation and late completion must produce one terminal decision");
+}
+
+} // namespace
 
 int main()
 {
@@ -362,6 +420,10 @@ int main()
       {"B2 deadline terminal claim",
        test_timeout_variant_claims_deadline_once_and_requests_cancellation},
       {"B2 context limitation", test_timeout_variant_does_not_gain_context_authority},
+      {"duplicate completion terminal ownership",
+       test_duplicate_completion_distinguishes_ordinary_async_from_terminal_claim},
+      {"B2 explicit cancellation terminal ownership",
+       test_timeout_explicit_cancel_owns_one_terminal_outcome},
   };
 
   std::size_t passed = 0;
@@ -380,7 +442,7 @@ int main()
     }
   }
 
-  std::cout << "All controlled-authority variant tests passed (" << passed << "/"
-            << tests.size() << ").\n";
+  std::cout << "All controlled-authority variant tests passed (" << passed << "/" << tests.size()
+            << ").\n";
   return 0;
 }

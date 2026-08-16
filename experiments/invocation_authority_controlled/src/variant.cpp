@@ -93,14 +93,14 @@ public:
     recorder_.record_provider_completion(descriptor_.variant_id, completion.request,
                                          completion.result.proposal.response_id,
                                          completion.completed_at);
-    variant_update update = accept_completion_without_provider_record(std::move(completion),
-                                                                       admission_at);
+    variant_update update =
+        accept_completion_without_provider_record(std::move(completion), admission_at);
     update.provider_completions = 1;
     return update;
   }
 
   variant_update accept_completion_without_provider_record(completed_provider_call completion,
-                                                            logical_time admission_at)
+                                                           logical_time admission_at)
   {
     const std::optional<std::string> rejection =
         validate_provider_result(completion.result, validation_);
@@ -156,20 +156,21 @@ private:
   std::optional<committed_proposal> committed_;
 };
 
-}  // namespace
+} // namespace
 
 bool proposal_provider::cancel(const request_record&)
 {
   return false;
 }
 
-void authority_variant::synchronise(const task_snapshot&)
+void authority_variant::synchronise(const task_snapshot&) {}
+
+variant_update authority_variant::cancel(std::uint64_t, logical_time)
 {
+  return {};
 }
 
-void authority_variant::halt(logical_time, std::string_view)
-{
-}
+void authority_variant::halt(logical_time, std::string_view) {}
 
 void authority_variant::reset(logical_time reset_at)
 {
@@ -181,8 +182,8 @@ std::vector<std::string> authority_variant::canonical_events() const
   return {};
 }
 
-std::optional<std::string>
-validate_provider_result(const provider_result& result, const proposal_validation_config& config)
+std::optional<std::string> validate_provider_result(const provider_result& result,
+                                                    const proposal_validation_config& config)
 {
   if (result.status != provider_status::ok)
   {
@@ -242,11 +243,10 @@ public:
       result = provider_failure("backend_terminal_failure");
     }
     const logical_time completed_at = now_();
-    return state_.accept_completion(
-        completed_provider_call{.request = request,
-                                .result = std::move(result),
-                                .completed_at = completed_at},
-        completed_at);
+    return state_.accept_completion(completed_provider_call{.request = request,
+                                                            .result = std::move(result),
+                                                            .completed_at = completed_at},
+                                    completed_at);
   }
 
   [[nodiscard]] const variant_descriptor& descriptor() const noexcept
@@ -348,11 +348,15 @@ public:
           const logical_time completed_at = now_();
           {
             std::lock_guard lock(completion_mutex_);
-            completions_.push_back(completed_provider_call{
-                .request = request,
-                .result = std::move(result),
-                .completed_at = completed_at,
-            });
+            const std::size_t copies = std::max<std::size_t>(1, result.completion_copies);
+            for (std::size_t copy = 0; copy < copies; ++copy)
+            {
+              completions_.push_back(completed_provider_call{
+                  .request = request,
+                  .result = result,
+                  .completed_at = completed_at,
+              });
+            }
           }
           job_ptr->finished.store(true);
         });
@@ -389,9 +393,9 @@ public:
   [[nodiscard]] std::size_t active_jobs() const
   {
     std::lock_guard lock(mutex_);
-    return static_cast<std::size_t>(std::count_if(
-        jobs_.begin(), jobs_.end(),
-        [](const std::unique_ptr<worker_job>& job) { return !job->finished.load(); }));
+    return static_cast<std::size_t>(std::count_if(jobs_.begin(), jobs_.end(),
+                                                  [](const std::unique_ptr<worker_job>& job)
+                                                  { return !job->finished.load(); }));
   }
 
   [[nodiscard]] const variant_descriptor& descriptor() const noexcept
@@ -411,9 +415,9 @@ private:
     std::vector<std::unique_ptr<worker_job>> finished;
     {
       std::lock_guard lock(mutex_);
-      auto first_finished = std::stable_partition(
-          jobs_.begin(), jobs_.end(),
-          [](const std::unique_ptr<worker_job>& job) { return !job->finished.load(); });
+      auto first_finished = std::stable_partition(jobs_.begin(), jobs_.end(),
+                                                  [](const std::unique_ptr<worker_job>& job)
+                                                  { return !job->finished.load(); });
       std::move(first_finished, jobs_.end(), std::back_inserter(finished));
       jobs_.erase(first_finished, jobs_.end());
     }
@@ -522,11 +526,15 @@ public:
           const logical_time completed_at = now_();
           {
             std::lock_guard lock(completion_mutex_);
-            completions_.push_back(completed_provider_call{
-                .request = request,
-                .result = std::move(result),
-                .completed_at = completed_at,
-            });
+            const std::size_t copies = std::max<std::size_t>(1, result.completion_copies);
+            for (std::size_t copy = 0; copy < copies; ++copy)
+            {
+              completions_.push_back(completed_provider_call{
+                  .request = request,
+                  .result = result,
+                  .completed_at = completed_at,
+              });
+            }
           }
           job_ptr->finished.store(true);
         });
@@ -587,12 +595,35 @@ public:
 
   bool dispatch(logical_time dispatch_at) { return state_.dispatch(dispatch_at); }
 
+  variant_update cancel(std::uint64_t request_id, logical_time cancelled_at)
+  {
+    std::optional<request_record> request;
+    {
+      std::lock_guard lock(mutex_);
+      const auto found = std::find_if(jobs_.begin(), jobs_.end(),
+                                      [request_id](const std::unique_ptr<worker_job>& job)
+                                      { return job->request.request_id == request_id; });
+      if (found == jobs_.end() || (*found)->terminal_claimed)
+      {
+        return {};
+      }
+      (*found)->terminal_claimed = true;
+      request = (*found)->request;
+    }
+    recorder_.record_rejection(kTimeoutDescriptor.variant_id, *request, {}, "cancelled",
+                               cancelled_at);
+    recorder_.record_cancellation(kTimeoutDescriptor.variant_id, *request, cancelled_at,
+                                  "explicit_cancel");
+    (void)request_provider_cancellation(provider_, *request);
+    return {.provider_completions = 0, .commits = 0, .rejections = 1, .last_reason = "cancelled"};
+  }
+
   [[nodiscard]] std::size_t active_jobs() const
   {
     std::lock_guard lock(mutex_);
-    return static_cast<std::size_t>(std::count_if(
-        jobs_.begin(), jobs_.end(),
-        [](const std::unique_ptr<worker_job>& job) { return !job->terminal_claimed; }));
+    return static_cast<std::size_t>(std::count_if(jobs_.begin(), jobs_.end(),
+                                                  [](const std::unique_ptr<worker_job>& job)
+                                                  { return !job->terminal_claimed; }));
   }
 
   [[nodiscard]] const variant_descriptor& descriptor() const noexcept
@@ -622,9 +653,9 @@ private:
   bool claim_terminal(std::uint64_t request_id)
   {
     std::lock_guard lock(mutex_);
-    const auto found = std::find_if(
-        jobs_.begin(), jobs_.end(), [request_id](const std::unique_ptr<worker_job>& job)
-        { return job->request.request_id == request_id; });
+    const auto found = std::find_if(jobs_.begin(), jobs_.end(),
+                                    [request_id](const std::unique_ptr<worker_job>& job)
+                                    { return job->request.request_id == request_id; });
     if (found == jobs_.end() || (*found)->terminal_claimed)
     {
       return false;
@@ -650,9 +681,9 @@ private:
     std::vector<std::unique_ptr<worker_job>> finished;
     {
       std::lock_guard lock(mutex_);
-      auto first_finished = std::stable_partition(
-          jobs_.begin(), jobs_.end(),
-          [](const std::unique_ptr<worker_job>& job) { return !job->finished.load(); });
+      auto first_finished = std::stable_partition(jobs_.begin(), jobs_.end(),
+                                                  [](const std::unique_ptr<worker_job>& job)
+                                                  { return !job->finished.load(); });
       std::move(first_finished, jobs_.end(), std::back_inserter(finished));
       jobs_.erase(first_finished, jobs_.end());
     }
@@ -698,9 +729,14 @@ bool timeout_variant::dispatch(logical_time dispatch_at)
   return implementation_->dispatch(dispatch_at);
 }
 
+variant_update timeout_variant::cancel(std::uint64_t request_id, logical_time cancelled_at)
+{
+  return implementation_->cancel(request_id, cancelled_at);
+}
+
 std::size_t timeout_variant::active_jobs() const
 {
   return implementation_->active_jobs();
 }
 
-}  // namespace muesli_bt::experiments::controlled_authority
+} // namespace muesli_bt::experiments::controlled_authority

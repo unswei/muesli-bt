@@ -558,6 +558,42 @@ if (MUESLI_BT_BUILD_CONTROLLED_AUTHORITY_EXPERIMENT)
     NAME muesli_bt_controlled_authority_runner
     COMMAND muesli_bt_controlled_authority_runner_tests
   )
+
+  add_library(
+    muesli_bt_controlled_authority_campaign_engine
+    experiments/invocation_authority_controlled/src/campaign_engine.cpp
+    experiments/invocation_authority_controlled/src/campaign_outcome.cpp
+    experiments/invocation_authority_controlled/src/campaign_plan.cpp
+    experiments/invocation_authority_controlled/src/campaign_writer.cpp
+    experiments/invocation_authority_controlled/src/scripted_provider.cpp
+  )
+  target_include_directories(
+    muesli_bt_controlled_authority_campaign_engine
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/experiments/invocation_authority_controlled/src
+  )
+  target_link_libraries(
+    muesli_bt_controlled_authority_campaign_engine
+    PUBLIC muesli_bt_controlled_authority_runner
+  )
+  target_compile_features(muesli_bt_controlled_authority_campaign_engine PUBLIC cxx_std_20)
+  if (MSVC)
+    target_compile_options(
+      muesli_bt_controlled_authority_campaign_engine PRIVATE /W4 /permissive-
+    )
+  else ()
+    target_compile_options(
+      muesli_bt_controlled_authority_campaign_engine PRIVATE -Wall -Wextra -Wpedantic
+    )
+  endif ()
+
+  add_executable(
+    muesli_bt_controlled_authority_campaign
+    experiments/invocation_authority_controlled/src/campaign_main.cpp
+  )
+  target_link_libraries(
+    muesli_bt_controlled_authority_campaign
+    PRIVATE muesli_bt_controlled_authority_campaign_engine
+  )
 endif ()
 
 add_executable(muslisp_tests tests/test_main.cpp src/repl_support.cpp)
@@ -668,6 +704,15 @@ if (Python3_Interpreter_FOUND)
     NAME muesli_bt_controlled_authority_c0
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_controlled_authority_c0.py"
   )
+  if (MUESLI_BT_BUILD_CONTROLLED_AUTHORITY_EXPERIMENT)
+    add_test(
+      NAME muesli_bt_controlled_authority_campaign
+      COMMAND
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_controlled_authority_campaign.py"
+        "$<TARGET_FILE:muesli_bt_controlled_authority_campaign>"
+    )
+  endif ()
   add_test(
     NAME muesli_bt_trace_validator_smoke
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_validate_trace.py"

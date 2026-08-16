@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.invalid/schemas/controlled_authority/v1/run-manifest.schema.json",
+  "title": "Controlled invocation-authority run manifest v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "catalogue_id",
+    "schedule",
+    "variant",
+    "seed",
+    "raw_trial_index",
+    "expected_outcome",
+    "observed_outcome",
+    "expected_outcome_met",
+    "metrics",
+    "counts",
+    "canonical_streams",
+    "manual_exclusion"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "controlled-authority.run-manifest.v1"},
+    "protocol_id": {"type": "string", "minLength": 1},
+    "catalogue_id": {"type": "string", "minLength": 1},
+    "schedule": {
+      "type": "object",
+      "required": ["internal_id", "reader_label"],
+      "properties": {
+        "internal_id": {"type": "string", "pattern": "^F(0[1-9]|1[0-6])$"},
+        "reader_label": {"type": "string", "minLength": 12}
+      },
+      "additionalProperties": false
+    },
+    "variant": {
+      "type": "object",
+      "required": ["short_label", "variant_id", "reader_label"],
+      "properties": {
+        "short_label": {"type": "string", "pattern": "^B[0-3]$"},
+        "variant_id": {"type": "string", "pattern": "^authority-b[0-3]-"},
+        "reader_label": {"type": "string", "minLength": 8}
+      },
+      "additionalProperties": false
+    },
+    "seed": {"type": "integer", "minimum": 0},
+    "raw_trial_index": {"type": "integer", "minimum": 1},
+    "expected_outcome": {"type": "string", "minLength": 1},
+    "observed_outcome": {"type": "string", "minLength": 1},
+    "expected_outcome_met": {"type": "boolean"},
+    "metrics": {
+      "type": "object",
+      "required": [
+        "obsolete_effect",
+        "current_result_accepted_exactly_once",
+        "valid_current_result_rejected",
+        "intervention_to_fallback_ms",
+        "maximum_tick_ms",
+        "terminal_outcome_count",
+        "task_replay_equal",
+        "canonical_trace_valid"
+      ],
+      "properties": {
+        "obsolete_effect": {"type": "boolean"},
+        "current_result_accepted_exactly_once": {"type": "boolean"},
+        "valid_current_result_rejected": {"type": "boolean"},
+        "intervention_to_fallback_ms": {"type": ["number", "null"], "minimum": 0},
+        "maximum_tick_ms": {"type": "number", "minimum": 0},
+        "terminal_outcome_count": {"type": "integer", "minimum": 0},
+        "task_replay_equal": {"type": "boolean"},
+        "canonical_trace_valid": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": {"type": "integer", "minimum": 0}
+    },
+    "canonical_streams": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "path",
+          "sha256",
+          "event_count",
+          "canonical_trace_valid",
+          "validation_errors"
+        ],
+        "properties": {
+          "kind": {"enum": ["task", "variant"]},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "event_count": {"type": "integer", "minimum": 1},
+          "canonical_trace_valid": {"type": "boolean"},
+          "validation_errors": {"type": "array", "items": {"type": "string"}}
+        },
+        "additionalProperties": false
+      }
+    },
+    "manual_exclusion": {"const": false}
+  },
+  "additionalProperties": false
+}

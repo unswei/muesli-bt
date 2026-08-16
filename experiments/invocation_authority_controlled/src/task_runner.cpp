@@ -31,8 +31,7 @@ bt::definition compile_common_task(const std::string& source)
     throw std::invalid_argument("shared task source must contain exactly one defbt form");
   }
   const std::vector<muslisp::value> form = muslisp::vector_from_list(expressions.front());
-  if (form.size() != 3 || !muslisp::is_symbol(form[0]) ||
-      muslisp::symbol_name(form[0]) != "defbt")
+  if (form.size() != 3 || !muslisp::is_symbol(form[0]) || muslisp::symbol_name(form[0]) != "defbt")
   {
     throw std::invalid_argument("shared task source must have the form (defbt name tree)");
   }
@@ -53,7 +52,7 @@ private:
   deterministic_coordinator& coordinator_;
 };
 
-}  // namespace
+} // namespace
 
 class shared_lisp_task_runner::implementation
 {
@@ -81,10 +80,7 @@ public:
     instance_handle_ = host_.create_instance(definition_handle);
   }
 
-  ~implementation()
-  {
-    host_.set_clock_interface(nullptr);
-  }
+  ~implementation() { host_.set_clock_interface(nullptr); }
 
   void request_submission(std::size_t count)
   {
@@ -95,10 +91,34 @@ public:
     pending_submissions_ += count;
   }
 
-  bt::status tick()
+  variant_update pump()
   {
     variant_->synchronise(coordinator_.task_state());
-    return host_.tick_instance(instance_handle_);
+    variant_update update = variant_->poll(coordinator_.now());
+    merge_update(pending_update_, update);
+    return update;
+  }
+
+  variant_update cancel_request(std::uint64_t request_id)
+  {
+    variant_->synchronise(coordinator_.task_state());
+    variant_update update = variant_->cancel(request_id, coordinator_.now());
+    merge_update(pending_update_, update);
+    return update;
+  }
+
+  bt::status tick()
+  {
+    const task_snapshot task = coordinator_.task_state();
+    variant_->synchronise(task);
+    if (has_last_task_ && last_task_.model_branch_active && !task.model_branch_active)
+    {
+      variant_->halt(coordinator_.now(), "branch_revoked");
+    }
+    const bt::status result = host_.tick_instance(instance_handle_);
+    last_task_ = task;
+    has_last_task_ = true;
+    return result;
   }
 
   void reset()
@@ -107,15 +127,19 @@ public:
     variant_->reset(coordinator_.now());
     pending_submissions_ = 0;
     model_ready_ = false;
+    pending_update_ = {};
+    last_task_ = coordinator_.task_state();
+    has_last_task_ = true;
   }
 
   [[nodiscard]] const authority_variant& variant() const noexcept { return *variant_; }
   [[nodiscard]] authority_variant& variant() noexcept { return *variant_; }
-
-  [[nodiscard]] std::vector<std::string> task_events() const
+  [[nodiscard]] const std::vector<request_record>& submitted_requests() const noexcept
   {
-    return host_.events().snapshot();
+    return submitted_requests_;
   }
+
+  [[nodiscard]] std::vector<std::string> task_events() const { return host_.events().snapshot(); }
 
   [[nodiscard]] std::vector<std::string> variant_events() const
   {
@@ -123,12 +147,22 @@ public:
   }
 
 private:
+  static void merge_update(variant_update& target, const variant_update& source)
+  {
+    target.provider_completions += source.provider_completions;
+    target.commits += source.commits;
+    target.rejections += source.rejections;
+    if (!source.last_reason.empty())
+    {
+      target.last_reason = source.last_reason;
+    }
+  }
+
   void register_callbacks()
   {
-    host_.callbacks().register_condition(
-        "controlled-emergency?",
-        [this](bt::tick_context&, std::span<const muslisp::value>)
-        { return coordinator_.task_state().emergency; });
+    host_.callbacks().register_condition("controlled-emergency?",
+                                         [this](bt::tick_context&, std::span<const muslisp::value>)
+                                         { return coordinator_.task_state().emergency; });
 
     host_.callbacks().register_action(
         "controlled-safe-stand",
@@ -146,8 +180,7 @@ private:
 
     host_.callbacks().register_action(
         "controlled-model-step",
-        [this](bt::tick_context&, bt::node_id, bt::node_memory&,
-               std::span<const muslisp::value>)
+        [this](bt::tick_context&, bt::node_id, bt::node_memory&, std::span<const muslisp::value>)
         {
           const task_snapshot task = coordinator_.task_state();
           variant_->synchronise(task);
@@ -160,20 +193,16 @@ private:
             return bt::status::success;
           }
 
-          variant_update update = variant_->poll(coordinator_.now());
+          variant_update update = pending_update_;
+          pending_update_ = {};
+          merge_update(update, variant_->poll(coordinator_.now()));
           while (pending_submissions_ > 0)
           {
             --pending_submissions_;
-            const request_record request =
-                coordinator_.submit_request(config_.request_deadline);
+            const request_record request = coordinator_.submit_request(config_.request_deadline);
+            submitted_requests_.push_back(request);
             const variant_update submitted = variant_->submit(request);
-            update.provider_completions += submitted.provider_completions;
-            update.commits += submitted.commits;
-            update.rejections += submitted.rejections;
-            if (!submitted.last_reason.empty())
-            {
-              update.last_reason = submitted.last_reason;
-            }
+            merge_update(update, submitted);
           }
 
           if (update.commits > 0)
@@ -221,7 +250,8 @@ private:
           {
             const std::string reason =
                 last_failure_reason_.empty() ? "model_branch_unavailable" : last_failure_reason_;
-            recorder_.record_fallback(variant_->descriptor().variant_id, coordinator_.now(), reason);
+            recorder_.record_fallback(variant_->descriptor().variant_id, coordinator_.now(),
+                                      reason);
             memory.b0 = true;
           }
           return bt::status::running;
@@ -238,6 +268,10 @@ private:
   std::size_t pending_submissions_ = 0;
   bool model_ready_ = false;
   std::string last_failure_reason_;
+  variant_update pending_update_;
+  std::vector<request_record> submitted_requests_;
+  task_snapshot last_task_;
+  bool has_last_task_ = false;
 };
 
 shared_lisp_task_runner::shared_lisp_task_runner(deterministic_coordinator& coordinator,
@@ -255,6 +289,16 @@ shared_lisp_task_runner::~shared_lisp_task_runner() = default;
 void shared_lisp_task_runner::request_submission(std::size_t count)
 {
   implementation_->request_submission(count);
+}
+
+variant_update shared_lisp_task_runner::pump()
+{
+  return implementation_->pump();
+}
+
+variant_update shared_lisp_task_runner::cancel_request(std::uint64_t request_id)
+{
+  return implementation_->cancel_request(request_id);
 }
 
 bt::status shared_lisp_task_runner::tick()
@@ -277,6 +321,11 @@ authority_variant& shared_lisp_task_runner::variant() noexcept
   return implementation_->variant();
 }
 
+const std::vector<request_record>& shared_lisp_task_runner::submitted_requests() const noexcept
+{
+  return implementation_->submitted_requests();
+}
+
 std::vector<std::string> shared_lisp_task_runner::task_events() const
 {
   return implementation_->task_events();
@@ -287,4 +336,4 @@ std::vector<std::string> shared_lisp_task_runner::variant_events() const
   return implementation_->variant_events();
 }
 
-}  // namespace muesli_bt::experiments::controlled_authority
+} // namespace muesli_bt::experiments::controlled_authority

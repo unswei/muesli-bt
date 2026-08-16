@@ -99,8 +99,7 @@ public:
   void wait_for_start()
   {
     std::unique_lock lock(mutex_);
-    check(condition_.wait_for(lock, 2s, [this] { return started_; }),
-          "provider did not start");
+    check(condition_.wait_for(lock, 2s, [this] { return started_; }), "provider did not start");
   }
 
   void release()
@@ -113,8 +112,7 @@ public:
   void wait_for_finish()
   {
     std::unique_lock lock(mutex_);
-    check(condition_.wait_for(lock, 2s, [this] { return finished_; }),
-          "provider did not finish");
+    check(condition_.wait_for(lock, 2s, [this] { return finished_; }), "provider did not finish");
   }
 
 private:
@@ -127,18 +125,20 @@ private:
 
 effect_recorder make_recorder(deterministic_coordinator& coordinator)
 {
-  return effect_recorder(
-      [&coordinator](const request_record& request, logical_time at)
-      { return coordinator.assess(request, at); });
+  return effect_recorder([&coordinator](const request_record& request, logical_time at)
+                         { return coordinator.assess(request, at); });
 }
 
 bool has_event(const std::vector<std::string>& events, std::string_view type,
                std::string_view field)
 {
   const std::string type_text = "\"type\":\"" + std::string(type) + "\"";
-  return std::any_of(events.begin(), events.end(), [&](const std::string& line)
-                     { return line.find(type_text) != std::string::npos &&
-                              line.find(field) != std::string::npos; });
+  return std::any_of(events.begin(), events.end(),
+                     [&](const std::string& line)
+                     {
+                       return line.find(type_text) != std::string::npos &&
+                              line.find(field) != std::string::npos;
+                     });
 }
 
 void test_b0_and_b1_execute_through_the_shared_lisp_task()
@@ -153,17 +153,16 @@ void test_b0_and_b1_execute_through_the_shared_lisp_task()
     std::unique_ptr<authority_variant> variant;
     if (blocking)
     {
-      variant = std::make_unique<blocking_variant>(
-          provider, recorder, [&coordinator] { return coordinator.now(); });
+      variant = std::make_unique<blocking_variant>(provider, recorder,
+                                                   [&coordinator] { return coordinator.now(); });
     }
     else
     {
-      variant = std::make_unique<asynchronous_variant>(
-          provider, recorder, [&coordinator] { return coordinator.now(); });
+      variant = std::make_unique<asynchronous_variant>(provider, recorder, [&coordinator]
+                                                       { return coordinator.now(); });
     }
     const std::string variant_id = variant->descriptor().variant_id;
-    shared_lisp_task_runner runner(coordinator, recorder, std::move(variant),
-                                   common_tree_source());
+    shared_lisp_task_runner runner(coordinator, recorder, std::move(variant), common_tree_source());
 
     runner.request_submission();
     (void)runner.tick();
@@ -193,8 +192,8 @@ void test_b2_timeout_runs_fallback_through_the_shared_task()
   coordinator.advance_to(0ms);
   effect_recorder recorder = make_recorder(coordinator);
   auto provider = std::make_shared<gated_provider>();
-  auto variant = std::make_unique<timeout_variant>(
-      provider, recorder, [&coordinator] { return coordinator.now(); });
+  auto variant = std::make_unique<timeout_variant>(provider, recorder,
+                                                   [&coordinator] { return coordinator.now(); });
   const std::string variant_id = variant->descriptor().variant_id;
   shared_lisp_task_runner runner(coordinator, recorder, std::move(variant), common_tree_source());
 
@@ -215,17 +214,16 @@ void test_b2_timeout_runs_fallback_through_the_shared_task()
 void test_b3_rejects_changed_context_through_production_gate()
 {
   deterministic_coordinator coordinator(
-      "context-a",
-      {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
-       {.sequence = 2,
-        .at = 80ms,
-        .kind = task_event_kind::context_changed,
-        .context_id = "context-b"}});
+      "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
+                    {.sequence = 2,
+                     .at = 80ms,
+                     .kind = task_event_kind::context_changed,
+                     .context_id = "context-b"}});
   coordinator.advance_to(0ms);
   effect_recorder recorder = make_recorder(coordinator);
   auto provider = std::make_shared<gated_provider>();
-  auto variant = std::make_unique<invocation_scoped_variant>(
-      provider, recorder, [&coordinator] { return coordinator.now(); });
+  auto variant = std::make_unique<invocation_scoped_variant>(provider, recorder, [&coordinator]
+                                                             { return coordinator.now(); });
   const std::string variant_id = variant->descriptor().variant_id;
   shared_lisp_task_runner runner(coordinator, recorder, std::move(variant), common_tree_source());
 
@@ -248,8 +246,7 @@ void test_b3_rejects_changed_context_through_production_gate()
   check(summary.current_commits == 0 && summary.obsolete_commits == 0 &&
             summary.current_dispatches == 0 && summary.obsolete_dispatches == 0,
         "B3 changed-context result must not commit or dispatch");
-  check(has_event(runner.variant_events(), "vla_result",
-                  "\"reason\":\"context_changed\""),
+  check(has_event(runner.variant_events(), "vla_result", "\"reason\":\"context_changed\""),
         "B3 should retain the production vla_result rejection evidence");
 }
 
@@ -260,8 +257,8 @@ void test_b3_rejects_a_result_after_the_logical_deadline()
   coordinator.advance_to(0ms);
   effect_recorder recorder = make_recorder(coordinator);
   auto provider = std::make_shared<gated_provider>();
-  auto variant = std::make_unique<invocation_scoped_variant>(
-      provider, recorder, [&coordinator] { return coordinator.now(); });
+  auto variant = std::make_unique<invocation_scoped_variant>(provider, recorder, [&coordinator]
+                                                             { return coordinator.now(); });
   const std::string variant_id = variant->descriptor().variant_id;
   shared_lisp_task_runner runner(coordinator, recorder, std::move(variant), common_tree_source());
 
@@ -280,8 +277,7 @@ void test_b3_rejects_a_result_after_the_logical_deadline()
       },
       "B3 did not reject a logically late result");
 
-  check(has_event(runner.variant_events(), "vla_result",
-                  "\"reason\":\"deadline_expired\""),
+  check(has_event(runner.variant_events(), "vla_result", "\"reason\":\"deadline_expired\""),
         "B3 deadline should be decided by the production commit gate");
 }
 
@@ -292,8 +288,8 @@ void test_b3_supersedes_an_older_production_invocation()
   coordinator.advance_to(0ms);
   effect_recorder recorder = make_recorder(coordinator);
   auto provider = std::make_shared<gated_provider>();
-  auto variant = std::make_unique<invocation_scoped_variant>(
-      provider, recorder, [&coordinator] { return coordinator.now(); });
+  auto variant = std::make_unique<invocation_scoped_variant>(provider, recorder, [&coordinator]
+                                                             { return coordinator.now(); });
   const std::string variant_id = variant->descriptor().variant_id;
   shared_lisp_task_runner runner(coordinator, recorder, std::move(variant), common_tree_source());
 
@@ -318,8 +314,7 @@ void test_b3_supersedes_an_older_production_invocation()
   check(summary.terminal_decisions == 2 && summary.current_dispatches == 1 &&
             !summary.has_obsolete_effect(),
         "B3 should reject the superseded invocation and dispatch only its replacement");
-  check(has_event(runner.variant_events(), "async_authority_revoked",
-                  "\"reason\":\"superseded\""),
+  check(has_event(runner.variant_events(), "async_authority_revoked", "\"reason\":\"superseded\""),
         "B3 replacement should use production generation revocation");
 }
 
@@ -330,8 +325,8 @@ void test_b3_accepts_and_dispatches_a_current_result()
   coordinator.advance_to(0ms);
   effect_recorder recorder = make_recorder(coordinator);
   auto provider = std::make_shared<gated_provider>();
-  auto variant = std::make_unique<invocation_scoped_variant>(
-      provider, recorder, [&coordinator] { return coordinator.now(); });
+  auto variant = std::make_unique<invocation_scoped_variant>(provider, recorder, [&coordinator]
+                                                             { return coordinator.now(); });
   const std::string variant_id = variant->descriptor().variant_id;
   shared_lisp_task_runner runner(coordinator, recorder, std::move(variant), common_tree_source());
 
@@ -363,17 +358,16 @@ void test_b3_accepts_and_dispatches_a_current_result()
 void test_b3_revalidates_context_at_production_dispatch_gate()
 {
   deterministic_coordinator coordinator(
-      "context-a",
-      {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
-       {.sequence = 2,
-        .at = 210ms,
-        .kind = task_event_kind::context_changed,
-        .context_id = "context-b"}});
+      "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
+                    {.sequence = 2,
+                     .at = 210ms,
+                     .kind = task_event_kind::context_changed,
+                     .context_id = "context-b"}});
   coordinator.advance_to(0ms);
   effect_recorder recorder = make_recorder(coordinator);
   auto provider = std::make_shared<gated_provider>();
-  auto variant = std::make_unique<invocation_scoped_variant>(
-      provider, recorder, [&coordinator] { return coordinator.now(); });
+  auto variant = std::make_unique<invocation_scoped_variant>(provider, recorder, [&coordinator]
+                                                             { return coordinator.now(); });
   const std::string variant_id = variant->descriptor().variant_id;
   shared_lisp_task_runner runner(coordinator, recorder, std::move(variant), common_tree_source());
 
@@ -405,14 +399,13 @@ void test_b3_revalidates_context_at_production_dispatch_gate()
 void test_b3_preemption_revokes_production_invocation_and_selects_safe_stand()
 {
   deterministic_coordinator coordinator(
-      "context-a",
-      {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
-       {.sequence = 2, .at = 80ms, .kind = task_event_kind::emergency_activated}});
+      "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
+                    {.sequence = 2, .at = 80ms, .kind = task_event_kind::emergency_activated}});
   coordinator.advance_to(0ms);
   effect_recorder recorder = make_recorder(coordinator);
   auto provider = std::make_shared<gated_provider>();
-  auto variant = std::make_unique<invocation_scoped_variant>(
-      provider, recorder, [&coordinator] { return coordinator.now(); });
+  auto variant = std::make_unique<invocation_scoped_variant>(provider, recorder, [&coordinator]
+                                                             { return coordinator.now(); });
   const std::string variant_id = variant->descriptor().variant_id;
   shared_lisp_task_runner runner(coordinator, recorder, std::move(variant), common_tree_source());
 
@@ -436,14 +429,13 @@ void test_b3_preemption_revokes_production_invocation_and_selects_safe_stand()
 void test_b3_runtime_reset_revokes_and_clears_production_state()
 {
   deterministic_coordinator coordinator(
-      "context-a",
-      {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
-       {.sequence = 2, .at = 80ms, .kind = task_event_kind::runtime_reset}});
+      "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
+                    {.sequence = 2, .at = 80ms, .kind = task_event_kind::runtime_reset}});
   coordinator.advance_to(0ms);
   effect_recorder recorder = make_recorder(coordinator);
   auto provider = std::make_shared<gated_provider>();
-  auto variant = std::make_unique<invocation_scoped_variant>(
-      provider, recorder, [&coordinator] { return coordinator.now(); });
+  auto variant = std::make_unique<invocation_scoped_variant>(provider, recorder, [&coordinator]
+                                                             { return coordinator.now(); });
   const std::string variant_id = variant->descriptor().variant_id;
   shared_lisp_task_runner runner(coordinator, recorder, std::move(variant), common_tree_source());
 
@@ -465,7 +457,100 @@ void test_b3_runtime_reset_revokes_and_clears_production_state()
   provider->wait_for_finish();
 }
 
-}  // namespace
+void test_branch_exit_revokes_b3_without_resubmission_on_reentry()
+{
+  deterministic_coordinator coordinator(
+      "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
+                    {.sequence = 2, .at = 80ms, .kind = task_event_kind::leave_model_branch},
+                    {.sequence = 3, .at = 120ms, .kind = task_event_kind::reenter_model_branch}});
+  coordinator.advance_to(0ms);
+  effect_recorder recorder = make_recorder(coordinator);
+  auto provider = std::make_shared<gated_provider>();
+  auto variant = std::make_unique<invocation_scoped_variant>(provider, recorder, [&coordinator]
+                                                             { return coordinator.now(); });
+  const std::string variant_id = variant->descriptor().variant_id;
+  shared_lisp_task_runner runner(coordinator, recorder, std::move(variant), common_tree_source());
+
+  runner.request_submission();
+  (void)runner.tick();
+  provider->wait_for_start();
+  coordinator.advance_to(80ms);
+  (void)runner.tick();
+  coordinator.advance_to(120ms);
+  (void)runner.tick();
+  provider->wait_for_finish();
+  (void)runner.pump();
+  (void)runner.tick();
+
+  const effect_summary summary = recorder.summary(variant_id);
+  check(summary.terminal_decisions == 1 && summary.result_rejections == 1 &&
+            runner.submitted_requests().size() == 1 && runner.variant().active_jobs() == 0,
+        "branch re-entry must not revive or silently resubmit revoked B3 work");
+  check(has_event(runner.variant_events(), "async_authority_revoked",
+                  "\"reason\":\"branch_revoked\""),
+        "ordinary model-branch exit should use the production revocation path");
+}
+
+void test_b3_explicit_cancel_uses_production_cancel_gate()
+{
+  deterministic_coordinator coordinator(
+      "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch}});
+  coordinator.advance_to(0ms);
+  effect_recorder recorder = make_recorder(coordinator);
+  auto provider = std::make_shared<gated_provider>();
+  auto variant = std::make_unique<invocation_scoped_variant>(provider, recorder, [&coordinator]
+                                                             { return coordinator.now(); });
+  const std::string variant_id = variant->descriptor().variant_id;
+  shared_lisp_task_runner runner(coordinator, recorder, std::move(variant), common_tree_source());
+
+  runner.request_submission();
+  (void)runner.tick();
+  provider->wait_for_start();
+  const std::uint64_t request_id = runner.submitted_requests().front().request_id;
+  const variant_update cancelled = runner.cancel_request(request_id);
+  check(cancelled.rejections == 1 && cancelled.last_reason == "cancelled",
+        "B3 explicit cancel should make one deterministic rejection visible to the task");
+  (void)runner.tick();
+  provider->wait_for_finish();
+
+  const effect_summary summary = recorder.summary(variant_id);
+  check(summary.cancellation_requests == 1 && summary.terminal_decisions == 1,
+        "B3 explicit cancellation should record one request and one terminal decision");
+  check(has_event(runner.variant_events(), "vla_cancel", "\"accepted\":true"),
+        "B3 explicit cancellation should retain canonical production vla_cancel evidence");
+}
+
+void test_preempted_b1_completion_is_observed_without_dispatch()
+{
+  deterministic_coordinator coordinator(
+      "context-a", {{.sequence = 1, .at = 0ms, .kind = task_event_kind::enter_model_branch},
+                    {.sequence = 2, .at = 80ms, .kind = task_event_kind::emergency_activated}});
+  coordinator.advance_to(0ms);
+  effect_recorder recorder = make_recorder(coordinator);
+  auto provider = std::make_shared<gated_provider>();
+  auto variant = std::make_unique<asynchronous_variant>(provider, recorder, [&coordinator]
+                                                        { return coordinator.now(); });
+  const std::string variant_id = variant->descriptor().variant_id;
+  shared_lisp_task_runner runner(coordinator, recorder, std::move(variant), common_tree_source());
+
+  runner.request_submission();
+  (void)runner.tick();
+  provider->wait_for_start();
+  coordinator.advance_to(80ms);
+  (void)runner.tick();
+  provider->release();
+  provider->wait_for_finish();
+  wait_for([&] { return runner.pump().provider_completions == 1; },
+           "pre-empted B1 completion was not admitted by the background pump");
+  (void)runner.tick();
+
+  const effect_summary summary = recorder.summary(variant_id);
+  check(summary.obsolete_commits == 1 && summary.safe_stand_activations == 1 &&
+            summary.current_dispatches == 0 && summary.obsolete_dispatches == 0,
+        "pre-empted ordinary async work should expose its stale commit without walking");
+}
+
+} // namespace
 
 int main()
 {
@@ -477,8 +562,13 @@ int main()
       {"B3 production supersession", test_b3_supersedes_an_older_production_invocation},
       {"B3 production context gate", test_b3_rejects_changed_context_through_production_gate},
       {"B3 production dispatch gate", test_b3_revalidates_context_at_production_dispatch_gate},
-      {"B3 production pre-emption", test_b3_preemption_revokes_production_invocation_and_selects_safe_stand},
+      {"B3 production pre-emption",
+       test_b3_preemption_revokes_production_invocation_and_selects_safe_stand},
       {"B3 production reset", test_b3_runtime_reset_revokes_and_clears_production_state},
+      {"B3 branch exit and re-entry", test_branch_exit_revokes_b3_without_resubmission_on_reentry},
+      {"B3 production explicit cancel", test_b3_explicit_cancel_uses_production_cancel_gate},
+      {"B1 pre-empted background completion",
+       test_preempted_b1_completion_is_observed_without_dispatch},
   };
 
   std::size_t passed = 0;

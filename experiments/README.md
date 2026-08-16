@@ -5,7 +5,8 @@ runnable examples under `examples/`.
 
 - `invocation_authority_controlled/` contains the provider-independent
   comparison of blocking, asynchronous, timeout-only and invocation-scoped
-  execution.
+  execution, including the deterministic campaign driver and paper artefact
+  writer.
 
 Each campaign keeps its frozen protocol separate from generated runs. Runtime
 evidence uses `mbt.evt.v1`; paper-facing summaries are derived artefacts.

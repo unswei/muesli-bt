@@ -43,6 +43,7 @@ struct provider_result
   provider_status status = provider_status::ok;
   task_proposal proposal;
   std::string reason;
+  std::size_t completion_copies = 1;
 };
 
 class proposal_provider
@@ -87,6 +88,7 @@ public:
   virtual variant_update submit(const request_record& request) = 0;
   virtual variant_update poll(logical_time admission_at) = 0;
   virtual bool dispatch(logical_time dispatch_at) = 0;
+  virtual variant_update cancel(std::uint64_t request_id, logical_time cancelled_at);
   virtual void synchronise(const task_snapshot& task);
   virtual void halt(logical_time halted_at, std::string_view reason);
   virtual void reset(logical_time reset_at);
@@ -153,6 +155,7 @@ public:
   variant_update submit(const request_record& request) override;
   variant_update poll(logical_time admission_at) override;
   bool dispatch(logical_time dispatch_at) override;
+  variant_update cancel(std::uint64_t request_id, logical_time cancelled_at) override;
   [[nodiscard]] std::size_t active_jobs() const override;
 
 private:
@@ -160,4 +163,4 @@ private:
   std::unique_ptr<implementation> implementation_;
 };
 
-}  // namespace muesli_bt::experiments::controlled_authority
+} // namespace muesli_bt::experiments::controlled_authority

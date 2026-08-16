@@ -46,6 +46,18 @@ independent oracle tracks the branch epoch, request generation, context and
 deadline. The oracle decides whether a commit or dispatch was obsolete; the
 implementation under test cannot redefine that outcome.
 
+The campaign driver resolves the frozen JSON files into a versioned tabular
+plan. The C++ engine reads that plan and executes the common task through the
+four real adapters. The driver then validates each canonical event stream and
+derives manifests, summaries and paper tables. Derived files never replace the
+canonical runtime evidence.
+
+The completion-burst schedule creates 16 independent task instances before it
+releases their provider barriers at one logical time. The replay schedule runs
+the preceding schedules again with the same deterministic scripted provider
+and compares task-decision signatures. Neither schedule substitutes an
+analysis-only model for runtime execution.
+
 The timing lane uses the real monotonic clock. Semantic and timing results are
 never pooled.
 
@@ -87,6 +99,12 @@ the canonical `mbt.evt.v1` stream for the common Lisp task. `variant_events()`
 returns the separate production stream owned by B3. The streams are not
 concatenated because each has its own canonical sequence and run envelope.
 
+`campaign_plan.hpp` defines the versioned resolved-plan boundary.
+`campaign_engine.hpp` executes its run records. The outcome and writer modules
+evaluate the frozen expectations and serialise raw trial records plus canonical
+streams. `run_campaign.py` is the supported command-line entry point and is
+responsible for all derived artefacts.
+
 ## example
 
 The common task gives an emergency branch priority over the model-mediated
@@ -124,6 +142,42 @@ runner.request_submission();
 The complete executable examples are in
 `experiments/invocation_authority_controlled/tests/task_runner_tests.cpp`.
 
+Build and run one complete engineering seed with:
+
+```sh
+cmake -S . -B build -DMUESLI_BT_BUILD_CONTROLLED_AUTHORITY_EXPERIMENT=ON
+cmake --build build --target muesli_bt_controlled_authority_campaign -j
+python3 experiments/invocation_authority_controlled/run_campaign.py \
+  --output /tmp/controlled-authority-seed-0 \
+  --seeds 0
+```
+
+The standard seed sets are selected with `--seed-set engineering` and
+`--seed-set paper`. The output directory must be new or empty.
+
+The artefact tree is:
+
+```text
+campaign-manifest.json
+resolved-plan.tsv
+raw_trials.jsonl
+events/*.mbt.evt.v1.jsonl
+runs/<internal-schedule>/<variant>/<seed>/manifest.json
+summary/trials.csv
+summary/schedule-summary.{csv,json}
+summary/variant-summary.{csv,json}
+paper/controlled-authority-table.{csv,md}
+paper/variant-summary.md
+```
+
+Run manifests retain internal schedule and variant keys for auditability, and
+pair each key with its reader label. Paper tables omit internal schedule keys
+and use the reader labels directly. Every canonical stream and frozen input is
+identified by a SHA-256 digest in a manifest. The compact paper table reports
+obsolete-effect trials and terminal-outcome counts. The terminal count exposes
+duplicate completion and blocked-submission controls that an obsolete-effect
+column alone would hide.
+
 ## gotchas
 
 - Internal schedule identifiers are for manifests and regression fixtures, not
@@ -141,6 +195,12 @@ The complete executable examples are in
 - The primary integrity unit is a complete resolved schedule, not an individual
   tick.
 - Runtime evidence must remain in `mbt.evt.v1`.
+- The driver rejects a non-empty output directory. Choose a new campaign path
+  instead of combining runs.
+- A partial or engineering campaign does not evaluate the paper gate. Only the
+  exact four variants, 16 schedules and frozen 128 paper seeds do so.
+- The replay schedule requires every preceding schedule for the same variant
+  and seed.
 
 ## see also
 
