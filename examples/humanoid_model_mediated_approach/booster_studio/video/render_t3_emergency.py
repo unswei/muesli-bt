@@ -69,7 +69,6 @@ def _load_events(path: pathlib.Path) -> list[dict[str, Any]]:
             not isinstance(event, dict)
             or event.get("schema") != "mbt.evt.v1"
             or not isinstance(event.get("seq"), int)
-            or not isinstance(event.get("tick"), int)
             or not isinstance(event.get("unix_ms"), int)
             or not isinstance(event.get("data"), dict)
         ):
@@ -138,6 +137,13 @@ def _positive_number(value: object, field: str) -> float:
     ):
         raise EmergencyVideoError(f"{field} must be a positive finite number")
     return float(value)
+
+
+def _event_tick(event: dict[str, Any], description: str) -> int:
+    tick = event.get("tick")
+    if isinstance(tick, bool) or not isinstance(tick, int) or tick < 0:
+        raise EmergencyVideoError(f"{description} has no valid BT tick")
+    return tick
 
 
 def _cancelled_target(result: dict[str, Any]) -> tuple[float, float, float]:
@@ -232,8 +238,8 @@ def build_timeline(
         "cleared walking-target state",
     )
 
-    emergency_tick = emergency["tick"]
-    safe_tick = safe_stand["tick"]
+    emergency_tick = _event_tick(emergency, "software emergency")
+    safe_tick = _event_tick(safe_stand, "safe-stand transition")
     if safe_tick < emergency_tick or safe_tick > emergency_tick + 1:
         raise EmergencyVideoError(
             "safe_stand did not become active within one BT tick of the emergency"
@@ -243,7 +249,8 @@ def build_timeline(
         (request_revoked, "request revocation"),
         (target_none, "walking-target clear"),
     ):
-        if event["tick"] < emergency_tick or event["tick"] > emergency_tick + 1:
+        event_tick = _event_tick(event, description)
+        if event_tick < emergency_tick or event_tick > emergency_tick + 1:
             raise EmergencyVideoError(
                 f"{description} did not occur within one BT tick of the emergency"
             )
@@ -266,7 +273,7 @@ def build_timeline(
         )
     if (
         revocation["seq"] < emergency["seq"]
-        or revocation["tick"] > emergency_tick + 1
+        or _event_tick(revocation, "authority revocation") > emergency_tick + 1
     ):
         raise EmergencyVideoError(
             "authority was not revoked within one BT tick of the emergency"

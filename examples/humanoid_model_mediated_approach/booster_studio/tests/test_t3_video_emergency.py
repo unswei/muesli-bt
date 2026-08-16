@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import copy
 import importlib.util
+import json
 import pathlib
 import sys
+import tempfile
 import unittest
 
 PROJECT = pathlib.Path(__file__).resolve().parents[1]
@@ -194,6 +196,20 @@ def shot() -> dict:
 
 
 class T3EmergencyVideoTests(unittest.TestCase):
+    def test_canonical_envelope_allows_non_tick_metadata_events(self) -> None:
+        events = t3_events()
+        events[0].pop("tick")
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = pathlib.Path(temporary_directory) / "events.jsonl"
+            path.write_text(
+                "".join(json.dumps(item) + "\n" for item in events),
+                encoding="utf-8",
+            )
+
+            loaded = emergency_video._load_events(path)
+
+        self.assertEqual(len(loaded), len(events))
+
     def test_timeline_proves_immediate_revocation_and_late_drop(self) -> None:
         timeline = emergency_video.build_timeline(t3_events(), capture(), shot())
 
