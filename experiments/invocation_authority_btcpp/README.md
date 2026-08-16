@@ -38,6 +38,11 @@ See [the public experiment contract](../../docs/examples/invocation-authority-bt
 - `run_campaign.py` resolves the frozen four-way plan, invokes the matched
   engine and writes paired manifests, summaries and reader-facing paper tables.
 
+A provider completion stops being logically active when the BT thread observes
+it. Worker-thread teardown may finish slightly later. This separation prevents
+operating-system scheduling from changing the tick in which a rejected result
+activates the authored fallback.
+
 ## run
 
 Run one complete engineering seed with:

@@ -292,6 +292,7 @@ public:
     {
       completed_call completion = std::move(completions.front());
       completions.pop_front();
+      mark_terminal_observed(completion.request.request_id);
       ++update.provider_completions;
       const std::optional<std::string> rejection =
           validate_provider_result(completion.result, validation_);
@@ -378,7 +379,7 @@ public:
     return static_cast<std::size_t>(
         std::count_if(jobs_.begin(), jobs_.end(),
                       [](const std::unique_ptr<worker_job>& job)
-                      { return !job->finished.load(); }));
+                      { return !job->terminal_observed; }));
   }
 
   [[nodiscard]] std::vector<std::string> canonical_events() const
@@ -397,9 +398,22 @@ private:
   {
     request_record request;
     bool cancellation_requested = false;
+    bool terminal_observed = false;
     std::atomic<bool> finished{false};
     std::jthread thread;
   };
+
+  void mark_terminal_observed(std::uint64_t request_id)
+  {
+    std::lock_guard lock(jobs_mutex_);
+    const auto found = std::find_if(
+        jobs_.begin(), jobs_.end(), [request_id](const std::unique_ptr<worker_job>& job)
+        { return job->request.request_id == request_id; });
+    if (found != jobs_.end())
+    {
+      (*found)->terminal_observed = true;
+    }
+  }
 
   void reap_finished_jobs()
   {
@@ -408,7 +422,8 @@ private:
       std::lock_guard lock(jobs_mutex_);
       auto first = std::stable_partition(
           jobs_.begin(), jobs_.end(),
-          [](const std::unique_ptr<worker_job>& job) { return !job->finished.load(); });
+          [](const std::unique_ptr<worker_job>& job)
+          { return !(job->finished.load() && job->terminal_observed); });
       std::move(first, jobs_.end(), std::back_inserter(finished));
       jobs_.erase(first, jobs_.end());
     }

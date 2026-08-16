@@ -338,6 +338,23 @@ void test_host_validation_rejects_invalid_pose()
   check(full.summary().current_commits == 0, "host-invalid proposal must not commit");
 }
 
+void test_ordinary_rejection_completes_lifecycle_deterministically()
+{
+  std::vector<scripted_provider_job> provider_jobs = jobs();
+  provider_jobs.front().result.proposal.pose[0] = 2.0;
+  fixture ordinary(profile::ordinary, enter_only(), std::move(provider_jobs));
+  ordinary.enter_and_submit();
+  ordinary.release("r1", 200ms);
+  (void)ordinary.tick_until(
+      [&ordinary] { return ordinary.summary().terminal_decisions == 1; });
+  check(ordinary.has_rejection("invalid_pose"),
+        "ordinary lifecycle should expose the host rejection");
+  check(ordinary.summary().fallback_activations == 1,
+        "ordinary lifecycle should activate fallback in the rejecting tick");
+  check(ordinary.runner->variant().active_jobs() == 0,
+        "an observed ordinary completion should no longer be logically active");
+}
+
 void test_reset_revokes_pending_work()
 {
   const std::vector<task_event> events{
@@ -414,6 +431,8 @@ int main(int argc, char** argv)
       {"duplicate completion", test_duplicate_completion_has_one_terminal_decision},
       {"cancel completion race", test_cancel_completion_race_has_one_terminal_decision},
       {"host validation", test_host_validation_rejects_invalid_pose},
+      {"ordinary rejection lifecycle",
+       test_ordinary_rejection_completes_lifecycle_deterministically},
       {"runtime reset", test_reset_revokes_pending_work},
   };
 
