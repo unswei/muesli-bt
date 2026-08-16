@@ -290,6 +290,28 @@ A successful WP8 campaign should report integrity and recovery separately:
 the rejected proposal must never be dispatched, while the recovery policy
 must produce at least one current-context action and complete the episode.
 
+Run the authorised Marvin campaign into a new evidence root after rebuilding
+the joint image from the pushed WP8 revision:
+
+```bash
+g8_root=/home/oliver/experiments/muesli-air-hockey/wp8-recovery-9cb7954-1b6bbbb
+checkpoint=/home/oliver/experiments/airhockey-memory-distillation/principal-sweep-v1-2026-08-14-v3/final/structured_k2/14303/checkpoint.npz
+docker run --rm --cpus 2 --memory 8g --ipc host \
+  --mount type=bind,src="$checkpoint",dst=/checkpoint/structured_k2-14303.npz,readonly \
+  --mount type=bind,src="$g8_root",dst=/wp8 \
+  local/muesli-air-hockey:wp8-9cb7954-1b6bbbb \
+  python3 /opt/muesli-bt/examples/air_hockey_model_mediated_defence/run_wp8.py run \
+    --runner /opt/muesli-bt/build/air-hockey-wp4/muesli_bt_air_hockey_scenario_tests \
+    --checkpoint /checkpoint/structured_k2-14303.npz \
+    --out /wp8/evidence/campaign \
+    --image local/muesli-air-hockey:wp8-9cb7954-1b6bbbb \
+    --image-digest <image-id-without-sha256-prefix>
+```
+
+This campaign is separate from the sealed WP7 root and runs all 228 matched
+pairs under deadline-only, invocation-scoped hold, and invocation-scoped
+current-context recovery treatments.
+
 ## run the contract tests
 
 From the repository root:

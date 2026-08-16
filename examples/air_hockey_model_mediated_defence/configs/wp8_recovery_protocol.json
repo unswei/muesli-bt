@@ -76,6 +76,7 @@
     "maximum_missing_terminal_invocations": 0,
     "maximum_replay_mismatches": 0,
     "maximum_trace_failures": 0,
+    "maximum_learned_p95_inference_ms": 20.0,
     "maximum_tick_p99_ms": 20.0
   }
 }
