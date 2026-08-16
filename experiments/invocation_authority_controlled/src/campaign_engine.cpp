@@ -294,9 +294,18 @@ public:
       return;
     }
     const auto deadline = std::chrono::steady_clock::now() + 2s;
+    bool provider_completion_observed = false;
     do
     {
-      measure([this] { (void)runner_->pump(); });
+      variant_update update;
+      measure([this, &update] { update = runner_->pump(); });
+      provider_completion_observed =
+          provider_completion_observed || update.provider_completions > 0;
+      if (!provider_completion_observed)
+      {
+        std::this_thread::yield();
+        continue;
+      }
       measure([this] { (void)runner_->tick(); });
       if (terminal_recorded(request->second))
       {
