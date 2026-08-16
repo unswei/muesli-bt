@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.invalid/schemas/controlled_authority/v1/schedule-catalogue.schema.json",
+  "title": "Controlled invocation-authority schedule catalogue v1",
+  "type": "object",
+  "required": ["schema_version", "catalogue_id", "time_unit", "schedules"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "controlled-authority.schedule-catalogue.v1"},
+    "catalogue_id": {"const": "controlled-authority.c0.schedules.v1"},
+    "time_unit": {"const": "ms"},
+    "schedules": {
+      "type": "array",
+      "minItems": 16,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": ["schedule_id", "reader_label", "purpose", "events", "required_full_outcome"],
+        "properties": {
+          "schedule_id": {"type": "string", "pattern": "^F(0[1-9]|1[0-6])$"},
+          "reader_label": {"type": "string", "minLength": 12},
+          "purpose": {"type": "string", "minLength": 12},
+          "events": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["at", "event"],
+              "properties": {
+                "at": {"type": "integer", "minimum": 0},
+                "event": {"type": "string", "minLength": 3}
+              },
+              "additionalProperties": true
+            }
+          },
+          "required_full_outcome": {"type": "string", "minLength": 5}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

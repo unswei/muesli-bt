@@ -175,6 +175,7 @@ nav:
       - Planning BT (PTZ): examples/planner-bt-ptz.md
       - VLA Stub BT: examples/vla-stub-bt.md
       - Hybrid VLA + Planner: examples/hybrid-vla-mcts.md
+      - Controlled Invocation-authority Campaign: examples/invocation-authority-controlled-campaign.md
       - Humanoid Model-mediated Approach: examples/humanoid-model-mediated-approach.md
       - Air-hockey Model-mediated Defence: examples/air-hockey-model-mediated-defence.md
       - C++ Nodes: examples/cpp-nodes.md

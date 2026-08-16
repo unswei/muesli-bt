@@ -1,0 +1,243 @@
+{
+  "$schema": "../../../schemas/controlled_authority/v1/protocol.schema.json",
+  "schema_version": "controlled-authority.protocol.v1",
+  "protocol_id": "controlled-authority.c0.v1",
+  "gate": "C0",
+  "status": "frozen",
+  "reader_language": "en-AU",
+  "identifier_policy": {
+    "schedule_ids_are_internal": true,
+    "reader_facing_field": "reader_label",
+    "paper_must_define_variants_before_using_short_labels": true
+  },
+  "common_task": {
+    "tree": "../lisp/common_task.lisp",
+    "initial_context_id": "context-a",
+    "request_deadline_ms": 500,
+    "proposal": {
+      "type": "approach_pose",
+      "frame_id": "task_context",
+      "dimensions": 3,
+      "bounds": {
+        "min": [-1.0, -1.0, -3.141593],
+        "max": [1.0, 1.0, 3.141593]
+      }
+    },
+    "fallback": "safe_wait",
+    "emergency_capability": "safe_stand"
+  },
+  "variants": [
+    {
+      "variant_id": "authority-b0-blocking",
+      "short_label": "B0",
+      "reader_label": "blocking service call",
+      "non_blocking": false,
+      "deadline": false,
+      "epoch_generation": false,
+      "context_identity": false,
+      "logical_revocation": false,
+      "terminal_claim": false,
+      "dispatch_revalidation": false
+    },
+    {
+      "variant_id": "authority-b1-asynchronous",
+      "short_label": "B1",
+      "reader_label": "ordinary asynchronous completion",
+      "non_blocking": true,
+      "deadline": false,
+      "epoch_generation": false,
+      "context_identity": false,
+      "logical_revocation": false,
+      "terminal_claim": false,
+      "dispatch_revalidation": false
+    },
+    {
+      "variant_id": "authority-b2-timeout",
+      "short_label": "B2",
+      "reader_label": "timeout and best-effort cancellation",
+      "non_blocking": true,
+      "deadline": true,
+      "epoch_generation": false,
+      "context_identity": false,
+      "logical_revocation": false,
+      "terminal_claim": "partial",
+      "dispatch_revalidation": false
+    },
+    {
+      "variant_id": "authority-b3-invocation-scoped",
+      "short_label": "B3",
+      "reader_label": "invocation-scoped authority",
+      "non_blocking": true,
+      "deadline": true,
+      "epoch_generation": true,
+      "context_identity": true,
+      "logical_revocation": true,
+      "terminal_claim": true,
+      "dispatch_revalidation": true
+    }
+  ],
+  "schedule_catalogue": "../schedules/catalogue.v1.json",
+  "seed_sets": {
+    "engineering": {
+      "first": 0,
+      "count": 32
+    },
+    "paper": {
+      "first": 10000,
+      "count": 128
+    }
+  },
+  "semantic_lane": {
+    "clock": "stepped",
+    "ordering": "event_barriers",
+    "paper_runs_per_schedule_and_variant": 128,
+    "primary_integrity_schedule_ids": ["F03", "F04", "F05", "F06", "F07"],
+    "complete_schedule_is_experimental_unit": true
+  },
+  "timing_lane": {
+    "clock": "steady_clock",
+    "canonical_host": "Apple M3",
+    "primary": {
+      "service_delay_ms": 500,
+      "tick_rate_hz": 50,
+      "concurrent_jobs": 1,
+      "repetitions": 200,
+      "statistic": "p99_of_maximum_tick_per_trial"
+    },
+    "service_delay_ms": [0, 5, 20, 50, 100, 250, 500, 1000, 2000],
+    "tick_rate_hz": [20, 50],
+    "concurrent_jobs": [1, 4, 16],
+    "delay_distributions": ["fixed", "uniform", "bimodal", "long_tail"],
+    "secondary_repetitions": 30
+  },
+  "run_level_metrics": [
+    "obsolete_effect",
+    "current_result_accepted_exactly_once",
+    "valid_current_result_rejected",
+    "intervention_to_fallback_ms",
+    "maximum_tick_ms",
+    "terminal_outcome_count",
+    "canonical_trace_valid",
+    "task_replay_equal"
+  ],
+  "oracle_precedence": [
+    "branch_revoked",
+    "superseded",
+    "context_changed",
+    "deadline_expired",
+    "current"
+  ],
+  "expected_variant_outcomes": {
+    "F01": {
+      "B0": "accept_current_exactly_once",
+      "B1": "accept_current_exactly_once",
+      "B2": "accept_current_exactly_once",
+      "B3": "accept_current_exactly_once"
+    },
+    "F02": {
+      "B0": "obsolete_effect_without_deadline",
+      "B1": "obsolete_effect_without_deadline",
+      "B2": "reject_deadline_expired",
+      "B3": "reject_deadline_expired"
+    },
+    "F03": {
+      "B0": "obsolete_effect_after_unobserved_branch_change",
+      "B1": "obsolete_effect",
+      "B2": "obsolete_effect",
+      "B3": "reject_branch_revoked"
+    },
+    "F04": {
+      "B0": "obsolete_effect_after_unobserved_preemption",
+      "B1": "obsolete_effect",
+      "B2": "obsolete_effect",
+      "B3": "reject_branch_revoked_and_activate_safe_stand"
+    },
+    "F05": {
+      "B0": "new_request_cannot_start_while_blocked",
+      "B1": "obsolete_effect",
+      "B2": "obsolete_effect",
+      "B3": "reject_superseded_then_accept_current"
+    },
+    "F06": {
+      "B0": "obsolete_effect_after_unobserved_context_change",
+      "B1": "obsolete_effect",
+      "B2": "obsolete_effect",
+      "B3": "reject_context_changed"
+    },
+    "F07": {
+      "B0": "obsolete_dispatch",
+      "B1": "obsolete_dispatch",
+      "B2": "obsolete_dispatch",
+      "B3": "reject_dispatch_context_changed"
+    },
+    "F08": {
+      "B0": "not_applicable_to_synchronous_return",
+      "B1": "duplicate_effect_exposed",
+      "B2": "one_terminal_decision",
+      "B3": "one_terminal_decision"
+    },
+    "F09": {
+      "B0": "not_applicable_without_cancellation",
+      "B1": "not_applicable_without_cancellation",
+      "B2": "one_terminal_decision",
+      "B3": "one_deterministic_terminal_decision"
+    },
+    "F10": {
+      "B0": "reject_invalid_schema",
+      "B1": "reject_invalid_schema",
+      "B2": "reject_invalid_schema",
+      "B3": "reject_invalid_schema"
+    },
+    "F11": {
+      "B0": "reject_host_validation",
+      "B1": "reject_host_validation",
+      "B2": "reject_host_validation",
+      "B3": "reject_host_validation"
+    },
+    "F12": {
+      "B0": "one_failure_and_delayed_fallback",
+      "B1": "one_failure_and_fallback",
+      "B2": "one_failure_and_fallback",
+      "B3": "one_failure_and_fallback"
+    },
+    "F13": {
+      "B0": "no_cross_job_effect_across_parallel_instances",
+      "B1": "no_cross_job_effect",
+      "B2": "no_cross_job_effect",
+      "B3": "no_cross_job_effect"
+    },
+    "F14": {
+      "B0": "request_key_reuse_cannot_start_while_blocked",
+      "B1": "obsolete_effect_or_old_key_write",
+      "B2": "obsolete_effect_or_old_key_write",
+      "B3": "reject_superseded_without_clearing_new_request"
+    },
+    "F15": {
+      "B0": "obsolete_effect_after_unobserved_reset",
+      "B1": "obsolete_effect",
+      "B2": "obsolete_effect",
+      "B3": "reject_branch_revoked_after_reset"
+    },
+    "F16": {
+      "B0": "task_decisions_equal",
+      "B1": "task_decisions_equal",
+      "B2": "task_decisions_equal",
+      "B3": "task_decisions_equal"
+    }
+  },
+  "negative_control_witnesses": {
+    "without_epoch_or_generation": "F03",
+    "without_context_identity": "F06",
+    "without_local_revocation": "F04",
+    "without_terminal_claim": "F08",
+    "without_dispatch_revalidation": "F07"
+  },
+  "paper_gate": {
+    "maximum_full_obsolete_effects": 0,
+    "maximum_full_false_rejections": 0,
+    "maximum_full_trace_failures": 0,
+    "maximum_full_replay_mismatches": 0,
+    "required_negative_control_exposure": true,
+    "manual_run_exclusion_allowed": false
+  }
+}

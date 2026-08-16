@@ -24,6 +24,8 @@ option(MUESLI_BT_BOOSTER_PORTABLE_RUNNER
 option(MUESLI_BT_BUILD_MODEL_SERVICE_BRIDGE "Build the optional muesli-model-service bridge target" OFF)
 option(MUESLI_BT_BUILD_BENCHMARKS "Build the optional benchmark harness" OFF)
 option(MUESLI_BT_BENCH_WITH_BTCPP "Build the optional BehaviorTree.CPP benchmark adapter" OFF)
+option(MUESLI_BT_BUILD_CONTROLLED_AUTHORITY_EXPERIMENT
+       "Build the controlled invocation-authority experiment" ON)
 
 add_library(
   muesli_bt_core
@@ -450,6 +452,114 @@ endif ()
 
 enable_testing()
 
+if (MUESLI_BT_BUILD_CONTROLLED_AUTHORITY_EXPERIMENT)
+  add_library(
+    muesli_bt_controlled_authority_common_task
+    experiments/invocation_authority_controlled/src/common_task.cpp
+  )
+  target_include_directories(
+    muesli_bt_controlled_authority_common_task
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/experiments/invocation_authority_controlled/src
+  )
+  target_compile_features(muesli_bt_controlled_authority_common_task PUBLIC cxx_std_20)
+  if (MSVC)
+    target_compile_options(muesli_bt_controlled_authority_common_task PRIVATE /W4 /permissive-)
+  else ()
+    target_compile_options(
+      muesli_bt_controlled_authority_common_task PRIVATE -Wall -Wextra -Wpedantic
+    )
+  endif ()
+
+  add_library(
+    muesli_bt_controlled_authority_variants
+    experiments/invocation_authority_controlled/src/effect_recorder.cpp
+    experiments/invocation_authority_controlled/src/variant.cpp
+  )
+  target_include_directories(
+    muesli_bt_controlled_authority_variants
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/experiments/invocation_authority_controlled/src
+  )
+  target_link_libraries(
+    muesli_bt_controlled_authority_variants
+    PUBLIC muesli_bt_controlled_authority_common_task
+  )
+  target_compile_features(muesli_bt_controlled_authority_variants PUBLIC cxx_std_20)
+  if (MSVC)
+    target_compile_options(muesli_bt_controlled_authority_variants PRIVATE /W4 /permissive-)
+  else ()
+    target_compile_options(muesli_bt_controlled_authority_variants PRIVATE -Wall -Wextra -Wpedantic)
+  endif ()
+
+  add_executable(
+    muesli_bt_controlled_authority_common_task_tests
+    experiments/invocation_authority_controlled/tests/common_task_tests.cpp
+  )
+  target_link_libraries(
+    muesli_bt_controlled_authority_common_task_tests
+    PRIVATE muesli_bt_controlled_authority_common_task muesli_bt_core
+  )
+  target_compile_definitions(
+    muesli_bt_controlled_authority_common_task_tests
+    PRIVATE
+      MUESLI_BT_CONTROLLED_AUTHORITY_COMMON_TREE="${CMAKE_CURRENT_SOURCE_DIR}/experiments/invocation_authority_controlled/lisp/common_task.lisp"
+  )
+  add_test(
+    NAME muesli_bt_controlled_authority_common_task
+    COMMAND muesli_bt_controlled_authority_common_task_tests
+  )
+
+  add_executable(
+    muesli_bt_controlled_authority_variant_tests
+    experiments/invocation_authority_controlled/tests/variant_tests.cpp
+  )
+  target_link_libraries(
+    muesli_bt_controlled_authority_variant_tests
+    PRIVATE muesli_bt_controlled_authority_variants
+  )
+  add_test(
+    NAME muesli_bt_controlled_authority_variants
+    COMMAND muesli_bt_controlled_authority_variant_tests
+  )
+
+  add_library(
+    muesli_bt_controlled_authority_runner
+    experiments/invocation_authority_controlled/src/runtime_variant.cpp
+    experiments/invocation_authority_controlled/src/task_runner.cpp
+  )
+  target_include_directories(
+    muesli_bt_controlled_authority_runner
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/experiments/invocation_authority_controlled/src
+  )
+  target_link_libraries(
+    muesli_bt_controlled_authority_runner
+    PUBLIC muesli_bt_controlled_authority_variants muesli_bt_core
+  )
+  target_compile_features(muesli_bt_controlled_authority_runner PUBLIC cxx_std_20)
+  if (MSVC)
+    target_compile_options(muesli_bt_controlled_authority_runner PRIVATE /W4 /permissive-)
+  else ()
+    target_compile_options(muesli_bt_controlled_authority_runner PRIVATE -Wall -Wextra -Wpedantic)
+  endif ()
+
+  add_executable(
+    muesli_bt_controlled_authority_runner_tests
+    experiments/invocation_authority_controlled/tests/task_runner_tests.cpp
+  )
+  target_link_libraries(
+    muesli_bt_controlled_authority_runner_tests
+    PRIVATE muesli_bt_controlled_authority_runner
+  )
+  target_compile_definitions(
+    muesli_bt_controlled_authority_runner_tests
+    PRIVATE
+      MUESLI_BT_CONTROLLED_AUTHORITY_COMMON_TREE="${CMAKE_CURRENT_SOURCE_DIR}/experiments/invocation_authority_controlled/lisp/common_task.lisp"
+  )
+  add_test(
+    NAME muesli_bt_controlled_authority_runner
+    COMMAND muesli_bt_controlled_authority_runner_tests
+  )
+endif ()
+
 add_executable(muslisp_tests tests/test_main.cpp src/repl_support.cpp)
 if (MUESLI_BT_BUILD_INTEGRATION_PYBULLET)
   target_link_libraries(muslisp_tests PRIVATE muesli_bt_integration_pybullet)
@@ -554,6 +664,10 @@ endif ()
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if (Python3_Interpreter_FOUND)
+  add_test(
+    NAME muesli_bt_controlled_authority_c0
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_controlled_authority_c0.py"
+  )
   add_test(
     NAME muesli_bt_trace_validator_smoke
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_validate_trace.py"

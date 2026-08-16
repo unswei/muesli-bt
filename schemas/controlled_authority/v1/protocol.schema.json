@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://muesli-bt.invalid/schemas/controlled_authority/v1/protocol.schema.json",
+  "title": "Controlled invocation-authority protocol v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "gate",
+    "status",
+    "identifier_policy",
+    "common_task",
+    "variants",
+    "schedule_catalogue",
+    "seed_sets",
+    "semantic_lane",
+    "timing_lane",
+    "run_level_metrics",
+    "oracle_precedence",
+    "expected_variant_outcomes",
+    "negative_control_witnesses",
+    "paper_gate"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": "controlled-authority.protocol.v1"},
+    "protocol_id": {"const": "controlled-authority.c0.v1"},
+    "gate": {"const": "C0"},
+    "status": {"const": "frozen"},
+    "reader_language": {"const": "en-AU"},
+    "identifier_policy": {
+      "type": "object",
+      "required": ["schedule_ids_are_internal", "reader_facing_field"],
+      "properties": {
+        "schedule_ids_are_internal": {"const": true},
+        "reader_facing_field": {"const": "reader_label"},
+        "paper_must_define_variants_before_using_short_labels": {"const": true}
+      },
+      "additionalProperties": false
+    },
+    "common_task": {"type": "object"},
+    "variants": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["variant_id", "short_label", "reader_label", "non_blocking", "deadline", "epoch_generation", "context_identity", "logical_revocation", "terminal_claim", "dispatch_revalidation"],
+        "properties": {
+          "variant_id": {"type": "string", "pattern": "^authority-b[0-3]-"},
+          "short_label": {"type": "string", "pattern": "^B[0-3]$"},
+          "reader_label": {"type": "string", "minLength": 8},
+          "non_blocking": {"type": "boolean"},
+          "deadline": {"type": "boolean"},
+          "epoch_generation": {"type": "boolean"},
+          "context_identity": {"type": "boolean"},
+          "logical_revocation": {"type": "boolean"},
+          "terminal_claim": {"type": ["boolean", "string"]},
+          "dispatch_revalidation": {"type": "boolean"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "schedule_catalogue": {"type": "string"},
+    "seed_sets": {
+      "type": "object",
+      "required": ["engineering", "paper"],
+      "properties": {
+        "engineering": {"$ref": "#/$defs/seedSet"},
+        "paper": {"$ref": "#/$defs/seedSet"}
+      },
+      "additionalProperties": false
+    },
+    "semantic_lane": {"type": "object"},
+    "timing_lane": {"type": "object"},
+    "run_level_metrics": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {"type": "string"}
+    },
+    "oracle_precedence": {
+      "const": ["branch_revoked", "superseded", "context_changed", "deadline_expired", "current"]
+    },
+    "expected_variant_outcomes": {
+      "type": "object",
+      "minProperties": 16,
+      "maxProperties": 16,
+      "patternProperties": {
+        "^F(0[1-9]|1[0-6])$": {
+          "type": "object",
+          "required": ["B0", "B1", "B2", "B3"],
+          "properties": {
+            "B0": {"type": "string", "minLength": 5},
+            "B1": {"type": "string", "minLength": 5},
+            "B2": {"type": "string", "minLength": 5},
+            "B3": {"type": "string", "minLength": 5}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "negative_control_witnesses": {
+      "type": "object",
+      "required": ["without_epoch_or_generation", "without_context_identity", "without_local_revocation", "without_terminal_claim", "without_dispatch_revalidation"],
+      "additionalProperties": {"type": "string", "pattern": "^F(0[1-9]|1[0-6])$"}
+    },
+    "paper_gate": {"type": "object"}
+  },
+  "$defs": {
+    "seedSet": {
+      "type": "object",
+      "required": ["first", "count"],
+      "properties": {
+        "first": {"type": "integer", "minimum": 0},
+        "count": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

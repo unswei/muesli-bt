@@ -64,6 +64,7 @@ Most examples follow the same pattern:
 
 ## Advanced Integrations
 
+- [controlled invocation-authority campaign](invocation-authority-controlled-campaign.md) - provider-independent interruption protocol and common task
 - [humanoid model-mediated approach video experiment](humanoid-model-mediated-approach.md) - advanced asynchronous-authority experiment
 - [air-hockey model-mediated defence](air-hockey-model-mediated-defence.md) - dynamic authority harness and reproducible paired analysis
 - [H1 locomotion demo](isaac-h1-ros2-demo.md) - advanced integration

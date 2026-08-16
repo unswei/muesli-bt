@@ -1,0 +1,196 @@
+{
+  "$schema": "../../../schemas/controlled_authority/v1/schedule-catalogue.schema.json",
+  "schema_version": "controlled-authority.schedule-catalogue.v1",
+  "catalogue_id": "controlled-authority.c0.schedules.v1",
+  "time_unit": "ms",
+  "schedules": [
+    {
+      "schedule_id": "F01",
+      "reader_label": "current result before the deadline",
+      "purpose": "positive control for accepting one valid current result",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 200, "event": "receive_result", "request": "r1"},
+        {"at": 220, "event": "dispatch_result", "request": "r1"}
+      ],
+      "required_full_outcome": "accept_current_exactly_once"
+    },
+    {
+      "schedule_id": "F02",
+      "reader_label": "result after the deadline",
+      "purpose": "separate elapsed-time expiry from branch and context changes",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 501, "event": "receive_result", "request": "r1"}
+      ],
+      "required_full_outcome": "reject_deadline_expired"
+    },
+    {
+      "schedule_id": "F03",
+      "reader_label": "branch exit and re-entry before completion",
+      "purpose": "expose an old invocation satisfying a reused node slot",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 80, "event": "leave_model_branch"},
+        {"at": 120, "event": "reenter_model_branch"},
+        {"at": 200, "event": "receive_result", "request": "r1"}
+      ],
+      "required_full_outcome": "reject_branch_revoked"
+    },
+    {
+      "schedule_id": "F04",
+      "reader_label": "higher-priority branch pre-empts a pending request",
+      "purpose": "test same-tick loss of branch authority",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 80, "event": "activate_emergency"},
+        {"at": 200, "event": "receive_result", "request": "r1"}
+      ],
+      "required_full_outcome": "reject_branch_revoked_and_activate_safe_stand"
+    },
+    {
+      "schedule_id": "F05",
+      "reader_label": "a newer request supersedes an older request",
+      "purpose": "test generation identity within one live branch",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 120, "event": "submit_request", "request": "r2"},
+        {"at": 200, "event": "receive_result", "request": "r1"},
+        {"at": 240, "event": "receive_result", "request": "r2"}
+      ],
+      "required_full_outcome": "reject_superseded_then_accept_current"
+    },
+    {
+      "schedule_id": "F06",
+      "reader_label": "observation context changes before result admission",
+      "purpose": "isolate context identity while branch and deadline stay current",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 80, "event": "change_context", "context_id": "context-b"},
+        {"at": 200, "event": "receive_result", "request": "r1"}
+      ],
+      "required_full_outcome": "reject_context_changed"
+    },
+    {
+      "schedule_id": "F07",
+      "reader_label": "context changes after admission but before dispatch",
+      "purpose": "test revalidation at the capability boundary",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 200, "event": "receive_result", "request": "r1"},
+        {"at": 200, "event": "admit_result", "request": "r1"},
+        {"at": 210, "event": "change_context", "context_id": "context-b"},
+        {"at": 220, "event": "dispatch_result", "request": "r1"}
+      ],
+      "required_full_outcome": "reject_dispatch_context_changed"
+    },
+    {
+      "schedule_id": "F08",
+      "reader_label": "the provider reports the same completion twice",
+      "purpose": "test exactly-once terminal admission",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 200, "event": "receive_result", "request": "r1"},
+        {"at": 201, "event": "receive_result", "request": "r1", "duplicate": true}
+      ],
+      "required_full_outcome": "one_terminal_decision"
+    },
+    {
+      "schedule_id": "F09",
+      "reader_label": "cancellation and completion occur at the same logical time",
+      "purpose": "test deterministic terminal ownership in both event orderings",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 200, "event": "cancel_request", "request": "r1", "ordering": 0},
+        {"at": 200, "event": "receive_result", "request": "r1", "ordering": 1}
+      ],
+      "required_full_outcome": "one_deterministic_terminal_decision"
+    },
+    {
+      "schedule_id": "F10",
+      "reader_label": "provider returns a malformed proposal",
+      "purpose": "test structural validation before publication",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 200, "event": "receive_malformed_result", "request": "r1"}
+      ],
+      "required_full_outcome": "reject_invalid_schema"
+    },
+    {
+      "schedule_id": "F11",
+      "reader_label": "host rejects a numerically or physically invalid proposal",
+      "purpose": "test frame, bounds and stability validation",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 200, "event": "receive_host_invalid_result", "request": "r1"}
+      ],
+      "required_full_outcome": "reject_host_validation"
+    },
+    {
+      "schedule_id": "F12",
+      "reader_label": "service disconnects while a request is pending",
+      "purpose": "test explicit failure and authored fallback",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 200, "event": "service_disconnect", "request": "r1"}
+      ],
+      "required_full_outcome": "one_failure_and_fallback"
+    },
+    {
+      "schedule_id": "F13",
+      "reader_label": "several jobs complete in one task interval",
+      "purpose": "test ownership under a concurrent completion burst",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request_burst", "count": 16},
+        {"at": 200, "event": "receive_result_burst", "count": 16}
+      ],
+      "required_full_outcome": "no_cross_job_effect"
+    },
+    {
+      "schedule_id": "F14",
+      "reader_label": "a logical request key is reused",
+      "purpose": "test generation-safe key reuse",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1", "job_key": "shared"},
+        {"at": 120, "event": "submit_request", "request": "r2", "job_key": "shared"},
+        {"at": 200, "event": "receive_result", "request": "r1"}
+      ],
+      "required_full_outcome": "reject_superseded_without_clearing_new_request"
+    },
+    {
+      "schedule_id": "F15",
+      "reader_label": "the subtree or runtime resets with work pending",
+      "purpose": "test revocation and cleanup before state destruction",
+      "events": [
+        {"at": 0, "event": "enter_model_branch"},
+        {"at": 0, "event": "submit_request", "request": "r1"},
+        {"at": 80, "event": "reset_runtime"},
+        {"at": 200, "event": "receive_result", "request": "r1"}
+      ],
+      "required_full_outcome": "reject_branch_revoked_after_reset"
+    },
+    {
+      "schedule_id": "F16",
+      "reader_label": "recorded task decisions replay without a live provider",
+      "purpose": "test task-level replay parity for every preceding schedule",
+      "events": [
+        {"at": 0, "event": "replay_recorded_schedules", "schedule_range": "F01-F15"}
+      ],
+      "required_full_outcome": "task_decisions_equal"
+    }
+  ]
+}
