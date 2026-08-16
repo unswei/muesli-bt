@@ -16,17 +16,17 @@ void registry::register_action(std::string name, action_fn fn, action_halt_fn ha
 }
 
 const condition_fn* registry::find_condition(std::string_view name) const {
-    const auto it = conditions_.find(std::string(name));
+    const auto it = conditions_.find(name);
     return it == conditions_.end() ? nullptr : &it->second;
 }
 
 const action_fn* registry::find_action(std::string_view name) const {
-    const auto it = actions_.find(std::string(name));
+    const auto it = actions_.find(name);
     return it == actions_.end() ? nullptr : &it->second;
 }
 
 const action_halt_fn* registry::find_action_halt(std::string_view name) const {
-    const auto it = action_halts_.find(std::string(name));
+    const auto it = action_halts_.find(name);
     return it == action_halts_.end() ? nullptr : &it->second;
 }
 

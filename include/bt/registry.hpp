@@ -19,6 +19,22 @@ using condition_fn = std::function<bool(tick_context&, std::span<const muslisp::
 using action_fn = std::function<status(tick_context&, node_id, node_memory&, std::span<const muslisp::value> args)>;
 using action_halt_fn = std::function<void(tick_context&, node_id, node_memory&)>;
 
+struct transparent_string_hash {
+    using is_transparent = void;
+
+    std::size_t operator()(std::string_view value) const noexcept {
+        return std::hash<std::string_view>{}(value);
+    }
+};
+
+struct transparent_string_equal {
+    using is_transparent = void;
+
+    bool operator()(std::string_view lhs, std::string_view rhs) const noexcept {
+        return lhs == rhs;
+    }
+};
+
 class registry {
 public:
     void register_condition(std::string name, condition_fn fn);
@@ -31,9 +47,9 @@ public:
     void clear();
 
 private:
-    std::unordered_map<std::string, condition_fn> conditions_;
-    std::unordered_map<std::string, action_fn> actions_;
-    std::unordered_map<std::string, action_halt_fn> action_halts_;
+    std::unordered_map<std::string, condition_fn, transparent_string_hash, transparent_string_equal> conditions_;
+    std::unordered_map<std::string, action_fn, transparent_string_hash, transparent_string_equal> actions_;
+    std::unordered_map<std::string, action_halt_fn, transparent_string_hash, transparent_string_equal> action_halts_;
 };
 
 }  // namespace bt
