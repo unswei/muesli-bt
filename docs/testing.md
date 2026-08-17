@@ -217,6 +217,10 @@ Release joint image and sets `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`,
 `MKL_NUM_THREADS` and `NUMEXPR_NUM_THREADS` to `1`. The runner checks these
 limits before creating evidence. This prevents numerical worker pools from
 introducing periodic scheduler stalls under the two-CPU container quota.
+The passing campaign revalidated 456 preserved baseline bundles and captured
+228 fresh recovery bundles. Recovery had zero obsolete dispatches and zero
+duplicate terminal decisions, saved 150/228 shots, and recorded 5.879 ms BT
+tick p99. Learned inference p95 was 0.249 ms.
 
 ## canonical event fixture suite
 

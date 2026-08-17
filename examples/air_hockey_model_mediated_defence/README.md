@@ -335,6 +335,21 @@ with the control process under Docker's two-CPU quota and create periodic
 50--60 ms scheduler stalls. Those stalls are infrastructure timing, not BT
 execution work, but they invalidate the operational latency gate.
 
+The passing campaign used image
+`local/muesli-air-hockey:wp8-c0ec89e-1b6bbbb` (image ID
+`sha256:d7058dcb76c5e7a347d3d03481fc84908ac15aa1052676e03e1b24433c4fa3a4`).
+All 228 recovery pairs and all 684 reaggregated bundles passed. Recovery
+dispatched no obsolete action and emitted no duplicate terminal decision. It
+saved 150/228 shots (0.6579), compared with 207/228 (0.9079) for the unsafe
+deadline-only baseline and 3/228 (0.0132) for hold-position fallback. Recovery
+BT tick p99 was 5.879 ms over 20,228 samples; 26 samples exceeded 20 ms and the
+maximum was 105.456 ms. Learned inference p95 was 0.249 ms over 12 samples.
+
+The campaign is retained on Marvin at
+`/home/oliver/experiments/muesli-air-hockey/wp8-recovery-thread-limited-c0ec89e-1b6bbbb/evidence/campaign`.
+Its `wp8-report.json` SHA-256 is
+`4c1d52bc18c837ca3488cb3885f548fb15ee1483cf1ac20795e93849f496c673`.
+
 ## run the contract tests
 
 From the repository root:
