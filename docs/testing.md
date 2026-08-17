@@ -248,9 +248,11 @@ WP10 isolates authority loss after admission. Its frozen 24-shot campaign
 crosses admission-only and two-gate dispatch with a context change, reactive
 owner pre-emption and a no-change control, for 144 treatment runs. Every result
 is admitted before the scheduled intervention. The runner then measures
-obsolete capability calls and public mallet motion towards the no-longer
-authorised target, completes the episode with current-context recovery, and
-requires exact event and trajectory replay plus strict trace validation.
+obsolete capability calls and paired mallet-trajectory separation towards the
+no-longer authorised target, completes the episode with current-context
+recovery, and requires exact event and trajectory replay plus strict trace
+validation. The paired projection removes motion common to both recovery
+trajectories rather than attributing it to the stale call.
 
 ## canonical event fixture suite
 

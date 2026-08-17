@@ -18,6 +18,7 @@ from run_wp10 import (
     TREATMENTS,
     GateG10PostAdmissionError,
     _load_protocol,
+    _paired_trajectory_effect,
     _post_loss_motion,
     _sha256,
     seal_campaign,
@@ -78,6 +79,29 @@ class GateG10PureTest(unittest.TestCase):
                 seal_campaign(
                     campaign, root / "campaign.tar.gz", root / "wp10-seal.json"
                 )
+
+    def test_paired_effect_projects_only_the_treatment_difference(self) -> None:
+        def result(position: float) -> dict:
+            return {
+                "motion_towards_no_longer_authorised_target": {
+                    "authority_loss_observation_step": 1,
+                    "no_longer_authorised_target": [1.0, 0.0],
+                },
+                "_public_trajectory": [
+                    {"observation_step": 1, "mallet_position": [0.0, 0.0]},
+                    {"observation_step": 2, "mallet_position": [position, 0.0]},
+                ],
+            }
+
+        effect = _paired_trajectory_effect(result(0.2), result(0.1))
+
+        self.assertAlmostEqual(
+            effect[
+                "maximum_projected_admission_only_separation_towards_obsolete_target"
+            ],
+            0.1,
+        )
+        self.assertAlmostEqual(effect["maximum_euclidean_mallet_separation"], 0.1)
 
 
 if __name__ == "__main__":

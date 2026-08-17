@@ -262,6 +262,81 @@ def _terminal_integrity(events: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
+def _paired_trajectory_effect(
+    admission_only: dict[str, Any], two_gate: dict[str, Any]
+) -> dict[str, Any]:
+    admission_motion = admission_only[
+        "motion_towards_no_longer_authorised_target"
+    ]
+    two_gate_motion = two_gate["motion_towards_no_longer_authorised_target"]
+    if admission_motion is None or two_gate_motion is None:
+        raise GateG10PostAdmissionError(
+            "paired physical effect requires a disturbed authority schedule"
+        )
+    if (
+        admission_motion["authority_loss_observation_step"]
+        != two_gate_motion["authority_loss_observation_step"]
+        or admission_motion["no_longer_authorised_target"]
+        != two_gate_motion["no_longer_authorised_target"]
+    ):
+        raise GateG10PostAdmissionError("paired physical-effect oracles changed")
+    loss_step = int(admission_motion["authority_loss_observation_step"])
+    target = admission_motion["no_longer_authorised_target"]
+    admission_rows = {
+        int(row["observation_step"]): row
+        for row in admission_only["_public_trajectory"]
+    }
+    two_gate_rows = {
+        int(row["observation_step"]): row for row in two_gate["_public_trajectory"]
+    }
+    if loss_step not in admission_rows or loss_step not in two_gate_rows:
+        raise GateG10PostAdmissionError("authority-loss state is absent from a pair")
+    admission_origin = admission_rows[loss_step]["mallet_position"]
+    two_gate_origin = two_gate_rows[loss_step]["mallet_position"]
+    if math.dist(admission_origin, two_gate_origin) > 1.0e-12:
+        raise GateG10PostAdmissionError("paired trajectories differ before authority loss")
+    direction = [
+        target[0] - admission_origin[0],
+        target[1] - admission_origin[1],
+    ]
+    norm = math.hypot(direction[0], direction[1])
+    if norm <= 1.0e-12:
+        raise GateG10PostAdmissionError("obsolete target equals the loss-state mallet pose")
+    unit = [direction[0] / norm, direction[1] / norm]
+    matched_steps = sorted(set(admission_rows) & set(two_gate_rows))
+    projected_separation: list[tuple[int, float]] = []
+    euclidean_separation: list[tuple[int, float]] = []
+    for step in matched_steps:
+        if step <= loss_step:
+            continue
+        admission_position = admission_rows[step]["mallet_position"]
+        two_gate_position = two_gate_rows[step]["mallet_position"]
+        delta = [
+            admission_position[0] - two_gate_position[0],
+            admission_position[1] - two_gate_position[1],
+        ]
+        projected_separation.append((step, delta[0] * unit[0] + delta[1] * unit[1]))
+        euclidean_separation.append((step, math.hypot(delta[0], delta[1])))
+    if not projected_separation:
+        raise GateG10PostAdmissionError("paired trajectories have no post-loss overlap")
+    maximum_step, maximum_projection = max(
+        projected_separation, key=lambda value: value[1]
+    )
+    maximum_distance_step, maximum_distance = max(
+        euclidean_separation, key=lambda value: value[1]
+    )
+    return {
+        "authority_loss_observation_step": loss_step,
+        "matched_post_loss_steps": len(projected_separation),
+        "maximum_projected_admission_only_separation_towards_obsolete_target": max(
+            0.0, maximum_projection
+        ),
+        "maximum_projected_separation_observation_step": maximum_step,
+        "maximum_euclidean_mallet_separation": maximum_distance,
+        "maximum_euclidean_separation_observation_step": maximum_distance_step,
+    }
+
+
 def _capture_cell(
     *,
     executable: Path,
@@ -417,6 +492,7 @@ def _capture_cell(
         if destination.exists():
             raise GateG10PostAdmissionError(f"refuse to replace WP10 run: {run_id}")
         os.replace(staged, destination)
+    result["_public_trajectory"] = trajectory
     result["tick_duration_ns"] = [
         value for timing in live["timing"] for value in timing["tick_duration_ns"]
     ]
@@ -457,35 +533,56 @@ def _summarise(results: list[dict[str, Any]], protocol: dict[str, Any]) -> dict[
                 "saves": clopper_pearson(saves, len(rows)),
                 "valid_handle_rejections": valid_rejections,
             }
-    paired_motion: dict[str, Any] = {}
+    paired_effects: dict[str, Any] = {}
     for disturbance in DISTURBANCES[:2]:
-        by_treatment = {
+        by_treatment: dict[str, dict[str, dict[str, Any]]] = {
             treatment: {
-                row["shot_key"]: row["motion_towards_no_longer_authorised_target"][
-                    "projected_motion_while_target_applied"
-                ]
-                for row in grouped[(disturbance, treatment)]
+                row["shot_key"]: row for row in grouped[(disturbance, treatment)]
             }
             for treatment in TREATMENTS
         }
         keys = sorted(by_treatment["admission_only"])
-        differences = [
-            by_treatment["two_gate"][key]
-            - by_treatment["admission_only"][key]
+        effects = [
+            _paired_trajectory_effect(
+                by_treatment["admission_only"][key],
+                by_treatment["two_gate"][key],
+            )
             for key in keys
         ]
-        paired_motion[disturbance] = paired_bootstrap(
-            differences,
-            samples=protocol["campaign"].get("bootstrap_samples", 10000),
-            seed=protocol["campaign"].get("bootstrap_seed", 6311),
-        )
+        maximum_projected = [
+            row[
+                "maximum_projected_admission_only_separation_towards_obsolete_target"
+            ]
+            for row in effects
+        ]
+        paired_effects[disturbance] = {
+            "pairs": len(effects),
+            "pairs_with_positive_projected_separation": sum(
+                value > 1.0e-12 for value in maximum_projected
+            ),
+            "mean_maximum_projected_admission_only_separation_towards_obsolete_target": sum(
+                maximum_projected
+            )
+            / len(maximum_projected),
+            "mean_maximum_euclidean_mallet_separation": sum(
+                row["maximum_euclidean_mallet_separation"] for row in effects
+            )
+            / len(effects),
+            "maximum_projected_separation_bootstrap": paired_bootstrap(
+                maximum_projected,
+                samples=protocol["campaign"].get("bootstrap_samples", 10000),
+                seed=protocol["campaign"].get("bootstrap_seed", 6311),
+            ),
+        }
     tick_ns = [value for row in results for value in row.pop("tick_duration_ns")]
+    for row in results:
+        row.pop("_public_trajectory")
     return {
         "schema_version": "airhockey.wp10.post_admission.summary.v1",
         "matched_shots": expected,
         "treatment_runs": len(results),
         "cells": cells,
-        "paired_two_gate_minus_admission_only_projected_motion": paired_motion,
+        "paired_physical_effect": paired_effects,
         "tick_timing": _timing_summary(tick_ns, protocol["control_period_ms"]),
     }
 
@@ -515,6 +612,10 @@ def _validate_gate(
             failures.append(f"{treatment} valid control dispatch")
         if control["valid_handle_rejections"] > gate["maximum_valid_control_rejections"]:
             failures.append(f"{treatment} valid control rejection")
+    if summary["paired_physical_effect"]["context_change"][
+        "pairs_with_positive_projected_separation"
+    ] != gate["required_context_pairs_with_positive_projected_separation"]:
+        failures.append("context-change physical separation")
     for name in (
         "missing_terminal_invocations",
         "duplicate_terminal_decisions",

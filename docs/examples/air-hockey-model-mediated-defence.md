@@ -181,8 +181,11 @@ The frozen protocol uses the same deterministic 24-shot subset for two
 treatments and three schedules: context change after admission, owner
 pre-emption after admission, and a no-change control. `admission_only` trusts
 the accepted handle; `two_gate` revalidates at the capability boundary. Both
-treatments use current-context recovery after the causal dispatch attempt. Run
-the split-safe checks with:
+treatments use current-context recovery after the causal dispatch attempt. The
+physical metric projects the paired mallet-position difference towards the
+obsolete target at matched observation steps, separating the stale call's
+trajectory effect from motion common to both recovery arms. Run the split-safe
+checks with:
 
 ```bash
 uv run --with-requirements \

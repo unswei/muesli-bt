@@ -436,10 +436,13 @@ uv run --with 'jsonschema>=4.20,<5' \
   --runner build/dev/muesli_bt_air_hockey_scenario_tests
 ```
 
-The 144-run campaign records obsolete capability calls, public mallet motion
-towards the no-longer authorised target, save outcome, valid-handle control
-rejections, exact replay and strict trace validation. `run_wp10.py seal` writes
-and verifies a compressed backup before making a passing campaign read-only.
+The 144-run campaign records obsolete capability calls, save outcome,
+valid-handle control rejections, exact replay and strict trace validation. Its
+physical metric pairs the two treatments at each observation step and projects
+their mallet-position separation towards the obsolete target. This isolates the
+trajectory effect of the stale capability call from later motion that both
+treatments may produce under recovery. `run_wp10.py seal` writes and verifies a
+compressed backup before making a passing campaign read-only.
 
 ## run the contract tests
 
