@@ -15,12 +15,21 @@ CONFIG_EXPECTATIONS = {
     "full.cfg": ("pass", "Model checking completed. No error has been found."),
     "deadline_only.cfg": ("counterexample", "Invariant Safety is violated."),
     "missing_entry_epoch.cfg": ("counterexample", "Invariant Safety is violated."),
+    "missing_generation.cfg": ("counterexample", "Invariant Safety is violated."),
     "missing_context.cfg": ("counterexample", "Invariant Safety is violated."),
     "missing_dispatch_revalidation.cfg": (
         "counterexample",
         "Invariant Safety is violated.",
     ),
     "missing_terminal_latch.cfg": ("counterexample", "Invariant Safety is violated."),
+}
+TRACE_EXPECTATIONS = {
+    "missing_generation.cfg": (
+        '/\\ currentGeneration = 1',
+        '/\\ capturedGeneration = 0',
+        '/\\ requestState = "admitted"',
+        '/\\ badAdmission = TRUE',
+    ),
 }
 
 
@@ -50,7 +59,11 @@ def run_configuration(jar: pathlib.Path, config: str) -> tuple[bool, str]:
         (expected == "pass" and completed.returncode == 0)
         or (expected == "counterexample" and completed.returncode != 0)
     )
-    return outcome_matches and marker in output, output
+    trace_matches = all(
+        trace_marker in output
+        for trace_marker in TRACE_EXPECTATIONS.get(config, ())
+    )
+    return outcome_matches and marker in output and trace_matches, output
 
 
 def main() -> int:

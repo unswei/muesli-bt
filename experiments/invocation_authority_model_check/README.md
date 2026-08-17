@@ -21,9 +21,21 @@ python3 run_tlc.py --jar /path/to/tla2tools.jar
 
 `full.cfg` should report that `Safety` holds. Each weakened configuration
 should produce a short counterexample: obsolete admission for the deadline,
-entry-epoch, and context variants; obsolete dispatch when dispatch
+entry-epoch, generation, and context variants; obsolete dispatch when dispatch
 revalidation is removed; and more than one completion/consume effect when
 the terminal and consume latches are removed.
+
+The runner additionally checks that `missing_generation.cfg` reaches the
+supersession witness: generation zero is captured, the live slot advances to
+generation one, and the old result is nevertheless admitted. This makes the
+generation mutation evidence specific rather than accepting an unrelated
+`Safety` violation.
+
+With TLC 2.19, the shortest observed witness is `Start`, `Supersede`,
+`Complete`, `AdmitAccepted`. At step 4, `capturedGeneration = 0`,
+`currentGeneration = 1`, `requestState = "admitted"`, and
+`badAdmission = TRUE`. TLC reports the invariant violation at search depth 5
+after generating 105 states and retaining 60 distinct states.
 
 `MaxSteps = 8` is a deliberately small bound. The configurations use TLC's
 state constraint to exhaustively explore all schedules up to that bound.
