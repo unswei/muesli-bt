@@ -229,6 +229,14 @@ and makes the campaign read-only. The external seal report is authoritative
 for backup verification and file modes because `wp8-report.json` necessarily
 records the pre-seal state.
 
+The passing Marvin campaign is sealed. Its 12,318-entry checksum manifest has
+SHA-256
+`149c0b71906c6675217e2a97e50b3d54059a68d4bc812ad6364c3179b1a0aa73`;
+all entries revalidated after sealing. The verified compressed backup has
+SHA-256
+`3a81bc515f74b39c9ba819ae51e1448d897a40f33b510bb7ed29667d1c7486cb`.
+All campaign files are mode `0444` and directories are mode `0555`.
+
 ## canonical event fixture suite
 
 Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:

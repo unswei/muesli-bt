@@ -364,6 +364,13 @@ The campaign is retained on Marvin at
 `/home/oliver/experiments/muesli-air-hockey/wp8-recovery-thread-limited-c0ec89e-1b6bbbb/evidence/campaign`.
 Its `wp8-report.json` SHA-256 is
 `4c1d52bc18c837ca3488cb3885f548fb15ee1483cf1ac20795e93849f496c673`.
+The external seal report is stored beside the campaign. The complete checksum
+manifest contains 12,318 entries and has SHA-256
+`149c0b71906c6675217e2a97e50b3d54059a68d4bc812ad6364c3179b1a0aa73`;
+an independent post-seal check reported zero failures. The verified compressed
+backup has SHA-256
+`3a81bc515f74b39c9ba819ae51e1448d897a40f33b510bb7ed29667d1c7486cb`.
+Campaign files are mode `0444` and directories are mode `0555`.
 
 ## run the contract tests
 
