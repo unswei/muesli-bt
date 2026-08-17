@@ -1,0 +1,86 @@
+{
+  "schema_version": "airhockey.wp10.post_admission.protocol.v1",
+  "status": "frozen_before_post_admission_campaign",
+  "parent_wp9_protocol": "configs/wp9_context_sensitivity_protocol.json",
+  "parent_wp9_protocol_sha256": "2a1d152ca1e8fe4ffc23bc2db6da9cd83c3640d4a1f4dbe2494d18b4750bb115",
+  "control_period_ms": 20,
+  "deadline_ms": 120,
+  "paper_split": {
+    "name": "muesli_test",
+    "seed": 6303,
+    "expected_shots": 72,
+    "manifest_sha256": "59527e9f55537d127fc401ee3ab5fbbfedbc36dc22cbca0322935eb99ea1d665",
+    "selection": "sha256_shot_id_order_first",
+    "selected_shots": 24
+  },
+  "paired_trial": {
+    "blackout_start_step": 1,
+    "blackout_length_steps": 1,
+    "timeout_steps": 125,
+    "source_age_limit_steps": 6,
+    "completion_delay_ms": 50,
+    "provider": "public_puck_target_v1",
+    "recovery_policy": "current_context_recovery.v1",
+    "behaviour_tree": "lisp/bt_invocation_scoped_current_context_recovery.lisp",
+    "behaviour_tree_sha256": "3e4d4e00b60d8d7a7414332ce9f60ff12345cae87b244681d2a0f7a244b5344f"
+  },
+  "treatments": [
+    {
+      "id": "admission_only",
+      "admission_policy": "invocation_scoped",
+      "dispatch_policy": "trust_admitted_handle"
+    },
+    {
+      "id": "two_gate",
+      "admission_policy": "invocation_scoped",
+      "dispatch_policy": "revalidate_invocation_authority"
+    }
+  ],
+  "disturbances": [
+    {
+      "id": "context_change",
+      "placement": "after_admission_before_dispatch",
+      "expected_two_gate_reason": "context_changed"
+    },
+    {
+      "id": "owner_revocation",
+      "placement": "after_intent_before_capability_call",
+      "expected_two_gate_reason": "branch_revoked"
+    },
+    {
+      "id": "no_change",
+      "placement": "matched_valid_handle_control",
+      "expected_two_gate_reason": ""
+    }
+  ],
+  "campaign": {
+    "matched_shots": 24,
+    "cells_per_shot": 6,
+    "treatment_runs": 144,
+    "exact_provider_replay": true,
+    "bootstrap_samples": 10000,
+    "bootstrap_seed": 6311,
+    "status": "pending_external_campaign"
+  },
+  "metrics": [
+    "obsolete_dispatch_rate",
+    "capability_calls_after_authority_loss",
+    "motion_towards_no_longer_authorised_target",
+    "save_rate",
+    "valid_handle_rejections_in_no_change_controls",
+    "replay_and_trace_consistency"
+  ],
+  "gate": {
+    "required_admission_only_obsolete_dispatches_per_disturbance": 24,
+    "maximum_two_gate_obsolete_dispatches": 0,
+    "required_valid_control_dispatches_per_treatment": 24,
+    "maximum_valid_control_rejections": 0,
+    "maximum_missing_terminal_invocations": 0,
+    "maximum_duplicate_terminal_decisions": 0,
+    "maximum_duplicate_dispatches": 0,
+    "maximum_replay_mismatches": 0,
+    "maximum_trace_failures": 0,
+    "maximum_privileged_policy_inputs": 0,
+    "maximum_tick_p99_ms": 20.0
+  }
+}

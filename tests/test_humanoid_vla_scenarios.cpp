@@ -570,6 +570,39 @@ void test_duplicate_completion()
         "a retained invocation should emit exactly one terminal decision");
 }
 
+void test_admitted_handle_branch_halt()
+{
+  auto gate = std::make_shared<completion_gate>();
+  scenario_rig rig(kBaseTree, {gate}, "humanoid-admitted-handle-branch-halt");
+
+  check(rig.tick() == bt::status::running,
+        "post-admission halt scenario should submit a request");
+  const std::uint64_t job_id = rig.only_job_id();
+  adopt_running_invocation(rig, job_id);
+  gate->wait_for_start();
+  gate->release();
+  wait_for_authority(rig, job_id, bt::vla_authority_state::accepted);
+
+  const bt::node_id authority_node = rig.invocation(job_id).authority_node;
+  bt::services services = rig.services();
+  bt::halt_subtree(rig.instance(), rig.host().callbacks(), services, authority_node,
+                   "post-admission owner pre-emption");
+
+  check(rig.invocation(job_id).authority_state == bt::vla_authority_state::accepted,
+        "post-admission halt must preserve the terminal admission decision");
+  check(!rig.invocation(job_id).dispatch_authority_active &&
+            rig.invocation(job_id).dispatch_authority_reason == "branch_revoked",
+        "post-admission halt must revoke the accepted handle's effect authority");
+  const bt::walking_target_dispatch_result dispatch = rig.host().dispatch_walking_target(
+      rig.instance().instance_handle, job_id, 903, accepted_target(0.25));
+  check(!dispatch.accepted && dispatch.reason == "branch_revoked" &&
+            rig.dispatcher().calls == 0,
+        "a handle must not reach the walking controller after its owner exits");
+  check(event_has(rig.host().events(), "walking_target_dispatch",
+                  {"\"decision\":\"rejected\"", "\"reason\":\"branch_revoked\""}),
+        "post-admission owner loss must emit rejected dispatch evidence");
+}
+
 void test_branch_halt()
 {
   auto gate = std::make_shared<completion_gate>();
@@ -686,6 +719,7 @@ const std::vector<std::pair<std::string_view, test_fn>> kTests = {
     {"supersession", test_supersession},
     {"late_completion", test_late_completion},
     {"duplicate_completion", test_duplicate_completion},
+    {"admitted_handle_branch_halt", test_admitted_handle_branch_halt},
     {"branch_halt", test_branch_halt},
     {"re_entry", test_re_entry},
     {"emergency_interruption", test_emergency_interruption},

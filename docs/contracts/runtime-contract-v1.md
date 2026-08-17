@@ -151,10 +151,13 @@ Safety rules:
   blackboard action write
 - invocation-scoped VLA commits fail closed when the host commit validator is
   unavailable
-- walking-target dispatch requires an accepted invocation, current context,
-  matching frame and exact accepted pose; successful dispatch is exactly once
+- walking-target dispatch requires an accepted invocation whose reactive owner
+  remains active, matching generation and deadline, current context, matching
+  frame and exact accepted pose; successful dispatch is exactly once
 - subtree halt and service-aware reset revoke and cancel active VLA jobs before
   clearing their tracked job, action and metadata keys
+- subtree halt after admission preserves the latched terminal result but revokes
+  the accepted handle's authority to dispatch
 - job-key cleanup compares the stored backend ID so an obsolete invocation
   cannot clear a newer job
 

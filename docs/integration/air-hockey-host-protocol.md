@@ -130,12 +130,15 @@ invocation-scoped mode also checks the current defence context through the
 runtime gate. The existing stable `ball_stale` reason denotes an over-age
 public puck observation; it does not imply access to privileged puck state.
 
-Immediately before `env.act`, the example dispatch gate rechecks authority,
-generation, deadline, context, exact action identity, source age and
+Immediately before `env.act`, the example dispatch gate rechecks that the
+reactive owner remains active, plus generation, deadline, context, exact action
+identity, source age and
 exactly-once dispatch. Only proposals that pass those local checks emit the
 canonical `cap_call_start` and `cap_call_end` pair for the host-bound
 `cap.vla.action_chunk.v1` call. A locally rejected obsolete proposal therefore
-records no capability call.
+records no capability call. The admission-only mode exists solely as a WP10
+experimental mutant: it preserves structural and exactly-once checks but trusts
+the volatile authority of an admitted handle.
 
 ## errors and failure modes
 

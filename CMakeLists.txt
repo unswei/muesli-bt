@@ -669,7 +669,8 @@ else ()
 endif ()
 
 foreach (scenario IN ITEMS normal_acceptance moved_ball supersession late_completion
-                           duplicate_completion branch_halt re_entry emergency_interruption)
+                           duplicate_completion admitted_handle_branch_halt branch_halt re_entry
+                           emergency_interruption)
   add_test(
     NAME muesli_bt_humanoid_vla_${scenario}
     COMMAND muesli_bt_humanoid_vla_scenario_tests ${scenario}
@@ -879,6 +880,14 @@ if (Python3_Interpreter_FOUND)
           check-native --runner "$<TARGET_FILE:muesli_bt_air_hockey_scenario_tests>"
       )
       set_tests_properties(muesli_bt_air_hockey_wp9_context_sensitivity PROPERTIES TIMEOUT 30)
+      add_test(
+        NAME muesli_bt_air_hockey_wp10_post_admission
+        COMMAND
+          "${Python3_EXECUTABLE}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/examples/air_hockey_model_mediated_defence/run_wp10.py"
+          check-native --runner "$<TARGET_FILE:muesli_bt_air_hockey_scenario_tests>"
+      )
+      set_tests_properties(muesli_bt_air_hockey_wp10_post_admission PROPERTIES TIMEOUT 30)
     endif ()
   else ()
     message(

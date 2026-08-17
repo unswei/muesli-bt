@@ -1216,8 +1216,25 @@ walking_target_dispatch_result runtime_host::dispatch_walking_target(std::int64_
                                                                        : invocation.authority_reason;
         return reject(reason, "runtime_structural");
     }
+    if (invocation.acceptance_policy == vla_acceptance_policy::invocation_scoped &&
+        !invocation.dispatch_authority_active) {
+        const std::string reason = invocation.dispatch_authority_reason.empty()
+                                       ? "branch_revoked"
+                                       : invocation.dispatch_authority_reason;
+        return reject(reason, "runtime_structural");
+    }
     if (invocation.walking_target_dispatched) {
         return reject("duplicate_dispatch", "runtime_structural");
+    }
+    if (invocation.acceptance_policy == vla_acceptance_policy::invocation_scoped) {
+        const auto generation = inst->vla_generations.find(invocation.job_key);
+        if (generation == inst->vla_generations.end() ||
+            generation->second != invocation.generation) {
+            return reject("superseded", "runtime_structural");
+        }
+        if (clock_ && clock_->now() > invocation.deadline) {
+            return reject("deadline_expired", "runtime_structural");
+        }
     }
     if (invocation.captured_context_id.empty() || current_context_id.empty()) {
         return reject("ball_stale", "runtime_structural");

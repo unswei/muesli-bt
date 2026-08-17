@@ -212,9 +212,12 @@ Uses per-node retry counter.
   without polling, validating, writing or emitting another `vla_result`
 
 An accepted three-component approach action may be handed to a registered
-walking-target dispatcher. The runtime rechecks invocation acceptance, current
-context, action frame, exact target identity and exactly-once dispatch before
-calling the host. The attempt emits `walking_target_dispatch`.
+walking-target dispatcher. The runtime rechecks invocation acceptance, live
+reactive ownership, generation, deadline, current context, action frame, exact
+target identity and exactly-once dispatch before calling the host. Halting the
+owning subtree after admission preserves the terminal admission decision but
+revokes the handle's dispatch authority. The attempt emits
+`walking_target_dispatch`.
 
 ## `vla-cancel`
 

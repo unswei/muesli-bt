@@ -57,13 +57,20 @@ struct action_dispatch_result {
     std::string reason = "host_policy_rejected";
 };
 
+enum class dispatch_authority_mode {
+    revalidate,
+    admission_only,
+};
+
 class air_hockey_action_dispatch_gate {
 public:
     air_hockey_action_dispatch_gate(air_hockey_env_backend& backend,
                                     air_hockey_action_validator& validator,
                                     action_host_state_provider state_provider,
                                     bt::clock_interface& clock,
-                                    bt::event_log& events);
+                                    bt::event_log& events,
+                                    dispatch_authority_mode authority_mode =
+                                        dispatch_authority_mode::revalidate);
 
     action_dispatch_result dispatch(bt::instance& instance,
                                     std::uint64_t job_id,
@@ -86,6 +93,7 @@ private:
     action_host_state_provider state_provider_;
     bt::clock_interface& clock_;
     bt::event_log& events_;
+    dispatch_authority_mode authority_mode_ = dispatch_authority_mode::revalidate;
     std::unordered_set<std::uint64_t> dispatched_jobs_;
     std::size_t accepted_dispatches_ = 0;
     std::size_t obsolete_dispatches_ = 0;

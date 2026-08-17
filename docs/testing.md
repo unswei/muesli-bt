@@ -244,6 +244,14 @@ identity with 0.10 and 0.20 displacement equivalence thresholds. The selected
 24-shot subset is determined by SHA-256 shot-identifier order, independent of
 outcome, and crossed with the three existing service delays.
 
+WP10 isolates authority loss after admission. Its frozen 24-shot campaign
+crosses admission-only and two-gate dispatch with a context change, reactive
+owner pre-emption and a no-change control, for 144 treatment runs. Every result
+is admitted before the scheduled intervention. The runner then measures
+obsolete capability calls and public mallet motion towards the no-longer
+authorised target, completes the episode with current-context recovery, and
+requires exact event and trajectory replay plus strict trace validation.
+
 ## canonical event fixture suite
 
 Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:

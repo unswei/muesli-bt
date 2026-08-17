@@ -106,12 +106,14 @@ air_hockey_action_dispatch_gate::air_hockey_action_dispatch_gate(
     air_hockey_action_validator& validator,
     action_host_state_provider state_provider,
     bt::clock_interface& clock,
-    bt::event_log& events)
+    bt::event_log& events,
+    dispatch_authority_mode authority_mode)
     : backend_(backend),
       validator_(validator),
       state_provider_(std::move(state_provider)),
       clock_(clock),
-      events_(events) {
+      events_(events),
+      authority_mode_(authority_mode) {
     if (!state_provider_) {
         throw std::invalid_argument("air-hockey dispatch gate requires a host-state provider");
     }
@@ -129,8 +131,9 @@ action_dispatch_result air_hockey_action_dispatch_gate::dispatch(bt::instance& i
     const action_host_state state = state_provider_();
     action_dispatch_result result{
         .accepted = false,
-        .obsolete = !invocation.captured_context_id.empty() &&
-                    invocation.captured_context_id != state.defence_context_id,
+        .obsolete = !invocation.dispatch_authority_active ||
+                    (!invocation.captured_context_id.empty() &&
+                     invocation.captured_context_id != state.defence_context_id),
         .reason = "host_policy_rejected",
     };
     if (invocation.authority_state != bt::vla_authority_state::accepted) {
@@ -142,15 +145,21 @@ action_dispatch_result air_hockey_action_dispatch_gate::dispatch(bt::instance& i
         result.reason = "duplicate_dispatch";
         return result;
     }
-    if (clock_.now() > invocation.deadline) {
-        result.reason = "deadline_expired";
-        return result;
-    }
     if (!action_is_finite_pair(action) || invocation.accepted_action != action) {
         result.reason = "invalid_pose";
         return result;
     }
-    if (invocation.acceptance_policy == bt::vla_acceptance_policy::invocation_scoped) {
+    if (authority_mode_ == dispatch_authority_mode::revalidate) {
+        if (!invocation.dispatch_authority_active) {
+            result.reason = invocation.dispatch_authority_reason.empty()
+                                ? "branch_revoked"
+                                : invocation.dispatch_authority_reason;
+            return result;
+        }
+        if (clock_.now() > invocation.deadline) {
+            result.reason = "deadline_expired";
+            return result;
+        }
         const auto generation = instance.vla_generations.find(invocation.job_key);
         if (generation == instance.vla_generations.end() || generation->second != invocation.generation) {
             result.reason = "superseded";
@@ -162,26 +171,28 @@ action_dispatch_result air_hockey_action_dispatch_gate::dispatch(bt::instance& i
         }
     }
 
-    bt::vla_commit_context validation_context{
-        .job_id = invocation.job_id,
-        .generation = invocation.generation,
-        .requesting_node = invocation.requesting_node,
-        .authority_node = invocation.authority_node,
-        .job_key = invocation.job_key,
-        .captured_context_id = invocation.captured_context_id,
-        .current_context_id = state.defence_context_id,
-        .expected_action_frame = invocation.action_frame,
-        .early_result = false,
-    };
-    bt::vla_action candidate{
-        .type = bt::vla_action_type::continuous,
-        .frame_id = invocation.action_frame,
-        .u = action,
-    };
-    const bt::vla_commit_validation validation = validator_.validate(validation_context, candidate);
-    if (!validation.accepted) {
-        result.reason = validation.reason.empty() ? "host_policy_rejected" : validation.reason;
-        return result;
+    if (authority_mode_ == dispatch_authority_mode::revalidate) {
+        bt::vla_commit_context validation_context{
+            .job_id = invocation.job_id,
+            .generation = invocation.generation,
+            .requesting_node = invocation.requesting_node,
+            .authority_node = invocation.authority_node,
+            .job_key = invocation.job_key,
+            .captured_context_id = invocation.captured_context_id,
+            .current_context_id = state.defence_context_id,
+            .expected_action_frame = invocation.action_frame,
+            .early_result = false,
+        };
+        bt::vla_action candidate{
+            .type = bt::vla_action_type::continuous,
+            .frame_id = invocation.action_frame,
+            .u = action,
+        };
+        const bt::vla_commit_validation validation = validator_.validate(validation_context, candidate);
+        if (!validation.accepted) {
+            result.reason = validation.reason.empty() ? "host_policy_rejected" : validation.reason;
+            return result;
+        }
     }
 
     emit("start", invocation, instance.tick_index, dispatching_node, action, result);

@@ -176,6 +176,25 @@ manifest has SHA-256
 and the verified backup has SHA-256
 `99f70a25e6736a24ddf3f1422d70336d59054919be12a3b60c5d2c7a7c3f903b`.
 
+WP10 adds a narrow post-admission experiment for the second authority gate.
+The frozen protocol uses the same deterministic 24-shot subset for two
+treatments and three schedules: context change after admission, owner
+pre-emption after admission, and a no-change control. `admission_only` trusts
+the accepted handle; `two_gate` revalidates at the capability boundary. Both
+treatments use current-context recovery after the causal dispatch attempt. Run
+the split-safe checks with:
+
+```bash
+uv run --with-requirements \
+  examples/air_hockey_model_mediated_defence/container/requirements-wp4.txt \
+  python examples/air_hockey_model_mediated_defence/run_wp10.py check-protocol
+
+uv run --with-requirements \
+  examples/air_hockey_model_mediated_defence/container/requirements-wp4.txt \
+  python examples/air_hockey_model_mediated_defence/run_wp10.py check-native \
+    --runner build/muesli_bt_air_hockey_scenario_tests
+```
+
 ## example behaviour tree
 
 The deadline-only and invocation-scoped trees are structurally identical. The

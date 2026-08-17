@@ -1124,6 +1124,8 @@ void revoke_vla_invocation(tick_context& ctx,
 
     invocation.authority_state = vla_authority_state::revoked;
     invocation.authority_reason = std::string(reason);
+    invocation.dispatch_authority_active = false;
+    invocation.dispatch_authority_reason = std::string(reason);
     emit_vla_authority_revoked(ctx, invocation, reason, detail);
 
     if (!request_backend_cancel || !ctx.svc.vla || invocation.cancel_requested) {
@@ -2853,6 +2855,13 @@ void halt_subtree_impl(tick_context& ctx, node_id root, std::string_view reason)
             }
             if (invocation.authority_state == vla_authority_state::active) {
                 revoke_vla_invocation(ctx, invocation, "branch_revoked", reason, true);
+            } else if (invocation.authority_state == vla_authority_state::accepted &&
+                       invocation.dispatch_authority_active) {
+                // Admission is terminal for the result, but it does not grant
+                // permanent effect authority. Preserve the accepted terminal
+                // outcome while invalidating the handle for later dispatch.
+                invocation.dispatch_authority_active = false;
+                invocation.dispatch_authority_reason = "branch_revoked";
             }
             clear_vla_invocation_keys(ctx, invocation, "vla-halt");
             erase_active_vla_job(ctx.inst, invocation);

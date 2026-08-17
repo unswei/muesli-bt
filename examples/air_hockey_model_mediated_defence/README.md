@@ -417,6 +417,30 @@ Sealing verifies the report and semantic summary hash, writes a complete
 checksum manifest, verifies the compressed backup, and changes the raw files
 and directories to modes `0444` and `0555` respectively.
 
+## wp10 post-admission authority
+
+WP10 isolates the race between result admission and capability use. The frozen
+protocol crosses two dispatch policies with context change, reactive owner
+pre-emption and a no-change control over the same deterministic 24-shot subset.
+The admission-only mutant trusts a handle after admission. The two-gate runtime
+revalidates the handle immediately before the effect. Both arms then use the
+current-context recovery tree.
+
+The local checks do not open the paper split:
+
+```bash
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp10.py check-protocol
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp10.py check-native \
+  --runner build/dev/muesli_bt_air_hockey_scenario_tests
+```
+
+The 144-run campaign records obsolete capability calls, public mallet motion
+towards the no-longer authorised target, save outcome, valid-handle control
+rejections, exact replay and strict trace validation. `run_wp10.py seal` writes
+and verifies a compressed backup before making a passing campaign read-only.
+
 ## run the contract tests
 
 From the repository root:

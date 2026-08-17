@@ -299,7 +299,9 @@ public:
                  std::optional<bt::vla_response> replay_response = std::nullopt,
                  std::optional<air_hockey_demo::host_configuration> remote_configuration =
                      std::nullopt,
-                 std::optional<std::string> runtime_run_id = std::nullopt)
+                 std::optional<std::string> runtime_run_id = std::nullopt,
+                 air_hockey_demo::dispatch_authority_mode dispatch_authority =
+                     air_hockey_demo::dispatch_authority_mode::revalidate)
         : policy_(policy),
           scenario_(std::move(scenario)),
           backend_(std::make_shared<air_hockey_demo::air_hockey_env_backend>(std::move(socket_path))),
@@ -313,7 +315,8 @@ public:
                          .enforce_context = policy == bt::vla_acceptance_policy::invocation_scoped,
                      },
                      [this] { return action_state(); }),
-          dispatch_gate_(*backend_, validator_, [this] { return action_state(); }, clock_, host_.events()) {
+          dispatch_gate_(*backend_, validator_, [this] { return action_state(); }, clock_,
+                         host_.events(), dispatch_authority) {
         muslisp::env_api_reset();
         air_hockey_demo::register_air_hockey_env_backend("air-hockey-direct-launch", backend_);
         muslisp::env_api_attach("air-hockey-direct-launch");
@@ -638,6 +641,7 @@ private:
                 if (!invocation || !action) {
                     return bt::status::failure;
                 }
+                const std::vector<double> proposed_action = *action;
                 if (before_dispatch_) {
                     std::function<void(bt::tick_context&)> callback = std::move(before_dispatch_);
                     before_dispatch_ = {};
@@ -648,7 +652,8 @@ private:
                             std::chrono::steady_clock::now() - fixture_started_at)
                             .count();
                 }
-                last_dispatch_ = dispatch_gate_.dispatch(context.inst, invocation->job_id, node, *action);
+                last_dispatch_ = dispatch_gate_.dispatch(context.inst, invocation->job_id, node,
+                                                         proposed_action);
                 context.bb_put("air-hockey-dispatch-reason", bt::bb_value{last_dispatch_->reason},
                                "air-hockey-dispatch-gate");
                 return hold_after_dispatch_ ? bt::status::running : bt::status::success;
@@ -1093,6 +1098,173 @@ void test_p9_context_sensitivity(const scenario_options& options) {
     rig.finish_events();
 }
 
+enum class post_admission_disturbance {
+    context_change,
+    owner_revocation,
+    no_change,
+};
+
+void run_p10_post_admission(const scenario_options& options,
+                            post_admission_disturbance disturbance,
+                            bool admission_only,
+                            std::string scenario) {
+    check(options.paper.has_value(), "P10 post-admission options were not supplied");
+    const paper_scenario_options& paper = *options.paper;
+    check(paper.completion_delay_ms >= 0 && paper.completion_delay_ms < 120,
+          "P10 completion delay must remain inside the deadline");
+    auto completion = std::make_shared<completion_gate>();
+    completion->action.assign(paper.provider_action.begin(), paper.provider_action.end());
+    const std::optional<bt::vla_response> replay =
+        paper.replay ? std::optional<bt::vla_response>{paper_replay_response(paper.provider_action)}
+                     : std::nullopt;
+    scenario_rig rig(
+        options.socket_path, options.tree_path, std::move(scenario),
+        bt::vla_acceptance_policy::invocation_scoped, {completion}, true,
+        options.event_path, replay,
+        air_hockey_demo::host_configuration{
+            .blackout_start_step = paper.blackout_start_step,
+            .blackout_length_steps = paper.blackout_length_steps,
+            .timeout_steps = paper.timeout_steps,
+            .action_lock_steps = paper.action_lock_steps,
+            .replace_track_steps = {},
+            .terminate_at_step = std::nullopt,
+        },
+        paper.run_id,
+        admission_only ? air_hockey_demo::dispatch_authority_mode::admission_only
+                       : air_hockey_demo::dispatch_authority_mode::revalidate);
+    check(rig.tick() == bt::status::running,
+          "P10 trial did not submit its request");
+    const std::uint64_t job = rig.only_job_id();
+    const std::string captured_context = rig.invocation(job).captured_context_id;
+    adopt_running_invocation(rig, job);
+    completion->wait_for_start();
+
+    std::optional<std::int64_t> authority_loss_step;
+    if (disturbance == post_admission_disturbance::context_change) {
+        rig.set_before_dispatch([&](bt::tick_context& context) {
+            rig.force_context_change(&context);
+            authority_loss_step = rig.state().observation_step;
+        });
+    } else if (disturbance == post_admission_disturbance::owner_revocation) {
+        rig.set_before_dispatch([&](bt::tick_context& context) {
+            rig.set_defence_available(false);
+            authority_loss_step = rig.state().observation_step;
+            const bt::node_id owner = rig.invocation(job).authority_node;
+            bt::halt_subtree(context.inst, context.reg, context.svc, owner,
+                             "post-admission owner pre-emption");
+        });
+    }
+
+    rig.advance_clock(std::chrono::milliseconds{paper.completion_delay_ms});
+    completion->release();
+    wait_for_authority(rig, job, bt::vla_authority_state::accepted);
+    check(rig.last_dispatch().has_value(),
+          "P10 accepted handle did not reach the dispatch boundary");
+    const air_hockey_demo::action_dispatch_result dispatch = *rig.last_dispatch();
+    const bool disturbed = disturbance != post_admission_disturbance::no_change;
+    const std::string expected_reason =
+        disturbance == post_admission_disturbance::context_change
+            ? "context_changed"
+            : (disturbance == post_admission_disturbance::owner_revocation
+                   ? "branch_revoked"
+                   : "");
+
+    predicate("p10_admission_succeeds_before_intervention",
+              event_count(rig.host().events(), "vla_result",
+                          {"\"decision\":\"accepted\""}) == 1 &&
+                  rig.invocation(job).authority_state == bt::vla_authority_state::accepted,
+              "P10 must admit the valid result exactly once before the intervention");
+    if (disturbed) {
+        predicate("p10_dispatch_outcome_matches_treatment",
+                  dispatch.obsolete &&
+                      (admission_only
+                           ? dispatch.accepted && rig.accepted_dispatches() == 1 &&
+                                 rig.obsolete_dispatches() == 1
+                           : !dispatch.accepted && dispatch.reason == expected_reason &&
+                                 rig.accepted_dispatches() == 0 &&
+                                 rig.obsolete_dispatches() == 0),
+                  "P10 disturbed dispatch did not separate admission-only and two-gate authority");
+    } else {
+        predicate("p10_no_change_control_accepts_valid_handle",
+                  dispatch.accepted && !dispatch.obsolete &&
+                      rig.accepted_dispatches() == 1 && rig.obsolete_dispatches() == 0,
+                  "P10 no-change control rejected a valid admitted handle");
+    }
+
+    // Apply an accepted proposal before the recovery branch can overwrite it.
+    // A context intervention consumes the pending recovery target, so a
+    // rejected dispatch needs one fresh recovery tick before control advances.
+    if (dispatch.accepted || disturbance != post_admission_disturbance::context_change) {
+        (void)rig.step_control();
+    } else {
+        (void)rig.tick();
+        (void)rig.step_control();
+    }
+    while (rig.state().episode_active) {
+        (void)rig.tick();
+        (void)rig.step_control();
+    }
+    predicate("p10_recovery_episode_completed",
+              rig.recovery_requests() > 0 &&
+                  (rig.state().terminated || rig.state().truncated),
+              "P10 trial did not complete under the current-context recovery tree");
+
+    const std::string disturbance_name =
+        disturbance == post_admission_disturbance::context_change
+            ? "context_change"
+            : (disturbance == post_admission_disturbance::owner_revocation
+                   ? "owner_revocation"
+                   : "no_change");
+    std::cout << "POST_ADMISSION {\"treatment\":\""
+              << (admission_only ? "admission_only" : "two_gate")
+              << "\",\"disturbance\":\"" << disturbance_name
+              << "\",\"captured_context_id\":\""
+              << bt::event_log::json_escape(captured_context)
+              << "\",\"authority_loss_observation_step\":";
+    if (authority_loss_step.has_value()) {
+        std::cout << *authority_loss_step;
+    } else {
+        std::cout << "null";
+    }
+    std::cout << ",\"dispatch_accepted\":" << (dispatch.accepted ? "true" : "false")
+              << ",\"dispatch_obsolete\":" << (dispatch.obsolete ? "true" : "false")
+              << ",\"dispatch_reason\":\"" << bt::event_log::json_escape(dispatch.reason)
+              << "\",\"accepted_dispatches\":" << rig.accepted_dispatches()
+              << ",\"obsolete_dispatches\":" << rig.obsolete_dispatches()
+              << ",\"recovery_requests\":" << rig.recovery_requests() << "}\n";
+    rig.finish_events();
+}
+
+void test_p10_context_admission_only(const scenario_options& options) {
+    run_p10_post_admission(options, post_admission_disturbance::context_change, true,
+                           "P10-context-admission-only");
+}
+
+void test_p10_context_two_gate(const scenario_options& options) {
+    run_p10_post_admission(options, post_admission_disturbance::context_change, false,
+                           "P10-context-two-gate");
+}
+
+void test_p10_owner_admission_only(const scenario_options& options) {
+    run_p10_post_admission(options, post_admission_disturbance::owner_revocation, true,
+                           "P10-owner-admission-only");
+}
+
+void test_p10_owner_two_gate(const scenario_options& options) {
+    run_p10_post_admission(options, post_admission_disturbance::owner_revocation, false,
+                           "P10-owner-two-gate");
+}
+
+void test_p10_control_admission_only(const scenario_options& options) {
+    run_p10_post_admission(options, post_admission_disturbance::no_change, true,
+                           "P10-control-admission-only");
+}
+
+void test_p10_control_two_gate(const scenario_options& options) {
+    run_p10_post_admission(options, post_admission_disturbance::no_change, false,
+                           "P10-control-two-gate");
+}
+
 void run_g6_current_delay(const scenario_options& options,
                           std::string scenario,
                           std::chrono::milliseconds delay,
@@ -1445,6 +1617,12 @@ const std::vector<std::pair<std::string_view, scenario_fn>> kScenarios{
     {"P7-invocation-scoped", test_p7_invocation_scoped},
     {"P8-current-context-recovery", test_p8_current_context_recovery},
     {"P9-context-sensitivity", test_p9_context_sensitivity},
+    {"P10-context-admission-only", test_p10_context_admission_only},
+    {"P10-context-two-gate", test_p10_context_two_gate},
+    {"P10-owner-admission-only", test_p10_owner_admission_only},
+    {"P10-owner-two-gate", test_p10_owner_two_gate},
+    {"P10-control-admission-only", test_p10_control_admission_only},
+    {"P10-control-two-gate", test_p10_control_two_gate},
 };
 
 }  // namespace
@@ -1458,12 +1636,12 @@ int main(int argc, char** argv) {
     const bool paper_requested =
         requested == "P7-deadline-only" || requested == "P7-invocation-scoped" ||
         requested == "P8-current-context-recovery" ||
-        requested == "P9-context-sensitivity";
+        requested == "P9-context-sensitivity" || requested.starts_with("P10-");
     if ((!paper_requested && (argc < 4 || argc > 5)) ||
         (paper_requested && argc != 14)) {
         std::cerr
             << "usage: muesli_bt_air_hockey_scenario_tests SCENARIO SOCKET TREE [EVENTS]\n"
-            << "paper usage: ... P7-*, P8-* or P9-* SOCKET TREE EVENTS RUN_ID ACTION_X ACTION_Y "
+            << "paper usage: ... P7-* through P10-* SOCKET TREE EVENTS RUN_ID ACTION_X ACTION_Y "
                "BLACKOUT_START BLACKOUT_LENGTH TIMEOUT ACTION_LOCK DELAY_MS live|replay\n";
         return 2;
     }

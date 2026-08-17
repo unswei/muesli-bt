@@ -63,6 +63,8 @@ struct vla_invocation {
     vla_acceptance_policy acceptance_policy = vla_acceptance_policy::deadline_only;
     vla_authority_state authority_state = vla_authority_state::active;
     std::string authority_reason;
+    bool dispatch_authority_active = true;
+    std::string dispatch_authority_reason;
     bool cancel_requested = false;
     bool walking_target_dispatched = false;
 };
