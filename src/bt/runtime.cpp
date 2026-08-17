@@ -2375,11 +2375,6 @@ status execute_vla_request(const node& n, tick_context& ctx, const std::vector<m
 }
 
 status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<muslisp::value>& args) {
-    if (!ctx.svc.vla) {
-        emit_log(ctx, log_level::error, "vla", "vla-wait: VLA service is not available");
-        return status::failure;
-    }
-
     const vla_wait_options opts = parse_vla_wait_options(n, args);
 
     const bb_entry* job_entry = ctx.bb_get(opts.job_key);
@@ -2403,6 +2398,22 @@ status execute_vla_wait(const node& n, tick_context& ctx, const std::vector<musl
         if (invocation->authority_state == vla_authority_state::active) {
             invocation->authority_node = n.id;
         }
+
+        // A retained job handle exposes the invocation's terminal BT status. It
+        // must not poll the backend, validate, write, or emit another terminal
+        // decision after authority has been consumed.
+        if (invocation->authority_state == vla_authority_state::accepted) {
+            return status::success;
+        }
+        if (invocation->authority_state == vla_authority_state::rejected ||
+            invocation->authority_state == vla_authority_state::revoked) {
+            return status::failure;
+        }
+    }
+
+    if (!ctx.svc.vla) {
+        emit_log(ctx, log_level::error, "vla", "vla-wait: VLA service is not available");
+        return status::failure;
     }
     if (!budget_allows_decision_point(ctx, n.id, "vla_poll")) {
         return status::running;

@@ -110,6 +110,31 @@ bool event_has(const bt::event_log& events, std::string_view type,
   return false;
 }
 
+std::size_t event_count(const bt::event_log& events, std::string_view type,
+                        std::initializer_list<std::string_view> fields = {})
+{
+  const std::string type_field = "\"type\":\"" + std::string(type) + "\"";
+  std::size_t count = 0;
+  for (const std::string& line : events.snapshot())
+  {
+    if (line.find(type_field) == std::string::npos)
+    {
+      continue;
+    }
+    bool matches = true;
+    for (const std::string_view field : fields)
+    {
+      if (line.find(field) == std::string::npos)
+      {
+        matches = false;
+        break;
+      }
+    }
+    count += matches ? 1U : 0U;
+  }
+  return count;
+}
+
 class manual_clock final : public bt::clock_interface
 {
 public:
@@ -443,6 +468,11 @@ void test_moved_ball()
                   {"\"decision\":\"rejected\"", "\"reason\":\"context_changed\"",
                    "\"captured_context_id\":\"ball-A\"", "\"current_context_id\":\"ball-B\""}),
         "moved-ball scenario should emit both captured and current context evidence");
+  (void)rig.tick();
+  check(event_count(rig.host().events(), "vla_result",
+                    {"\"job_id\":\"" + std::to_string(job_id) + "\"",
+                     "\"decision\":\"rejected\""}) == 1,
+        "a retained rejected invocation should not emit another terminal decision");
 }
 
 void test_supersession()
@@ -530,14 +560,14 @@ void test_duplicate_completion()
   const bt::bb_entry* action = rig.instance().bb.get("approach-action");
   check(action != nullptr, "first completion should write the action");
   const std::uint64_t accepted_write_tick = action->last_write_tick;
-  (void)rig.tick();
+  check(rig.tick() == bt::status::success,
+        "a retained accepted invocation should return its latched terminal status");
 
   check(rig.instance().bb.get("approach-action")->last_write_tick == accepted_write_tick,
         "duplicate terminal polling must not write the action twice");
-  check(event_has(rig.host().events(), "vla_result",
-                  {"\"job_id\":\"" + std::to_string(job_id) + "\"", "\"decision\":\"rejected\"",
-                   "\"reason\":\"duplicate_terminal_result\""}),
-        "duplicate completion should emit a deterministic rejection reason");
+  check(event_count(rig.host().events(), "vla_result",
+                    {"\"job_id\":\"" + std::to_string(job_id) + "\""}) == 1,
+        "a retained invocation should emit exactly one terminal decision");
 }
 
 void test_branch_halt()

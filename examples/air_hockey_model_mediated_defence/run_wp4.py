@@ -118,6 +118,7 @@ def validate_definition(lock: dict[str, Any]) -> None:
         "cmake=3.28.3-1build7",
         "g++=4:13.2.0-7ubuntu1",
         "make=4.3-4.1build2",
+        "-DCMAKE_BUILD_TYPE=Release",
         "container-check",
         (
             'CMD ["python3", '

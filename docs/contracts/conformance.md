@@ -123,6 +123,9 @@ python3 tools/validate_trace.py check build/linux-ros2-l2/ros2_l2_artifacts/ros2
 
 This verifier is the supported ROS-backed replay/conformance check for the current `L2` lane.
 It validates canonical `mbt.evt.v1` output first, together with the scenario summaries produced by the rosbag suite.
+Strict trace validation rejects more than one terminal `vla_result` decision
+for the same submitted job. A terminal `vla_poll` followed by its single
+`vla_result` decision remains valid.
 
 For tooling consumers, the important part is that simulator-backed runs and ROS-backed runs now expose the same canonical artefact path:
 

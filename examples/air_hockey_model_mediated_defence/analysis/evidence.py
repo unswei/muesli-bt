@@ -403,6 +403,8 @@ def integrity_summary(
         observed_decision == expected["terminal_decision"]
         and observed_reason == expected["reason"]
         and len(obsolete_dispatches) == expected["obsolete_dispatches"]
+        and duplicate_commits == 0
+        and duplicate_dispatches == 0
     )
     return {
         "submitted_invocations": len(submissions),

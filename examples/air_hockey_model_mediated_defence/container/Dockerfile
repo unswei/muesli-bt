@@ -29,7 +29,8 @@ RUN python3 -m pip install --no-cache-dir \
       -r /opt/muesli-bt/examples/air_hockey_model_mediated_defence/container/requirements-wp4.txt && \
     python3 -m pip install --no-build-isolation --no-deps /opt/airhockey-distillation
 
-RUN cmake -S /opt/muesli-bt -B /opt/muesli-bt/build/air-hockey-wp4 && \
+RUN cmake -S /opt/muesli-bt -B /opt/muesli-bt/build/air-hockey-wp4 \
+      -DCMAKE_BUILD_TYPE=Release && \
     cmake --build /opt/muesli-bt/build/air-hockey-wp4 \
       --target muesli_bt_air_hockey_scenario_tests -j2
 

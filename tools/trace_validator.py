@@ -407,6 +407,7 @@ def validate_trace(trace_path: str, config: CheckConfig) -> ValidationReport:
     active_jobs: dict[str, dict[str, Any]] = {}
     deadline_snapshots: list[dict[str, Any]] = []
     async_state: dict[str, dict[str, Any]] = {}
+    vla_terminal_decisions: dict[tuple[str, int | None], int | None] = {}
 
     for event in events:
         if event.node_id is not None:
@@ -735,6 +736,33 @@ def validate_trace(trace_path: str, config: CheckConfig) -> ValidationReport:
                         context={"job_id": job_id, **_event_context(event)},
                     )
                 )
+            if event.event_type == "vla_result":
+                raw_generation = _event_data(event).get("generation")
+                generation = (
+                    raw_generation if isinstance(raw_generation, int) else None
+                )
+                invocation_id = (job_id, generation)
+                previous_seq = vla_terminal_decisions.get(invocation_id)
+                if invocation_id in vla_terminal_decisions:
+                    violations.append(
+                        Violation(
+                            code="async_duplicate_terminal_decision",
+                            severity="error",
+                            file_name=event.file_name,
+                            line_no=event.line_no,
+                            seq=event.seq,
+                            tick=event.tick,
+                            message=f"duplicate terminal vla_result decision for job {job_id}",
+                            context={
+                                "job_id": job_id,
+                                "generation": generation,
+                                "previous_terminal_seq": previous_seq,
+                                **_event_context(event),
+                            },
+                        )
+                    )
+                else:
+                    vla_terminal_decisions[invocation_id] = event.seq
             state["terminal_seq"] = event.seq
             active_jobs.pop(job_id, None)
 

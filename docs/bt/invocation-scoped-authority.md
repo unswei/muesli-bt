@@ -65,6 +65,15 @@ revoke the job.
 The requesting node remains unchanged for identity and evidence. Only the
 authority-owner node changes.
 
+### terminal latch
+
+Each invocation emits at most one terminal `vla_result` decision. If
+`:clear_job #f` retains the job ID, later `vla-wait` ticks return `success` for
+an accepted invocation and `failure` for a rejected or revoked invocation.
+They do not poll the backend, repeat host validation, rewrite the action or
+emit another terminal decision. Clear the job key or submit a new generation
+to begin a new lifecycle.
+
 ### commit gate
 
 For `invocation_scoped`, a final or early result is committed only when:

@@ -134,6 +134,76 @@ def _prepare_output(output: Path) -> Path:
     return output
 
 
+def _marked_run_dirs(runs: Path) -> list[Path]:
+    return sorted(
+        path.parent
+        for path in runs.glob(f"*/{RUN_MARKER}")
+        if (path.parent / "manifest.json").is_file()
+    )
+
+
+def _reuse_baseline_runs(
+    source: Path, output_runs: Path, protocol: dict[str, Any]
+) -> dict[str, Any]:
+    source = source.resolve()
+    if not (source / RUN_ROOT_MARKER).is_file():
+        raise GateG8RecoveryError(f"baseline source is not a marked WP8 run: {source}")
+    source_protocol = source / "wp8-protocol.json"
+    if not source_protocol.is_file() or _sha256(source_protocol) != _sha256(
+        PROTOCOL_PATH
+    ):
+        raise GateG8RecoveryError("baseline source used a different WP8 protocol")
+
+    copied: defaultdict[str, int] = defaultdict(int)
+    source_revisions: defaultdict[str, set[str]] = defaultdict(set)
+    for source_run in _marked_run_dirs(source / "runs"):
+        manifest = read_json(source_run / "manifest.json")
+        treatment = _treatment_from_run_id(manifest["run_id"])
+        if treatment == "invocation_scoped_current_context_recovery":
+            continue
+        if manifest["expected_integrity"] != protocol["paired_trial"][
+            "expected"
+        ][treatment]:
+            raise GateG8RecoveryError(
+                f"baseline source oracle changed: {manifest['run_id']}"
+            )
+        destination = output_runs / source_run.name
+        if destination.exists():
+            raise GateG8RecoveryError(f"duplicate reused run: {destination.name}")
+        destination.mkdir()
+        shutil.copy2(source_run / RUN_MARKER, destination / RUN_MARKER)
+        shutil.copy2(source_run / "manifest.json", destination / "manifest.json")
+        for name in RAW_NAMES:
+            shutil.copy2(source_run / name, destination / name)
+        analyse_run(destination)
+        copied[treatment] += 1
+        source_revisions[treatment].add(
+            manifest["repositories"]["muesli_bt"]["commit"]
+        )
+
+    expected = protocol["campaign"]["total_pairs"]
+    for treatment in TREATMENTS[:2]:
+        if copied[treatment] != expected:
+            raise GateG8RecoveryError(
+                f"baseline source contains {copied[treatment]} {treatment} runs; "
+                f"expected {expected}"
+            )
+    measured_path = source / "wp8-measured.json"
+    return {
+        "mode": "recovery_only_with_reused_baselines",
+        "source_root": str(source),
+        "source_protocol_sha256": _sha256(source_protocol),
+        "source_measured_sha256": (
+            _sha256(measured_path) if measured_path.is_file() else None
+        ),
+        "copied_runs": dict(sorted(copied.items())),
+        "source_revisions": {
+            treatment: sorted(revisions)
+            for treatment, revisions in sorted(source_revisions.items())
+        },
+    }
+
+
 def _expected_predicates(treatment: str) -> set[str]:
     if treatment == "deadline_only":
         return {
@@ -539,11 +609,7 @@ def _treatment_from_run_id(run_id: str) -> str:
 
 def _campaign_summary(runs: Path) -> dict[str, Any]:
     groups: defaultdict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
-    run_dirs = sorted(
-        path.parent
-        for path in runs.glob(f"*/{RUN_MARKER}")
-        if (path.parent / "manifest.json").is_file()
-    )
+    run_dirs = _marked_run_dirs(runs)
     if not run_dirs:
         raise GateG8RecoveryError("no marked WP8 run bundles")
     for run_dir in run_dirs:
@@ -625,25 +691,32 @@ def _measurements(
     summary: dict[str, Any],
     learned_inference_ns: list[int],
 ) -> dict[str, Any]:
-    run_dirs = sorted(
-        path.parent
-        for path in runs.glob(f"*/{RUN_MARKER}")
-        if (path.parent / "manifest.json").is_file()
-    )
+    run_dirs = _marked_run_dirs(runs)
     tick_ns: list[int] = []
+    tick_ns_by_treatment: defaultdict[str, list[int]] = defaultdict(list)
     replay_mismatches = 0
     trace_failures = 0
     direct_replay_failures = 0
     missing_terminal = 0
     reason_failures = 0
+    duplicate_terminal_decisions = 0
+    duplicate_dispatches = 0
     recovery_predicates = 0
+    treatment_revisions: defaultdict[str, set[str]] = defaultdict(set)
+    treatment_images: defaultdict[str, set[str]] = defaultdict(set)
     for run_dir in run_dirs:
         manifest = read_json(run_dir / "manifest.json")
         trial = read_json(run_dir / "trial-summary.json")
+        treatment = _treatment_from_run_id(manifest["run_id"])
+        treatment_revisions[treatment].add(
+            manifest["repositories"]["muesli_bt"]["commit"]
+        )
+        treatment_images[treatment].add(manifest["container"]["digest"])
         for timing in _timing_records(
             (run_dir / "runner.stdout").read_text(encoding="utf-8")
         ):
             tick_ns.extend(timing["tick_duration_ns"])
+            tick_ns_by_treatment[treatment].extend(timing["tick_duration_ns"])
         if not read_json(run_dir / "replay-report.json")["matched"]:
             replay_mismatches += 1
         if read_json(run_dir / "trace-validation.json")["status"] != "passed":
@@ -652,9 +725,9 @@ def _measurements(
             direct_replay_failures += 1
         missing_terminal += trial["integrity"]["invocations_without_terminal_state"]
         reason_failures += int(not trial["integrity"]["reason_code_agreement"])
-        if _treatment_from_run_id(manifest["run_id"]) == (
-            "invocation_scoped_current_context_recovery"
-        ):
+        duplicate_terminal_decisions += trial["integrity"]["duplicate_commits"]
+        duplicate_dispatches += trial["integrity"]["duplicate_dispatches"]
+        if treatment == "invocation_scoped_current_context_recovery":
             recovery_predicates += int(
                 "p8_recovery_episode_completed PASS"
                 in (run_dir / "runner.stdout").read_text(encoding="utf-8")
@@ -663,12 +736,25 @@ def _measurements(
         "runs": len(run_dirs),
         "missing_terminal_invocations": missing_terminal,
         "reason_code_failures": reason_failures,
+        "duplicate_terminal_decisions": duplicate_terminal_decisions,
+        "duplicate_dispatches": duplicate_dispatches,
         "replay_mismatches": replay_mismatches,
         "trace_failures": trace_failures,
         "direct_replay_failures": direct_replay_failures,
         "recovery_episode_predicates": recovery_predicates,
         "tick_timing": _timing_summary(tick_ns, 20.0),
+        "tick_timing_by_treatment": {
+            treatment: _timing_summary(tick_ns_by_treatment[treatment], 20.0)
+            for treatment in TREATMENTS
+        },
         "learned_inference_timing": _timing_summary(learned_inference_ns),
+        "treatment_provenance": {
+            treatment: {
+                "muesli_bt_revisions": sorted(treatment_revisions[treatment]),
+                "container_digests": sorted(treatment_images[treatment]),
+            }
+            for treatment in TREATMENTS
+        },
         "treatments": {
             treatment: {
                 "obsolete_dispatch_pairs": summary["treatments"][treatment][
@@ -681,12 +767,29 @@ def _measurements(
     }
 
 
+def _timing_gate_summary(
+    measurements: dict[str, Any], reaggregated: bool
+) -> tuple[str, dict[str, Any]]:
+    scope = (
+        "invocation_scoped_current_context_recovery"
+        if reaggregated
+        else "all_treatments"
+    )
+    timing = (
+        measurements["tick_timing_by_treatment"][scope]
+        if reaggregated
+        else measurements["tick_timing"]
+    )
+    return scope, timing
+
+
 def run_campaign(
     executable: Path,
     checkpoint: Path,
     output: Path,
     image: str,
     image_digest: str,
+    reuse_baselines_from: Path | None = None,
 ) -> dict[str, Any]:
     protocol = _load_wp8()
     executable = executable.resolve()
@@ -726,6 +829,13 @@ def run_campaign(
         raise GateG8RecoveryError("learned checkpoint metadata changed")
 
     runs = output / "runs"
+    reaggregation = None
+    treatments = TREATMENTS
+    if reuse_baselines_from is not None:
+        reaggregation = _reuse_baseline_runs(
+            reuse_baselines_from, runs, protocol
+        )
+        treatments = ("invocation_scoped_current_context_recovery",)
     pair_count = 0
     for shot_index, generated in enumerate(shots):
         observation = wp7._initial_observation(
@@ -740,7 +850,7 @@ def run_campaign(
                 "selected_seed": schedule["seed"],
                 "selected_delay_ms": schedule["delay_ms"],
             }
-            for treatment in TREATMENTS:
+            for treatment in treatments:
                 _capture_run(
                     executable=executable,
                     output_root=runs,
@@ -779,7 +889,7 @@ def run_campaign(
         action, elapsed_ns = wp7._provider_action(learned_provider, observation)
         learned_inference_ns.append(elapsed_ns)
         pair_id = f"p8-learned-s{learned_definition['delay_seed']}-{wp7._shot_key(generated)[:12]}"
-        for treatment in TREATMENTS:
+        for treatment in treatments:
             _capture_run(
                 executable=executable,
                 output_root=runs,
@@ -821,6 +931,7 @@ def run_campaign(
         "runs": summary["run_count"],
         "measurements": measurements,
         "campaign_summary_sha256": semantic_sha256(summary),
+        "reaggregation": reaggregation,
     }
     write_json(output / "wp8-measured.json", measured)
     gate = protocol["gate"]
@@ -857,13 +968,23 @@ def run_campaign(
         failures.append("missing terminal invocation")
     if measurements["reason_code_failures"]:
         failures.append("reason-code agreement")
+    if measurements["duplicate_terminal_decisions"]:
+        failures.append("duplicate terminal decision")
+    if measurements["duplicate_dispatches"]:
+        failures.append("duplicate dispatch")
     if measurements["replay_mismatches"] > gate["maximum_replay_mismatches"]:
         failures.append("replay")
     if measurements["trace_failures"] > gate["maximum_trace_failures"]:
         failures.append("trace validation")
     if measurements["direct_replay_failures"]:
         failures.append("direct replay")
-    if measurements["tick_timing"]["p99_ms"] > gate["maximum_tick_p99_ms"]:
+    timing_gate_scope, timing_gate = _timing_gate_summary(
+        measurements, reaggregation is not None
+    )
+    measured["timing_gate_scope"] = timing_gate_scope
+    measured["timing_gate"] = timing_gate
+    write_json(output / "wp8-measured.json", measured)
+    if timing_gate["p99_ms"] > gate["maximum_tick_p99_ms"]:
         failures.append("BT tick p99")
     if measurements["learned_inference_timing"]["p95_ms"] > gate[
         "maximum_learned_p95_inference_ms"
@@ -895,6 +1016,11 @@ def main() -> int:
     parser.add_argument("--out", type=Path)
     parser.add_argument("--image")
     parser.add_argument("--image-digest")
+    parser.add_argument(
+        "--reuse-baselines-from",
+        type=Path,
+        help="reuse and revalidate deadline-only and hold bundles from a marked WP8 campaign",
+    )
     arguments = parser.parse_args()
     protocol = _load_wp8()
     if arguments.command == "check-protocol":
@@ -919,6 +1045,7 @@ def main() -> int:
         arguments.out,
         arguments.image,
         arguments.image_digest,
+        arguments.reuse_baselines_from,
     )
     return 0
 

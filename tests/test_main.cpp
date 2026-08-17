@@ -4176,15 +4176,15 @@ void test_vla_invocation_scoped_authority_accepts_current_result() {
           "accepted result should terminally consume invocation authority");
     const std::uint64_t accepted_write_tick = inst->bb.get("authority-action")->last_write_tick;
     value duplicate = eval_text("(bt.tick authority-accept-inst '((state 0.0) (ball-context \"ball-A\")))", env);
-    check(is_symbol(duplicate) && symbol_name(duplicate) == "running",
-          "duplicate result should fail its wait branch and leave the request branch running");
+    check(is_symbol(duplicate) && symbol_name(duplicate) == "success",
+          "a retained accepted invocation should return its latched terminal status");
     check(inst->bb.get("authority-action")->last_write_tick == accepted_write_tick,
-          "duplicate terminal result must not write the accepted action again");
+          "a latched terminal invocation must not write the accepted action again");
     check(validator.calls == 1, "accepted invocation should run host validation exactly once");
 
     bool saw_rich_submit = false;
     bool saw_accepted_result = false;
-    bool saw_duplicate_rejection = false;
+    std::size_t terminal_decisions = 0;
     for (const std::string& line : host.events().snapshot()) {
         saw_rich_submit = saw_rich_submit ||
                           (line.find("\"type\":\"vla_submit\"") != std::string::npos &&
@@ -4196,14 +4196,14 @@ void test_vla_invocation_scoped_authority_accepts_current_result() {
                                line.find("\"decision\":\"accepted\"") != std::string::npos &&
                                line.find("\"authority_state\":\"accepted\"") != std::string::npos &&
                                line.find("\"host_validation\":\"accepted\"") != std::string::npos);
-        saw_duplicate_rejection = saw_duplicate_rejection ||
-                                  (line.find("\"type\":\"vla_result\"") != std::string::npos &&
-                                   line.find("\"decision\":\"rejected\"") != std::string::npos &&
-                                   line.find("\"reason\":\"duplicate_terminal_result\"") != std::string::npos);
+        if (line.find("\"type\":\"vla_result\"") != std::string::npos &&
+            line.find("\"decision\":") != std::string::npos) {
+            ++terminal_decisions;
+        }
     }
     check(saw_rich_submit, "vla_submit should record invocation identity and captured context");
     check(saw_accepted_result, "vla_result should record authority and host validation acceptance");
-    check(saw_duplicate_rejection, "accepted invocation should reject a duplicate terminal result");
+    check(terminal_decisions == 1, "an invocation should emit exactly one terminal vla_result decision");
     host.set_vla_commit_validator(nullptr);
 }
 

@@ -90,6 +90,8 @@ The learned-provider checkpoint remains explicitly unresolved until the ACRA
 freeze. The joint Dockerfile consumes Git archives, not mutable working trees.
 It also installs the exact Ubuntu CMake, C++ and Make package versions required
 to build the muesli runner because the simulator base image has no compiler.
+The runner is configured explicitly with `CMAKE_BUILD_TYPE=Release`; the
+container-definition check rejects an image recipe that omits this setting.
 
 Run every non-MuJoCo startup, schema and provider check locally:
 
@@ -275,9 +277,8 @@ external inference.
 
 The frozen protocol is `configs/wp8_recovery_protocol.json`. It is paired
 with the existing deadline-only and invocation-scoped hold treatments, but
-the WP7 two-arm seal is not modified. The external campaign remains pending;
-the local check exercises the new tree, policy callback, event evidence and
-zero-obsolete-dispatch predicate:
+the WP7 two-arm seal is not modified. The local check exercises the new tree,
+policy callback, event evidence and zero-obsolete-dispatch predicate:
 
 ```bash
 cmake --build build/dev --target muesli_bt_air_hockey_scenario_tests -j
@@ -290,27 +291,41 @@ A successful WP8 campaign should report integrity and recovery separately:
 the rejected proposal must never be dispatched, while the recovery policy
 must produce at least one current-context action and complete the episode.
 
-Run the authorised Marvin campaign into a new evidence root after rebuilding
-the joint image from the pushed WP8 revision:
+The first three-arm Marvin run completed all 684 treatments but is not valid
+paper evidence. It exposed two harness defects: retained terminal jobs emitted
+repeated `vla_result` decisions, and the image used CMake's unoptimised default.
+The failed run remains unchanged at
+`/home/oliver/experiments/muesli-air-hockey/wp8-recovery-d3c7be6-1b6bbbb/evidence/campaign`.
+
+After rebuilding the pushed revision, rerun only the recovery treatment into a
+new evidence root and revalidate the unchanged deadline-only and hold raw
+bundles from the failed campaign:
 
 ```bash
-g8_root=/home/oliver/experiments/muesli-air-hockey/wp8-recovery-d3c7be6-1b6bbbb
+failed_g8=/home/oliver/experiments/muesli-air-hockey/wp8-recovery-d3c7be6-1b6bbbb/evidence/campaign
+g8_root=/home/oliver/experiments/muesli-air-hockey/wp8-recovery-latched-<muesli-revision>-1b6bbbb
 checkpoint=/home/oliver/experiments/airhockey-memory-distillation/principal-sweep-v1-2026-08-14-v3/final/structured_k2/14303/checkpoint.npz
 docker run --rm --cpus 2 --memory 8g --ipc host \
   --mount type=bind,src="$checkpoint",dst=/checkpoint/structured_k2-14303.npz,readonly \
+  --mount type=bind,src="$failed_g8",dst=/wp8-source,readonly \
   --mount type=bind,src="$g8_root",dst=/wp8 \
-  local/muesli-air-hockey:wp8-9cb7954-1b6bbbb \
+  local/muesli-air-hockey:wp8-<muesli-revision>-1b6bbbb \
   python3 /opt/muesli-bt/examples/air_hockey_model_mediated_defence/run_wp8.py run \
     --runner /opt/muesli-bt/build/air-hockey-wp4/muesli_bt_air_hockey_scenario_tests \
     --checkpoint /checkpoint/structured_k2-14303.npz \
     --out /wp8/evidence/campaign \
-    --image local/muesli-air-hockey:wp8-9cb7954-1b6bbbb \
-    --image-digest <image-id-without-sha256-prefix>
+    --image local/muesli-air-hockey:wp8-<muesli-revision>-1b6bbbb \
+    --image-digest <image-id-without-sha256-prefix> \
+    --reuse-baselines-from /wp8-source
 ```
 
-This campaign is separate from the sealed WP7 root and runs all 228 matched
-pairs under deadline-only, invocation-scoped hold, and invocation-scoped
-current-context recovery treatments.
+The new root contains 228 freshly run recovery bundles and copied raw bundles
+for the 456 preserved baselines. Every copied bundle is hash-checked and
+reanalysed with the corrected strict checker. The report records revisions and
+container digests by treatment. Because the preserved baselines came from the
+old unoptimised image, the latency gate applies only to the fresh Release
+recovery arm; the combined timing distribution remains diagnostic and is not
+presented as a homogeneous Release benchmark.
 
 ## run the contract tests
 

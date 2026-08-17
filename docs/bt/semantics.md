@@ -208,6 +208,8 @@ Uses per-node retry counter.
   commit validator immediately before the write
 - invocation-scoped commits fail closed when no host validator is registered
 - on timeout/error/cancel/invalid: returns `failure` (and clears `job_id` unless configured otherwise)
+- when `job_id` is retained, returns the invocation's latched terminal status
+  without polling, validating, writing or emitting another `vla_result`
 
 An accepted three-component approach action may be handed to a registered
 walking-target dispatcher. The runtime rechecks invocation acceptance, current

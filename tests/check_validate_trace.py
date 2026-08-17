@@ -249,6 +249,72 @@ def main() -> int:
         if "async_terminal_without_submit" not in completed.stdout:
             raise AssertionError("async terminal without submit check should mention async_terminal_without_submit")
 
+        duplicate_terminal_trace = tmp / "duplicate_terminal_decision.jsonl"
+        duplicate_terminal_events = [
+            make_run_start(),
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "tick_begin",
+                "run_id": "trace-validator-smoke",
+                "tick": 1,
+                "data": {"tick_budget_ms": 20},
+            },
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "vla_submit",
+                "run_id": "trace-validator-smoke",
+                "tick": 1,
+                "data": {"job_id": "job-duplicate", "generation": 1, "node_id": 7},
+            },
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "vla_result",
+                "run_id": "trace-validator-smoke",
+                "tick": 1,
+                "data": {
+                    "job_id": "job-duplicate",
+                    "generation": 1,
+                    "node_id": 8,
+                    "status": "ok",
+                    "decision": "accepted",
+                },
+            },
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "vla_result",
+                "run_id": "trace-validator-smoke",
+                "tick": 1,
+                "data": {
+                    "job_id": "job-duplicate",
+                    "generation": 1,
+                    "node_id": 8,
+                    "status": "ok",
+                    "decision": "rejected",
+                    "reason": "duplicate_terminal_result",
+                },
+            },
+            {
+                "schema": "mbt.evt.v1",
+                "contract_version": "1.0.0",
+                "type": "tick_end",
+                "run_id": "trace-validator-smoke",
+                "tick": 1,
+                "data": {"root_status": "success", "tick_ms": 1.0, "tick_budget_ms": 20.0},
+            },
+        ]
+        resequence(duplicate_terminal_events)
+        write_events(duplicate_terminal_trace, duplicate_terminal_events)
+        completed = run_cli("check", str(duplicate_terminal_trace))
+        assert_exit(completed, 1, "duplicate async terminal decision check")
+        if "async_duplicate_terminal_decision" not in completed.stdout:
+            raise AssertionError(
+                "duplicate async terminal decision check should mention async_duplicate_terminal_decision"
+            )
+
         runtime_tail_trace = tmp / "runtime_tail.jsonl"
         runtime_tail_events = [
             make_run_start(),
