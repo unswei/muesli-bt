@@ -85,5 +85,5 @@
     "maximum_privileged_policy_inputs": 0,
     "maximum_tick_p99_ms": 20.0
   },
-  "pilot_disposition": "A 52-cell unsealed pilot from revision 205ac3c was stopped before aggregation after revealing that controller lag can make within-command displacement zero. The final paired trajectory-separation metric was frozen before the final campaign and the pilot is excluded."
+  "pilot_disposition": "A 52-cell unsealed pilot from revision 205ac3c was stopped before aggregation after revealing that controller lag can make within-command displacement zero. A 14-cell dry run from revision 95b7240 was stopped after finding that owner pre-emption at observation step 0 precedes the stored trajectory; that arm tests authority and capability calls, not physical target separation. The final context-only paired trajectory metric was frozen before the final campaign, and both preliminary runs are excluded."
 }

@@ -534,7 +534,10 @@ def _summarise(results: list[dict[str, Any]], protocol: dict[str, Any]) -> dict[
                 "valid_handle_rejections": valid_rejections,
             }
     paired_effects: dict[str, Any] = {}
-    for disturbance in DISTURBANCES[:2]:
+    # Only context change yields a distinct physical target. Owner pre-emption
+    # tests control-flow authority and capability calls; the recovery policy
+    # may independently choose the same numerical target in that schedule.
+    for disturbance in ("context_change",):
         by_treatment: dict[str, dict[str, dict[str, Any]]] = {
             treatment: {
                 row["shot_key"]: row for row in grouped[(disturbance, treatment)]
