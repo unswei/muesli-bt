@@ -372,6 +372,22 @@ backup has SHA-256
 `3a81bc515f74b39c9ba819ae51e1448d897a40f33b510bb7ed29667d1c7486cb`.
 Campaign files are mode `0444` and directories are mode `0555`.
 
+## wp9 context-token sensitivity
+
+WP9 is a small matched sensitivity study over the host-owned context
+equivalence relation. Its frozen protocol is
+`configs/wp9_context_sensitivity_protocol.json`. It compares three policies at
+the same tracking reacquisition: always assign a new context, assign a new
+context above 0.10 normalised public-target displacement, or assign one above
+0.20 displacement. The policy sees only public observation indices 16--18.
+
+The study predeclares 0.10 as the downstream usefulness tolerance. It reports
+context invalidations, obsolete dispatches above that reference tolerance,
+rejections at or below it, and save rate. Twenty-four shots are selected by
+SHA-256 shot-identifier order and crossed with the existing 50, 80 and 110 ms
+delays, giving 72 matched cases and 216 policy runs. Thresholds and selection
+were frozen before campaign outcomes were inspected.
+
 ## run the contract tests
 
 From the repository root:

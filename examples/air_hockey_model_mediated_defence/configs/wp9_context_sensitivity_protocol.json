@@ -1,0 +1,83 @@
+{
+  "schema_version": "airhockey.wp9.context_sensitivity.protocol.v1",
+  "status": "frozen_before_context_sensitivity_campaign",
+  "parent_wp8_protocol": "configs/wp8_recovery_protocol.json",
+  "parent_wp8_protocol_sha256": "8bf75467e823be3157d59e9e3d1b3ba61790297dcbee1290c11b2c747b0966b3",
+  "source_wp8_report_sha256": "4c1d52bc18c837ca3488cb3885f548fb15ee1483cf1ac20795e93849f496c673",
+  "source_wp8_seal": {
+    "checksum_manifest_sha256": "149c0b71906c6675217e2a97e50b3d54059a68d4bc812ad6364c3179b1a0aa73",
+    "backup_sha256": "3a81bc515f74b39c9ba819ae51e1448d897a40f33b510bb7ed29667d1c7486cb"
+  },
+  "control_period_ms": 20,
+  "deadline_ms": 120,
+  "paper_split": {
+    "name": "muesli_test",
+    "seed": 6303,
+    "expected_shots": 72,
+    "manifest_sha256": "59527e9f55537d127fc401ee3ab5fbbfedbc36dc22cbca0322935eb99ea1d665",
+    "selection": "sha256_shot_id_order_first",
+    "selected_shots": 24
+  },
+  "paired_trial": {
+    "blackout_start_step": 1,
+    "blackout_length_steps": 1,
+    "reacquisition_step": 2,
+    "timeout_steps": 125,
+    "source_age_limit_steps": 6,
+    "completion_delay_ms": [50, 80, 110],
+    "provider": "public_puck_target_v1",
+    "recovery_policy": "current_context_recovery.v1",
+    "behaviour_tree": "lisp/bt_invocation_scoped_current_context_recovery.lisp",
+    "behaviour_tree_sha256": "3e4d4e00b60d8d7a7414332ce9f60ff12345cae87b244681d2a0f7a244b5344f"
+  },
+  "context_observation": {
+    "schema": "airhockey.public_observation.v1",
+    "visible_flag_index": 18,
+    "target_indices": [16, 17],
+    "comparison": "euclidean_distance_between_submission_and_reacquisition_targets",
+    "reference_usefulness_max_displacement": 0.1,
+    "boundary_rule": "useful_and_equivalent_at_or_below_threshold",
+    "privileged_state": false
+  },
+  "policies": [
+    {
+      "id": "reacquisition_identity",
+      "kind": "always_new_context_on_reacquisition",
+      "displacement_threshold": null
+    },
+    {
+      "id": "public_displacement_0_10",
+      "kind": "new_context_above_public_displacement",
+      "displacement_threshold": 0.1
+    },
+    {
+      "id": "public_displacement_0_20",
+      "kind": "new_context_above_public_displacement",
+      "displacement_threshold": 0.2
+    }
+  ],
+  "threshold_basis": "fixed fractions of the normalised [-1,1] target span; no campaign outcomes were inspected before freeze",
+  "campaign": {
+    "matched_cases": 72,
+    "policy_runs": 216,
+    "exact_provider_replay": true,
+    "bootstrap_samples": 10000,
+    "bootstrap_seed": 6310,
+    "status": "pending_external_campaign"
+  },
+  "metrics": [
+    "context_invalidations_per_episode",
+    "obsolete_dispatch_rate_under_reference_tolerance",
+    "reference_useful_result_rejection_rate",
+    "save_rate"
+  ],
+  "gate": {
+    "maximum_missing_terminal_invocations": 0,
+    "maximum_duplicate_terminal_decisions": 0,
+    "maximum_duplicate_dispatches": 0,
+    "maximum_replay_mismatches": 0,
+    "maximum_trace_failures": 0,
+    "maximum_privileged_policy_inputs": 0,
+    "maximum_tick_p99_ms": 20.0
+  }
+}

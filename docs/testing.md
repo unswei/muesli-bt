@@ -237,6 +237,13 @@ SHA-256
 `3a81bc515f74b39c9ba819ae51e1448d897a40f33b510bb7ed29667d1c7486cb`.
 All campaign files are mode `0444` and directories are mode `0555`.
 
+WP9 freezes the context-token sensitivity protocol before its campaign. It
+uses only the public puck target and visibility flag, fixes the downstream
+usefulness tolerance at 0.10 normalised units, and compares reacquisition
+identity with 0.10 and 0.20 displacement equivalence thresholds. The selected
+24-shot subset is determined by SHA-256 shot-identifier order, independent of
+outcome, and crossed with the three existing service delays.
+
 ## canonical event fixture suite
 
 Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:
