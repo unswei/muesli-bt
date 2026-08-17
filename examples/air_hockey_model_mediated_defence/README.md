@@ -291,6 +291,21 @@ A successful WP8 campaign should report integrity and recovery separately:
 the rejected proposal must never be dispatched, while the recovery policy
 must produce at least one current-context action and complete the episode.
 
+After a WP8 campaign passes, seal it as a separate fail-closed operation. The
+seal writes a complete SHA-256 manifest, creates and verifies a compressed
+backup, then changes campaign files to mode `0444` and directories to `0555`:
+
+```bash
+python examples/air_hockey_model_mediated_defence/run_wp8.py seal \
+  --campaign /path/to/evidence/campaign \
+  --backup /path/to/evidence/campaign.tar.gz \
+  --seal-report /path/to/evidence/wp8-seal.json
+```
+
+The backup and seal report must be outside the campaign. The command refuses
+unmarked or non-passing campaigns, changed protocols or summaries, symlinks,
+and existing output targets.
+
 The first three-arm Marvin run completed all 684 treatments but is not valid
 paper evidence. It exposed two harness defects: retained terminal jobs emitted
 repeated `vla_result` decisions, and the image used CMake's unoptimised default.

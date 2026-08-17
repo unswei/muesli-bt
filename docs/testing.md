@@ -222,6 +222,13 @@ The passing campaign revalidated 456 preserved baseline bundles and captured
 duplicate terminal decisions, saved 150/228 shots, and recorded 5.879 ms BT
 tick p99. Learned inference p95 was 0.249 ms.
 
+`run_wp8.py seal` is a separate, fail-closed publication step. It verifies the
+WP8 marker, passing report, frozen protocol hash and campaign-summary hash;
+writes a complete SHA-256 manifest; creates and verifies a compressed backup;
+and makes the campaign read-only. The external seal report is authoritative
+for backup verification and file modes because `wp8-report.json` necessarily
+records the pre-seal state.
+
 ## canonical event fixture suite
 
 Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:
