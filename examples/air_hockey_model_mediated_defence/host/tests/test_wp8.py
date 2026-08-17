@@ -10,7 +10,12 @@ EXAMPLE_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(EXAMPLE_ROOT))
 
 from analysis.evidence import integrity_summary
-from run_wp8 import _timing_gate_summary
+from run_wp8 import (
+    GateG8RecoveryError,
+    THREAD_LIMIT_ENVIRONMENT,
+    _timing_gate_summary,
+    _validate_thread_limits,
+)
 
 
 def _event(event_type: str, **data: object) -> dict[str, object]:
@@ -18,6 +23,15 @@ def _event(event_type: str, **data: object) -> dict[str, object]:
 
 
 class GateG8PureTest(unittest.TestCase):
+    def test_campaign_requires_single_threaded_numerical_libraries(self) -> None:
+        environment = {name: "1" for name in THREAD_LIMIT_ENVIRONMENT}
+
+        _validate_thread_limits(environment)
+
+        environment["OPENBLAS_NUM_THREADS"] = "32"
+        with self.assertRaises(GateG8RecoveryError):
+            _validate_thread_limits(environment)
+
     def test_reaggregation_gates_only_new_release_recovery_timing(self) -> None:
         measurements = {
             "tick_timing": {"p99_ms": 72.0},

@@ -212,6 +212,12 @@ its verified backup SHA-256 is
 Because the full condition's current fallback only holds position, its lower
 save rate is a documented fallback limitation, not a Gate G7 integrity failure.
 
+WP8 adds the current-context recovery arm. Its Marvin campaign requires a
+Release joint image and sets `OMP_NUM_THREADS`, `OPENBLAS_NUM_THREADS`,
+`MKL_NUM_THREADS` and `NUMEXPR_NUM_THREADS` to `1`. The runner checks these
+limits before creating evidence. This prevents numerical worker pools from
+introducing periodic scheduler stalls under the two-CPU container quota.
+
 ## canonical event fixture suite
 
 Canonical fixtures are stored under `tests/fixtures/mbt.evt.v1/` and validated in CI:

@@ -43,6 +43,12 @@ TREATMENTS = (
     "invocation_scoped_hold",
     "invocation_scoped_current_context_recovery",
 )
+THREAD_LIMIT_ENVIRONMENT = (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+)
 SCENARIOS = {
     "deadline_only": "P7-deadline-only",
     "invocation_scoped_hold": "P7-invocation-scoped",
@@ -59,6 +65,17 @@ SLUGS = {
 
 class GateG8RecoveryError(EvidenceError):
     """A WP8 campaign invariant failed before evidence promotion."""
+
+
+def _validate_thread_limits(environment: dict[str, str]) -> None:
+    invalid = [
+        name for name in THREAD_LIMIT_ENVIRONMENT if environment.get(name) != "1"
+    ]
+    if invalid:
+        raise GateG8RecoveryError(
+            "WP8 requires single-threaded numerical libraries: "
+            + ", ".join(invalid)
+        )
 
 
 def _sha256(path: Path) -> str:
@@ -791,6 +808,7 @@ def run_campaign(
     image_digest: str,
     reuse_baselines_from: Path | None = None,
 ) -> dict[str, Any]:
+    _validate_thread_limits(dict(os.environ))
     protocol = _load_wp8()
     executable = executable.resolve()
     checkpoint = checkpoint.resolve()

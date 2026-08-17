@@ -306,6 +306,8 @@ failed_g8=/home/oliver/experiments/muesli-air-hockey/wp8-recovery-d3c7be6-1b6bbb
 g8_root=/home/oliver/experiments/muesli-air-hockey/wp8-recovery-latched-<muesli-revision>-1b6bbbb
 checkpoint=/home/oliver/experiments/airhockey-memory-distillation/principal-sweep-v1-2026-08-14-v3/final/structured_k2/14303/checkpoint.npz
 docker run --rm --cpus 2 --memory 8g --ipc host \
+  --env OMP_NUM_THREADS=1 --env OPENBLAS_NUM_THREADS=1 \
+  --env MKL_NUM_THREADS=1 --env NUMEXPR_NUM_THREADS=1 \
   --mount type=bind,src="$checkpoint",dst=/checkpoint/structured_k2-14303.npz,readonly \
   --mount type=bind,src="$failed_g8",dst=/wp8-source,readonly \
   --mount type=bind,src="$g8_root",dst=/wp8 \
@@ -326,6 +328,12 @@ container digests by treatment. Because the preserved baselines came from the
 old unoptimised image, the latency gate applies only to the fresh Release
 recovery arm; the combined timing distribution remains diagnostic and is not
 presented as a homogeneous Release benchmark.
+
+The WP8 runner fails before opening an output root unless all four thread
+limits are `1`. Without those limits, numerical-library worker pools contend
+with the control process under Docker's two-CPU quota and create periodic
+50--60 ms scheduler stalls. Those stalls are infrastructure timing, not BT
+execution work, but they invalidate the operational latency gate.
 
 ## run the contract tests
 
