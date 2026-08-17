@@ -256,8 +256,10 @@ def _run_native_half(
     generated: Any,
     events_path: Path,
     replay: bool,
+    backend: Any | None = None,
+    expected_predicates: set[str] | None = None,
 ) -> dict[str, Any]:
-    backend = wp7.MujocoDirectLaunchHostBackend(
+    backend = backend or wp7.MujocoDirectLaunchHostBackend(
         shot_factory=lambda shot=generated.shot: shot
     )
     schemas = wp7.SchemaRegistry(REPOSITORY_ROOT / "schemas" / "air_hockey_host" / "v1")
@@ -298,7 +300,8 @@ def _run_native_half(
             f"{completed.stderr.strip()}"
         )
     observed = wp7._observed_predicates(completed.stdout)
-    if observed != _expected_predicates(treatment):
+    expected = expected_predicates or _expected_predicates(treatment)
+    if observed != expected:
         backend.shutdown()
         raise GateG8RecoveryError(
             f"{run_id} predicate mismatch: {sorted(observed)}"

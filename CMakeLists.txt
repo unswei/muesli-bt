@@ -871,6 +871,14 @@ if (Python3_Interpreter_FOUND)
           --runner "$<TARGET_FILE:muesli_bt_air_hockey_scenario_tests>"
       )
       set_tests_properties(muesli_bt_air_hockey_wp8_recovery PROPERTIES TIMEOUT 30)
+      add_test(
+        NAME muesli_bt_air_hockey_wp9_context_sensitivity
+        COMMAND
+          "${Python3_EXECUTABLE}"
+          "${CMAKE_CURRENT_SOURCE_DIR}/examples/air_hockey_model_mediated_defence/run_wp9.py"
+          check-native --runner "$<TARGET_FILE:muesli_bt_air_hockey_scenario_tests>"
+      )
+      set_tests_properties(muesli_bt_air_hockey_wp9_context_sensitivity PROPERTIES TIMEOUT 30)
     endif ()
   else ()
     message(

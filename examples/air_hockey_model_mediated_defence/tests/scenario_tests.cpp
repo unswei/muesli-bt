@@ -713,6 +713,19 @@ void wait_for_authority(scenario_rig& rig,
         "air-hockey invocation did not reach its expected authority state");
 }
 
+bt::vla_authority_state wait_for_terminal_authority(scenario_rig& rig,
+                                                    std::uint64_t job_id) {
+    wait_for(
+        [&] {
+            (void)rig.tick();
+            const bt::vla_authority_state state = rig.invocation(job_id).authority_state;
+            return state == bt::vla_authority_state::accepted ||
+                   state == bt::vla_authority_state::rejected;
+        },
+        "air-hockey invocation did not reach a terminal authority state");
+    return rig.invocation(job_id).authority_state;
+}
+
 void wait_for_completion_drop(scenario_rig& rig) {
     wait_for(
         [&] {
@@ -996,6 +1009,87 @@ void test_p8_current_context_recovery(const scenario_options& options) {
               rig.recovery_requests() > 0 &&
                   (rig.state().terminated || rig.state().truncated),
               "P8 recovery must continue with the local policy until episode end");
+    rig.finish_events();
+}
+
+void test_p9_context_sensitivity(const scenario_options& options) {
+    check(options.paper.has_value(), "P9 context sensitivity options were not supplied");
+    const paper_scenario_options& paper = *options.paper;
+    auto completion = std::make_shared<completion_gate>();
+    completion->action.assign(paper.provider_action.begin(), paper.provider_action.end());
+    scenario_rig rig(
+        options.socket_path, options.tree_path, "P9-context-sensitivity",
+        bt::vla_acceptance_policy::invocation_scoped, {completion}, true,
+        options.event_path, std::nullopt,
+        air_hockey_demo::host_configuration{
+            .blackout_start_step = paper.blackout_start_step,
+            .blackout_length_steps = paper.blackout_length_steps,
+            .timeout_steps = paper.timeout_steps,
+            .action_lock_steps = paper.action_lock_steps,
+            .replace_track_steps = {},
+            .terminate_at_step = std::nullopt,
+        },
+        paper.run_id);
+    check(rig.tick() == bt::status::running,
+          "P9 context sensitivity trial did not submit its request");
+    const std::uint64_t job = rig.only_job_id();
+    const std::string captured_context = rig.invocation(job).captured_context_id;
+    adopt_running_invocation(rig, job);
+    completion->wait_for_start();
+
+    const int reacquisition_step =
+        paper.blackout_start_step + paper.blackout_length_steps;
+    while (rig.state().episode_active &&
+           rig.state().observation_step < reacquisition_step) {
+        (void)rig.step_control();
+        if (rig.state().episode_active &&
+            rig.state().observation_step < reacquisition_step) {
+            (void)rig.tick();
+        }
+    }
+    check(rig.state().episode_active &&
+              rig.state().observation_step == reacquisition_step &&
+              rig.state().puck_visible,
+          "P9 trial did not reach its predeclared visible reacquisition");
+    const int elapsed_control_ms = reacquisition_step * 20;
+    check(paper.completion_delay_ms >= elapsed_control_ms,
+          "P9 completion delay precedes reacquisition");
+    rig.advance_clock(std::chrono::milliseconds{
+        paper.completion_delay_ms - elapsed_control_ms});
+    completion->release();
+
+    const bt::vla_authority_state terminal = wait_for_terminal_authority(rig, job);
+    const bool context_changed = rig.state().defence_context_id != captured_context;
+    const bool accepted = terminal == bt::vla_authority_state::accepted;
+    const std::string terminal_reason = rig.invocation(job).authority_reason;
+    predicate("p9_context_policy_effect_matches_token",
+              accepted == !context_changed &&
+                  (accepted ? rig.accepted_dispatches() == 1
+                            : rig.accepted_dispatches() == 0),
+              "P9 authority decision did not match the host context token");
+
+    (void)rig.step_control();
+    while (rig.state().episode_active) {
+        (void)rig.tick();
+        (void)rig.step_control();
+    }
+    const std::string original_job_field =
+        "\"job_id\":\"" + std::to_string(job) + "\"";
+    predicate("p9_context_policy_terminal_once",
+              event_count(rig.host().events(), "vla_result", {original_job_field}) == 1,
+              "P9 original invocation produced more than one terminal decision");
+    predicate("p9_context_policy_episode_completed",
+              (accepted || rig.recovery_requests() > 0) &&
+                  (rig.state().terminated || rig.state().truncated),
+              "P9 context policy did not complete its episode");
+    std::cout << "CONTEXT_SENSITIVITY {\"context_changed\":"
+              << (context_changed ? "true" : "false")
+              << ",\"terminal\":\"" << (accepted ? "accepted" : "rejected")
+              << "\",\"reason\":\""
+              << bt::event_log::json_escape(terminal_reason)
+              << "\",\"accepted_dispatches\":" << rig.accepted_dispatches()
+              << ",\"obsolete_dispatches\":" << rig.obsolete_dispatches()
+              << ",\"recovery_requests\":" << rig.recovery_requests() << "}\n";
     rig.finish_events();
 }
 
@@ -1350,6 +1444,7 @@ const std::vector<std::pair<std::string_view, scenario_fn>> kScenarios{
     {"P7-deadline-only", test_p7_deadline_only},
     {"P7-invocation-scoped", test_p7_invocation_scoped},
     {"P8-current-context-recovery", test_p8_current_context_recovery},
+    {"P9-context-sensitivity", test_p9_context_sensitivity},
 };
 
 }  // namespace
@@ -1362,12 +1457,13 @@ int main(int argc, char** argv) {
     const std::string_view requested = argv[1];
     const bool paper_requested =
         requested == "P7-deadline-only" || requested == "P7-invocation-scoped" ||
-        requested == "P8-current-context-recovery";
+        requested == "P8-current-context-recovery" ||
+        requested == "P9-context-sensitivity";
     if ((!paper_requested && (argc < 4 || argc > 5)) ||
         (paper_requested && argc != 14)) {
         std::cerr
             << "usage: muesli_bt_air_hockey_scenario_tests SCENARIO SOCKET TREE [EVENTS]\n"
-            << "paper usage: ... P7-* or P8-* SOCKET TREE EVENTS RUN_ID ACTION_X ACTION_Y "
+            << "paper usage: ... P7-*, P8-* or P9-* SOCKET TREE EVENTS RUN_ID ACTION_X ACTION_Y "
                "BLACKOUT_START BLACKOUT_LENGTH TIMEOUT ACTION_LOCK DELAY_MS live|replay\n";
         return 2;
     }

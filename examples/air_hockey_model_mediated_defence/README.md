@@ -388,6 +388,22 @@ SHA-256 shot-identifier order and crossed with the existing 50, 80 and 110 ms
 delays, giving 72 matched cases and 216 policy runs. Thresholds and selection
 were frozen before campaign outcomes were inspected.
 
+Check the frozen protocol and both native authority branches from the
+repository root:
+
+```bash
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp9.py check-protocol
+uv run --with 'jsonschema>=4.20,<5' \
+  python examples/air_hockey_model_mediated_defence/run_wp9.py check-native \
+  --runner build/dev/muesli_bt_air_hockey_scenario_tests
+```
+
+The full `run` command additionally requires the sealed WP8 campaign and its
+external seal report. It refuses a non-empty output directory, verifies every
+WP8 checksum before starting, requires single-threaded numerical-library
+settings, and records live/replay evidence for every policy run.
+
 ## run the contract tests
 
 From the repository root:
