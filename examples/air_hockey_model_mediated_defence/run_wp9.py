@@ -12,6 +12,7 @@ import math
 import os
 import shutil
 import subprocess
+import tarfile
 import tempfile
 from collections import defaultdict
 from pathlib import Path
@@ -171,6 +172,118 @@ def _prepare_output(output: Path) -> Path:
     output.mkdir(parents=True, exist_ok=True)
     (output / RUN_ROOT_MARKER).write_text("airhockey.wp9.run.v1\n", encoding="utf-8")
     return output
+
+
+def _checksum_manifest(root: Path, output: Path) -> None:
+    rows = []
+    for path in sorted(
+        value for value in root.rglob("*") if value.is_file() and value != output
+    ):
+        if path.is_symlink():
+            raise GateG9SensitivityError(
+                "refuse to seal a WP9 campaign containing symlinks"
+            )
+        rows.append(f"{_sha256(path)}  {path.relative_to(root).as_posix()}\n")
+    output.write_text("".join(rows), encoding="utf-8")
+
+
+def seal_campaign(campaign: Path, backup: Path, seal_report: Path) -> dict[str, Any]:
+    campaign = campaign.resolve()
+    backup = backup.resolve()
+    seal_report = seal_report.resolve()
+    if campaign == Path(campaign.anchor):
+        raise GateG9SensitivityError("refuse to seal a filesystem root")
+    if not (campaign / RUN_ROOT_MARKER).is_file():
+        raise GateG9SensitivityError("refuse to seal an unmarked WP9 campaign")
+    if any(path.is_symlink() for path in campaign.rglob("*")):
+        raise GateG9SensitivityError(
+            "refuse to seal a WP9 campaign containing symlinks"
+        )
+    for destination in (backup, seal_report):
+        try:
+            destination.relative_to(campaign)
+        except ValueError:
+            pass
+        else:
+            raise GateG9SensitivityError(
+                "WP9 backup and seal report must be outside the campaign"
+            )
+    if backup == seal_report:
+        raise GateG9SensitivityError(
+            "WP9 backup and seal report must be different files"
+        )
+
+    report_path = campaign / "wp9-report.json"
+    summary_path = campaign / "context-sensitivity-summary.json"
+    report = read_json(report_path)
+    if report.get("status") != "passed":
+        raise GateG9SensitivityError(
+            "refuse to seal a WP9 campaign that did not pass"
+        )
+    if report.get("protocol_sha256") != _sha256(PROTOCOL_PATH):
+        raise GateG9SensitivityError(
+            "WP9 campaign protocol does not match the frozen protocol"
+        )
+    summary = read_json(summary_path)
+    if semantic_sha256(summary) != report.get("summary_sha256"):
+        raise GateG9SensitivityError(
+            "WP9 campaign summary changed after validation"
+        )
+    if report.get("policy_runs") != summary.get("policy_runs"):
+        raise GateG9SensitivityError("WP9 report and summary cardinalities differ")
+    if report.get("privileged_policy_inputs") != 0:
+        raise GateG9SensitivityError(
+            "refuse to seal a WP9 campaign with privileged policy inputs"
+        )
+    if backup.exists() or seal_report.exists():
+        raise GateG9SensitivityError(
+            "refuse to replace an existing WP9 backup or seal report"
+        )
+
+    checksums = campaign / "checksums.sha256"
+    if checksums.exists():
+        raise GateG9SensitivityError(
+            "refuse to replace an existing WP9 checksum manifest"
+        )
+    backup.parent.mkdir(parents=True, exist_ok=True)
+    seal_report.parent.mkdir(parents=True, exist_ok=True)
+    _checksum_manifest(campaign, checksums)
+    with tarfile.open(backup, "w:gz", compresslevel=6) as archive:
+        archive.add(campaign, arcname=campaign.name, recursive=True)
+    backup_sha256 = _sha256(backup)
+    with tarfile.open(backup, "r:gz") as archive:
+        member_names = {member.name for member in archive.getmembers()}
+        required_suffixes = (
+            "/wp9-report.json",
+            "/context-sensitivity-summary.json",
+            "/checksums.sha256",
+        )
+        if not all(
+            any(name.endswith(suffix) for name in member_names)
+            for suffix in required_suffixes
+        ):
+            raise GateG9SensitivityError("WP9 backup verification failed")
+
+    for path in sorted(campaign.rglob("*"), reverse=True):
+        path.chmod(0o555 if path.is_dir() else 0o444)
+    campaign.chmod(0o555)
+    seal = {
+        "schema_version": "airhockey.wp9.seal.v1",
+        "status": "sealed",
+        "campaign": str(campaign),
+        "campaign_report_sha256": _sha256(report_path),
+        "campaign_checksum_manifest_sha256": _sha256(checksums),
+        "backup": str(backup),
+        "backup_sha256": backup_sha256,
+        "backup_verified": True,
+        "raw_bundles_read_only": True,
+        "file_mode": "0444",
+        "directory_mode": "0555",
+    }
+    write_json(seal_report, seal)
+    seal_report.chmod(0o444)
+    backup.chmod(0o444)
+    return seal
 
 
 def check_native(executable: Path) -> None:
@@ -634,13 +747,18 @@ def run_campaign(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=("check-protocol", "check-native", "run"))
+    parser.add_argument(
+        "command", choices=("check-protocol", "check-native", "run", "seal")
+    )
     parser.add_argument("--runner", type=Path)
     parser.add_argument("--out", type=Path)
     parser.add_argument("--source-wp8-campaign", type=Path)
     parser.add_argument("--source-wp8-seal", type=Path)
     parser.add_argument("--image")
     parser.add_argument("--image-digest")
+    parser.add_argument("--campaign", type=Path)
+    parser.add_argument("--backup", type=Path)
+    parser.add_argument("--seal-report", type=Path)
     arguments = parser.parse_args()
     protocol, _ = _load_protocol()
     if arguments.command == "check-protocol":
@@ -654,6 +772,15 @@ def main() -> int:
         if arguments.runner is None:
             parser.error("check-native requires --runner")
         check_native(arguments.runner.resolve())
+        return 0
+    if arguments.command == "seal":
+        required = (arguments.campaign, arguments.backup, arguments.seal_report)
+        if any(value is None for value in required):
+            parser.error("seal requires --campaign, --backup and --seal-report")
+        result = seal_campaign(
+            arguments.campaign, arguments.backup, arguments.seal_report
+        )
+        print(f"air-hockey WP9 sealed: {result['backup_sha256']}")
         return 0
     required = (
         arguments.runner,

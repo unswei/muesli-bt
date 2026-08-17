@@ -404,6 +404,19 @@ external seal report. It refuses a non-empty output directory, verifies every
 WP8 checksum before starting, requires single-threaded numerical-library
 settings, and records live/replay evidence for every policy run.
 
+After a passing campaign, seal and back it up outside the campaign directory:
+
+```bash
+python examples/air_hockey_model_mediated_defence/run_wp9.py seal \
+  --campaign /path/to/wp9/campaign \
+  --backup /path/to/wp9-campaign-backup.tar.gz \
+  --seal-report /path/to/wp9-seal.json
+```
+
+Sealing verifies the report and semantic summary hash, writes a complete
+checksum manifest, verifies the compressed backup, and changes the raw files
+and directories to modes `0444` and `0555` respectively.
+
 ## run the contract tests
 
 From the repository root:
