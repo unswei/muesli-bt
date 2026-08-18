@@ -446,6 +446,49 @@ control-flow authority and obsolete capability calls; its recovery branch may
 independently choose the same numerical target. `run_wp10.py seal` writes and
 verifies a compressed backup before making a passing campaign read-only.
 
+## wp11 live-provider workload
+
+WP11 tests whether authority loss occurs under a live asynchronous workload,
+rather than only under constructed delay schedules. Twenty-four held-out
+MuJoCo episodes share one warmed, single-worker TCP service running the frozen
+700,000-step DreamerV3 teacher. The service keeps separate recurrent carry for
+each episode and records receive, queue, inference and delivery timestamps.
+No sleep, timeout or latency fault is injected.
+
+The capture trajectory is policy-independent: the public-observation-only
+current-context recovery controller drives each episode while Dreamer runs as
+a shadow proposal provider. There are no blackouts or replacement steps. The
+host starts a new context only when the visible public puck moves more than
+0.10 normalised units from the current context anchor. Provider outputs and
+delivery times are captured once, then the immutable record is replayed under
+deadline-only, admission-only and two-gate authority. The study estimates the
+incidence of natural authority loss; it is not a closed-loop comparison of the
+three policies.
+
+Check the frozen protocol without opening the paper split:
+
+```bash
+uv run --with-requirements \
+  examples/air_hockey_model_mediated_defence/container/requirements-wp4.txt \
+  --with numpy \
+  python examples/air_hockey_model_mediated_defence/run_wp11.py check-protocol
+```
+
+The complete Marvin command requires the pinned ACRA source tree and frozen
+teacher experiment root:
+
+```bash
+python examples/air_hockey_model_mediated_defence/run_wp11.py run \
+  --acra-root /home/oliver/Code/airhockey-memory-distillation-release-1b6bbbb \
+  --experiment-root /home/oliver/experiments/airhockey-memory-distillation \
+  --output /path/to/wp11/campaign
+```
+
+`capture.json` is the only live provider capture. `authority-replay.json`
+contains all three policy decisions over that same record. A passing campaign
+can be sealed with `run_wp11.py seal`, which writes a checksum manifest and a
+compressed backup outside the campaign directory.
+
 ## run the contract tests
 
 From the repository root:

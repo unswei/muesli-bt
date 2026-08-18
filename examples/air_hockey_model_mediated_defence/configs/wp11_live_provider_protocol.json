@@ -1,0 +1,122 @@
+{
+  "schema_version": "airhockey.wp11.live_provider.protocol.v1",
+  "status": "frozen_before_live_provider_campaign",
+  "purpose": "capture one natural-latency asynchronous provider workload and replay its immutable outputs and delivery times under each authority policy",
+  "parent_wp9_protocol": "configs/wp9_context_sensitivity_protocol.json",
+  "parent_wp9_protocol_sha256": "2a1d152ca1e8fe4ffc23bc2db6da9cd83c3640d4a1f4dbe2494d18b4750bb115",
+  "repositories": {
+    "acra_revision": "1b6bbbbf19743b0042f01eabf0628eba5621cacf",
+    "base_image_digest": "de846e25961d2408db73a6b5cfe2afc7ecf0e14e0e8ac837f97212a180e51d5f"
+  },
+  "paper_split": {
+    "distribution_config": "configs/direct_launch_muesli_v1.yaml",
+    "distribution_config_sha256": "7d2819356dad664ede5d879845082b52bedcb69f0a2ae68ec27f389ea69603a5",
+    "name": "muesli_test",
+    "seed": 6303,
+    "expected_shots": 72,
+    "manifest_sha256": "59527e9f55537d127fc401ee3ab5fbbfedbc36dc22cbca0322935eb99ea1d665",
+    "selection": "sha256_shot_id_order_first",
+    "selected_shots": 24
+  },
+  "provider": {
+    "kind": "live_dreamerv3_tcp_service",
+    "teacher_id": "dreamerv3_teacher_v3",
+    "checkpoint_step": 700000,
+    "checkpoint_relative_to_experiment_root": "frozen-teachers/dreamerv3-teacher-v3-step-700000",
+    "agent_sha256": "6a672d5b6d7c2b9ca2335f1a85b69280ca7db58deb5e2f56d2ba033ebf636254",
+    "manifest_sha256": "b269950b0f10b32c7b411ece890b349d5c1280cc95f6d4864818db4c3ac72c15",
+    "teacher_config_relative_to_acra_root": "configs/teacher/dreamerv3_v3.yaml",
+    "teacher_config_sha256": "537c68a17dbcf9d29665e3726a94e61a99a0bdaf07fb1e69946c09e34a1770d4",
+    "reward_config_relative_to_acra_root": "configs/reward/defend_shot_v1.yaml",
+    "reward_config_sha256": "7ca33aa738603ea018df8e95e819b289df4572e5410fa46415083552fc037b5a",
+    "profile": "full",
+    "deterministic_inference": true,
+    "transport": "localhost_tcp_jsonl_v1",
+    "process_isolation": true,
+    "workers": 1,
+    "queue_discipline": "fifo",
+    "warmup_requests": 4,
+    "warmup_split": "engineering",
+    "latency_injection": false,
+    "one_outstanding_request_per_episode": true
+  },
+  "workload": {
+    "concurrent_episodes": 24,
+    "control_period_ms": 20,
+    "wall_clock_paced": true,
+    "timeout_steps": 125,
+    "action_lock_steps": 5,
+    "blackout_start_step": 0,
+    "blackout_length_steps": 0,
+    "replace_track_steps": [],
+    "scene_change_schedule": "none",
+    "capture_controller": "current_context_recovery.v1",
+    "capture_controller_tree": "lisp/bt_invocation_scoped_current_context_recovery.lisp",
+    "capture_controller_tree_sha256": "3e4d4e00b60d8d7a7414332ce9f60ff12345cae87b244681d2a0f7a244b5344f",
+    "provider_outputs_applied_during_capture": false,
+    "provider_role": "shadow_proposal_workload"
+  },
+  "context_policy": {
+    "id": "public_displacement_0_10",
+    "input_schema": "airhockey.public_observation.v1",
+    "visible_flag_index": 18,
+    "target_indices": [16, 17],
+    "operation": "start_new_context_when_visible_puck_displacement_from_current_context_anchor_exceeds_threshold",
+    "displacement_threshold": 0.1,
+    "boundary_rule": "equivalent_at_or_below_threshold",
+    "privileged_state": false
+  },
+  "authority": {
+    "deadline_ms": 120,
+    "source_age_limit_steps": 6,
+    "generation_rule": "increment_per_episode_request",
+    "admission_boundary": "first_episode_control_boundary_at_or_after_provider_delivery",
+    "dispatch_boundary": "next_episode_control_boundary_after_admission",
+    "policies": [
+      "deadline_only",
+      "invocation_scoped_admission_only",
+      "invocation_scoped_two_gate"
+    ]
+  },
+  "capture": {
+    "provider_outputs_and_delivery_times_recorded_once": true,
+    "policy_independent_scene_trajectory": true,
+    "exact_record_reused_by_all_policies": true,
+    "monotonic_clock": true,
+    "raw_observations_public_only": true
+  },
+  "metrics": [
+    "provider_end_to_end_latency_ms",
+    "provider_queue_latency_ms",
+    "provider_inference_latency_ms",
+    "natural_context_changes",
+    "authority_loss_before_admission",
+    "authority_loss_after_admission",
+    "obsolete_admission_rate",
+    "obsolete_dispatch_rate",
+    "capability_calls_after_authority_loss",
+    "valid_no_change_dispatch_rate",
+    "provider_and_policy_replay_hash_mismatches",
+    "capture_controller_save_rate"
+  ],
+  "campaign": {
+    "captures": 1,
+    "policy_replays": 3,
+    "bootstrap_samples": 10000,
+    "bootstrap_seed": 6311,
+    "positive_authority_loss_required": false,
+    "status": "pending_external_campaign"
+  },
+  "gate": {
+    "minimum_completed_episodes": 24,
+    "minimum_provider_responses": 24,
+    "maximum_provider_errors": 0,
+    "maximum_latency_injections": 0,
+    "maximum_scripted_scene_changes": 0,
+    "maximum_privileged_provider_inputs": 0,
+    "maximum_record_replay_hash_mismatches": 0,
+    "maximum_policy_replay_hash_mismatches": 0,
+    "maximum_invalid_provider_outputs": 0,
+    "maximum_two_gate_obsolete_dispatches": 0
+  }
+}
