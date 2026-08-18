@@ -1,11 +1,18 @@
 {
-  "schema_version": "airhockey.wp11.live_provider.protocol.v2",
-  "status": "frozen_before_corrected_live_provider_campaign",
+  "schema_version": "airhockey.wp11.live_provider.protocol.v3",
+  "status": "frozen_before_process_isolated_live_provider_campaign",
   "purpose": "capture one natural-latency asynchronous provider workload and replay its immutable outputs and delivery times under each authority policy",
   "supersedes": {
     "protocol_sha256": "91bde619624729dd0041656d03815f94e89878c45ca315af50c241dff74d3e91",
     "failed_campaign_report_sha256": "8b934013e6ab320ab65df0bd79668777b2715c7779bf03d2edba1a29dbd74418",
     "reason": "the original harness stepped 24 environments serially and had a 70.24 ms median control boundary instead of the frozen 20 ms period",
+    "scientific_conditions_changed": false,
+    "failed_campaign_outcomes_are_not_decision_inputs": true
+  },
+  "supersedes_threaded_harness": {
+    "protocol_sha256": "3cc995a85d470bdc11eedf91c4da1067d6c2f4de9d5c2238fb46ecbd9927c723",
+    "failed_campaign_report_sha256": "fe786632072828d3e5e537cdb5b29f758ca75b728076c1490c3af8976b7f2110",
+    "reason": "Python threads contended while stepping MuJoCo and produced a 247.56 ms control-boundary p95; the 24-core host instead requires one simulator process per episode",
     "scientific_conditions_changed": false,
     "failed_campaign_outcomes_are_not_decision_inputs": true
   },
@@ -49,7 +56,7 @@
   },
   "workload": {
     "concurrent_episodes": 24,
-    "episode_stepping": "one_independent_thread_per_episode",
+    "episode_stepping": "one_spawned_process_per_episode",
     "control_period_ms": 20,
     "wall_clock_paced": true,
     "timeout_steps": 125,

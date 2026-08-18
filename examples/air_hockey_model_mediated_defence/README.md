@@ -453,9 +453,9 @@ rather than only under constructed delay schedules. Twenty-four held-out
 MuJoCo episodes share one warmed, single-worker TCP service running the frozen
 700,000-step DreamerV3 teacher. The service keeps separate recurrent carry for
 each episode and records receive, queue, inference and delivery timestamps.
-Each simulator episode advances in an independent thread at its own 20 ms
-wall-clock cadence. No sleep, timeout or latency fault is injected into the
-provider.
+Each simulator episode advances in an independent spawned process at its own
+20 ms wall-clock cadence. No sleep, timeout or latency fault is injected into
+the provider.
 
 The capture trajectory is policy-independent: the public-observation-only
 current-context recovery controller drives each episode while Dreamer runs as
@@ -495,8 +495,10 @@ The superseded first harness stepped all 24 environments serially. Its median
 control boundary was 70.24 ms rather than the frozen 20 ms, so that run is not
 paper evidence and remains unsealed at
 `wp11-live-provider-26ad84a-1b6bbbb`. Protocol v2 records its report hash,
-retains every scientific condition, parallelises only simulator stepping, and
-adds gates for cycle overruns and the control-boundary p95.
+retains every scientific condition, and adds gates for cycle overruns and the
+control-boundary p95. Its thread-isolated correction also failed because
+Python/MuJoCo contention produced a 247.56 ms boundary p95; protocol v3 records
+that report hash and changes simulator isolation from threads to processes.
 
 ## run the contract tests
 

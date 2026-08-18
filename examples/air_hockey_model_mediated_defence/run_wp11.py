@@ -6,14 +6,14 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import multiprocessing
 import os
 import shutil
 import subprocess
 import sys
 import tarfile
-import threading
 import time
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -65,7 +65,10 @@ def load_protocol(
     *, acra_root: Path | None = None, experiment_root: Path | None = None
 ) -> dict[str, Any]:
     protocol = read_json(PROTOCOL_PATH)
-    if protocol.get("status") != "frozen_before_corrected_live_provider_campaign":
+    if (
+        protocol.get("status")
+        != "frozen_before_process_isolated_live_provider_campaign"
+    ):
         raise GateG11LiveProviderError("WP11 protocol is not frozen")
     if tuple(protocol["authority"]["policies"]) != POLICIES:
         raise GateG11LiveProviderError("WP11 authority policy order changed")
@@ -393,7 +396,7 @@ def _collect_response(
 def _capture_episode(
     episode: _Episode,
     provider_executor: ThreadPoolExecutor,
-    start_barrier: threading.Barrier,
+    scheduled_start_ns: int,
     control_period_ns: int,
 ) -> dict[str, Any]:
     """Step one independent MuJoCo episode at its own wall-clock cadence."""
@@ -404,7 +407,9 @@ def _capture_episode(
     boundary_intervals: list[int] = []
     cycle_overruns = 0
     maximum_lateness_ns = 0
-    start_barrier.wait(timeout=30)
+    remaining_ns = scheduled_start_ns - time.monotonic_ns()
+    if remaining_ns > 0:
+        time.sleep(remaining_ns / 1_000_000_000.0)
     episode_started_ns = time.monotonic_ns()
     previous_boundary_ns = episode_started_ns
     timeline.append(_boundary(episode, episode_started_ns))
@@ -452,37 +457,44 @@ def _capture_episode(
     }
 
 
-def capture(
-    *,
+def _capture_episode_process(
+    index: int,
+    generated: Any,
     protocol: dict[str, Any],
     readiness: dict[str, Any],
-    output: Path,
+    scheduled_start_ns: int,
 ) -> dict[str, Any]:
+    """Create and pace one simulator in an isolated worker process."""
+
     from airhockey_distill.envs import (
         BlackoutSchedule,
         DefendShotTrackingLoss,
         MujocoDirectLaunchBackend,
     )
 
-    shots = _selected_shots(protocol)
     workload = protocol["workload"]
-    threshold = float(protocol["context_policy"]["displacement_threshold"])
-    episodes: list[_Episode] = []
-    for index, generated in enumerate(shots, start=1):
-        environment = DefendShotTrackingLoss(
-            MujocoDirectLaunchBackend(),
-            blackout=BlackoutSchedule(
-                start_observation_step=int(workload["blackout_start_step"]),
-                length_steps=int(workload["blackout_length_steps"]),
-            ),
-            timeout_steps=int(workload["timeout_steps"]),
-            action_lock_steps=int(workload["action_lock_steps"]),
-        )
+    environment = DefendShotTrackingLoss(
+        MujocoDirectLaunchBackend(),
+        blackout=BlackoutSchedule(
+            start_observation_step=int(workload["blackout_start_step"]),
+            length_steps=int(workload["blackout_length_steps"]),
+        ),
+        timeout_steps=int(workload["timeout_steps"]),
+        action_lock_steps=int(workload["action_lock_steps"]),
+    )
+    client: LiveProviderClient | None = None
+    provider_executor = ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix=f"wp11-provider-client-{index:04d}"
+    )
+    try:
         observation, info = environment.reset(
             shot=generated.shot, seed=int(protocol["paper_split"]["seed"])
         )
         public = [float(value) for value in observation]
-        context = PublicDisplacementContext(f"episode-{index:04d}", threshold)
+        context = PublicDisplacementContext(
+            f"episode-{index:04d}",
+            float(protocol["context_policy"]["displacement_threshold"]),
+        )
         context.update(public)
         client = LiveProviderClient(
             readiness["host"], int(readiness["port"]), timeout_seconds=120
@@ -493,34 +505,53 @@ def capture(
         episode = _Episode(
             index, generated, environment, public, dict(info), context, client
         )
-        episodes.append(episode)
+        result = _capture_episode(
+            episode,
+            provider_executor,
+            scheduled_start_ns,
+            int(workload["control_period_ms"]) * 1_000_000,
+        )
+        result["episode"] = {
+            "session_id": f"episode-{index:04d}",
+            "shot_id": generated.shot.shot_id,
+            "shot_manifest_entry_sha256": semantic_sha256(generated.as_dict()),
+            "outcome": episode.outcome,
+            "save": episode.outcome in SAVE_OUTCOMES,
+            "context_changes": episode.context_changes,
+        }
+        return result
+    finally:
+        provider_executor.shutdown(wait=True, cancel_futures=False)
+        if client is not None:
+            client.close()
+        environment.close()
 
-    control_period_ns = int(workload["control_period_ms"]) * 1_000_000
-    provider_executor = ThreadPoolExecutor(
-        max_workers=len(episodes), thread_name_prefix="wp11-provider-client"
-    )
-    episode_executor = ThreadPoolExecutor(
-        max_workers=len(episodes), thread_name_prefix="wp11-mujoco-episode"
-    )
-    start_barrier = threading.Barrier(len(episodes))
-    try:
+
+def capture(
+    *,
+    protocol: dict[str, Any],
+    readiness: dict[str, Any],
+    output: Path,
+) -> dict[str, Any]:
+    shots = _selected_shots(protocol)
+    workload = protocol["workload"]
+    scheduled_start_ns = time.monotonic_ns() + 20_000_000_000
+    spawn_context = multiprocessing.get_context("spawn")
+    with ProcessPoolExecutor(
+        max_workers=len(shots), mp_context=spawn_context
+    ) as episode_executor:
         futures = [
             episode_executor.submit(
-                _capture_episode,
-                episode,
-                provider_executor,
-                start_barrier,
-                control_period_ns,
+                _capture_episode_process,
+                index,
+                generated,
+                protocol,
+                readiness,
+                scheduled_start_ns,
             )
-            for episode in episodes
+            for index, generated in enumerate(shots, start=1)
         ]
-        episode_results = [future.result(timeout=180) for future in futures]
-    finally:
-        episode_executor.shutdown(wait=True, cancel_futures=False)
-        provider_executor.shutdown(wait=True, cancel_futures=False)
-        for episode in episodes:
-            episode.client.close()
-            episode.environment.close()
+        episode_results = [future.result(timeout=240) for future in futures]
 
     timelines = [
         boundary for result in episode_results for boundary in result["timeline"]
@@ -559,7 +590,7 @@ def capture(
             "workers": protocol["provider"]["workers"],
         },
         "workload": {
-            "concurrent_episodes": len(episodes),
+            "concurrent_episodes": len(shots),
             "control_period_ms": workload["control_period_ms"],
             "cycle_overruns": cycle_overruns,
             "total_cycles": len(work_durations),
@@ -569,19 +600,7 @@ def capture(
             "scripted_scene_changes": 0,
             "provider_outputs_applied": False,
         },
-        "episodes": [
-            {
-                "session_id": f"episode-{episode.index:04d}",
-                "shot_id": episode.generated.shot.shot_id,
-                "shot_manifest_entry_sha256": semantic_sha256(
-                    episode.generated.as_dict()
-                ),
-                "outcome": episode.outcome,
-                "save": episode.outcome in SAVE_OUTCOMES,
-                "context_changes": episode.context_changes,
-            }
-            for episode in episodes
-        ],
+        "episodes": [result["episode"] for result in episode_results],
         "context_timeline": timelines,
         "provider_records": sorted(responses, key=lambda value: value["request_id"]),
     }
