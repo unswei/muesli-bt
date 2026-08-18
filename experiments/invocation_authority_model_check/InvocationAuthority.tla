@@ -2,13 +2,12 @@
 EXTENDS Naturals
 
 (***************************************************************************)
-(* A deliberately small model of one asynchronous invocation.  The model  *)
-(* explores bounded event schedules, rather than claiming to cover all     *)
-(* implementation states or all possible host policies.                    *)
+(* A deliberately small finite model of one asynchronous invocation.  It  *)
+(* explores the complete reachable state graph of this abstraction, rather *)
+(* than all implementation states or possible host policies.               *)
 (***************************************************************************)
 
-CONSTANTS MaxSteps,
-          UseEntryEpoch,
+CONSTANTS UseEntryEpoch,
           UseGeneration,
           UseContext,
           UseLifecycleChecks,
@@ -17,9 +16,12 @@ CONSTANTS MaxSteps,
           UseConsumeLatch
 
 RequestStates == {"idle", "issued", "admitted", "rejected", "dispatched"}
+TokenValues == {0, 1}
+CompletionClaimValues == 0..2
 
-VARIABLES step,
-          requestState,
+ToggleToken(token) == 1 - token
+
+VARIABLES requestState,
           ownerActive,
           currentEpoch,
           currentGeneration,
@@ -36,8 +38,7 @@ VARIABLES step,
           badAdmission,
           badDispatch
 
-vars == <<step,
-          requestState,
+vars == <<requestState,
           ownerActive,
           currentEpoch,
           currentGeneration,
@@ -55,7 +56,6 @@ vars == <<step,
           badDispatch>>
 
 Init ==
-  /\ step = 0
   /\ requestState = "idle"
   /\ ownerActive = TRUE
   /\ currentEpoch = 0
@@ -115,8 +115,9 @@ Start ==
                   admitted, consumed, badAdmission, badDispatch>>
 
 BranchExit ==
-  /\ requestState = "issued"
+  /\ requestState \in {"issued", "admitted"}
   /\ ownerActive
+  /\ currentEpoch = capturedEpoch
   /\ ownerActive' = FALSE
   /\ UNCHANGED <<requestState, currentEpoch, currentGeneration, currentContext,
                   capturedEpoch, capturedGeneration, capturedContext,
@@ -125,8 +126,9 @@ BranchExit ==
 
 Reenter ==
   /\ ~ownerActive
+  /\ currentEpoch = capturedEpoch
   /\ ownerActive' = TRUE
-  /\ currentEpoch' = currentEpoch + 1
+  /\ currentEpoch' = ToggleToken(currentEpoch)
   /\ requestState' = "issued"
   /\ UNCHANGED <<currentGeneration, currentContext, capturedEpoch, capturedGeneration,
                   capturedContext, deadlineOpen, cancelled, resultReady,
@@ -135,7 +137,8 @@ Reenter ==
 
 Supersede ==
   /\ requestState \in {"issued", "admitted"}
-  /\ currentGeneration' = currentGeneration + 1
+  /\ currentGeneration = capturedGeneration
+  /\ currentGeneration' = ToggleToken(currentGeneration)
   /\ UNCHANGED <<requestState, ownerActive, currentEpoch, currentContext,
                   capturedEpoch, capturedGeneration, capturedContext,
                   deadlineOpen, cancelled, resultReady, completionClaims,
@@ -143,7 +146,8 @@ Supersede ==
 
 ContextChange ==
   /\ requestState \in {"issued", "admitted"}
-  /\ currentContext' = currentContext + 1
+  /\ currentContext = capturedContext
+  /\ currentContext' = ToggleToken(currentContext)
   /\ UNCHANGED <<requestState, ownerActive, currentEpoch, currentGeneration,
                   capturedEpoch, capturedGeneration, capturedContext,
                   deadlineOpen, cancelled, resultReady, completionClaims,
@@ -183,7 +187,7 @@ DuplicateComplete ==
   /\ resultReady
   /\ (IF UseTerminalLatch THEN FALSE ELSE TRUE)
   /\ resultReady' = TRUE
-  /\ completionClaims' = completionClaims + 1
+  /\ completionClaims' = 2
   /\ UNCHANGED <<requestState, ownerActive, currentEpoch, currentGeneration,
                   currentContext, capturedEpoch, capturedGeneration,
                   capturedContext, deadlineOpen, cancelled, admitted,
@@ -236,11 +240,23 @@ Next ==
   \/ AdmitRejected
   \/ Dispatch
 
-BoundedSteps == step <= MaxSteps
-
-StepNext ==
-  /\ Next
-  /\ step' = step + 1
+TypeOK ==
+  /\ requestState \in RequestStates
+  /\ ownerActive \in BOOLEAN
+  /\ currentEpoch \in TokenValues
+  /\ currentGeneration \in TokenValues
+  /\ currentContext \in TokenValues
+  /\ capturedEpoch \in TokenValues
+  /\ capturedGeneration \in TokenValues
+  /\ capturedContext \in TokenValues
+  /\ deadlineOpen \in BOOLEAN
+  /\ cancelled \in BOOLEAN
+  /\ resultReady \in BOOLEAN
+  /\ completionClaims \in CompletionClaimValues
+  /\ admitted \in BOOLEAN
+  /\ consumed \in BOOLEAN
+  /\ badAdmission \in BOOLEAN
+  /\ badDispatch \in BOOLEAN
 
 Safety ==
   /\ ~badAdmission
