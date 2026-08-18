@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import threading
 import unittest
 from pathlib import Path
@@ -20,6 +21,7 @@ from run_wp11 import (
     PublicDisplacementContext,
     load_protocol,
     replay_capture,
+    seal,
 )
 
 
@@ -164,6 +166,27 @@ class WP11Test(unittest.TestCase):
             ],
             1,
         )
+
+    def test_seal_verifies_backup_and_makes_campaign_read_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            campaign = root / "campaign"
+            campaign.mkdir()
+            (campaign / ".air-hockey-wp11-run").write_text(
+                "airhockey.wp11.run.v1\n", encoding="utf-8"
+            )
+            (campaign / "capture.json").write_text("{}\n", encoding="utf-8")
+            (campaign / "wp11-report.json").write_text(
+                '{"status":"passed","protocol_sha256":"test"}\n',
+                encoding="utf-8",
+            )
+            result = seal(campaign, root / "backup.tar.gz", root / "seal.json")
+            self.assertTrue(result["backup_verified"])
+            self.assertEqual(campaign.stat().st_mode & 0o777, 0o555)
+            self.assertEqual((campaign / "capture.json").stat().st_mode & 0o777, 0o444)
+            for path in campaign.iterdir():
+                path.chmod(0o644)
+            campaign.chmod(0o755)
 
 
 if __name__ == "__main__":

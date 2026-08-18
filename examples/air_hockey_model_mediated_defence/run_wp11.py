@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import time
 from concurrent.futures import Future, ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
@@ -938,9 +939,31 @@ def seal(campaign: Path, backup: Path, seal_report: Path) -> dict[str, Any]:
     ):
         lines.append(f"{_sha256(path)}  {path.relative_to(campaign).as_posix()}")
     manifest.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    for path in sorted(
+        (value for value in campaign.rglob("*") if value.is_file()), reverse=True
+    ):
+        path.chmod(0o444)
+    for path in sorted(
+        (value for value in campaign.rglob("*") if value.is_dir()), reverse=True
+    ):
+        path.chmod(0o555)
+    campaign.chmod(0o555)
     backup.parent.mkdir(parents=True, exist_ok=True)
     with tarfile.open(backup, "w:gz") as archive:
         archive.add(campaign, arcname=campaign.name, recursive=True)
+    with tempfile.TemporaryDirectory(prefix="wp11-backup-verify-") as directory:
+        extracted_root = Path(directory)
+        with tarfile.open(backup, "r:gz") as archive:
+            archive.extractall(extracted_root, filter="data")
+        extracted_campaign = extracted_root / campaign.name
+        for line in lines:
+            expected, relative = line.split("  ", 1)
+            if _sha256(extracted_campaign / relative) != expected:
+                raise GateG11LiveProviderError(
+                    f"WP11 backup verification failed: {relative}"
+                )
+        if _sha256(extracted_campaign / manifest.name) != _sha256(manifest):
+            raise GateG11LiveProviderError("WP11 backup checksum manifest changed")
     result = {
         "schema_version": "airhockey.wp11.seal.v1",
         "campaign": str(campaign),
@@ -949,6 +972,9 @@ def seal(campaign: Path, backup: Path, seal_report: Path) -> dict[str, Any]:
         "checksum_manifest_sha256": _sha256(manifest),
         "backup": str(backup),
         "backup_sha256": _sha256(backup),
+        "backup_verified": True,
+        "campaign_file_mode": "0444",
+        "campaign_directory_mode": "0555",
     }
     write_json(seal_report, result)
     return result
