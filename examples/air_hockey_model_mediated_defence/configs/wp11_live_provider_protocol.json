@@ -1,7 +1,14 @@
 {
-  "schema_version": "airhockey.wp11.live_provider.protocol.v1",
-  "status": "frozen_before_live_provider_campaign",
+  "schema_version": "airhockey.wp11.live_provider.protocol.v2",
+  "status": "frozen_before_corrected_live_provider_campaign",
   "purpose": "capture one natural-latency asynchronous provider workload and replay its immutable outputs and delivery times under each authority policy",
+  "supersedes": {
+    "protocol_sha256": "91bde619624729dd0041656d03815f94e89878c45ca315af50c241dff74d3e91",
+    "failed_campaign_report_sha256": "8b934013e6ab320ab65df0bd79668777b2715c7779bf03d2edba1a29dbd74418",
+    "reason": "the original harness stepped 24 environments serially and had a 70.24 ms median control boundary instead of the frozen 20 ms period",
+    "scientific_conditions_changed": false,
+    "failed_campaign_outcomes_are_not_decision_inputs": true
+  },
   "parent_wp9_protocol": "configs/wp9_context_sensitivity_protocol.json",
   "parent_wp9_protocol_sha256": "2a1d152ca1e8fe4ffc23bc2db6da9cd83c3640d4a1f4dbe2494d18b4750bb115",
   "repositories": {
@@ -42,6 +49,7 @@
   },
   "workload": {
     "concurrent_episodes": 24,
+    "episode_stepping": "one_independent_thread_per_episode",
     "control_period_ms": 20,
     "wall_clock_paced": true,
     "timeout_steps": 125,
@@ -117,6 +125,8 @@
     "maximum_record_replay_hash_mismatches": 0,
     "maximum_policy_replay_hash_mismatches": 0,
     "maximum_invalid_provider_outputs": 0,
-    "maximum_two_gate_obsolete_dispatches": 0
+    "maximum_two_gate_obsolete_dispatches": 0,
+    "maximum_cycle_overrun_rate": 0.05,
+    "maximum_control_boundary_p95_ms": 25.0
   }
 }

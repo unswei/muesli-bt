@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
@@ -64,7 +65,7 @@ def load_protocol(
     *, acra_root: Path | None = None, experiment_root: Path | None = None
 ) -> dict[str, Any]:
     protocol = read_json(PROTOCOL_PATH)
-    if protocol.get("status") != "frozen_before_live_provider_campaign":
+    if protocol.get("status") != "frozen_before_corrected_live_provider_campaign":
         raise GateG11LiveProviderError("WP11 protocol is not frozen")
     if tuple(protocol["authority"]["policies"]) != POLICIES:
         raise GateG11LiveProviderError("WP11 authority policy order changed")
@@ -389,6 +390,68 @@ def _collect_response(
     return True
 
 
+def _capture_episode(
+    episode: _Episode,
+    provider_executor: ThreadPoolExecutor,
+    start_barrier: threading.Barrier,
+    control_period_ns: int,
+) -> dict[str, Any]:
+    """Step one independent MuJoCo episode at its own wall-clock cadence."""
+
+    responses: list[dict[str, Any]] = []
+    timeline: list[dict[str, Any]] = []
+    work_durations: list[int] = []
+    boundary_intervals: list[int] = []
+    cycle_overruns = 0
+    maximum_lateness_ns = 0
+    start_barrier.wait(timeout=30)
+    episode_started_ns = time.monotonic_ns()
+    previous_boundary_ns = episode_started_ns
+    timeline.append(_boundary(episode, episode_started_ns))
+    cycle = 0
+    while episode.active:
+        cycle_started_ns = time.monotonic_ns()
+        _collect_response(episode, responses)
+        if episode.future is None:
+            _submit(episode, provider_executor)
+        action = _current_context_target(episode.observation)
+        observation, reward, terminated, truncated, info = episode.environment.step(
+            action
+        )
+        episode.observation = [float(value) for value in observation]
+        episode.reward = float(reward)
+        episode.info = dict(info)
+        if episode.context.update(episode.observation):
+            episode.context_changes += 1
+        episode.active = not (bool(terminated) or bool(truncated))
+        if not episode.active:
+            episode.outcome = str(info.get("outcome", "unknown"))
+        boundary_ns = time.monotonic_ns()
+        timeline.append(_boundary(episode, boundary_ns))
+        boundary_intervals.append(boundary_ns - previous_boundary_ns)
+        previous_boundary_ns = boundary_ns
+        work_durations.append(boundary_ns - cycle_started_ns)
+        cycle += 1
+        next_cycle_ns = episode_started_ns + cycle * control_period_ns
+        remaining_ns = next_cycle_ns - time.monotonic_ns()
+        if remaining_ns > 0:
+            time.sleep(remaining_ns / 1_000_000_000.0)
+        else:
+            cycle_overruns += 1
+            maximum_lateness_ns = max(maximum_lateness_ns, -remaining_ns)
+    _collect_response(episode, responses, wait=True)
+    return {
+        "episode_started_monotonic_ns": episode_started_ns,
+        "episode_finished_monotonic_ns": time.monotonic_ns(),
+        "timeline": timeline,
+        "responses": responses,
+        "work_durations_ns": work_durations,
+        "boundary_intervals_ns": boundary_intervals,
+        "cycle_overruns": cycle_overruns,
+        "maximum_lateness_ns": maximum_lateness_ns,
+    }
+
+
 def capture(
     *,
     protocol: dict[str, Any],
@@ -405,8 +468,6 @@ def capture(
     workload = protocol["workload"]
     threshold = float(protocol["context_policy"]["displacement_threshold"])
     episodes: list[_Episode] = []
-    timelines: list[dict[str, Any]] = []
-    responses: list[dict[str, Any]] = []
     for index, generated in enumerate(shots, start=1):
         environment = DefendShotTrackingLoss(
             MujocoDirectLaunchBackend(),
@@ -433,62 +494,63 @@ def capture(
             index, generated, environment, public, dict(info), context, client
         )
         episodes.append(episode)
-        timelines.append(_boundary(episode, time.monotonic_ns()))
 
     control_period_ns = int(workload["control_period_ms"]) * 1_000_000
-    cycle_durations: list[int] = []
-    cycle_overruns = 0
-    campaign_started_ns = time.monotonic_ns()
-    executor = ThreadPoolExecutor(
+    provider_executor = ThreadPoolExecutor(
         max_workers=len(episodes), thread_name_prefix="wp11-provider-client"
     )
+    episode_executor = ThreadPoolExecutor(
+        max_workers=len(episodes), thread_name_prefix="wp11-mujoco-episode"
+    )
+    start_barrier = threading.Barrier(len(episodes))
     try:
-        cycle = 0
-        while any(episode.active for episode in episodes):
-            cycle_started_ns = time.monotonic_ns()
-            for episode in episodes:
-                _collect_response(episode, responses)
-            for episode in episodes:
-                if episode.active and episode.future is None:
-                    _submit(episode, executor)
-            for episode in episodes:
-                if not episode.active:
-                    continue
-                action = _current_context_target(episode.observation)
-                observation, reward, terminated, truncated, info = (
-                    episode.environment.step(action)
-                )
-                episode.observation = [float(value) for value in observation]
-                episode.reward = float(reward)
-                episode.info = dict(info)
-                if episode.context.update(episode.observation):
-                    episode.context_changes += 1
-                episode.active = not (bool(terminated) or bool(truncated))
-                if not episode.active:
-                    episode.outcome = str(info.get("outcome", "unknown"))
-                timelines.append(_boundary(episode, time.monotonic_ns()))
-            cycle += 1
-            next_cycle_ns = campaign_started_ns + cycle * control_period_ns
-            remaining_ns = next_cycle_ns - time.monotonic_ns()
-            if remaining_ns > 0:
-                time.sleep(remaining_ns / 1_000_000_000.0)
-            else:
-                cycle_overruns += 1
-            cycle_durations.append(time.monotonic_ns() - cycle_started_ns)
-        for episode in episodes:
-            _collect_response(episode, responses, wait=True)
+        futures = [
+            episode_executor.submit(
+                _capture_episode,
+                episode,
+                provider_executor,
+                start_barrier,
+                control_period_ns,
+            )
+            for episode in episodes
+        ]
+        episode_results = [future.result(timeout=180) for future in futures]
     finally:
-        executor.shutdown(wait=True, cancel_futures=False)
+        episode_executor.shutdown(wait=True, cancel_futures=False)
+        provider_executor.shutdown(wait=True, cancel_futures=False)
         for episode in episodes:
             episode.client.close()
             episode.environment.close()
+
+    timelines = [
+        boundary for result in episode_results for boundary in result["timeline"]
+    ]
+    responses = [
+        response for result in episode_results for response in result["responses"]
+    ]
+    work_durations = [
+        value for result in episode_results for value in result["work_durations_ns"]
+    ]
+    boundary_intervals = [
+        value for result in episode_results for value in result["boundary_intervals_ns"]
+    ]
+    cycle_overruns = sum(int(result["cycle_overruns"]) for result in episode_results)
+    maximum_lateness_ns = max(
+        int(result["maximum_lateness_ns"]) for result in episode_results
+    )
+    campaign_started_ns = min(
+        int(result["episode_started_monotonic_ns"]) for result in episode_results
+    )
+    campaign_finished_ns = max(
+        int(result["episode_finished_monotonic_ns"]) for result in episode_results
+    )
 
     capture_record = {
         "schema_version": "airhockey.wp11.live_provider.capture.v1",
         "protocol_sha256": _sha256(PROTOCOL_PATH),
         "muesli_bt_revision": _source_revision(),
         "campaign_started_monotonic_ns": campaign_started_ns,
-        "campaign_finished_monotonic_ns": time.monotonic_ns(),
+        "campaign_finished_monotonic_ns": campaign_finished_ns,
         "provider": {
             "protocol_version": PROTOCOL_VERSION,
             "kind": protocol["provider"]["kind"],
@@ -500,7 +562,10 @@ def capture(
             "concurrent_episodes": len(episodes),
             "control_period_ms": workload["control_period_ms"],
             "cycle_overruns": cycle_overruns,
-            "cycle_duration": _latency_summary(cycle_durations),
+            "total_cycles": len(work_durations),
+            "maximum_cycle_lateness_ms": maximum_lateness_ns / 1_000_000.0,
+            "cycle_work_duration": _latency_summary(work_durations),
+            "control_boundary_interval": _latency_summary(boundary_intervals),
             "scripted_scene_changes": 0,
             "provider_outputs_applied": False,
         },
@@ -735,6 +800,13 @@ def _report(
         "two_gate_obsolete_dispatches": replay["policies"][
             "invocation_scoped_two_gate"
         ]["obsolete_dispatches"],
+        "cycle_overrun_rate": (
+            capture_record["workload"]["cycle_overruns"]
+            / capture_record["workload"]["total_cycles"]
+        ),
+        "control_boundary_p95_ms": capture_record["workload"][
+            "control_boundary_interval"
+        ]["p95_ms"],
     }
     gate = protocol["gate"]
     failures: list[str] = []
@@ -751,6 +823,8 @@ def _report(
         ("policy_replay_hash_mismatches", "maximum_policy_replay_hash_mismatches"),
         ("invalid_provider_outputs", "maximum_invalid_provider_outputs"),
         ("two_gate_obsolete_dispatches", "maximum_two_gate_obsolete_dispatches"),
+        ("cycle_overrun_rate", "maximum_cycle_overrun_rate"),
+        ("control_boundary_p95_ms", "maximum_control_boundary_p95_ms"),
     ):
         if measurements[metric] > gate[gate_name]:
             failures.append(metric.replace("_", " "))

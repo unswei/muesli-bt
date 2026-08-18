@@ -453,7 +453,9 @@ rather than only under constructed delay schedules. Twenty-four held-out
 MuJoCo episodes share one warmed, single-worker TCP service running the frozen
 700,000-step DreamerV3 teacher. The service keeps separate recurrent carry for
 each episode and records receive, queue, inference and delivery timestamps.
-No sleep, timeout or latency fault is injected.
+Each simulator episode advances in an independent thread at its own 20 ms
+wall-clock cadence. No sleep, timeout or latency fault is injected into the
+provider.
 
 The capture trajectory is policy-independent: the public-observation-only
 current-context recovery controller drives each episode while Dreamer runs as
@@ -488,6 +490,13 @@ python examples/air_hockey_model_mediated_defence/run_wp11.py run \
 contains all three policy decisions over that same record. A passing campaign
 can be sealed with `run_wp11.py seal`, which writes a checksum manifest and a
 compressed backup outside the campaign directory.
+
+The superseded first harness stepped all 24 environments serially. Its median
+control boundary was 70.24 ms rather than the frozen 20 ms, so that run is not
+paper evidence and remains unsealed at
+`wp11-live-provider-26ad84a-1b6bbbb`. Protocol v2 records its report hash,
+retains every scientific condition, parallelises only simulator stepping, and
+adds gates for cycle overruns and the control-boundary p95.
 
 ## run the contract tests
 
